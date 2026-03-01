@@ -122,6 +122,7 @@ Additional documentation is located in the docs/ directory:
 
 
 - [Architecture](docs/architecture.md)
+- [Component System](docs/components.md)
 - [Runtime](docs/runtime.md)
 - [Message Bus](docs/message-bus.md)
 - [Deployment](docs/deployment.md)
