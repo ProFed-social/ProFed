@@ -15,14 +15,16 @@ class ComponentError(Exception):
 class Component:
     def __init__(self, name):
         self.name = name
-
-    def __call__(self, cfg) -> None:
+        self.entry = None
         try:
             mod = importlib.import_module(f"profed.adapters.{self.name}")
-            component = getattr(mod, "".join(n.capitalize() for n in self.name.split("_")))
-            asyncio.run(component(cfg))
+            self.entry = getattr(mod, "".join(n.capitalize() for n in self.name.split("_")))
         except Exception as e:
             raise ComponentError(f"Error in component {self.name}: {e}")
+ 
+    def __call__(self, cfg) -> None:
+        if self.entry is not None:
+            asyncio.run(self.entry(cfg))
     
 
 class Process:
@@ -44,8 +46,9 @@ def run(config: Dict[str, Any]) -> None:
     if main is None:
         raise IndexError("No components to run configured")
 
-    processes = [Process(Component(name), config.get(name, {}))
-                 for name in components]
+    components = [Component(name) for name in components]
+    processes = [Process(component, config.get(component.name, {}))
+                 for component in components]
 
     Component(main)(config[main])
 
