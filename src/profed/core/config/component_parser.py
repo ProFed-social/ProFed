@@ -1,62 +1,76 @@
-from typing import Any, Dict
-from copy import copy
+from typing import Any, Dict, Sequence
+from copy import copy, deepcopy
 import inspect
 
 class ConfigError(Exception):
     pass
 
 
-class _parse_iteration:
-    def __init__(self, raw, parsed) -> None:
-        self._progress = False
-        self._raw = copy(raw)
-        self._parsed = copy(parsed)
+class parse_list:
+    def __init__(self, runlist: Sequence[str]):
+        self.parsers = {}
 
-        for section in raw.keys():
-            parse_fn = self._parse_function(section)
-            can_parse, expected_params = self._parameters_available(parse_fn)
+        rl = [r for r in runlist]
+        newfound = True
+        while newfound:
+           newfound, parsers = self._find_parsers(rl)
 
-            if can_parse:
-                raw_section = self._raw.pop(section)
-                self._parsed[section] = parse_fn(raw_section,
-                                                 **{arg: self._parsed[arg]
-                                                    for arg in expected_params})
-                self._progress = True
+           self.parsers.update(parsers)
 
-    def _parse_function(self, section):
-        parse_fn = lambda cfg: cfg
+           newfound = {nf for nf in newfound if nf not in rl}
+           if len(newfound) == 0:
+               break
+           rl += newfound
+
+    def _find_parse(self, component: str):
         try:
-            mod = __import__(f"profed.adapters.{section}.config", fromlist=["parse"])
-            parse_fn = getattr(mod, "parse", parse_fn)
+            mod = __import__(f"profed.adapters.{component}.config", fromlist=["parse"])
+            return getattr(mod, "parse", None)
         except ImportError:
-            pass
+            return None
 
-        return parse_fn
-
-    def _parameters_available(self, parse_fn):
+    def _extract_expected_sections(self, parse_fn):
             signature = inspect.signature(parse_fn)
-            expected = [p.name
-                        for p in signature.parameters.values()
-                        if p.default == inspect.Parameter.empty and
-                           p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD][1:]
-            return all(p in self._parsed for p in expected), expected
+            return [p.name
+                    for p in signature.parameters.values()
+                    if p.default == inspect.Parameter.empty and
+                       p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD][1:]
 
-    def __call__(self):
-        return self._raw, self._parsed
+    def _find_parsers(self, runlist: Sequence[str]):
+        parsers = {}
+        newfound = set()
+        for component in runlist:
+            parse_fn = self._find_parse(component)
+            if parse_fn is None:
+                continue
+            expected = self._extract_expected_sections(parse_fn)
 
-    def __bool__(self) -> bool:
-        return self._progress
+            newfound = newfound | set(expected)
+            parsers[component] = (parse_fn, expected)
+        return list(newfound), parsers
+
+
+    def parse_all(self, raw):
+        parsed = {}
+        to_call_parsers = {name for name in self.parsers.keys()}
+
+        while to_call_parsers:
+            called = set()
+            for p in to_call_parsers:
+                parse_fn, expected = self.parsers[p]
+                if all(n in parsed for n in expected):
+                    parsed[p] = parse_fn(raw[p], **{arg: parsed[arg] for arg in expected})
+                    called.add(p)
+            if not called:
+                raise ConfigError(f"Circular or missing dependency in config sections: {to_call_parsers}")
+            to_call_parsers = {p for p in to_call_parsers if p not in called}
+
+        return parsed
 
 
 def components_from_raw(raw: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
-    parsed = {}
-
-    while raw:
-        iteration = _parse_iteration(raw, parsed)
-
-        if iteration:
-            raw, parsed = iteration()
-        else:
-            raise ConfigError(f"Circular or missing dependency in config sections: {raw.keys()}")
-
+    parsers = parse_list(raw["profed"]["run"].split())
+    parsed = deepcopy(raw)
+    parsed.update(parsers.parse_all(raw))
     return parsed
+

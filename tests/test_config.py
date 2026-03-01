@@ -29,50 +29,44 @@ class Cfg:
         for f in raw.paths:
             f.unlink()
 
-     
-
-def test_empty_config():
-    with Cfg():
-        assert len(config()) == 0
-
 
 def test_simple_config_file(tmp_path):
-    with Cfg(tmp_path, files=[("config.ini", "[example]\nfoo=bar\n")]):
+    with Cfg(tmp_path, files=[("config.ini", "[profed]\nrun=example\n[example]\nfoo=bar\n")]):
         assert config()["example"]["foo"] == "bar"
 
 
 def test_environment():
-    with Cfg(env={"PROFED_EXAMPLE__FOO": "bar"}):
+    with Cfg(env={"PROFED_EXAMPLE__FOO": "bar", "PROFED_PROFED__RUN": "example"}):
         assert config()["example"]["foo"] == "bar"
 
 
 def test_command_line():
-    with Cfg(argv=["", "--example.foo=bar"]):
+    with Cfg(argv=["", "--example.foo=bar", "--profed.run=example"]):
         assert config()["example"]["foo"] == "bar"
 
 
 def test_files_override(tmp_path):
     with Cfg(tmp_path, files=[("config1.ini", "[example]\nfoo=bar\n"),
-                              ("config2.ini", "[example]\nfoo=blub\n")]):
+                              ("config2.ini", "[profed]\nrun=example\n[example]\nfoo=blub\n")]):
         assert config()["example"]["foo"] == "blub"
 
 
 def test_environment_override_file(tmp_path):
     with Cfg(tmp_path,
-             files=[("config.ini", "[example]\nfoo=bar\n")],
+             files=[("config.ini", "[profed]\nrun=example\n[example]\nfoo=bar\n")],
              env={"PROFED_EXAMPLE__FOO": "blub"}):
         assert config()["example"]["foo"] == "blub"
 
 
 def test_command_line_override_file(tmp_path):
     with Cfg(tmp_path,
-             files=[("config.ini", "[example]\nfoo=bar\n")],
+             files=[("config.ini", "[profed]\nrun=example\n[example]\nfoo=bar\n")],
              argv = ["", "--example.foo=blub"]):
         assert config()["example"]["foo"] == "blub"
 
 
 def test_command_line_override_environment():
-    with Cfg(env={"PROFED_EXAMPLE__FOO": "bar"},
+    with Cfg(env={"PROFED_EXAMPLE__FOO": "bar", "PROFED_PROFED__RUN": "example"},
              argv = ["", "--example.foo=blub"]):
         assert config()["example"]["foo"] == "blub"
 
@@ -85,7 +79,7 @@ def test_component_parser():
          "    return cfg\n",
          mod.__dict__)
 
-    with Cfg(argv = ["", "--example.foo=bar"]):
+    with Cfg(argv = ["", "--example.foo=bar", "--profed.run=example"]):
         assert config()["example"]["foo"] == "blub"
 
 

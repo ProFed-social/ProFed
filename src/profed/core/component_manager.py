@@ -37,13 +37,17 @@ class Process:
         os.waitpid(self.pid, 0)
 
 
-def run(config: Dict[str, Any], main: Optional[str] = None) -> None:
-    processes = [Process(Component(name), cfg)
-                 for name, cfg in config.items()
-                 if name != main]
+def run(config: Dict[str, Any]) -> None:
+    components = list(config["profed"]["run"].split())
+    main = components.pop(0)
 
-    if main is not None:
-        Component(main)(config[main])
+    if main is None:
+        raise IndexError("No components to run configured")
+
+    processes = [Process(Component(name), config.get(name, {}))
+                 for name in components]
+
+    Component(main)(config[main])
 
     for p in processes:
         p.wait()
