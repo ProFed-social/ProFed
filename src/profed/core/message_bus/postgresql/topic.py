@@ -8,10 +8,11 @@ from .snapshot import SnapshotPublisher
 from .subscriber import subscribe
 
 class Topic:
-    def __init__(self, pool: Pool, config: Dict[str, str], name: str):
+    def __init__(self, component_name: str, pool: Pool, config: Dict[str, str], name: str):
         self._pool = pool
         self._config = config
         self._name = name
+        self._component_name = component_name
 
     def publish(self) -> Publisher:
         return Publisher(self._pool, self._config["schema"], self._name)
@@ -19,5 +20,5 @@ class Topic:
     def publish_snapshot(self) -> SnapshotPublisher:
         return SnapshotPublisher(self._pool, self._config["schema"], self._name)
 
-    def subscribe(self, component_schema: str) -> AsyncGenerator[Dict[str, str], None]:
-        return subscribe(self._pool, self._config, self._name, component_schema)
+    def subscribe(self) -> AsyncGenerator[Dict[str, str], None]:
+        return subscribe(self._pool, self._config, self._name, self._component_name)

@@ -8,7 +8,7 @@ async def test_messages_are_yielded_in_order(topic, db):
     db.insert_message("public.test", {"v": "b"})
     db.insert_message("public.test", {"v": "c"})
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
 
     messages = [
         await subscriber.__anext__(),

@@ -34,7 +34,7 @@ class Cfg:
 def mock_module():
     mod = ModuleType("profed.core.message_bus.example")
     sys.modules["profed.core.message_bus.example"] = mod
-    exec("def init(cfg):\n"
+    exec("def init(component_name, cfg):\n"
          "    return cfg\n",
          mod.__dict__)
 
@@ -42,7 +42,7 @@ def mock_module():
 def test_message_bus_isntantiation(mock_module):
     with Cfg({"message_bus": {"type": "example"}, "profed": {"run":""}}):
         message_bus._instance = None
-        message_bus.init_message_bus()
+        message_bus.init_message_bus("example")
 
         bus = message_bus.message_bus()
 

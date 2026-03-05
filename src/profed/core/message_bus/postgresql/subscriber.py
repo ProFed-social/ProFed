@@ -8,7 +8,7 @@ from asyncpg import Pool, Connection
 MIN_WAIT = 0.05
 MAX_WAIT = 2.0
 
-def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: str) \
+def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_name: str) \
         -> AsyncGenerator[Dict[str, Any], None]:
     min_wait = float(config.get("minimum_message_wait", MIN_WAIT))
     max_wait = float(config.get("maximum_message_wait", MAX_WAIT))
@@ -16,7 +16,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
     async def _ensure_gap_table(conn: Connection) -> None:
         await conn.execute(f"""
                            CREATE TABLE IF NOT EXISTS
-                           {component_schema}.{topic}_gaps (
+                           {component_name}.{topic}_gaps (
                                missing_id BIGINT PRIMARY KEY
                            )
                            """)
@@ -30,7 +30,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
                                   """)
         if row:
             await conn.execute(f"""
-                               DELETE FROM {component_schema}.{topic}_gaps
+                               DELETE FROM {component_name}.{topic}_gaps
                                WHERE missing_id <= $1
                                """,
                                row["event_id"])
@@ -39,7 +39,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
         row = await conn.fetchrow(f"""
                                   SELECT 1
                                   FROM {config['schema']}.{topic} t
-                                  JOIN {component_schema}.{topic}_gaps g
+                                  JOIN {component_name}.{topic}_gaps g
                                   ON t.id = g.missing_id
                                   LIMIT 1
                                   """)
@@ -79,7 +79,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
                            last_seen: int,
                            config: Dict[str, str],
                            topic:str,
-                           component_schema: str) -> int:
+                           component_name: str) -> int:
         next_row = await conn.fetchrow(f"""
                                        SELECT id
                                        FROM {config['schema']}.{topic}
@@ -89,7 +89,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
         if next_row:
             gap_id = last_seen + 1
             await conn.execute(f"""
-                               INSERT INTO {component_schema}.{topic}_gaps
+                               INSERT INTO {component_name}.{topic}_gaps
                                (missing_id)
                                VALUES ($1)
                                ON CONFLICT DO NOTHING
@@ -125,6 +125,6 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
                 await asyncio.sleep(wait)
                 wait = min(wait * 2, max_wait)
 
-                last_seen = await _accept_gaps(conn, last_seen, config, topic, component_schema)
+                last_seen = await _accept_gaps(conn, last_seen, config, topic, component_name)
 
     return read_messages()

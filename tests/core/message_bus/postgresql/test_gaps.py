@@ -10,7 +10,7 @@ async def test_gap_detected_and_late_message_processed(topic, db):
     # simulate missing 2 by inserting id=3 manually
     db.messages["public.test"].append({"id": 3, "payload": {"v": "c"}})
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
 
     first = await subscriber.__anext__()
     assert first["v"] == "a"

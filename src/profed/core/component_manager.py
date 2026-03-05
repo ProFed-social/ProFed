@@ -13,7 +13,7 @@ class ComponentError(Exception):
 
 
 class Component:
-    def __init__(self, name, init: Optional[List[Callable]] = None):
+    def __init__(self, name: str, init: Optional[List[Callable]] = None):
         self.name = name
         self.entry = None
         self.init = init
@@ -26,7 +26,7 @@ class Component:
     def __call__(self, cfg) -> None:
         if self.entry is not None:
             for i in (self.init or []):
-                i()
+                i(self.name)
             asyncio.run(self.entry(cfg))
     
 

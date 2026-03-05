@@ -7,7 +7,7 @@ async def test_publish_and_receive(topic):
     async with topic.publish() as publish:
         await publish({"x": 1})
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
 
     message = await subscriber.__anext__()
 
