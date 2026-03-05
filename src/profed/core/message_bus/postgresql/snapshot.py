@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from typing import Callable, Dict, Any, Awaitable
-import json
-from asyncpg import Connection, Pool, Transaction
+from asyncpg import Connection, Pool 
+from asyncpg.transaction import Transaction
 
 def _publish_snapshot(conn: Connection, topic: str, schema: str) \
         -> Callable[[Dict[str, Any], int], Awaitable[None]]:
@@ -12,7 +12,7 @@ def _publish_snapshot(conn: Connection, topic: str, schema: str) \
                            INSERT INTO {schema}.{topic}_snapshots (payload, event_id)
                            VALUES ($1, $2)
                            """,
-                           json.dumps(snapshot),
+                           snapshot,
                            last_event_id)
     return publish
 
@@ -22,20 +22,24 @@ class SnapshotPublisher:
         self._pool: Pool = pool
         self._schema: str = schema
         self._topic: str = topic
+        self._context = None
         self._conn: Connection | None = None
         self._tx: Transaction | None = None
 
     async def __aenter__(self) -> Callable[[Dict[str, Any], int], Awaitable[None]]:
-        self._conn = await self._pool.acquire()
+        self._context = self._pool.acquire()
+        self._conn = await self._context.__aenter__()
         self._tx = self._conn.transaction()
         await self._tx.start()
         return _publish_snapshot(self._conn, self._topic, self._schema)
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        if exc_type:
-            await self._tx.rollback()
-            raise exc
-        else:
-            await self._tx.commit()
-            await self._conn.execute(f"NOTIFY {self._schema}_{self._topic}_snapshot")
-        await self._pool.release(self._conn)
+        try:
+            if exc_type:
+                await self._tx.rollback()
+                raise exc
+            else:
+                await self._tx.commit()
+                await self._conn.execute(f"NOTIFY {self._schema}_{self._topic}_snapshot")
+        finally:
+            await self._context.__aexit__(exc_type, exc, tb)

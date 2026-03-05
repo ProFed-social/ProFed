@@ -46,11 +46,9 @@ def cli(argv: Sequence[str], raw: _raw_conf_t) -> _raw_conf_t:
 
     upd = {}
     for arg in argv[1:]:
-        print(arg)
         m = rx.fullmatch(arg)
         if m:
             section, param, value = m.group(1, 2, 3)
-            print(section, param, value)
             upd.setdefault(section, {})[param] = value
 
     return update_raw(raw, upd)

@@ -10,8 +10,8 @@ class MessageBus:
         self._pool = pool
 
     def topic(self, name: str):
-        from .topic import topic
-        return topic(self._pool, self._config, name)
+        from .topic import Topic
+        return Topic(self._pool, self._config, name)
 
     async def health_check(self):
         async with self._pool.acquire() as conn:

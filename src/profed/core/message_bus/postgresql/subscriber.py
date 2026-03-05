@@ -3,7 +3,6 @@
 
 from typing import Dict, Any, AsyncGenerator
 import asyncio
-import json
 from asyncpg import Pool, Connection
 
 MIN_WAIT = 0.05
@@ -26,7 +25,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
         row = await conn.fetchrow(f"""
                                   SELECT event_id
                                   FROM {config['schema']}.{topic}_snapshots
-                                  ORDER BY created_at DESC
+                                  ORDER BY event_id DESC
                                   OFFSET 1 LIMIT 1
                                   """)
         if row:
@@ -55,7 +54,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
                                 """,
                                 last_seen)
 
-    async def _process_snashot_notification(conn: Connection):
+    async def _process_snapshot_notification(conn: Connection):
         while conn.notifies:
             notify = conn.notifies.pop(0)
             if notify.channel.endswith("_snapshot"):
@@ -70,7 +69,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
                 if row["id"] != last_seen + 1:
                     break
                 last_seen = row["id"]
-                yield last_seen, json.loads(row["payload"])
+                yield last_seen, row["payload"]
             else:
                 continue
             break
@@ -84,7 +83,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
         next_row = await conn.fetchrow(f"""
                                        SELECT id
                                        FROM {config['schema']}.{topic}
-                                       WHERE id == $1
+                                       WHERE id = $1
                                        """,
                                        last_seen + 1)
         if next_row:
@@ -108,7 +107,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_schema: 
             await conn.execute(f"LISTEN {config['schema']}_{topic}_snapshot")
 
             while True:
-                await _process_snashot_notification(conn)
+                await _process_snapshot_notification(conn)
 
                 if await _detect_corruption(conn):
                     raise RuntimeError(f"Corruption detected in topic '{topic}'")
