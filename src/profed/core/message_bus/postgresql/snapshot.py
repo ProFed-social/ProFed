@@ -48,9 +48,9 @@ class SnapshotPublisher:
 async def last_snapshot(pool: Pool, schema: str, topic: str):
     async with pool.acquire() as conn:
         row = await conn.fetchrow(f"""
-                                  SELECT last_event_id, snapshot
+                                  SELECT last_event_id, payload 
                                   FROM {schema}.{topic}_snapshots
                                   ORDER BY last_event_id DESC
                                   LIMIT 1
                                   """)
-        return (row["last_seen"], row["snapshot"]) if row else (0, None)
+        return (row["last_seen"], row["payload"]) if row else (0, None)
