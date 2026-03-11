@@ -14,9 +14,7 @@ async def _init_well_known_router(component_name: str, config):
     await (await webfinger_storage()).ensure_table()
     await rebuild_webfinger_projection()
 
-    def webfinger_user_evnets_thread():
-        asyncio.run(webfinger_handle_user_events)
-    Thread(target=webfinger_user_evnets_thread)
+    asyncio.create_task(webfinger_handle_user_events)
 
 
 async def _reset_component_schema(component_name: str, config):
