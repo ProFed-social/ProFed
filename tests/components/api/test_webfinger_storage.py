@@ -10,6 +10,7 @@ def fake_conn():
     conn = Mock()
     conn.execute = AsyncMock()
     conn.fetch = AsyncMock(return_value=[])
+    conn.fetchrow = AsyncMock(return_value={})
     return conn
 
 
@@ -123,4 +124,43 @@ async def test_delete_user_not_exists(fake_pool):
                                WHERE acct = $1
                                """,
                                "bob@example.com")
+
+
+@pytest.mark.asyncio
+async def test_fetch_actor_url_found(fake_pool):
+    async with fake_pool.acquire() as conn:
+        conn.fetchrow.return_value = {"actor_url": "https://example.com/alice"}
+
+        store = await storage.webfinger_storage()
+        result = await store.fetch_actor_url("alice@example.com")
+
+        assert result == "https://example.com/alice"
+
+
+@pytest.mark.asyncio
+async def test_fetch_actor_url_not_found(fake_pool):
+    async with fake_pool.acquire() as conn:
+        conn.fetchrow.return_value = None
+
+        store = await storage.webfinger_storage()
+        result = await store.fetch_actor_url("unknown@example.com")
+
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test_ensure_table_executes_create(fake_pool):
+    store = await storage.webfinger_storage()
+    await store.ensure_table()
+
+    async with fake_pool.acquire() as conn:
+        conn.execute.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_webfinger_storage_not_initialized():
+    storage._instance = None
+
+    with pytest.raises(RuntimeError):
+        await storage.webfinger_storage()
 

@@ -115,3 +115,31 @@ async def test_user_event_processing_unknown_event(fake_storage, fake_message_bu
     fake_storage.update.assert_not_awaited()
     fake_storage.delete.assert_not_awaited()
 
+
+@pytest.mark.asyncio
+@with_events([{"type": "created",
+               "payload": {
+                   "acct": "bob@example.com",
+                   "actor_url": "https://example.com/bob"}},
+              {"type": "updated",
+               "payload": {
+                   "acct": "bob@example.com",
+                   "actor_url": "https://example.com/bob_new"}},
+              {"type": "deleted",
+               "payload": {
+                   "acct": "bob@example.com"}}])
+async def test_event_processing_multiple_messages(fake_storage, fake_message_bus):
+    await projections.webfinger_handle_user_events()
+
+    assert fake_storage.add.await_count == 1
+    assert fake_storage.update.await_count == 1
+    assert fake_storage.delete.await_count == 1
+
+
+@pytest.mark.asyncio
+@with_events([{"type": "created"}])
+async def test_event_processing_invalid_message(fake_storage, fake_message_bus):
+    with pytest.raises(KeyError):
+        await projections.webfinger_handle_user_events()
+
+
