@@ -4,7 +4,7 @@
 import pytest
 from functools import wraps
 from unittest.mock import AsyncMock, Mock
-from profed.components.api.projections import rebuild_webfinger_projection
+from profed.components.api.projections.webfinger import rebuild
 
 
 @pytest.fixture
@@ -36,15 +36,15 @@ def with_snapshot(last_seen, snapshot):
 @with_snapshot(42,
                [{"acct": "alice@example.com",
                  "actor_url": "https://example.com/alice"}])
-async def test_rebuild_webfinger_projection_success(fake_storage):
-    await rebuild_webfinger_projection()
+async def test_rebuild_success(fake_storage):
+    await rebuild()
     fake_storage.add.assert_awaited_once_with("alice@example.com", "https://example.com/alice")
 
 
 @pytest.mark.asyncio
 @with_snapshot(None, [])
-async def test_rebuild_webfinger_projection_no_snapshot(fake_storage):
-    await rebuild_webfinger_projection()
+async def test_rebuild_no_snapshot(fake_storage):
+    await rebuild()
     fake_storage.add.assert_not_awaited()
 
 
@@ -52,11 +52,11 @@ async def test_rebuild_webfinger_projection_no_snapshot(fake_storage):
 @with_snapshot(42,
                [{"acct": "alice@example.com",
                  "actor_url": "https://example.com/alice"}])
-async def test_rebuild_webfinger_projection_add_failure(fake_storage):
+async def test_rebuild_add_failure(fake_storage):
     fake_storage.add.side_effect = RuntimeError("DB error")
 
     with pytest.raises(RuntimeError, match="DB error"):
-        await rebuild_webfinger_projection()
+        await rebuild()
 
 
 @pytest.mark.asyncio
@@ -66,14 +66,14 @@ async def test_rebuild_webfinger_projection_add_failure(fake_storage):
                 {"acct": "bob@example.com",
                  "actor_url": "https://example.com/bob"}])
 async def test_projection_multiple_users(fake_storage):
-    await rebuild_webfinger_projection()
+    await rebuild()
     assert fake_storage.add.await_count == 2
 
 
 @pytest.mark.asyncio
 @with_snapshot(5, [{"acct": "alice@example.com"}])
 async def test_projection_invalid_payload(fake_storage):
-    await rebuild_webfinger_projection()
+    await rebuild()
     assert fake_storage.add.await_count == 0
 
 
@@ -85,6 +85,6 @@ async def test_projection_invalid_payload(fake_storage):
                  "actor_url": "https://example.com/bob"},
                 {"acct": "alice@example.com"}])
 async def test_projection_multiple_users_one_malformed(fake_storage):
-    await rebuild_webfinger_projection()
+    await rebuild()
     assert fake_storage.add.await_count == 2
 

@@ -5,7 +5,7 @@ from typing import Dict
 import asyncpg
 
 
-class _webfinger_storage:
+class _storage:
     def __init__(self, pool: asyncpg.Pool, schema_name: str):
         self._pool = pool
         self._schema_name = schema_name
@@ -48,20 +48,20 @@ class _webfinger_storage:
                                username)
 
 
-_instance: _webfinger_storage | None = None
+_instance: _storage | None = None
 
 
-async def init_webfinger_storage(component_name: str, config: Dict[str, str]) -> None:
+async def init(component_name: str, config: Dict[str, str]) -> None:
     global _instance
     pool = await asyncpg.create_pool(host=config["host"],
                                      port=int(config["port"]),
                                      database=config["database"],
                                      user=config["user"],
                                      password=config["password"],)
-    _instance = _webfinger_storage(pool, component_name)
+    _instance = _storage(pool, component_name)
 
 
-async def webfinger_storage() -> _webfinger_storage:
+async def storage() -> _storage:
     if _instance is None:
         raise RuntimeError("Webfinger Storage is not initialized.")
     return _instance

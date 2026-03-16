@@ -5,7 +5,7 @@ import pytest
 from functools import wraps
 from unittest.mock import AsyncMock, Mock
 from profed.components.api.storage import webfinger as storage
-from profed.components.api import projections
+from profed.components.api.projections import webfinger as projections
 import profed.core.message_bus
 
 
@@ -76,7 +76,7 @@ def with_events(events):
 @with_events([{"type": "created",
                "payload": {"username": "bob"}}])
 async def test_user_added_event(fake_storage, fake_message_bus):
-    await projections.webfinger_handle_user_events()
+    await projections.handle_user_events()
 
     fake_storage.add.assert_awaited_with("bob")
 
@@ -85,14 +85,14 @@ async def test_user_added_event(fake_storage, fake_message_bus):
 @with_events([{"type": "deleted",
                "payload": {"username": "bob"}}])
 async def test_user_event_processing_delete_event(fake_storage, fake_message_bus):
-    await projections.webfinger_handle_user_events()
+    await projections.handle_user_events()
 
     fake_storage.delete.assert_awaited_once_with("bob")
 
 @pytest.mark.asyncio
 @with_events([{"type": "unknown_event", "payload": {}}])
 async def test_user_event_processing_unknown_event(fake_storage, fake_message_bus):
-    await projections.webfinger_handle_user_events()
+    await projections.handle_user_events()
 
     fake_storage.add.assert_not_awaited()
     fake_storage.delete.assert_not_awaited()
@@ -103,7 +103,7 @@ async def test_user_event_processing_unknown_event(fake_storage, fake_message_bu
               {"type": "updated", "payload": {"username": "bob"}},
               {"type": "deleted", "payload": {"username": "bob"}}])
 async def test_event_processing_multiple_messages(fake_storage, fake_message_bus):
-    await projections.webfinger_handle_user_events()
+    await projections.handle_user_events()
 
     assert fake_storage.add.await_count == 1
     assert fake_storage.delete.await_count == 1
@@ -113,6 +113,6 @@ async def test_event_processing_multiple_messages(fake_storage, fake_message_bus
 @with_events([{"type": "created"}])
 async def test_event_processing_invalid_message(fake_storage, fake_message_bus):
     with pytest.raises(KeyError):
-        await projections.webfinger_handle_user_events()
+        await projections.handle_user_events()
 
 

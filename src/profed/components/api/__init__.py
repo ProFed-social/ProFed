@@ -5,16 +5,16 @@ from threading import Thread
 import asyncio
 import asyncpg
 from .app import create_app
-from .storage.webfinger import init_webfinger_storage, webfinger_storage
-from .projections import rebuild_webfinger_projection, webfinger_handle_user_events
+from .storage import webfinger as webfinger_storage
+from .projections import webfinger as webfinger_projections
 
 
 async def _init_well_known_router(component_name: str, config):
-    await init_webfinger_storage(component_name, config)
-    await (await webfinger_storage()).ensure_table()
-    await rebuild_webfinger_projection()
+    await webfinger_storage.init(component_name, config)
+    await (await webfinger_storage.storage()).ensure_table()
+    await webfinger_projections.rebuild()
 
-    asyncio.create_task(webfinger_handle_user_events)
+    asyncio.create_task(webfinger_projections.handle_user_events)
 
 
 async def _reset_component_schema(component_name: str, config):
