@@ -63,5 +63,5 @@ async def init(component_name: str, config: Dict[str, str]) -> None:
 
 async def storage() -> _storage:
     if _instance is None:
-        raise RuntimeError("Webfinger Storage is not initialized.")
+        raise RuntimeError("Webfinger storage is not initialized.")
     return _instance
