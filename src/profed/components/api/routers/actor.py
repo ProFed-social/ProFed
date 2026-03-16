@@ -19,3 +19,4 @@ async def actor(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$")):
         raise
     except Exception:
         raise HTTPException(status_code=500)
+
