@@ -32,7 +32,7 @@ def build_projection(topic: Dict,
 
 
     async def rebuild():
-        global last_seen
+        nonlocal last_seen
 
         await init()
 
