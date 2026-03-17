@@ -56,6 +56,7 @@ def test_actor_success(client, fake_storage):
     }
     response = client.get("/actors/alice")
     assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/activity+json")
     data = response.json()
     assert data["name"] == "Alice"
     assert data["preferredUsername"] == "alice"
