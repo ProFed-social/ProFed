@@ -42,7 +42,7 @@ class FakeMessageBus:
 def fake_message_bus():
     backup = message_bus._instance
     message_bus._instance = FakeMessageBus()
-    projections.last_seen = 0
+    projections.reset_last_seen(0)
 
     yield message_bus._instance
 
@@ -57,6 +57,7 @@ def fake_storage():
     storage._instance.update = AsyncMock()
     storage._instance.delete = AsyncMock()
     storage._instance.fetch = AsyncMock()
+    storage._instance.ensure_table = AsyncMock()
 
     yield storage._instance
 
@@ -136,7 +137,7 @@ async def test_handle_user_events_ignores_unknown_type(fake_storage, fake_messag
                            "name": "New User",
                            "resume": {"experience": []}}}])
 async def test_handle_user_events_skips_messages_before_last_seen(fake_storage, fake_message_bus):
-    projections.last_seen = 2
+    projections.reset_last_seen(2)
     await projections.handle_user_events()
 
     fake_storage.add.assert_awaited_once()

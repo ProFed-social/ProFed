@@ -12,7 +12,8 @@ def build_projection(topic: Dict,
                      verify_event: Optional[Callable[[str, Dict], bool]] = None,
                      verify_snapshot_item: Optional[Callable[[Dict], bool]] = None) \
         -> Tuple[Callable[[], Awaitable[None]],
-                 Callable[[], Awaitable[None]]]:
+                 Callable[[], Awaitable[None]],
+                 Callable[[int], None]]:
     verify_event = (verify_event
                     if verify_event is not None else
                     lambda et, p: True)
@@ -20,9 +21,10 @@ def build_projection(topic: Dict,
                             if verify_snapshot_item is not None else
                             lambda i: True)
     last_seen = 0
+    topic_name = topic["name"]
 
     async def handle_events():
-        async for event in message_bus().topic(topic["name"]).subscribe(last_seen):
+        async for event in message_bus().topic(topic_name).subscribe(last_seen):
             event_type, payload = topic["validate"](event)
 
             if (event_type is not None and
@@ -36,7 +38,7 @@ def build_projection(topic: Dict,
 
         await init()
 
-        last_seen, snapshot = await message_bus().topic(topic["name"]).last_snapshot()
+        last_seen, snapshot = await message_bus().topic(topic_name).last_snapshot()
 
         for it in snapshot:
             item = topic["snapshot_validate"](it)
@@ -44,4 +46,9 @@ def build_projection(topic: Dict,
             if item is not None and verify_snapshot_item(item):
                 await on_snapshot_item(item)
 
-    return handle_events, rebuild
+
+    def reset_last_seen(new_last_seen):
+        nonlocal last_seen
+        last_seen = new_last_seen
+
+    return handle_events, rebuild, reset_last_seen

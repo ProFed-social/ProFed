@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, Mock
 from profed.core import message_bus
 
 from profed.components.api.storage import webfinger as storage
-from profed.components.api.projections.webfinger import rebuild
+from profed.components.api.projections.webfinger import rebuild, reset_last_seen
 
 
 class FakeTopic:
@@ -18,7 +18,7 @@ class FakeTopic:
         self.messages = []
 
     async def last_snapshot(self):
-        return self.snapshots[-1] if len(self.snapshots) > 0 else (None, [])
+        return self.snapshots[-1] if len(self.snapshots) > 0 else (0, [])
 
     def subscribe(self, last_seen: int = 0):
         async def generator():
@@ -43,6 +43,7 @@ class FakeMessageBus:
 def fake_message_bus():
     backup = message_bus._instance
     message_bus._instance = FakeMessageBus()
+    reset_last_seen(0)
 
     yield message_bus._instance
 
@@ -56,6 +57,7 @@ def fake_storage():
     storage._instance.add = AsyncMock()
     storage._instance.delete = AsyncMock()
     storage._instance.user_exists = AsyncMock()
+    storage._instance.ensure_table = AsyncMock()
 
     yield storage._instance
 
@@ -109,12 +111,13 @@ async def test_projection_invalid_payload(fake_message_bus, fake_storage):
 
 
 @pytest.mark.asyncio
-async def test_projection_multiple_users_one_malformed(fake_message_bus, fake_storage):
+async def test_projection_multiple_users_some_malformed(fake_message_bus, fake_storage):
     fake_message_bus.topic("users").snapshots = [
             (10,
              [{"username": "alice"},
               {"username": ""},
-              {"no_username": "alice"}])
+              {"no_username": "alice"},
+              {"username": "bob"}])
             ]
     await rebuild()
     assert fake_storage.add.await_count == 2

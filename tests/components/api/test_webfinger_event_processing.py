@@ -16,7 +16,7 @@ class FakeTopic:
         self.messages = []
 
     async def last_snapshot(self):
-        return self.snapshots[-1] if len(self.snapshots) > 0 else (None, [])
+        return self.snapshots[-1] if len(self.snapshots) > 0 else (0, [])
 
     def subscribe(self, last_seen: int = 0):
         async def generator():
@@ -41,6 +41,7 @@ class FakeMessageBus:
 def fake_message_bus():
     backup = message_bus._instance
     message_bus._instance = FakeMessageBus()
+    projections.reset_last_seen(0)
 
     yield message_bus._instance
 
@@ -54,6 +55,7 @@ def fake_storage():
     storage._instance.add = AsyncMock()
     storage._instance.delete = AsyncMock()
     storage._instance.user_exists = AsyncMock()
+    storage._instance.ensure_table = AsyncMock()
 
     yield storage._instance
 
