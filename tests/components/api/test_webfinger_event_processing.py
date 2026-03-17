@@ -89,7 +89,7 @@ async def test_user_event_processing_delete_event(fake_storage, fake_message_bus
     fake_storage.delete.assert_awaited_once_with("bob")
 
 @pytest.mark.asyncio
-@with_events([{"type": "unknown_event", "payload": {}}])
+@with_events([{"type": "unknown_event", "payload": {"username": "alice"}}])
 async def test_user_event_processing_unknown_event(fake_storage, fake_message_bus):
     await projections.handle_user_events()
 
@@ -114,4 +114,10 @@ async def test_event_processing_invalid_message(fake_storage, fake_message_bus):
     with pytest.raises(KeyError):
         await projections.handle_user_events()
 
+
+@pytest.mark.asyncio
+@with_events([{"type": "created", "payload": {}}])
+async def test_event_processing_malformed_payload_raises(fake_storage, fake_message_bus):
+    with pytest.raises(KeyError):
+        await projections.handle_user_events()
 

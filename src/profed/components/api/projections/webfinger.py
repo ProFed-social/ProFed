@@ -15,14 +15,15 @@ async def handle_user_events() -> None:
 
     wf_storage = await storage() 
 
-    async for event in message_bus().topic("users").subscribe():
+    async for event in message_bus().topic("users").subscribe(last_seen):
+        
         event_type = event.get("type")
         data = event["payload"]
 
         await {"created": wf_storage.add,
                "deleted": wf_storage.delete}.get(
                        event_type,
-                       _unknown_message_type)(data.get("username", None))
+                       _unknown_message_type)(data["username"])
 
 
 async def rebuild() -> None:
