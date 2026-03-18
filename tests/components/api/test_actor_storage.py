@@ -27,8 +27,13 @@ def fake_pool(fake_conn):
     pool = Mock()
     pool.acquire = Mock(return_value=AsyncContextManagerMock(fake_conn))
 
+    backup = actor._instance
     actor._instance = actor._storage(pool, "test_schema")
-    return pool
+
+    yield pool
+
+    actor._instance = backup
+
 
 
 @pytest.mark.asyncio
