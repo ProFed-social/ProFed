@@ -3,11 +3,11 @@
 
 from profed.components.api.models.ordered_collection import OrderedCollection
 from profed.components.api.identity import actor_url_from_username
+from profed.components.api.storage.outbox import storage
 
 
 async def resolve_outbox(username: str) -> OrderedCollection:
-    return OrderedCollection(
-        id=f"{actor_url_from_username(username)}/outbox",
-        totalItems=0,
-        orderedItems=[],
-    )
+    obx_storage = await storage()
+    return OrderedCollection(id=f"{actor_url_from_username(username)}/outbox",
+                             totalItems=0,
+                             orderedItems=await obx_storage.fetch(username))
