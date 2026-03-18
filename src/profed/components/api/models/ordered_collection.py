@@ -4,12 +4,13 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from typing import Any
+from pydantic import Field
 from .activity_streams import ActivityStreamsObject
+from .activity import Activity
 
 
 class OrderedCollectionBase(ActivityStreamsObject):
-    orderedItems: list[dict[str, Any]] = []
+    orderedItems: list[Activity] = Field(default_factory=list)
 
 
 class OrderedCollection(OrderedCollectionBase):
