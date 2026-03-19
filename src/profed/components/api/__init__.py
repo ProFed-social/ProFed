@@ -8,7 +8,7 @@ from .app import create_app
 from .storage import (
         webfinger_users as webfinger_storage,
         actor as actor_storage,
-        # inbox as inbox_storage,
+        # inbox_users as inbox_storage,
         outbox as outbox_storage)
 from .projections import (
         webfinger as webfinger_projections,
@@ -22,7 +22,7 @@ async def _init_well_known_router(component_name: str, config):
     await (await webfinger_storage.storage()).ensure_table()
     await webfinger_projections.rebuild()
 
-    asyncio.create_task(webfinger_projections.handle_user_events)
+    asyncio.create_task(webfinger_projections.handle_user_events())
 
 
 async def _init_actor_router(component_name: str, config):
@@ -30,7 +30,7 @@ async def _init_actor_router(component_name: str, config):
     await (await actor_storage.storage()).ensure_table()
     await actor_projections.rebuild()
      
-    asyncio.create_task(actor_projections.handle_user_events)
+    asyncio.create_task(actor_projections.handle_user_events())
 
 
 async def _init_outbox_router(component_name: str, config):
@@ -38,7 +38,7 @@ async def _init_outbox_router(component_name: str, config):
     await (await outbox_storage.storage()).ensure_table()
     await outbox_projections.rebuild()
      
-    asyncio.create_task(outbox_projections.handle_user_events)
+    asyncio.create_task(outbox_projections.handle_user_events())
 
 
 async def _reset_component_schema(component_name: str, config):
