@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock
 
 from profed.core import message_bus
 
-from profed.components.api.storage import webfinger as storage
+from profed.components.api.storage import webfinger_users as storage
 from profed.components.api.projections.webfinger import rebuild, reset_last_seen
 
 
@@ -52,16 +52,15 @@ def fake_message_bus():
 
 @pytest.fixture
 def fake_storage():
-    backup = storage._instance
-    storage._instance = AsyncMock()
-    storage._instance.add = AsyncMock()
-    storage._instance.delete = AsyncMock()
-    storage._instance.user_exists = AsyncMock()
-    storage._instance.ensure_table = AsyncMock()
+    instance = AsyncMock()
+    instance.add = AsyncMock()
+    instance.delete = AsyncMock()
+    instance.exists = AsyncMock()
+    instance.ensure_table = AsyncMock()
 
-    yield storage._instance
+    storage.overwrite(instance)
 
-    storage._instance = backup
+    return instance
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,7 @@
 import os
 import pytest
 from unittest.mock import AsyncMock, Mock
-from profed.components.api.storage import webfinger as storage
+from profed.components.api.storage import webfinger_users as storage
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -15,15 +15,14 @@ from profed.components.api.services.webfinger import resolve_actor_url
 
 @pytest.fixture
 def fake_storage():
-    backup = storage._instance
-    storage._instance = Mock()
-    storage._instance.add = AsyncMock()
-    storage._instance.delete = AsyncMock()
-    storage._instance.user_exists = AsyncMock()
+    instance = Mock()
+    instance.add = AsyncMock()
+    instance.delete = AsyncMock()
+    instance.exists = AsyncMock()
 
-    yield storage._instance
+    storage.overwrite(instance)
 
-    storage._instance = backup
+    return instance
 
 @pytest.fixture
 def cfg():
@@ -48,7 +47,7 @@ def client(cfg):
 
 
 def test_webfinger_endpoint_success(client, fake_storage):
-    fake_storage.user_exists.return_value = True
+    fake_storage.exists.return_value = True
     response = client.get("/.well-known/webfinger?resource=acct:alice@example.com")
     assert response.status_code == 200
     data = response.json()
@@ -57,13 +56,13 @@ def test_webfinger_endpoint_success(client, fake_storage):
 
 
 def test_webfinger_endpoint_not_found(client, fake_storage):
-    fake_storage.user_exists.return_value = False
+    fake_storage.exists.return_value = False
     response = client.get("/.well-known/webfinger?resource=acct:unknown@example.com")
     assert response.status_code == 404
 
 
 def test_webfinger_endpoint_storage_error(client, fake_storage):
-    fake_storage.user_exists.side_effect = RuntimeError("DB error")
+    fake_storage.exists.side_effect = RuntimeError("DB error")
     response = client.get("/.well-known/webfinger?resource=acct:alice@example.com")
     assert response.status_code == 500
 
@@ -95,7 +94,7 @@ def test_webfinger_response_structure(client, fake_storage):
 
 @pytest.mark.asyncio
 async def test_resolve_actor_url_success(fake_storage):
-    fake_storage.user_exists.return_value = True
+    fake_storage.exists.return_value = True
 
     result = await resolve_actor_url("alice@example.com")
 
@@ -104,7 +103,7 @@ async def test_resolve_actor_url_success(fake_storage):
 
 @pytest.mark.asyncio
 async def test_resolve_actor_url_storage_error(fake_storage):
-    fake_storage.user_exists.side_effect = RuntimeError()
+    fake_storage.exists.side_effect = RuntimeError()
 
     with pytest.raises(RuntimeError):
         await resolve_actor_url("alice@example.com")

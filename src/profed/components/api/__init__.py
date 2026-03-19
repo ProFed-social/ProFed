@@ -6,7 +6,7 @@ import asyncio
 import asyncpg
 from .app import create_app
 from .storage import (
-        webfinger as webfinger_storage,
+        webfinger_users as webfinger_storage,
         actor as actor_storage,
         # inbox as inbox_storage,
         outbox as outbox_storage)

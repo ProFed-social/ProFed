@@ -26,3 +26,4 @@ handle_activities, rebuild, reset_last_seen = \
                          init=_init,
                          on_snapshot_item=_apply_item,
                          on_message_type={"created": _created})
+

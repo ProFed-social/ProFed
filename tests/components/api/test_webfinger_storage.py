@@ -3,7 +3,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, Mock
-from profed.components.api.storage import webfinger
+from profed.components.api.storage import webfinger_users
 
 
 @pytest.fixture
@@ -28,87 +28,87 @@ def fake_pool(fake_conn):
     pool = Mock()
     pool.acquire = Mock(return_value=AsyncContextManagerMock(fake_conn))
 
-    webfinger._instance = webfinger._storage(pool, "test_schema")
+    webfinger_users.reinit(pool, "test_schema")
     return pool
 
 
 @pytest.mark.asyncio
 async def test_add_user_success(fake_pool):
-    store = await webfinger.storage()
+    store = await webfinger_users.storage()
     await store.add("alice")
 
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
-                               f"""
-                               INSERT INTO {store._schema_name}.webfinger_users (username)
-                               VALUES ($1)
-                               ON CONFLICT (username) DO NOTHING
-                               """,
-                               "alice")
+                                   f"""
+                                   INSERT INTO {store._schema_name}.webfinger_users (username)
+                                   VALUES ($1)
+                                   ON CONFLICT (username) DO NOTHING
+                                   """,
+                                   "alice")
 
 
 @pytest.mark.asyncio
 async def test_add_user_already_exists(fake_pool):
-    store = await webfinger.storage()
+    store = await webfinger_users.storage()
     await store.add("alice")
 
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
-                               f"""
-                               INSERT INTO {store._schema_name}.webfinger_users (username)
-                               VALUES ($1)
-                               ON CONFLICT (username) DO NOTHING
-                               """,
-                               "alice")
+                                   f"""
+                                   INSERT INTO {store._schema_name}.webfinger_users (username)
+                                   VALUES ($1)
+                                   ON CONFLICT (username) DO NOTHING
+                                   """,
+                                   "alice")
 
 
 @pytest.mark.asyncio
 async def test_delete_user_success(fake_pool):
-    store = await webfinger.storage()
+    store = await webfinger_users.storage()
     await store.delete("alice")
 
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
-                               f"""
-                               DELETE FROM {store._schema_name}.webfinger_users
-                               WHERE acct = $1
-                               """,
-                               "alice")
+                                   f"""
+                                   DELETE FROM {store._schema_name}.webfinger_users
+                                   WHERE acct = $1
+                                   """,
+                                   "alice")
 
 
 @pytest.mark.asyncio
 async def test_delete_user_not_exists(fake_pool):
-    store = await webfinger.storage()
+    store = await webfinger_users.storage()
     await store.delete("bob")
 
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
-                               f"""
-                               DELETE FROM {store._schema_name}.webfinger_users
-                               WHERE acct = $1
-                               """,
-                               "bob")
+                                   f"""
+                                   DELETE FROM {store._schema_name}.webfinger_users
+                                   WHERE acct = $1
+                                   """,
+                                   "bob")
 
 
 @pytest.mark.asyncio
 async def test_user_exists_found(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.fetchrow.return_value = {"c": 1}
-        store = await webfinger.storage()
-        assert await store.user_exists("alice@example.com")
+        store = await webfinger_users.storage()
+        assert await store.exists("alice@example.com")
 
 
 @pytest.mark.asyncio
 async def test_user_exists_not_found(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.fetchrow.return_value = {"c": 0}
-        store = await webfinger.storage()
-        assert not await store.user_exists("alice@example.com")
+        store = await webfinger_users.storage()
+        assert not await store.exists("alice@example.com")
 
 
 @pytest.mark.asyncio
 async def test_ensure_table_executes_create(fake_pool):
-    store = await webfinger.storage()
+    store = await webfinger_users.storage()
     await store.ensure_table()
 
     async with fake_pool.acquire() as conn:
@@ -117,8 +117,8 @@ async def test_ensure_table_executes_create(fake_pool):
 
 @pytest.mark.asyncio
 async def test_storage_not_initialized():
-    webfinger._instance = None
+    webfinger_users.overwrite(None)
 
     with pytest.raises(RuntimeError):
-        await webfinger.storage()
+        await webfinger_users.storage()
 

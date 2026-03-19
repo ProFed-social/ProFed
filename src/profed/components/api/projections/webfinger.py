@@ -3,7 +3,7 @@
 
 from profed.core.projections import build_projection
 from profed.topics import users
-from profed.components.api.storage.webfinger import storage
+from profed.components.api.storage.webfinger_users import storage
 
 
 async def _init() -> None:
