@@ -13,8 +13,6 @@ _SOURCE_KEYS = {
 
 class SourceKey:
     def __init__(self, source_topic: str):
-        global _SOURCE_KEYS
-
         source_key = _SOURCE_KEYS.get(source_topic)
         if source_key is None:
             raise ValueError("source_topic has no mapping to source key")
@@ -33,6 +31,6 @@ class SourceKey:
         return uuid.UUID(bytes=self._prefix + message_id.to_bytes(8, "big", signed=False))
 
 
-def source_key(source_id: str) -> SourceKey:
-    return SourceKey(source_id)
+def source_key(source_topic: str) -> SourceKey:
+    return SourceKey(source_topic)
 
