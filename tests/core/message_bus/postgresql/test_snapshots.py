@@ -1,5 +1,7 @@
+# Copyright (C) 2026 Christof Donat
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
-import asyncio
+
 import pytest
 
 
@@ -17,9 +19,9 @@ async def test_snapshot_publish(topic, db):
 
 @pytest.mark.asyncio
 async def test_snapshot_prunes_old_gaps(topic, db):
-    db.insert_message("public.test", {"v": "a"}, 1)
-    db.insert_message("public.test", {"v": "a"}, 3)
-    db.insert_message("public.test", {"v": "a"}, 5)
+    db.insert_message("public.test", {"v": "a"}, i=1)
+    db.insert_message("public.test", {"v": "a"}, i=3)
+    db.insert_message("public.test", {"v": "a"}, i=5)
     db.insert_gap("test.test_gaps", 2)
     db.insert_gap("test.test_gaps", 4)
 

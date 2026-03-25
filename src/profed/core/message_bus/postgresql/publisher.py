@@ -8,12 +8,16 @@ from asyncpg.transaction import Transaction
 
 def _publish(conn: Connection, topic: str, schema: str) \
         -> Callable[[Dict[str, Any]], Awaitable[None]]:
-    async def publish(message: Dict[str, Any]) -> None:
-        await conn.execute(f"""
-                           INSERT INTO {schema}.{topic} (payload)
-                           VALUES ($1)
+    async def publish(message: Dict[str, Any], message_id=None) -> None:
+        row = await conn.fetchrow(f"""
+                           INSERT INTO {schema}.{topic} (payload, message_id)
+                           VALUES ($1, $2)
+                           ON CONFLICT (message_id) DO NOTHING
+                           RETURNING id
                            """,
-                           message)
+                           message,
+                           message_id)
+        return None if row is None else row["id"]
     return publish
 
 

@@ -47,7 +47,8 @@ class FakeConnection:
                                     args[0])
             else:
                 self._db.insert_message(self._extract_table(query),
-                                        args[0])
+                                        args[0],
+                                        i=args[1])
         elif "DELETE" in query:
             self._db.delete_gaps(self._extract_table(query),
                                  args[0])
@@ -81,6 +82,8 @@ class FakeConnection:
                              self._fetch_single_table(right_table.lower(), *args),
                              l_col.lower(),
                              r_col.lower())
+        elif "INSERT INTO" in query:
+            return self._db.insert_message(self._extract_table(query), *args)
 
         return []
 
@@ -123,10 +126,13 @@ class InMemoryDatabase:
         self.gaps = defaultdict(set)
         self.connections = []
 
-    def insert_message(self, table, payload, i = None):
+    def insert_message(self, table, payload, message_id = None, i = None):
         table_messages = self.messages[table]
         new_id = i if i is not None else len(table_messages) + 1
-        table_messages.append({"id": new_id, "payload": payload})
+        if message_id is None or message_id not in (m["message_id"] for m in table_messages):
+            table_messages.append({"id": new_id, "payload": payload, "message_id": message_id})
+            return [{"id": new_id}]
+        return None
 
     def fetch_messages(self, table, last_seen):
         return sorted((m

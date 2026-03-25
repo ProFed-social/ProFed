@@ -20,8 +20,8 @@ class Topic:
     def publish_snapshot(self) -> SnapshotPublisher:
         return SnapshotPublisher(self._pool, self._config["schema"], self._name)
 
-    def subscribe(self, last_seen: int = 0) -> AsyncGenerator[Dict[str, str], None]:
-        return subscribe(self._pool, self._config, self._name, self._component_name, last_seen)
+    def subscribe(self, last_seen: int = 0, include_sequence_id: bool = False) -> AsyncGenerator[Dict[str, str], None]:
+        return subscribe(self._pool, self._config, self._name, self._component_name, last_seen, include_sequence_id)
 
     def last_snapshot(self):
         return last_snapshot(self._pool, self._config["schema"], self._name)

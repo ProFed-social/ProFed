@@ -1,14 +1,14 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from typing import Dict, Any, AsyncGenerator
+from typing import Dict, Any, AsyncGenerator, Tuple
 import asyncio
 from asyncpg import Pool, Connection
 
 MIN_WAIT = 0.05
 MAX_WAIT = 2.0
 
-def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_name: str, last_seen: int) \
+def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_name: str, last_seen: int, include_sequence_id: bool = False) \
         -> AsyncGenerator[Dict[str, Any], None]:
     min_wait = float(config.get("minimum_message_wait", MIN_WAIT))
     max_wait = float(config.get("maximum_message_wait", MAX_WAIT))
@@ -98,7 +98,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_name: st
             last_seen = gap_id
         return last_seen
 
-    async def read_messages(last_seen) -> AsyncGenerator[Dict[str, Any], None]:
+    async def read_messages(last_seen) -> AsyncGenerator[Dict[str, Any] | Tuple[int, Dict[str, Any]], None]:
         wait: float = min_wait
         async with pool.acquire() as conn:
             await _ensure_gap_table(conn)
@@ -115,7 +115,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, component_name: st
                 async for seen, message in _process_messages(conn, last_seen):
                     last_seen = seen
                     processed = True
-                    yield message
+                    yield message if not include_sequence_id else (seen, message)
 
                 if processed:
                     wait = min_wait
