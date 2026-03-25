@@ -19,7 +19,7 @@ async def test_subscribe_with_sequence_id_yields_id_and_message(topic, db):
 
 @pytest.mark.asyncio
 async def test_publish_with_dedupe_key_inserts_once(topic, db):
-    key = source_key(b"\0\0users\0").message_id(1)
+    key = source_key("users").message_id(1)
 
     async with topic.publish() as publish:
         first = await publish({"x": 1}, message_id=key)
@@ -32,8 +32,8 @@ async def test_publish_with_dedupe_key_inserts_once(topic, db):
 
 @pytest.mark.asyncio
 async def test_publish_with_different_dedupe_keys_inserts_both(topic, db):
-    key1 = source_key(b"\0\0users\0").message_id(1)
-    key2 = source_key(b"\0\0users\0").message_id(2)
+    key1 = source_key("users").message_id(1)
+    key2 = source_key("users").message_id(2)
 
     async with topic.publish() as publish:
         assert await publish({"x": 1}, message_id=key1) is 1 
@@ -44,7 +44,7 @@ async def test_publish_with_different_dedupe_keys_inserts_both(topic, db):
 
 @pytest.mark.asyncio
 async def test_subscribe_with_message_id_sees_only_one_deduplicated_message(topic, db):
-    key = source_key(b"\0\0users\0").message_id(1)
+    key = source_key("users").message_id(1)
 
     async with topic.publish() as publish:
         await publish({"x": 1}, message_id=key)
