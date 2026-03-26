@@ -113,7 +113,7 @@ async def test_projection_multiple_users_some_malformed(fake_message_bus, fake_s
     fake_message_bus.topic("users").snapshots = [
             (10,
              [{"username": "alice"},
-              {"username": ""},
+              {"username": 43},
               {"no_username": "alice"},
               {"username": "bob"}])
             ]

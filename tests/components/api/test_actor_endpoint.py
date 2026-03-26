@@ -49,9 +49,7 @@ def client(cfg):
 
 def test_actor_success(client, fake_storage):
     fake_storage.fetch.return_value = {
-        "id": "https://example.com/actors/alice",
-        "type": "Person",
-        "preferredUsername": "alice",
+        "username": "alice",
         "name": "Alice"
     }
     response = client.get("/actors/alice")

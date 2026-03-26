@@ -23,12 +23,12 @@ def fake_storage():
 
 @pytest.mark.asyncio
 async def test_resolve_actor_found(fake_storage):
-    fake_storage.fetch.return_value = {"name": "Alice"}
+    fake_storage.fetch.return_value = {"name": "Alice", "username": "alice"}
 
     act = await resolve_actor("alice")
 
     assert act is not None
-    assert act["name"] == "Alice"
+    assert act.name == "Alice"
 
 
 @pytest.mark.asyncio
