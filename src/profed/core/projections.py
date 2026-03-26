@@ -6,6 +6,7 @@ from profed.core.message_bus import message_bus
 
 
 def build_projection(topic: Dict,
+                     subscriber: str,
                      init: Callable[[], Awaitable[None]],
                      on_message_type: Dict[str, Callable[[Dict], Awaitable[None]]],
                      on_snapshot_item: Callable[[Dict], Awaitable[None]],
@@ -24,7 +25,7 @@ def build_projection(topic: Dict,
     topic_name = topic["name"]
 
     async def handle_events():
-        async for event in message_bus().topic(topic_name).subscribe(last_seen):
+        async for event in message_bus().topic(topic_name).subscribe(subscriber, last_seen):
             event_type, payload = topic["validate"](event)
 
             if (event_type is not None and

@@ -6,24 +6,23 @@ import asyncpg
 
 
 class _storage:
-    def __init__(self, pool: asyncpg.Pool, schema_name: str):
+    def __init__(self, pool: asyncpg.Pool):
         self._pool = pool
-        self._schema_name = schema_name
 
     async def ensure_table(self) -> None:
         async with self._pool.acquire() as conn:
-            await conn.execute(f"""CREATE TABLE IF NOT EXISTS {self._schema_name}.outbox (
+            await conn.execute(f"""CREATE TABLE IF NOT EXISTS api.outbox (
                                    username TEXT NOT NULL,
                                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                                    activity JSONB NOT NULL)
                                """)
             await conn.execute(f"""CREATE INDEX IF NOT EXISTS outbox_username_created_at_idx
-                                   ON {self._schema_name}.outbox (username, created_at)
+                                   ON api.outbox (username, created_at)
                                """)
 
     async def add(self, username: str, activity: dict) -> None:
         async with self._pool.acquire() as conn:
-            await conn.execute(f"""INSERT INTO {self._schema_name}.outbox (username, activity)
+            await conn.execute(f"""INSERT INTO api.outbox (username, activity)
                                    VALUES ($1, $2)
                                """,
                                username,
@@ -32,7 +31,7 @@ class _storage:
     async def fetch(self, username: str) -> List[dict]:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(f"""SELECT activity
-                                        FROM {self._schema_name}.outbox
+                                        FROM api.outbox
                                         WHERE username = $1
                                         ORDER BY created_at
                                     """,
@@ -43,14 +42,14 @@ class _storage:
 _instance: _storage | None = None
 
 
-async def init(component_name: str, config: Dict[str, str]) -> None:
+async def init(config: Dict[str, str]) -> None:
     global _instance
     pool = await asyncpg.create_pool(host=config["host"],
                                      port=int(config["port"]),
                                      database=config["database"],
                                      user=config["user"],
                                      password=config["password"])
-    _instance = _storage(pool, component_name)
+    _instance = _storage(pool)
 
 
 async def storage() -> _storage:

@@ -23,6 +23,7 @@ async def _created(data: dict) -> None:
 
 handle_activities, rebuild, reset_last_seen = \
         build_projection(topic=activities,
+                         subscriber="api",
                          init=_init,
                          on_snapshot_item=_apply_item,
                          on_message_type={"created": _created})

@@ -17,32 +17,32 @@ from .projections import (
         outbox as outbox_projections)
 
 
-async def _init_well_known_router(component_name: str, config):
-    await webfinger_storage.init(component_name, config)
+async def _init_well_known_router(config):
+    await webfinger_storage.init(config)
     await (await webfinger_storage.storage()).ensure_table()
     await webfinger_projections.rebuild()
 
     asyncio.create_task(webfinger_projections.handle_user_events())
 
 
-async def _init_actor_router(component_name: str, config):
-    await actor_storage.init(component_name, config)
+async def _init_actor_router(config):
+    await actor_storage.init(config)
     await (await actor_storage.storage()).ensure_table()
     await actor_projections.rebuild()
      
     asyncio.create_task(actor_projections.handle_user_events())
 
 
-async def _init_inbox_router(component_name: str, config):
-    await inbox_storage.init(component_name, config)
+async def _init_inbox_router(config):
+    await inbox_storage.init(config)
     await (await inbox_storage.storage()).ensure_table()
     await inbox_projections.rebuild()
      
     asyncio.create_task(inbox_projections.handle_user_events())
 
 
-async def _init_outbox_router(component_name: str, config):
-    await outbox_storage.init(component_name, config)
+async def _init_outbox_router(config):
+    await outbox_storage.init(config)
     await (await outbox_storage.storage()).ensure_table()
     await outbox_projections.rebuild()
      
@@ -56,12 +56,12 @@ async def _reset_component_schema(component_name: str, config):
                                      user=config["user"],
                                      password=config["password"],)
     async with pool.acquire() as conn:
-        await conn.execute(f"DROP SCHEMA IF EXISTS {component_name} CASCADE")
-        await conn.execute(f"CREATE SCHEMA {component_name}")
+        await conn.execute(f"DROP SCHEMA IF EXISTS api CASCADE")
+        await conn.execute(f"CREATE SCHEMA api")
 
 
-async def init(component_name: str, config):
-    await _reset_component_schema(component_name, config)
+async def Api(config):
+    await _reset_component_schema(config)
 
     deactive_routers = config.get("deactive_routers", "").split()
     init_routers = [ini
@@ -74,7 +74,7 @@ async def init(component_name: str, config):
     
     for ini in init_routers:
         print(f"call router init function: {ini}")
-        await ini(component_name, config)
+        await ini(config)
 
     app = create_app(config)
     return app

@@ -6,7 +6,7 @@ from profed.core.config import config
 
 _instance = None
 
-def init_message_bus(component_name: str):
+def init_message_bus():
     global _instance
     if _instance is not None:
         return _instance
@@ -16,7 +16,7 @@ def init_message_bus(component_name: str):
 
     mod = import_module(f".{typ}", package=__name__)
     init = getattr(mod, "init")
-    _instance = init(component_name, cfg)
+    _instance = init(cfg)
 
 def message_bus():
     if _instance is None:

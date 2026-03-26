@@ -3,9 +3,9 @@
 
 import sys
 from types import ModuleType
-from pytest import fixture
+from pytest import fixture, mark
 
-from profed.core.component_manager import run, Component, Process
+from profed.core.component_manager import run, Component
 
 @fixture
 def mock_module():
@@ -24,13 +24,8 @@ def test_component_manager_without_main(mock_module):
     run({"example": {"foo": "bar"}, "profed": {"run": "example"}})
 
 
-def test_component(mock_module):
+@mark.asyncio
+async def test_component(mock_module):
     cmp = Component("example")
-    cmp({"foo": "bar"})
-
-
-def test_process(mock_module):
-    p = Process(Component("example"), {"foo": "bar"})
-    p.wait()
-
+    await cmp({"foo": "bar"})
 

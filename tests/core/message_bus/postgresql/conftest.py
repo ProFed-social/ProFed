@@ -30,7 +30,7 @@ async def bus(db):
     with patch("profed.core.message_bus.postgresql.asyncpg.create_pool",
                new=_create_fake_pool):
         from profed.core.message_bus.postgresql import init
-        bus = await init("test", CONFIG)
+        bus = await init(CONFIG)
 
     return bus
 

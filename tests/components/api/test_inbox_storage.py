@@ -8,8 +8,8 @@ from profed.components.api.storage import inbox_users as storage
 
 @pytest.fixture
 def fake_conn():
-    conn = Mock()
-    conn.execute = AsyncMock()
+    conn = AsyncMock()
+
     conn.fetch = AsyncMock(return_value=[])
     conn.fetchrow = AsyncMock(return_value={})
     return conn
@@ -28,7 +28,7 @@ def fake_pool(fake_conn):
     pool = Mock()
     pool.acquire = Mock(return_value=AsyncContextManagerMock(fake_conn))
 
-    storage.reinit(pool, "test_schema")
+    storage.reinit(pool)
     return pool
 
 
@@ -40,7 +40,7 @@ async def test_add_user_success(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
                                    f"""
-                                   INSERT INTO {store._schema_name}.inbox_users (username)
+                                   INSERT INTO api.inbox_users (username)
                                    VALUES ($1)
                                    ON CONFLICT (username) DO NOTHING
                                    """,
@@ -55,7 +55,7 @@ async def test_add_user_already_exists(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
                                    f"""
-                                   INSERT INTO {store._schema_name}.inbox_users (username)
+                                   INSERT INTO api.inbox_users (username)
                                    VALUES ($1)
                                    ON CONFLICT (username) DO NOTHING
                                    """,
@@ -70,7 +70,7 @@ async def test_delete_user_success(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
                                    f"""
-                                   DELETE FROM {store._schema_name}.inbox_users
+                                   DELETE FROM api.inbox_users
                                    WHERE acct = $1
                                    """,
                                    "alice")
@@ -84,7 +84,7 @@ async def test_delete_user_not_exists(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
                                    f"""
-                                   DELETE FROM {store._schema_name}.inbox_users
+                                   DELETE FROM api.inbox_users
                                    WHERE acct = $1
                                    """,
                                    "bob")

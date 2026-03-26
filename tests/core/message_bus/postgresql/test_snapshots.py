@@ -29,7 +29,7 @@ async def test_snapshot_prunes_old_gaps(topic, db):
         await publish({"state": "ok"}, last_event_id=3)
         await publish({"state": "ok"}, last_event_id=5)
 
-    subscriber = topic.subscribe()
+    subscriber = topic.subscribe("test")
     await subscriber.__anext__()
     await subscriber.__anext__()
 

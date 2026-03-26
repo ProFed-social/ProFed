@@ -5,14 +5,13 @@ from typing import Dict
 import asyncpg
 
 class MessageBus:
-    def __init__(self, component_name: str, config: Dict[str, str], pool: asyncpg.Pool):
+    def __init__(self, config: Dict[str, str], pool: asyncpg.Pool):
         self._config = config
         self._pool = pool
-        self._component_name = component_name
 
     def topic(self, name: str):
         from .topic import Topic
-        return Topic(self._component_name, self._pool, self._config, name)
+        return Topic(self._pool, self._config, name)
 
     async def health_check(self):
         async with self._pool.acquire() as conn:

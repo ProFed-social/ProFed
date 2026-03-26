@@ -33,6 +33,7 @@ async def _deleted(data: dict) -> None:
 
 handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=users,
+                         subscriber="api",
                          init=_init,
                          on_snapshot_item=_apply_snapshot_item,
                          on_message_type={"created": _created,

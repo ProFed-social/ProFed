@@ -6,26 +6,25 @@ from asyncpg import Pool, create_pool
 
 
 class _storage:
-    def __init__(self, pool: Pool, schema_name: str):
+    def __init__(self, pool: Pool):
         self._pool = pool
-        self._schema_name = schema_name
 
     async def ensure_schema(self):
         async with self._pool.acquire() as conn:
-            await conn.execute("""CREATE TABLE IF NOT EXISTS {self._schema_name}.actor (
+            await conn.execute("""CREATE TABLE IF NOT EXISTS api.actor (
                                       username TEXT PRIMARY KEY,
                                       payload JSONB NOT NULL)""")
 
     async def add(self, username: str, payload: dict):
         async with self._pool.acquire() as conn:
-            await conn.execute("""INSERT INTO {self._schema_name}.actor (username, payload)
+            await conn.execute("""INSERT INTO api.actor (username, payload)
                                   VALUES ($1, $2)""",
                                username,
                                payload)
 
     async def update(self, username: str, payload: dict):
         async with self._pool.acquire() as conn:
-            await conn.execute("""UPDATE {self._schema_name}.actor
+            await conn.execute("""UPDATE api.actor
                                   SET payload = $2
                                   WHERE username = $1""",
                                username,
@@ -33,14 +32,14 @@ class _storage:
 
     async def delete(self, username: str, _=None):
         async with self._pool.acquire() as conn:
-            await conn.execute("""DELETE FROM {self._schema_name}.actor
+            await conn.execute("""DELETE FROM api.actor
                                   WHERE username = $1""",
                                username)
 
     async def fetch(self, username: str) -> Optional[Dict]:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow("""SELECT payload
-                                         FROM {self._schema_name}.actor
+                                         FROM api.actor
                                          WHERE username = $1""",
                                       username)
         return row["payload"] if row is not None else None
@@ -49,14 +48,14 @@ class _storage:
 _instance: _storage | None = None
 
 
-async def init(component_name: str, config: Dict[str, str]) -> None:
+async def init(config: Dict[str, str]) -> None:
     global _instance
     pool = await create_pool(host=config["host"],
                              port=int(config["port"]),
                              database=config["database"],
                              user=config["user"],
                              password=config["password"],)
-    _instance = _storage(pool, component_name)
+    _instance = _storage(pool)
 
 
 async def storage() -> _storage:

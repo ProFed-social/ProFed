@@ -34,6 +34,7 @@ def build_users_projection(storage):
         await store.delete(data["username"])
 
     return build_projection(topic=users,
+                            subscriber="api",
                             init=_init,
                             on_snapshot_item=_apply_snapshot_item,
                             on_message_type={"created": _created,

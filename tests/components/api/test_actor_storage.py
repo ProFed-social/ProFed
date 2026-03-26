@@ -28,7 +28,7 @@ def fake_pool(fake_conn):
     pool.acquire = Mock(return_value=AsyncContextManagerMock(fake_conn))
 
     backup = actor._instance
-    actor._instance = actor._storage(pool, "test_schema")
+    actor._instance = actor._storage(pool)
 
     yield pool
 

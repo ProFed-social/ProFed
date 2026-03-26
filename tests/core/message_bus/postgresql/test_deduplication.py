@@ -9,7 +9,7 @@ from profed.core.message_bus.source_key import source_key
 async def test_subscribe_with_sequence_id_yields_id_and_message(topic, db):
     db.insert_message("public.test", {"v": "a"}, i=7)
 
-    subscriber = topic.subscribe(include_sequence_id=True)
+    subscriber = topic.subscribe(subscriber="test", include_sequence_id=True)
 
     sequence_id, message = await subscriber.__anext__()
 
@@ -50,7 +50,7 @@ async def test_subscribe_with_message_id_sees_only_one_deduplicated_message(topi
         await publish({"x": 1}, message_id=key)
         await publish({"x": 1}, message_id=key)
 
-    subscriber = topic.subscribe(include_sequence_id=True)
+    subscriber = topic.subscribe(subscriber="test", include_sequence_id=True)
     sequence_id, message = await subscriber.__anext__()
 
     assert sequence_id == 1

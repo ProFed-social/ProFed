@@ -13,49 +13,28 @@ class ComponentError(Exception):
 
 
 class Component:
-    def __init__(self, name: str, init: Optional[List[Callable]] = None):
+    def __init__(self, name: str):
         self.name = name
         self.entry = None
-        self.init = init
         try:
             mod = importlib.import_module(f"profed.components.{self.name}")
             self.entry = getattr(mod, "".join(n.capitalize() for n in self.name.split("_")))
         except Exception as e:
             raise ComponentError(f"Error in component {self.name}: {e}")
  
-    def __call__(self, cfg) -> None:
+    async def __call__(self, cfg) -> None:
         if self.entry is not None:
-            for i in (self.init or []):
-                i(self.name)
-            asyncio.run(self.entry(cfg))
+            await (self.entry(cfg))
     
 
-class Process:
-    def __init__(self, cmp: Component, cfg):
-        self.pid = os.fork()
-        if self.pid == 0:
-            # child process
-            cmp(cfg)
-            os._exit(0)
-
-    def wait(self) -> None:
-        os.waitpid(self.pid, 0)
-
-
 def run(config: Dict[str, Any], init: Optional[List[Callable]] = None) -> None:
-    components = list(config["profed"]["run"].split())
-    main = components.pop(0)
+    for i in (init or []):
+        i()
 
-    if main is None:
-        raise IndexError("No components to run configured")
-
-    main_component = Component(main, init)
-    components = [Component(name, init) for name in components]
-    processes = [Process(component, config.get(component.name, {}))
-                 for component in components]
-
-    main_component(config[main])
-
-    for p in processes:
-        p.wait()
+    component_names = list(config["profed"]["run"].split())
+    components = [Component(name) for name in component_names]
+    async def main():
+        await asyncio.gather(*[component(config.get(component.name, {}))
+                               for component in components])
+    asyncio.run(main())
 

@@ -6,7 +6,7 @@ import asyncpg
 from .bus import MessageBus
 
 
-async def init(component_name: str, config: Dict[str, str]):
+async def init(config: Dict[str, str]):
     pool = await asyncpg.create_pool(
         host=config["host"],
         port=int(config["port"]),
@@ -14,4 +14,4 @@ async def init(component_name: str, config: Dict[str, str]):
         user=config["user"],
         password=config["password"],
     )
-    return MessageBus(component_name, config, pool)
+    return MessageBus(config, pool)

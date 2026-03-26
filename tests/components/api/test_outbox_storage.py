@@ -28,7 +28,7 @@ def fake_pool(fake_conn):
     pool.acquire = Mock(return_value=AsyncContextManagerMock(fake_conn))
 
     backup = outbox._instance
-    outbox._instance = outbox._storage(pool, "outbox")
+    outbox._instance = outbox._storage(pool)
 
     yield pool
 
@@ -56,7 +56,7 @@ async def test_add_success(fake_pool, fake_conn):
     await store.add("alice", activity)
 
     fake_conn.execute.assert_awaited_with(
-                               f"""INSERT INTO {store._schema_name}.outbox (username, activity)
+                               f"""INSERT INTO api.outbox (username, activity)
                                    VALUES ($1, $2)
                                """,
                                "alice",
@@ -87,7 +87,7 @@ async def test_fetch_found(fake_pool, fake_conn):
 
     fake_conn.fetch.assert_awaited_with(
                                     f"""SELECT activity
-                                        FROM {store._schema_name}.outbox
+                                        FROM api.outbox
                                         WHERE username = $1
                                         ORDER BY created_at
                                     """,

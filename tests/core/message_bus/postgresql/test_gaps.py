@@ -9,7 +9,7 @@ async def test_gap_detected_and_late_message_processed(topic, db):
     db.insert_message("public.test", {"v": "a"})
     db.messages["public.test"].append({"id": 3, "payload": {"v": "c"}})
 
-    subscriber = topic.subscribe()
+    subscriber = topic.subscribe("test")
 
     first = await subscriber.__anext__()
     assert first["v"] == "a"

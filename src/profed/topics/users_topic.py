@@ -4,6 +4,8 @@
 import logging
 from typing import Optional, Dict, Tuple
 
+from profed.models import UserProfile
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +37,13 @@ def _payload_content(payload, ignore) -> Optional[Dict]:
         logger.warning(ignore(f"payload is not a JSON object: {payload!r}"))
         return None
 
-    if "username" not in payload:
-        logger.warning(ignore(f"username not found in payload: {payload!r}"))
+    try:
+        profile = UserProfile.model_validate(payload)
+    except Exception as exc:
+        logger.warning(ignore(f"invalid payload: {payload!r}; {exc}"))
         return None
 
-    username = payload["username"]
-    if not isinstance(username, str) or username == "":
-        logger.warning(ignore(f"invalid username: {username!r}"))
-        return None
-
-    return payload
+    return profile.model_dump(exclude_none=True)
 
 
 def _payload(event: Dict) -> Optional[Dict]:
