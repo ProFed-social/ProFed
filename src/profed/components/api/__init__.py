@@ -4,6 +4,7 @@
 from threading import Thread
 import asyncio
 import asyncpg
+import uvicorn
 from .app import create_app
 from .storage import (
         webfinger_users as webfinger_storage,
@@ -76,4 +77,10 @@ async def Api(config):
         await ini(config)
 
     app = create_app(config)
-    return app
+
+    server = uvicorn.Server(uvicorn.Config(app,
+                                           host=config.get("host", "127.0.0.1"),
+                                           port=int(config.get("port", 8000)),
+                                           loop="asyncio"))
+    await server.serve()
+
