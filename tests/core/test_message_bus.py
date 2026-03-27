@@ -6,7 +6,7 @@ import sys
 from typing import Dict
 from types import ModuleType
 
-from pytest import fixture
+from pytest import fixture, mark
 
 from profed.core.config import config, raw
 
@@ -34,15 +34,16 @@ class Cfg:
 def mock_module():
     mod = ModuleType("profed.core.message_bus.example")
     sys.modules["profed.core.message_bus.example"] = mod
-    exec("def init(cfg):\n"
+    exec("async def init(cfg):\n"
          "    return cfg\n",
          mod.__dict__)
 
 
-def test_message_bus_isntantiation(mock_module):
+@mark.asyncio
+async def test_message_bus_instantiation(mock_module):
     with Cfg({"message_bus": {"type": "example"}, "profed": {"run":""}}):
         message_bus._instance = None
-        message_bus.init_message_bus()
+        await message_bus.init_message_bus()
 
         bus = message_bus.message_bus()
 

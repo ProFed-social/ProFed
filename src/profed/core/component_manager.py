@@ -27,9 +27,11 @@ class Component:
             await (self.entry(cfg))
     
 
-def run(config: Dict[str, Any], init: Optional[List[Callable]] = None) -> None:
-    for i in (init or []):
-        i()
+def run(config: Dict[str, Any], init=None) -> None:
+    async def init_all(i):
+        await asyncio.gather(*i)
+    if init is not None:
+        asyncio.run(init_all(init))
 
     component_names = list(config["profed"]["run"].split())
     components = [Component(name) for name in component_names]
