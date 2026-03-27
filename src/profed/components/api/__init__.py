@@ -49,7 +49,7 @@ async def _init_outbox_router(config):
     asyncio.create_task(outbox_projections.handle_user_events())
 
 
-async def _reset_component_schema(component_name: str, config):
+async def _reset_component_schema(config):
     pool = await asyncpg.create_pool(host=config["host"],
                                      port=int(config["port"]),
                                      database=config["database"],
