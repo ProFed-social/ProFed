@@ -28,15 +28,15 @@ class Component:
     
 
 def run(config: Dict[str, Any], init=None) -> None:
-    async def init_all(i):
-        await asyncio.gather(*i)
+    async def init_all(ini):
+        await asyncio.gather(*(i() for i in ini))
     if init is not None:
         asyncio.run(init_all(init))
 
     component_names = list(config["profed"]["run"].split())
     components = [Component(name) for name in component_names]
     async def main():
-        await asyncio.gather(*[component(config.get(component.name, {}))
-                               for component in components])
+        await asyncio.gather(*(component(config.get(component.name, {}))
+                               for component in components))
     asyncio.run(main())
 
