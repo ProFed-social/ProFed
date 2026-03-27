@@ -67,9 +67,8 @@ async def Api(config):
     init_routers = [ini
                     for name, ini in (("well_known", _init_well_known_router),
                                       ("actor", _init_actor_router),
-                                       ("inbox", _init_inbox_router),
-                                       ("outbox", _init_outbox_router),
-                                       )
+                                      ("inbox", _init_inbox_router),
+                                      ("outbox", _init_outbox_router))
                     if name not in deactive_routers]
     
     for ini in init_routers:
