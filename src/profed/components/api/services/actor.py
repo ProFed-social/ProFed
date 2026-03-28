@@ -3,9 +3,7 @@
 
 from profed.models.activity_pub import Person 
 from profed.models import UserProfile
-from profed.identity import actor_url_from_username
 from profed.components.api.storage.actor import storage
-from profed.core.config import config
 
 
 async def resolve_actor(username: str):
@@ -15,11 +13,6 @@ async def resolve_actor(username: str):
     if payload is None:
         return None
 
-    profile = UserProfile.model_validate(payload)
+    return Person.from_user(UserProfile.model_validate(payload))
 
-    return Person(id=actor_url_from_username(username),
-                  preferredUsername=username,
-                  name=profile.name,
-                  summary=profile.summary,
-                  resume=profile.resume)
 

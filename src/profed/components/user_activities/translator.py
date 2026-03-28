@@ -6,7 +6,6 @@ import logging
 from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.topics import users as users_topic
-from profed.identity import actor_url_from_username
 from profed.models import UserProfile
 from profed.models.activity_pub import Person, CreateActivity, UpdateActivity
 
@@ -17,22 +16,14 @@ _SUBSCRIBER = "user_activities"
 
 
 def _activity_from_user_event(event_type: str, payload: dict):
-    profile = UserProfile.model_validate(payload)
-    username = profile.username
-
-    actor = Person(id=actor_url_from_username(username),
-                   preferredUsername=username,
-                   name=profile.name,
-                   summary=profile.summary,
-                   resume=profile.resume)
-
+    actor = Person.from_user(UserProfile.model_validate(payload))
     actor_dict = actor.model_dump(by_alias=True, exclude_none=True)
 
-    activities = {"created": CreateActivity,
-                  "updated": UpdateActivity}
-    return (activities[event_type](id=f"{actor.id}#{event_type[,-1]}",
-                                   actor=actor.id,
-                                   object=actor_dict)
+    activities = {"created": (CreateActivity, "create"),
+                  "updated": (UpdateActivity, "update")}
+    return (activities[event_type][0](id=f"{actor.id}#{activities[event_type][1]}",
+                                      actor=actor.id,
+                                      object=actor_dict)
             if event_type in activities else
             None)
 

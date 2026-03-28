@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from pydantic import Field
-from .activity_streams import ActivityStreamsObject
-from .activity import Activity
+from profed.models.activity_pub.activity_streams import ActivityStreamsObject
+from profed.models.activity_pub.activity import Activity
 
 
 class OrderedCollectionBase(ActivityStreamsObject):

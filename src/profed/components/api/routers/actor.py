@@ -3,14 +3,14 @@
 
 from fastapi import APIRouter, HTTPException, Path
 from profed.components.api.services.actor import resolve_actor
-from profed.components.api.models.actor import Actor
+from profed.models.activity_pub import Person 
 from profed.components.api.http import ActivityPubJSONResponse
 
 router = APIRouter()
 
 
 @router.get("/actors/{username}",
-            response_model=Actor,
+            response_model=Person,
             response_class=ActivityPubJSONResponse)
 async def actor(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$")):
     try:
