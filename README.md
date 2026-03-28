@@ -74,9 +74,10 @@ https://codeberg.org/ProFed/ProFed
 
 Please open issues there.
 
-GitHub mirror (automatically synchronized):
+GitHub, and GitLab mirrors (automatically synchronized):
 
 https://github.com/ProFed-social/ProFed
+https://gitlab.com/profed/profed
 
 Issues should preferably be raised on Codeberg.
 

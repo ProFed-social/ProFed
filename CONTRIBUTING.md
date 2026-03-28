@@ -21,12 +21,13 @@ https://codeberg.org/ProFed/ProFed
 
 Please submit all pull requests to this repository.
 
-There is also a GitHub mirror for convenience:
+There are also mirrors on GitHub, and GitLab for convenience:
 
 https://github.com/ProFed-social/ProFed
+https://gitlab.com/profed/profed
 
-Forks from GitHub are fine, but all pull requests must target the canonical
-Codeberg repository.
+Forks from GitHub, or GitLab are fine, but all pull requests must target the
+canonical Codeberg repository.
 
 ## How to Contribute
 
