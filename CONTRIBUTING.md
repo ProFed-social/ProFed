@@ -23,8 +23,8 @@ Please submit all pull requests to this repository.
 
 There are also mirrors on GitHub, and GitLab for convenience:
 
-https://github.com/ProFed-social/ProFed
-https://gitlab.com/profed/profed
+- https://github.com/ProFed-social/ProFed
+- https://gitlab.com/profed/profed
 
 Forks from GitHub, or GitLab are fine, but all pull requests must target the
 canonical Codeberg repository.

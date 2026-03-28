@@ -76,8 +76,8 @@ Please open issues there.
 
 GitHub, and GitLab mirrors (automatically synchronized):
 
-https://github.com/ProFed-social/ProFed
-https://gitlab.com/profed/profed
+- https://github.com/ProFed-social/ProFed
+- https://gitlab.com/profed/profed
 
 Issues should preferably be raised on Codeberg.
 
