@@ -39,11 +39,10 @@ def _activity_from_user_event(event_type: str, payload: dict):
 
 async def handle_user_events() -> None:
     async with message_bus().topic("activities").publish() as publish:
-        async for sequence_id, event in message_bus().topic("users").subscribe(
-            _SUBSCRIBER,
-            0,
-            include_sequence_id=True,
-        ):
+        async for sequence_id, event \
+                in message_bus().topic("users").subscribe(_SUBSCRIBER,
+                                                          0,
+                                                          include_sequence_id=True):
             event_type, payload = users_topic["validate"](event)
 
             if event_type not in ("created", "updated") or payload is None:
@@ -52,20 +51,14 @@ async def handle_user_events() -> None:
             try:
                 activity = _activity_from_user_event(event_type, payload)
             except Exception as exc:
-                logger.warning(
-                    "Ignoring malformed users event in user_activities: %r; %s",
-                    payload,
-                    exc,
-                )
+                logger.warning("Ignoring malformed users event in user_activities: %r; %s",
+                               payload,
+                               exc)
                 continue
 
-            await publish(
-                {
-                    "type": "created",
-                    "payload": {
-                        "username": payload["username"],
-                        **activity.model_dump(by_alias=True, exclude_none=True),
-                    },
-                },
-                message_id=_USERS_SOURCE.message_id(sequence_id),
-            )
+            await publish({"type": "created",
+                           "payload": {"username": payload["username"],
+                                       **activity.model_dump(by_alias=True,
+                                                             exclude_none=True)}},
+                          message_id=_USERS_SOURCE.message_id(sequence_id))
+
