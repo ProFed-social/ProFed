@@ -1,8 +1,8 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from profed.identity import username_from_acct, actor_url_from_username
 from profed.components.api.storage.webfinger_users import storage
-from profed.components.api.identity import username_from_acct, actor_url_from_username
 
 
 async def resolve_actor_url(acct: str):

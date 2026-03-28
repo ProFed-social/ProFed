@@ -2,10 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-import os
 import asyncio
 import importlib
-from typing import List, Dict, Any, Optional, Callable
 
 
 class ComponentError(Exception):
@@ -27,16 +25,15 @@ class Component:
             await (self.entry(cfg))
     
 
-def run(config: Dict[str, Any], init=None) -> None:
-    async def init_all(ini):
-        await asyncio.gather(*(i() for i in ini))
-    if init is not None:
-        asyncio.run(init_all(init))
-
-    component_names = list(config["profed"]["run"].split())
-    components = [Component(name) for name in component_names]
+def run(config, init=None):
     async def main():
+        if init is not None:
+            await asyncio.gather(*(fn() for fn in init))
+
+        component_names = list(config["profed"]["run"].split())
+        components = [Component(name) for name in component_names]
         await asyncio.gather(*(component(config.get(component.name, {}))
                                for component in components))
+
     asyncio.run(main())
 
