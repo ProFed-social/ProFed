@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from threading import Thread
 import asyncio
 import asyncpg
 import uvicorn

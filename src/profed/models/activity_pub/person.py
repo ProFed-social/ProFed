@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from pydantic import Field
-from profed.core.config import config
 from profed.identity import actor_url_from_username
 
 from profed.models.resume import Resume
