@@ -70,13 +70,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 Canonical repository:
 
-https://codeberg.org/GrayDurian/ProFed
+https://codeberg.org/ProFed/ProFed
 
 Please open issues there.
 
 GitHub mirror (automatically synchronized):
 
-https://github.com/cdonat/ProFed
+https://github.com/ProFed-social/ProFed
 
 Issues should preferably be raised on Codeberg.
 

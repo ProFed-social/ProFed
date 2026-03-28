@@ -17,13 +17,13 @@ Thank you for your interest in contributing to ProFed!
 
 The canonical repository for ProFed is hosted on Codeberg:
 
-https://codeberg.org/GrayDurian/ProFed
+https://codeberg.org/ProFed/ProFed
 
 Please submit all pull requests to this repository.
 
 There is also a GitHub mirror for convenience:
 
-https://github.com/cdonat/ProFed
+https://github.com/ProFed-social/ProFed
 
 Forks from GitHub are fine, but all pull requests must target the canonical
 Codeberg repository.
