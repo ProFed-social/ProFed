@@ -9,7 +9,7 @@ def _publish_snapshot(conn: Connection, topic: str, schema: str) \
         -> Callable[[Dict[str, Any], int], Awaitable[None]]:
     async def publish(snapshot: Dict[str, Any], last_event_id: int) -> None:
         await conn.execute(f"""
-                           INSERT INTO {schema}.{topic}_snapshots (payload, event_id)
+                           INSERT INTO {schema}.{topic}_snapshots (payload, last_event_id)
                            VALUES ($1, $2)
                            """,
                            snapshot,
@@ -53,4 +53,4 @@ async def last_snapshot(pool: Pool, schema: str, topic: str):
                                   ORDER BY last_event_id DESC
                                   LIMIT 1
                                   """)
-        return (row["last_seen"], row["payload"]) if row else (0, None)
+        return (row["last_event_id"], row["payload"]) if row else (0, [])
