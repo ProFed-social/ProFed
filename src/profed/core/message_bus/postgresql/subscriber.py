@@ -1,14 +1,20 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from typing import Dict, Any, AsyncGenerator, Tuple
+from typing import Dict, Any, AsyncGenerator, Optional, Tuple
 import asyncio
 from asyncpg import Pool, Connection
 
 MIN_WAIT = 0.05
 MAX_WAIT = 2.0
 
-def subscribe(pool: Pool, config: Dict[str, str], topic: str, subscriber: str, last_seen: int, include_sequence_id: bool = False) \
+def subscribe(pool: Pool,
+              config: Dict[str, str],
+              topic: str,
+              subscriber: str,
+              last_seen: int,
+              include_sequence_id: bool = False,
+              caught_up: Optional[asyncio.Event] = None) \
         -> AsyncGenerator[Dict[str, Any], None]:
     min_wait = float(config.get("minimum_message_wait", MIN_WAIT))
     max_wait = float(config.get("maximum_message_wait", MAX_WAIT))
@@ -78,7 +84,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, subscriber: str, l
     async def _accept_gaps(conn: Connection,
                            last_seen: int,
                            config: Dict[str, str],
-                           topic:str,
+                           topic: str,
                            subscriber: str) -> int:
         next_row = await conn.fetchrow(f"""
                                        SELECT id
@@ -100,6 +106,7 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, subscriber: str, l
 
     async def read_messages(last_seen) -> AsyncGenerator[Dict[str, Any] | Tuple[int, Dict[str, Any]], None]:
         wait: float = min_wait
+        backlog_done = False
         async with pool.acquire() as conn:
             await _ensure_gap_table(conn)
             await conn.execute(f"LISTEN {config['schema']}_{topic}")
@@ -120,6 +127,11 @@ def subscribe(pool: Pool, config: Dict[str, str], topic: str, subscriber: str, l
                 if processed:
                     wait = min_wait
                     continue
+                if not backlog_done:
+                    backlog_done = True
+                    if caught_up is not None:
+                        caught_up.set()
+
 
                 await asyncio.sleep(wait)
                 wait = min(wait * 2, max_wait)
