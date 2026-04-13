@@ -34,8 +34,11 @@ def test_host_and_port_remain_available_for_db():
 
 def test_component_db_overrides_database_section():
     cfg = {"host": "other-db.example.com", "database": "other"}
-    db  = {"host": "localhost", "port": "5432",
-           "database": "mydb", "user": "u", "password": "p"}
+    db  = {"host": "localhost",
+           "port": "5432",
+           "database": "mydb",
+           "user": "u",
+           "password": "p"}
     result = parse(cfg, db)
     assert result["host"] == "other-db.example.com"
     assert result["database"] == "other"
