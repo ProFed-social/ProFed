@@ -3,6 +3,7 @@
 
 from importlib import import_module
 from profed.core.config import config
+from profed.core.config.database import with_database_defaults
 
 _instance = None
 
@@ -14,6 +15,9 @@ async def init_message_bus():
     cfg = config().get("message_bus", {})
     typ = cfg.get("type", "postgresql")
 
+    db_cfg = config().get("database", {})
+    cfg = with_database_defaults(cfg, db_cfg)
+ 
     mod = import_module(f".{typ}", package=__name__)
     init = getattr(mod, "init")
     _instance = await init(cfg)

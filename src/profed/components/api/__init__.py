@@ -78,8 +78,8 @@ async def Api(config):
     app = create_app(config)
 
     server = uvicorn.Server(uvicorn.Config(app,
-                                           host=config.get("host", "127.0.0.1"),
-                                           port=int(config.get("port", 8000)),
+                                           host=config.get("listen_host", "127.0.0.1"),
+                                           port=int(config.get("listen_port", 8000)),
                                            loop="asyncio"))
     await server.serve()
 
