@@ -9,7 +9,7 @@ class _storage:
     def __init__(self, pool: Pool):
         self._pool = pool
 
-    async def ensure_schema(self):
+    async def ensure_table(self):
         async with self._pool.acquire() as conn:
             await conn.execute("""CREATE TABLE IF NOT EXISTS api.actor (
                                       username TEXT PRIMARY KEY,
