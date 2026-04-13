@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import json
 import pytest
 from unittest.mock import AsyncMock, Mock
 from profed.components.api.storage import outbox
@@ -60,7 +61,7 @@ async def test_add_success(fake_pool, fake_conn):
                                    VALUES ($1, $2)
                                """,
                                "alice",
-                               activity)
+                               json.dumps(activity))
 
 
 @pytest.mark.asyncio
@@ -79,8 +80,8 @@ async def test_fetch_found(fake_pool, fake_conn):
     }
 
     fake_conn.fetch.return_value = [
-        {"activity": activity_1},
-        {"activity": activity_2},
+        {"activity": json.dumps(activity_1)},
+        {"activity": json.dumps(activity_2)},
     ]
 
     result = await store.fetch("alice")

@@ -3,6 +3,7 @@
 
 
 import pytest
+import json
 
 
 @pytest.mark.asyncio
@@ -14,7 +15,7 @@ async def test_snapshot_publish(topic, db):
     snapshots = db.snapshots["public.test_snapshots"]
 
     assert len(snapshots) == 1
-    assert snapshots[0]["payload"] == {"state": 42}
+    assert snapshots[0]["payload"] == json.dumps({"state": 42})
 
 
 @pytest.mark.asyncio

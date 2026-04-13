@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import json
 import re
 from collections import defaultdict
 
@@ -8,7 +9,6 @@ from collections import defaultdict
 class FakeConnection:
     def __init__(self, db):
         self._db = db
-        self.notifies = []
         self._listeners = {}
 
     class _Transaction:
@@ -133,7 +133,9 @@ class InMemoryDatabase:
         table_messages = self.messages[table]
         new_id = i if i is not None else len(table_messages) + 1
         if message_id is None or message_id not in (m["message_id"] for m in table_messages):
-            table_messages.append({"id": new_id, "payload": payload, "message_id": message_id})
+            table_messages.append({"id": new_id,
+                                   "payload": payload if isinstance(payload, str) else json.dumps(payload),
+                                   "message_id": message_id})
             return [{"id": new_id}]
         return None
 
@@ -144,7 +146,7 @@ class InMemoryDatabase:
                       key=lambda m: m["id"])
 
     def insert_snapshot(self, table, payload, event_id):
-        self.snapshots[table].append({"payload": payload,
+        self.snapshots[table].append({"payload": payload if isinstance(payload, str) else json.dumps(payload),
                                       "last_event_id": event_id})
 
     def fetch_snapshots(self, table):

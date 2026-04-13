@@ -176,8 +176,8 @@ async def test_rebuild_multiple_items_some_malformed(fake_storage, fake_message_
                                "type": "created",
                                "actor": "https://example.com/actors/alice",
                                "object": {"id": "https://example.com/actors/alice"}}}])
-async def test_handle_activities_created(fake_storage, fake_message_bus):
-    await projections.handle_activities()
+async def test_handle_user_events_created(fake_storage, fake_message_bus):
+    await projections.handle_user_events()
 
     fake_storage.add.assert_awaited_once_with("alice",
                                               {"username": "alice",
@@ -192,8 +192,8 @@ async def test_handle_activities_created(fake_storage, fake_message_bus):
                                "type": "Update",
                                "actor": "https://example.com/actors/alice",
                                "object": {"id": "https://example.com/actors/alice"}}}])
-async def test_handle_activities_ignores_unknown_event_type(fake_storage, fake_message_bus):
-    await projections.handle_activities()
+async def test_handle_user_events_ignores_unknown_event_type(fake_storage, fake_message_bus):
+    await projections.handle_user_events()
 
     fake_storage.add.assert_not_awaited()
 
@@ -203,8 +203,8 @@ async def test_handle_activities_ignores_unknown_event_type(fake_storage, fake_m
                    "payload": {"type": "created",
                                "actor": "https://example.com/actors/alice",
                                "object": {"id": "https://example.com/actors/alice"}}}])
-async def test_handle_activities_ignores_malformed_event(fake_storage, fake_message_bus):
-    await projections.handle_activities()
+async def test_handle_user_events_ignores_malformed_event(fake_storage, fake_message_bus):
+    await projections.handle_user_events()
 
     fake_storage.add.assert_not_awaited()
 
@@ -219,8 +219,8 @@ async def test_handle_activities_ignores_malformed_event(fake_storage, fake_mess
                                "type": "created",
                                "actor": "https://example.com/actors/alice",
                                "object": {"id": "https://example.com/actors/alice"}}}])
-async def test_handle_activities_continues_after_malformed_event(fake_storage, fake_message_bus):
-    await projections.handle_activities()
+async def test_handle_user_events_continues_after_malformed_event(fake_storage, fake_message_bus):
+    await projections.handle_user_events()
 
     fake_storage.add.assert_awaited_once_with("alice",
                                               {"username": "alice",

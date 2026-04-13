@@ -5,6 +5,7 @@
 from typing import Callable, Dict, Any, Awaitable
 from asyncpg import Pool, Connection 
 from asyncpg.transaction import Transaction
+import json
 
 def _publish(conn: Connection, topic: str, schema: str) \
         -> Callable[[Dict[str, Any]], Awaitable[None]]:
@@ -15,7 +16,7 @@ def _publish(conn: Connection, topic: str, schema: str) \
                            ON CONFLICT (message_id) DO NOTHING
                            RETURNING id
                            """,
-                           message,
+                           json.dumps(message),
                            message_id)
         return None if row is None else row["id"]
     return publish

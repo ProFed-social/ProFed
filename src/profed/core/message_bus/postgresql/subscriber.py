@@ -4,6 +4,7 @@
 from typing import Dict, Any, AsyncGenerator, Optional, Tuple
 import asyncio
 from asyncpg import Pool, Connection
+import json
 
 MIN_WAIT = 0.05
 MAX_WAIT = 2.0
@@ -70,7 +71,7 @@ def subscribe(pool: Pool,
                 if row["id"] != last_seen + 1:
                     break
                 last_seen = row["id"]
-                yield last_seen, row["payload"]
+                yield last_seen, json.loads(row["payload"])
             else:
                 continue
             break
