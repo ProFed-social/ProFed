@@ -20,6 +20,7 @@ def subscribe(pool: Pool,
     max_wait = float(config.get("maximum_message_wait", MAX_WAIT))
 
     async def _ensure_gap_table(conn: Connection) -> None:
+        await conn.execute(f"CREATE SCHEMA IF NOT EXISTS {subscriber}")
         await conn.execute(f"""
                            CREATE TABLE IF NOT EXISTS
                            {subscriber}.{topic}_gaps (
