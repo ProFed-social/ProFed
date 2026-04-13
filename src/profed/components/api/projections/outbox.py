@@ -21,7 +21,7 @@ async def _created(data: dict) -> None:
     await store.add(data["username"], data)
 
 
-handle_activities, rebuild, reset_last_seen = \
+handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=activities,
                          subscriber="api",
                          init=_init,
