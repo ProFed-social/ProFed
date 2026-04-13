@@ -3,6 +3,7 @@
 
 from typing import Dict, List
 import asyncpg
+import json
 
 
 class _storage:
@@ -26,7 +27,7 @@ class _storage:
                                    VALUES ($1, $2)
                                """,
                                username,
-                               activity)
+                               json.dumps(activity))
 
     async def fetch(self, username: str) -> List[dict]:
         async with self._pool.acquire() as conn:
@@ -36,7 +37,7 @@ class _storage:
                                         ORDER BY created_at
                                     """,
                                     username)
-            return [row["activity"] for row in rows]
+            return [json.loads(row["activity"]) for row in rows]
 
 
 _instance: _storage | None = None

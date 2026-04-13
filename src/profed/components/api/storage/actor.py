@@ -3,6 +3,7 @@
 
 from typing import Dict, Optional
 from asyncpg import Pool, create_pool
+import json
 
 
 class _storage:
@@ -20,7 +21,7 @@ class _storage:
             await conn.execute("""INSERT INTO api.actor (username, payload)
                                   VALUES ($1, $2)""",
                                username,
-                               payload)
+                               json.dumps(payload))
 
     async def update(self, username: str, payload: dict):
         async with self._pool.acquire() as conn:
@@ -28,7 +29,7 @@ class _storage:
                                   SET payload = $2
                                   WHERE username = $1""",
                                username,
-                               payload)
+                               json.dumps(payload))
 
     async def delete(self, username: str, _=None):
         async with self._pool.acquire() as conn:
@@ -42,7 +43,7 @@ class _storage:
                                          FROM api.actor
                                          WHERE username = $1""",
                                       username)
-        return row["payload"] if row is not None else None
+        return json.loads(row["payload"]) if row is not None else None
 
 
 _instance: _storage | None = None
