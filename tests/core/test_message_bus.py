@@ -63,3 +63,48 @@ def test_message_bus_fail_without_init(mock_module):
         except Exception as e:
             assert False, f"expected RuntimeError - got different Exception: {e}"
 
+
+@mark.asyncio
+async def test_database_section_is_passed_to_message_bus(mock_module):
+    with Cfg({"message_bus": {"type": "example"},
+              "database":    {"host": "db.example.com",
+                              "port": "5432",
+                              "database": "mydb",
+                              "user": "u",
+                              "password": "p"},
+              "profed":      {"run": ""}}):
+        message_bus._instance = None
+        await message_bus.init_message_bus()
+        bus = message_bus.message_bus()
+        assert bus["host"] == "db.example.com"
+        assert bus["database"] == "mydb"
+        assert bus["password"] == "p"
+
+
+@mark.asyncio
+async def test_message_bus_section_overrides_database_section(mock_module):
+    with Cfg({"message_bus": {"type": "example",
+                              "host": "bus-specific-host"},
+              "database":    {"host": "db.example.com",
+                              "port": "5432",
+                              "database": "mydb",
+                              "user": "u",
+                              "password": "p"},
+              "profed":      {"run": ""}}):
+        message_bus._instance = None
+        await message_bus.init_message_bus()
+        bus = message_bus.message_bus()
+        assert bus["host"] == "bus-specific-host"
+        assert bus["database"] == "mydb"
+
+
+@mark.asyncio
+async def test_no_database_section_leaves_message_bus_config_unchanged(mock_module):
+    with Cfg({"message_bus": {"type": "example", "host": "myhost"},
+              "profed":      {"run": ""}}):
+        message_bus._instance = None
+        await message_bus.init_message_bus()
+        bus = message_bus.message_bus()
+        assert bus["host"] == "myhost"
+        assert "database" not in bus
+
