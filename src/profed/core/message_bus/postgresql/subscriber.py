@@ -30,9 +30,9 @@ def subscribe(pool: Pool,
 
     async def _prune_gaps_from_snapshot(conn: Connection) -> None:
         row = await conn.fetchrow(f"""
-                                  SELECT event_id
+                                  SELECT last_event_id
                                   FROM {config['schema']}.{topic}_snapshots
-                                  ORDER BY event_id DESC
+                                  ORDER BY last_event_id DESC
                                   OFFSET 1 LIMIT 1
                                   """)
         if row:
@@ -40,7 +40,7 @@ def subscribe(pool: Pool,
                                DELETE FROM {subscriber}.{topic}_gaps
                                WHERE missing_id <= $1
                                """,
-                               row["event_id"])
+                               row["last_event_id"])
 
     async def _detect_corruption(conn: Connection) -> bool:
         row = await conn.fetchrow(f"""
@@ -60,12 +60,6 @@ def subscribe(pool: Pool,
                                 ORDER BY id
                                 """,
                                 last_seen)
-
-    async def _process_snapshot_notification(conn: Connection):
-        while conn.notifies:
-            notify = conn.notifies.pop(0)
-            if notify.channel.endswith("_snapshot"):
-                await _prune_gaps_from_snapshot(conn)
 
     async def _process_messages(conn: Connection, last_seen: int):
         while True:
@@ -108,35 +102,53 @@ def subscribe(pool: Pool,
     async def read_messages(last_seen) -> AsyncGenerator[Dict[str, Any] | Tuple[int, Dict[str, Any]], None]:
         wait: float = min_wait
         backlog_done = False
+        message_event = asyncio.Event()
+        snapshot_event = asyncio.Event()
+ 
+        def _on_message(conn, pid, channel, payload):
+            message_event.set()
+ 
+        def _on_snapshot(conn, pid, channel, payload):
+            snapshot_event.set()
+
         async with pool.acquire() as conn:
             await _ensure_gap_table(conn)
-            await conn.execute(f"LISTEN {config['schema']}_{topic}")
-            await conn.execute(f"LISTEN {config['schema']}_{topic}_snapshot")
+            await conn.add_listener(f"{config['schema']}_{topic}", _on_message)
+            await conn.add_listener(f"{config['schema']}_{topic}_snapshot", _on_snapshot)
+ 
+            try:
+                while True:
+                    if snapshot_event.is_set():
+                        snapshot_event.clear()
+                        await _prune_gaps_from_snapshot(conn)
+ 
+                    if await _detect_corruption(conn):
+                        raise RuntimeError(f"Corruption detected in topic '{topic}'")
 
-            while True:
-                await _process_snapshot_notification(conn)
+                    message_event.clear()
+                    processed = False
+                    async for seen, message in _process_messages(conn, last_seen):
+                        last_seen = seen
+                        processed = True
+                        yield message if not include_sequence_id else (seen, message)
 
-                if await _detect_corruption(conn):
-                    raise RuntimeError(f"Corruption detected in topic '{topic}'")
+                    if processed:
+                        wait = min_wait
+                        continue
+                    if not backlog_done:
+                        backlog_done = True
+                        if caught_up is not None:
+                            caught_up.set()
 
-                processed = False
-                async for seen, message in _process_messages(conn, last_seen):
-                    last_seen = seen
-                    processed = True
-                    yield message if not include_sequence_id else (seen, message)
+                    try:
+                        await asyncio.wait_for(message_event.wait(), timeout=wait)
+                        wait = min_wait
+                    except asyncio.TimeoutError:
+                        wait = min(wait * 2, max_wait)
+                        last_seen = await _accept_gaps(conn, last_seen, config, topic, subscriber)
+            finally:
+                await conn.remove_listener(f"{config['schema']}_{topic}", _on_message)
+                await conn.remove_listener(f"{config['schema']}_{topic}_snapshot", _on_snapshot)
 
-                if processed:
-                    wait = min_wait
-                    continue
-                if not backlog_done:
-                    backlog_done = True
-                    if caught_up is not None:
-                        caught_up.set()
-
-
-                await asyncio.sleep(wait)
-                wait = min(wait * 2, max_wait)
-
-                last_seen = await _accept_gaps(conn, last_seen, config, topic, subscriber)
 
     return read_messages(last_seen)

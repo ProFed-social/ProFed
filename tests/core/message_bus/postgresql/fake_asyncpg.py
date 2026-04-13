@@ -5,16 +5,11 @@ import re
 from collections import defaultdict
 
 
-class FakeNotification:
-    def __init__(self, channel: str):
-        self.channel = channel
-
-
 class FakeConnection:
     def __init__(self, db):
         self._db = db
         self.notifies = []
-        self._listeners = set()
+        self._listeners = {}
 
     class _Transaction:
         async def start(self):
@@ -30,13 +25,11 @@ class FakeConnection:
         return self._Transaction()
 
     async def execute(self, query: str, *args):
-        if query.startswith("LISTEN"):
-            self._listeners.add(query.split()[1])
-        elif query.startswith("NOTIFY"):
+        if query.startswith("NOTIFY"):
             channel = query.split()[1]
             for conn in self._db.connections:
-                if channel in conn._listeners:
-                    conn.notifies.append(FakeNotification(channel))
+                for callback in list(conn._listeners.get(channel, [])):
+                    callback(conn, 0, channel, "")
         elif "INSERT INTO" in query:
             if "_snapshots" in query:
                 self._db.insert_snapshot(self._extract_table(query),
@@ -91,6 +84,16 @@ class FakeConnection:
         rows = await self.fetch(query, *args)
         return rows[0] if rows else None
 
+    async def add_listener(self, channel: str, callback) -> None:
+        self._listeners.setdefault(channel, []).append(callback)
+ 
+    async def remove_listener(self, channel: str, callback) -> None:
+        if channel in self._listeners:
+            try:
+                self._listeners[channel].remove(callback)
+            except ValueError:
+                pass
+ 
     def _extract_table(self, query: str) -> str:
         for part in query.split():
             if "." in part:
@@ -142,13 +145,13 @@ class InMemoryDatabase:
 
     def insert_snapshot(self, table, payload, event_id):
         self.snapshots[table].append({"payload": payload,
-                                      "event_id": event_id})
+                                      "last_event_id": event_id})
 
     def fetch_snapshots(self, table):
         sorted_snaps = sorted(self.snapshots[table],
-                              key=lambda s: s["event_id"],
+                              key=lambda s: s["last_event_id"],
                               reverse=True)
-        return ([{"event_id": sorted_snaps[1]["event_id"]}]
+        return ([{"last_event_id": sorted_snaps[1]["last_event_id"]}]
                 if len(sorted_snaps) >= 2 else
                 [])
 
