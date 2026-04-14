@@ -41,3 +41,4 @@ def validate_incoming_activities_snapshot_item(item) -> Optional[Dict]:
 topic = {"name": "incoming_activities",
          "validate": validate_incoming_activities_event,
          "snapshot_validate": validate_incoming_activities_snapshot_item}
+
