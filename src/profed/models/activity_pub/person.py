@@ -23,6 +23,8 @@ class Person(Actor):
     type: str = "Person"
     name: str | None = None
     summary: str | None = None
+    inbox: str
+    outbox: str
     resume: Resume | None = None
 
     @classmethod
@@ -31,5 +33,7 @@ class Person(Actor):
                    preferredUsername=profile.username,
                    name=profile.name,
                    summary=profile.summary,
-                   resume=profile.resume)
+                   resume=profile.resume,
+                   inbox=f"{actor_url_from_username(profile.username)}/inbox",
+                   outbox=f"{actor_url_from_username(profile.username)}/outbox")
 
