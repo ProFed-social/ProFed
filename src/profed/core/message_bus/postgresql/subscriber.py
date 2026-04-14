@@ -82,14 +82,14 @@ def subscribe(pool: Pool,
                            config: Dict[str, str],
                            topic: str,
                            subscriber: str) -> int:
+        gap_id = last_seen + 1
         next_row = await conn.fetchrow(f"""
-                                       SELECT id
+                                       SELECT min(id) AS min_id
                                        FROM {config['schema']}.{topic}
-                                       WHERE id = $1
+                                       WHERE id > $1
                                        """,
-                                       last_seen + 1)
-        if next_row:
-            gap_id = last_seen + 1
+                                       last_seen)
+        if next_row and next_row["min_id"] is not None and next_row["min_id"] > gap_id:
             await conn.execute(f"""
                                INSERT INTO {subscriber}.{topic}_gaps
                                (missing_id)
@@ -97,7 +97,7 @@ def subscribe(pool: Pool,
                                ON CONFLICT DO NOTHING
                                """,
                                gap_id)
-            last_seen = gap_id
+            return gap_id
         return last_seen
 
     async def read_messages(last_seen) -> AsyncGenerator[Dict[str, Any] | Tuple[int, Dict[str, Any]], None]:

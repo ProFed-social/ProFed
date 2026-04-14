@@ -62,6 +62,10 @@ class FakeConnection:
                 if lr[l_col] == rr[r_col]]
 
     async def fetch(self, query: str, *args):
+        if "MIN(ID)" in query.upper():
+            rows = self._fetch_single_table(self._extract_table(query), *args)
+            min_id = min((r["id"] for r in rows), default=None)
+            return [{"min_id": min_id}]
         if "FROM" in query:
             tables = re.findall(r"FROM\s+([^\s]+)\s+([^\s]+)\s+JOIN\s+([^\s]+)\s+([^\s]+)\s+ON\s+([^\s]+)\.([^\s]+)\s*=\s*([^\s]+)\.([^\s]+)",
                                 query.upper(),
