@@ -15,6 +15,19 @@ from .projections import (
         actor as actor_projections,
         inbox as inbox_projections,
         outbox as outbox_projections)
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+def _logged_task(coro, name):
+    async def _wrapper():
+        try:
+            await coro
+        except Exception:
+            logger.exception("Projection task %s failed", name)
+            raise
+    return asyncio.create_task(_wrapper(), name=name)
 
 
 async def _init_well_known_router(config):
@@ -22,7 +35,7 @@ async def _init_well_known_router(config):
     await (await webfinger_storage.storage()).ensure_table()
     await webfinger_projections.rebuild()
 
-    asyncio.create_task(webfinger_projections.handle_user_events())
+    _logged_task(webfinger_projections.handle_user_events(), "webfinger")
 
 
 async def _init_actor_router(config):
@@ -30,7 +43,7 @@ async def _init_actor_router(config):
     await (await actor_storage.storage()).ensure_table()
     await actor_projections.rebuild()
      
-    asyncio.create_task(actor_projections.handle_user_events())
+    _logged_task(actor_projections.handle_user_events(), "actor")
 
 
 async def _init_inbox_router(config):
@@ -38,7 +51,7 @@ async def _init_inbox_router(config):
     await (await inbox_storage.storage()).ensure_table()
     await inbox_projections.rebuild()
      
-    asyncio.create_task(inbox_projections.handle_user_events())
+    _logged_task(inbox_projections.handle_user_events(), "inbox")
 
 
 async def _init_outbox_router(config):
@@ -46,7 +59,7 @@ async def _init_outbox_router(config):
     await (await outbox_storage.storage()).ensure_table()
     await outbox_projections.rebuild()
      
-    asyncio.create_task(outbox_projections.handle_user_events())
+    _logged_task(outbox_projections.handle_user_events(), "outbox")
 
 
 async def _reset_component_schema(config):
