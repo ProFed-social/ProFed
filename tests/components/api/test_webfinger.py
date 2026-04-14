@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from profed.core.config import raw, config
 from profed.components.api.routers.well_known import router as webfinger_router
-from profed.components.api.services.webfinger import resolve_actor_url
+from profed.components.api.services.webfinger import resolve_actor_url, resolve_acct_from_actor_url
 
 
 @pytest.fixture
@@ -107,4 +107,58 @@ async def test_resolve_actor_url_storage_error(fake_storage):
 
     with pytest.raises(RuntimeError):
         await resolve_actor_url("alice@example.com")
+
+
+def test_webfinger_actor_url_success(client, fake_storage, cfg):
+    fake_storage.exists.return_value = True
+    response = client.get("/.well-known/webfinger"
+                          "?resource=https://example.com/actors/alice")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["subject"] == "acct:alice@example.com"
+    assert data["links"][0]["href"] == "https://example.com/actors/alice"
+ 
+ 
+def test_webfinger_actor_url_wrong_domain(client, fake_storage, cfg):
+    response = client.get("/.well-known/webfinger"
+                          "?resource=https://other.example.com/actors/alice")
+    assert response.status_code == 404
+ 
+ 
+def test_webfinger_actor_url_not_found(client, fake_storage, cfg):
+    fake_storage.exists.return_value = False
+    response = client.get("/.well-known/webfinger"
+                          "?resource=https://example.com/actors/unknown")
+    assert response.status_code == 404
+ 
+ 
+def test_webfinger_actor_url_wrong_path(client, fake_storage, cfg):
+    response = client.get("/.well-known/webfinger"
+                          "?resource=https://example.com/users/alice")
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_resolve_acct_from_actor_url_success(fake_storage, cfg):
+    fake_storage.exists.return_value = True
+    result = await resolve_acct_from_actor_url("https://example.com/actors/alice")
+    assert result == "alice@example.com"
+ 
+ 
+@pytest.mark.asyncio
+async def test_resolve_acct_from_actor_url_wrong_domain(fake_storage, cfg):
+    result = await resolve_acct_from_actor_url("https://other.example.com/actors/alice")
+    assert result is None
+ 
+ 
+@pytest.mark.asyncio
+async def test_resolve_acct_from_actor_url_not_found(fake_storage, cfg):
+    fake_storage.exists.return_value = False
+    result = await resolve_acct_from_actor_url("https://example.com/actors/unknown")
+    assert result is None
+ 
+ 
+@pytest.mark.asyncio
+async def test_resolve_acct_from_actor_url_wrong_path(fake_storage, cfg):
+    result = await resolve_acct_from_actor_url("https://example.com/users/alice")
+    assert result is None
 
