@@ -114,8 +114,6 @@ def subscribe(pool: Pool,
 
         async with pool.acquire() as conn:
             await _ensure_gap_table(conn)
-            await conn.add_listener(f"{config['schema']}_{topic}", _on_message)
-            await conn.add_listener(f"{config['schema']}_{topic}_snapshot", _on_snapshot)
  
             try:
                 while True:
@@ -140,6 +138,8 @@ def subscribe(pool: Pool,
                         backlog_done = True
                         if caught_up is not None:
                             caught_up.set()
+                        await conn.add_listener(f"{config['schema']}_{topic}", _on_message)
+                        await conn.add_listener(f"{config['schema']}_{topic}_snapshot", _on_snapshot)
 
                     try:
                         await asyncio.wait_for(message_event.wait(), timeout=wait)
@@ -148,8 +148,9 @@ def subscribe(pool: Pool,
                         wait = min(wait * 2, max_wait)
                         last_seen = await _accept_gaps(conn, last_seen, config, topic, subscriber)
             finally:
-                await conn.remove_listener(f"{config['schema']}_{topic}", _on_message)
-                await conn.remove_listener(f"{config['schema']}_{topic}_snapshot", _on_snapshot)
+                if backlog_done:
+                    await conn.remove_listener(f"{config['schema']}_{topic}", _on_message)
+                    await conn.remove_listener(f"{config['schema']}_{topic}_snapshot", _on_snapshot)
 
 
     return read_messages(last_seen)

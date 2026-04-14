@@ -5,6 +5,8 @@ from pytest import fixture
 from pytest_asyncio import fixture as async_fixture
 from unittest.mock import patch
 
+import asyncio
+
 from .fake_asyncpg import InMemoryDatabase, FakePool
 
 
@@ -38,4 +40,28 @@ async def bus(db):
 @fixture
 def topic(bus):
     return bus.topic("test")
+ 
 
+@async_fixture
+async def drain(topic):
+    """Subscribe, collect messages until caught_up, cancel, return messages."""
+    async def _drain(**subscribe_kwargs):
+        caught_up = asyncio.Event()
+        collected = []
+ 
+        async def consume():
+            async for msg in topic.subscribe("test",
+                                              caught_up=caught_up,
+                                              **subscribe_kwargs):
+                collected.append(msg)
+ 
+        task = asyncio.create_task(consume())
+        await asyncio.wait_for(caught_up.wait(), timeout=2.0)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        return collected
+ 
+    return _drain
