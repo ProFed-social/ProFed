@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from fastapi import FastAPI
-from .routers import (well_known,
-                      actor,
-                      inbox,
-                      outbox)
+from .s2s.webfinger import router as well_known
+from .s2s.actor     import router as actor
+from .s2s.inbox     import router as inbox
+from .s2s.outbox    import router as outbox
 
 def create_app(config):
 

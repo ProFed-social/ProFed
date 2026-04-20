@@ -5,16 +5,12 @@ import asyncio
 import asyncpg
 import uvicorn
 from .app import create_app
-from .storage import (
-        webfinger_users as webfinger_storage,
-        actor as actor_storage,
-        inbox_users as inbox_storage,
-        outbox as outbox_storage)
-from .projections import (
-        webfinger as webfinger_projections,
-        actor as actor_projections,
-        inbox as inbox_projections,
-        outbox as outbox_projections)
+
+from .s2s.webfinger import storage as webfinger_storage, projection as webfinger_projection
+from .s2s.actor     import storage as actor_storage,     projection as actor_projection
+from .s2s.inbox     import storage as inbox_storage,     projection as inbox_projection
+from .s2s.outbox    import storage as outbox_storage,    projection as outbox_projection
+
 import logging
 
 
@@ -33,33 +29,33 @@ def _logged_task(coro, name):
 async def _init_well_known_router(config):
     await webfinger_storage.init(config)
     await (await webfinger_storage.storage()).ensure_table()
-    await webfinger_projections.rebuild()
+    await webfinger_projection.rebuild()
 
-    _logged_task(webfinger_projections.handle_user_events(), "webfinger")
+    _logged_task(webfinger_projection.handle_user_events(), "webfinger")
 
 
 async def _init_actor_router(config):
     await actor_storage.init(config)
     await (await actor_storage.storage()).ensure_table()
-    await actor_projections.rebuild()
+    await actor_projection.rebuild()
      
-    _logged_task(actor_projections.handle_user_events(), "actor")
+    _logged_task(actor_projection.handle_user_events(), "actor")
 
 
 async def _init_inbox_router(config):
     await inbox_storage.init(config)
     await (await inbox_storage.storage()).ensure_table()
-    await inbox_projections.rebuild()
+    await inbox_projection.rebuild()
      
-    _logged_task(inbox_projections.handle_user_events(), "inbox")
+    _logged_task(inbox_projection.handle_user_events(), "inbox")
 
 
 async def _init_outbox_router(config):
     await outbox_storage.init(config)
     await (await outbox_storage.storage()).ensure_table()
-    await outbox_projections.rebuild()
+    await outbox_projection.rebuild()
      
-    _logged_task(outbox_projections.handle_user_events(), "outbox")
+    _logged_task(outbox_projection.handle_user_events(), "outbox")
 
 
 async def _reset_component_schema(config):
