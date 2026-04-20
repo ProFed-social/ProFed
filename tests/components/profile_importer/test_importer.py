@@ -43,7 +43,11 @@ class FakeTopic:
     async def last_snapshot(self):
         return self._last_snapshot
  
-    def subscribe(self, subscriber, last_seen=0, include_sequence_id=False, caught_up=None):
+    def subscribe(self,
+                  subscriber,
+                  last_seen=0,
+                  include_sequence_id=False,
+                  caught_up=None):
         async def generator():
             for seq, event in self.messages:
                 if seq > last_seen:

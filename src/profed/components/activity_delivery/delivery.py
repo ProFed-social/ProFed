@@ -1,0 +1,168 @@
+# Copyright (C) 2026 Christof Donat
+# SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+import asyncio
+import logging
+import random
+import time
+from email.utils import parsedate_to_datetime
+from typing import Optional
+ 
+import httpx
+ 
+from profed.core.message_bus import message_bus
+from .projections import get_delivery_status
+ 
+ 
+logger = logging.getLogger(__name__)
+ 
+INITIAL_RETRY          = 300
+RETRY_MULTIPLIER       = 2
+MAX_RETRY              = 86400
+MAX_TOTAL              = 172800
+REQUEST_TIMEOUT        = 30.0
+INBOX_CACHE_TTL_MEAN   = 3600.0
+INBOX_CACHE_TTL_JITTER = 0.10
+ 
+PERMANENT_FAILURES = {403, 404, 410}
+ 
+
+_inbox_cache: dict[str, tuple[str, float, float]] = {}
+ 
+ 
+async def _fetch_inbox_url(actor_url: str, config: dict) -> Optional[str]:
+    now = time.monotonic()
+    cached = _inbox_cache.get(actor_url)
+    if cached is not None and now < cached[2]:
+        return cached[0]
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.get(actor_url,
+                                        headers={"Accept": "application/activity+json"},
+                                        timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
+            inbox = response.json().get("inbox")
+            if isinstance(inbox, str):
+                mean   = float(config.get("inbox_cache_ttl", INBOX_CACHE_TTL_MEAN))
+                jitter = float(config.get("inbox_cache_ttl_jitter", INBOX_CACHE_TTL_JITTER))
+                ttl    = mean * random.uniform(1 - jitter, 1 + jitter)
+                _inbox_cache[actor_url] = (inbox, now, now + ttl)
+                return inbox
+    except Exception:
+        logger.warning("Failed to fetch actor %s", actor_url)
+    return None
+ 
+ 
+def _next_delay(config: dict,
+                status: dict | None,
+                retry_after: int | None) -> int | None:
+    """Return seconds to wait before next attempt, or None to give up."""
+    initial  = int(config.get("initial_retry",    INITIAL_RETRY))
+    mult     = float(config.get("retry_multiplier", RETRY_MULTIPLIER))
+    max_wait = int(config.get("max_retry",        MAX_RETRY))
+    max_tot  = int(config.get("max_total",        MAX_TOTAL))
+ 
+    if status is None:
+        return retry_after if retry_after and retry_after > initial else initial
+ 
+    first_attempt_at = status.get("first_attempt_at", time.time())
+    if time.time() - first_attempt_at > max_tot:
+        return None
+ 
+    attempt = status["attempt"]
+    base    = retry_after if retry_after and retry_after > initial else initial
+    return min(int(base * (mult ** (attempt - 1))), max_wait)
+ 
+ 
+def _parse_retry_after(headers) -> int | None:
+    value = headers.get("retry-after")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        dt = parsedate_to_datetime(value)
+        return max(0, int(dt.timestamp() - time.time()))
+    except Exception:
+        return None
+ 
+ 
+async def _publish_attempt(activity_id: str,
+                            recipient: str,
+                            attempt: int,
+                            success: bool,
+                            status_code: int | None,
+                            retry_after: int | None,
+                            first_attempt_at: float) -> None:
+    async with message_bus().topic("deliveries").publish() as publish:
+        await publish({"type": "attempted",
+                       "payload": {"activity_id":      activity_id,
+                                   "recipient":        recipient,
+                                   "success":          success,
+                                   "attempt":          attempt,
+                                   "status_code":      status_code,
+                                   "retry_after":      retry_after,
+                                   "first_attempt_at": first_attempt_at}})
+ 
+ 
+async def deliver(config: dict,
+                   activity_id: str,
+                   activity: dict,
+                   recipient_acct: str) -> None:
+    status = await get_delivery_status(activity_id, recipient_acct)
+ 
+    if status is not None and status["success"]:
+        return
+ 
+    attempt  = 1 if status is None else status["attempt"] + 1
+    first_at = time.time() if status is None else status["first_attempt_at"]
+    retry_after = status.get("retry_after") if status else None
+ 
+    delay = _next_delay(config, status, retry_after)
+    if delay is None:
+        logger.warning("Giving up on %s → %s after %d attempts",
+                       activity_id, recipient_acct, attempt - 1)
+        return
+ 
+    if delay > 0:
+        await asyncio.sleep(delay)
+ 
+    actor_url = _actor_url_from_acct(recipient_acct)
+    inbox_url = await _fetch_inbox_url(actor_url, config)
+    if inbox_url is None:
+        await _publish_attempt(activity_id, recipient_acct, attempt,
+                               False, None, None, first_at)
+        return
+ 
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.post(inbox_url,
+                                         json=activity,
+                                         headers={"Content-Type": "application/activity+json"},
+                                         timeout=REQUEST_TIMEOUT)
+        status_code = response.status_code
+        retry_after = _parse_retry_after(response.headers)
+        success     = 200 <= status_code < 300
+        permanent   = status_code in PERMANENT_FAILURES
+        await _publish_attempt(activity_id, recipient_acct, attempt,
+                               success, status_code, retry_after, first_at)
+        if not success and not permanent:
+            asyncio.create_task(
+                deliver(config, activity_id, activity, recipient_acct),
+                name=f"retry:{activity_id}:{recipient_acct}")
+    except Exception:
+        logger.exception("HTTP error delivering %s → %s",
+                         activity_id, recipient_acct)
+        await _publish_attempt(activity_id, recipient_acct, attempt,
+                               False, None, None, first_at)
+        asyncio.create_task(
+            deliver(config, activity_id, activity, recipient_acct),
+            name=f"retry:{activity_id}:{recipient_acct}")
+ 
+ 
+def _actor_url_from_acct(acct: str) -> str:
+    username, host = acct.split("@", 1)
+    return f"https://{host}/users/{username}"
+

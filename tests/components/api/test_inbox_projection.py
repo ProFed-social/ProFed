@@ -19,12 +19,19 @@ class FakeTopic:
     async def last_snapshot(self):
         return self.snapshots[-1] if len(self.snapshots) > 0 else (0, [])
 
-    def subscribe(self, subscriber:str, last_seen: int = 0):
+    def subscribe(self,
+                  subscriber:str,
+                  last_seen: int = 0,
+                  include_sequence_id: bool = False,
+                  caught_up=None):
         async def generator():
             for message in self.messages:
                 if message[0] > last_seen:
                     self.last_seen = message[0]
-                    yield message[1]
+                    yield (message[0], message[1]) if include_sequence_id else message[1]
+            if caught_up is not None:
+                caught_up.set()
+
         return generator()
 
 

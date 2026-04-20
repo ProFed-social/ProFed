@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import asyncio
 from typing import Optional, Dict, Callable, Awaitable, Tuple
 from profed.core.message_bus import message_bus
 
@@ -46,6 +47,22 @@ def build_projection(topic: Dict,
 
             if item is not None and verify_snapshot_item(item):
                 await on_snapshot_item(item)
+
+        caught_up = asyncio.Event()
+        async for seq, event in message_bus().topic(topic_name).subscribe(subscriber,
+                                                                          last_seen,
+                                                                          include_sequence_id=True,
+                                                                          caught_up=caught_up):
+            event_type, payload = topic["validate"](event)
+            if (event_type is not None and
+                event_type in on_message_type and
+                verify_event(event_type, payload)):
+
+                    await on_message_type[event_type](payload)
+
+            last_seen = seq
+            if caught_up.is_set():
+                break
 
 
     def reset_last_seen(new_last_seen):
