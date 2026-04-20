@@ -11,13 +11,13 @@ def create_app(config):
 
     app = FastAPI()
 
-    deactive_routers = config.get("deactive_routers", "").split()
+    deactivate_routers = config.get("deactivate_routers", "").split()
     init_routers = [rt
-                    for name, rt in (("well_known", well_known.router),
-                                     ("actor", actor.router),
-                                     ("inbox", inbox.router),
-                                     ("outbox", outbox.router))
-                    if name not in deactive_routers]
+                    for name, rt in (("s2s_well_known", well_known.router),
+                                     ("s2s_actor", actor.router),
+                                     ("s2s_inbox", inbox.router),
+                                     ("s2s_outbox", outbox.router))
+                    if name not in deactivate_routers]
     
     for rt in init_routers:
         app.include_router(rt)

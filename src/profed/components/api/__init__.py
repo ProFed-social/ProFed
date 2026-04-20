@@ -76,13 +76,13 @@ async def _reset_component_schema(config):
 async def Api(config):
     await _reset_component_schema(config)
 
-    deactive_routers = config.get("deactive_routers", "").split()
+    deactivate_routers = config.get("deactivate_routers", "").split()
     init_routers = [ini
-                    for name, ini in (("well_known", _init_well_known_router),
-                                      ("actor", _init_actor_router),
-                                      ("inbox", _init_inbox_router),
-                                      ("outbox", _init_outbox_router))
-                    if name not in deactive_routers]
+                    for name, ini in (("s2s_well_known", _init_well_known_router),
+                                      ("s2s_actor", _init_actor_router),
+                                      ("s2s_inbox", _init_inbox_router),
+                                      ("s2s_outbox", _init_outbox_router))
+                    if name not in deactivate_routers]
     
     for ini in init_routers:
         print(f"call router init function: {ini}")
