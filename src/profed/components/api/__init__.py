@@ -10,6 +10,9 @@ from .s2s.webfinger import storage as webfinger_storage, projection as webfinger
 from .s2s.actor     import storage as actor_storage,     projection as actor_projection
 from .s2s.inbox     import storage as inbox_storage,     projection as inbox_projection
 from .s2s.outbox    import storage as outbox_storage,    projection as outbox_projection
+from .c2s.oauth     import projection as oauth_projection
+from .c2s.oauth     import router as oauth_router
+
 
 import logging
 
@@ -57,6 +60,14 @@ async def _init_outbox_router(config):
      
     _logged_task(outbox_projection.handle_user_events(), "outbox")
 
+ 
+async def _init_c2s_oauth_router(config):
+    await oauth_projection.apps_rebuild()
+    await oauth_projection.codes_rebuild()
+    oauth_router.init(config)
+    _logged_task(oauth_projection.apps_handle_events(), "c2s_oauth_apps")
+    _logged_task(oauth_projection.codes_handle_events(), "c2s_oauth_codes")
+
 
 async def _reset_component_schema(config):
     pool = await asyncpg.create_pool(host=config["host"],
@@ -77,7 +88,8 @@ async def Api(config):
                     for name, ini in (("s2s_webfinger", _init_webfinger_router),
                                       ("s2s_actor", _init_actor_router),
                                       ("s2s_inbox", _init_inbox_router),
-                                      ("s2s_outbox", _init_outbox_router))
+                                      ("s2s_outbox", _init_outbox_router),
+                                      ("c2s_oauth", _init_c2s_oauth_router))
                     if name not in deactivate_routers]
     
     for ini in init_routers:
