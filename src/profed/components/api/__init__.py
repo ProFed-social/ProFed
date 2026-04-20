@@ -26,7 +26,7 @@ def _logged_task(coro, name):
     return asyncio.create_task(_wrapper(), name=name)
 
 
-async def _init_well_known_router(config):
+async def _init_webfinger_router(config):
     await webfinger_storage.init(config)
     await (await webfinger_storage.storage()).ensure_table()
     await webfinger_projection.rebuild()
@@ -74,7 +74,7 @@ async def Api(config):
 
     deactivate_routers = config.get("deactivate_routers", "").split()
     init_routers = [ini
-                    for name, ini in (("s2s_well_known", _init_well_known_router),
+                    for name, ini in (("s2s_webfinger", _init_webfinger_router),
                                       ("s2s_actor", _init_actor_router),
                                       ("s2s_inbox", _init_inbox_router),
                                       ("s2s_outbox", _init_outbox_router))
