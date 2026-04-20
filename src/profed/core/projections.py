@@ -49,20 +49,26 @@ def build_projection(topic: Dict,
                 await on_snapshot_item(item)
 
         caught_up = asyncio.Event()
-        async for seq, event in message_bus().topic(topic_name).subscribe(subscriber,
-                                                                          last_seen,
-                                                                          include_sequence_id=True,
-                                                                          caught_up=caught_up):
-            event_type, payload = topic["validate"](event)
-            if (event_type is not None and
-                event_type in on_message_type and
-                verify_event(event_type, payload)):
-
+        async def _drain():
+            nonlocal last_seen
+            async for seq, event in message_bus().topic(topic_name).subscribe(subscriber,
+                                                                              last_seen,
+                                                                              include_sequence_id=True,
+                                                                              caught_up=caught_up):
+                event_type, payload = topic["validate"](event)
+                if (event_type is not None and event_type in on_message_type and verify_event(event_type, payload)):
                     await on_message_type[event_type](payload)
+                last_seen = seq
+                if caught_up.is_set():
+                    return
 
-            last_seen = seq
-            if caught_up.is_set():
-                break
+        drain_task = asyncio.create_task(_drain())
+        await caught_up.wait()
+        drain_task.cancel()
+        try:
+            await drain_task
+        except asyncio.CancelledError:
+            pass
 
 
     def reset_last_seen(new_last_seen):
