@@ -40,7 +40,7 @@ async def test_add_user_success(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
                                    f"""
-                                   INSERT INTO api.webfinger_users (username)
+                                   INSERT INTO api.s2s_webfinger_users (username)
                                    VALUES ($1)
                                    ON CONFLICT (username) DO NOTHING
                                    """,
@@ -55,7 +55,7 @@ async def test_add_user_already_exists(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
                                    f"""
-                                   INSERT INTO api.webfinger_users (username)
+                                   INSERT INTO api.s2s_webfinger_users (username)
                                    VALUES ($1)
                                    ON CONFLICT (username) DO NOTHING
                                    """,
@@ -70,7 +70,7 @@ async def test_delete_user_success(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
                                    f"""
-                                   DELETE FROM api.webfinger_users
+                                   DELETE FROM api.s2s_webfinger_users
                                    WHERE acct = $1
                                    """,
                                    "alice")
@@ -84,7 +84,7 @@ async def test_delete_user_not_exists(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited_with(
                                    f"""
-                                   DELETE FROM api.webfinger_users
+                                   DELETE FROM api.s2s_webfinger_users
                                    WHERE acct = $1
                                    """,
                                    "bob")

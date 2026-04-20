@@ -3,5 +3,5 @@
 
 from .users import build_storage
 
-init, storage, overwrite, reinit = build_storage("inbox_users")
+init, storage, overwrite, reinit = build_storage("s2s_inbox_users")
 

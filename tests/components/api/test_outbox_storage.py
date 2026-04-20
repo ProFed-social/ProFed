@@ -57,7 +57,7 @@ async def test_add_success(fake_pool, fake_conn):
     await store.add("alice", activity)
 
     fake_conn.execute.assert_awaited_with(
-                               f"""INSERT INTO api.outbox (username, activity)
+                               f"""INSERT INTO api.s2s_outbox (username, activity)
                                    VALUES ($1, $2)
                                """,
                                "alice",
@@ -88,7 +88,7 @@ async def test_fetch_found(fake_pool, fake_conn):
 
     fake_conn.fetch.assert_awaited_with(
                                     f"""SELECT activity
-                                        FROM api.outbox
+                                        FROM api.s2s_outbox
                                         WHERE username = $1
                                         ORDER BY created_at
                                     """,
