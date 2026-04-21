@@ -12,6 +12,13 @@ from .s2s.inbox     import storage as inbox_storage,     projection as inbox_pro
 from .s2s.outbox    import storage as outbox_storage,    projection as outbox_projection
 from .c2s.oauth     import projection as oauth_projection
 from .c2s.oauth     import router as oauth_router
+from .c2s.timelines import storage as timelines_storage
+from .c2s.timelines import projection as timelines_projection
+from .c2s.instance  import router as instance_router
+from .c2s.statuses  import router as statuses_router
+from .c2s.accounts  import router as accounts_router
+from .c2s.apps      import router as apps_router
+from .c2s.timelines import router as timelines_router
 
 
 import logging
@@ -67,6 +74,30 @@ async def _init_c2s_oauth_router(config):
     oauth_router.init(config)
     _logged_task(oauth_projection.apps_handle_events(), "c2s_oauth_apps")
     _logged_task(oauth_projection.codes_handle_events(), "c2s_oauth_codes")
+ 
+ 
+async def _init_c2s_instance_router(config):
+    instance_router.init(config)
+ 
+ 
+async def _init_c2s_statuses_router(config):
+    statuses_router.init(config)
+ 
+ 
+async def _init_c2s_accounts_router(config):
+    accounts_router.init(config)
+ 
+ 
+async def _init_c2s_apps_router(config):
+    apps_router.init(config)
+
+
+async def _init_c2s_timelines_router(config):
+    await timelines_storage.init(config)
+    await (await timelines_storage.storage()).ensure_table()
+    await timelines_projection.rebuild()
+    timelines_router.init(config)
+    _logged_task(timelines_projection.handle_events(), "c2s_timelines")
 
 
 async def _reset_component_schema(config):
@@ -86,10 +117,17 @@ async def Api(config):
     deactivate_routers = config.get("deactivate_routers", "").split()
     init_routers = [ini
                     for name, ini in (("s2s_webfinger", _init_webfinger_router),
-                                      ("s2s_actor", _init_actor_router),
-                                      ("s2s_inbox", _init_inbox_router),
-                                      ("s2s_outbox", _init_outbox_router),
-                                      ("c2s_oauth", _init_c2s_oauth_router))
+                                      ("s2s_actor",     _init_actor_router),
+                                      ("s2s_inbox",     _init_inbox_router),
+                                      ("s2s_outbox",    _init_outbox_router),
+
+                                      ("c2s_oauth",     _init_c2s_oauth_router),
+                                      ("c2s_oauth",     _init_c2s_oauth_router),
+                                      ("c2s_instance",  _init_c2s_instance_router),
+                                      ("c2s_statuses",  _init_c2s_statuses_router),
+                                      ("c2s_accounts",  _init_c2s_accounts_router),
+                                      ("c2s_apps",      _init_c2s_apps_router),
+                                      ("c2s_timelines", _init_c2s_timelines_router))
                     if name not in deactivate_routers]
     
     for ini in init_routers:

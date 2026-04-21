@@ -7,7 +7,7 @@ from .s2s.actor     import router as actor
 from .s2s.inbox     import router as inbox
 from .s2s.outbox    import router as outbox
 from .c2s.oauth     import router as oauth
-from .c2s.apps      import router as apps
+from .c2s           import router as c2s
 
 
 def create_app(config):
@@ -15,15 +15,15 @@ def create_app(config):
 
     deactivate_routers = config.get("deactivate_routers", "").split()
     init_routers = [rt
-                    for name, rt in (("s2s_webfinger", webfinger.router),
-                                     ("s2s_actor", actor.router),
-                                     ("s2s_inbox", inbox.router),
-                                     ("s2s_outbox", outbox.router),
-                                     ("c2s_oauth", oauth.router),
-                                     ("c2s_apps", apps.router))
+                    for name, rt in (("s2s_webfinger", lambda: webfinger.router),
+                                     ("s2s_actor", lambda: actor.router),
+                                     ("s2s_inbox", lambda: inbox.router),
+                                     ("s2s_outbox", lambda: outbox.router),
+                                     ("c2s_oauth", lambda: oauth.router),
+                                     ("c2s", c2s.create_router))
                     if name not in deactivate_routers]
     
     for rt in init_routers:
-        app.include_router(rt)
+        app.include_router(rt())
 
     return app

@@ -8,8 +8,16 @@ from profed.core.message_bus import message_bus
  
  
 router = APIRouter()
+
+
+active = False
  
  
+def init(config: dict) -> None:
+    global active
+    active = True 
+
+
 class AppRegistration(BaseModel):
     client_name: str
     redirect_uris: str
