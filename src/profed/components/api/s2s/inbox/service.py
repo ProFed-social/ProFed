@@ -19,9 +19,9 @@ async def accept_inbox_activity(username: str, activity: dict) -> bool:
         raise ValueError("Malformed ActivityPub activity")
 
     async with message_bus().topic("incoming_activities").publish() as publish:
-        await publish({
-            "username": username,
-            "activity": activity,
-        })
+        await publish({"type":    "incoming",
+                       "payload": {"username": username,
+                                   "activity": activity}})
+
 
     return True
