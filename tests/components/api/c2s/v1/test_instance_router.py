@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core.config import config, raw
-from profed.components.api.c2s.instance import router as instance_module
+from profed.components.api.c2s.v1.instance import router as instance_module
  
  
 class Cfg:

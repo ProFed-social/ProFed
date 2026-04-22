@@ -1,0 +1,21 @@
+# Copyright (C) 2026 Christof Donat
+# SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+from typing import List
+from fastapi import APIRouter
+from profed.components.api.active_routers import get_active
+from .instance import router as instance
+ 
+ 
+async def init(config: dict, deactivate: List[str]) -> None:
+    for r in get_active({"instance": instance}, deactivate):
+        r.init(config)
+ 
+ 
+def create_router(deactivate: List[str]) -> APIRouter:
+    router = APIRouter(prefix="/v2")
+    for r in get_active({"instance": instance}, deactivate):
+        if r.active:
+            router.include_router(r.router)
+    return router
+

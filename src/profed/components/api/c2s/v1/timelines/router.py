@@ -4,10 +4,10 @@
 from fastapi import APIRouter, Depends, Query
 from typing import Annotated, Optional
 from profed.identity import actor_url_from_username, acct_from_username
-from .storage import storage
-from ..auth import current_user
+from profed.components.api.c2s.v1.timelines.storage import storage
+from profed.components.api.c2s.auth import current_user 
  
- 
+
 router = APIRouter()
 active = False
  

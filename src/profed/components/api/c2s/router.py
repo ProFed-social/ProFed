@@ -1,18 +1,18 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
+
+from typing import List
 from fastapi import APIRouter
-from .apps      import router as apps
-from .instance  import router as instance
-from .accounts  import router as accounts
-from .statuses  import router as statuses
-from .timelines import router as timelines
+from profed.components.api.active_routers import narrow_deactivate_routers
+from . import oauth, v1, v2
  
  
-def create_router() -> APIRouter:
-    router = APIRouter(prefix="/api/v1")
-    for r in (apps, instance, accounts, statuses, timelines):
-        if r.active:
-            router.include_router(r.router)
-    return router
+def create_router(deactivate: List[str]) -> APIRouter:
+    api = APIRouter(prefix="/api")
+    api.include_router(v1.create_router(narrow_deactivate_routers("v1_", deactivate)))
+    api.include_router(v2.create_router(narrow_deactivate_routers("v2_", deactivate)))
+    if "oauth" not in deactivate:
+        api.include_router(oauth.create_router(deactivate))
+    return api
 

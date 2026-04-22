@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core.config import config, raw
-from profed.components.api.c2s.accounts import router as accounts_module
+from profed.components.api.c2s.v1.accounts import router as accounts_module
 from profed.components.api.c2s.auth import current_user 
  
 class Cfg:
@@ -47,7 +47,7 @@ def client():
 def test_verify_credentials_returns_account(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.api.c2s.accounts.router.resolve_actor",
+        with patch("profed.components.api.c2s.v1.accounts.router.resolve_actor",
                    new=AsyncMock(return_value=FakePerson())):
             response = client.get("/accounts/verify_credentials")
 
@@ -62,7 +62,7 @@ def test_verify_credentials_returns_account(client):
 def test_verify_credentials_unknown_actor_returns_404(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.api.c2s.accounts.router.resolve_actor",
+        with patch("profed.components.api.c2s.v1.accounts.router.resolve_actor",
                    new=AsyncMock(return_value=None)):
             response = client.get("/accounts/verify_credentials")
     assert response.status_code == 404

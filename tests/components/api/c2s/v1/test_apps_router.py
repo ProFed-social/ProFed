@@ -5,7 +5,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core import message_bus
-from profed.components.api.c2s.apps.router import router
+from profed.components.api.c2s.v1.apps.router import router
  
  
 class FakePublishContext:
@@ -45,7 +45,7 @@ def client(fake_bus):
  
  
 def test_register_app_returns_credentials(client, fake_bus):
-    response = client.post("/api/v1/apps",
+    response = client.post("/apps",
                            json={"client_name":   "Tusky",
                                  "redirect_uris": "tusky://callback",
                                  "scopes":        "read write"})
@@ -58,7 +58,7 @@ def test_register_app_returns_credentials(client, fake_bus):
  
  
 def test_register_app_publishes_event(client, fake_bus):
-    client.post("/api/v1/apps",
+    client.post("/apps",
                 json={"client_name":   "Tusky",
                       "redirect_uris": "tusky://callback",
                       "scopes":        "read write"})
@@ -71,12 +71,12 @@ def test_register_app_publishes_event(client, fake_bus):
  
  
 def test_register_app_default_scopes(client, fake_bus):
-    response = client.post("/api/v1/apps",
+    response = client.post("/apps",
                            json={"client_name":   "MinApp",
                                  "redirect_uris": "myapp://cb"})
     assert response.json()["scopes"] == "read"
  
  
 def test_register_app_missing_required_fields_returns_422(client):
-    response = client.post("/api/v1/apps", json={"scopes": "read"})
+    response = client.post("/apps", json={"scopes": "read"})
     assert response.status_code == 422

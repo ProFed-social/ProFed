@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from typing import Annotated
 from profed.core.message_bus import message_bus
 from profed.identity import actor_url_from_username, acct_from_username
-from ..auth import current_user
+from profed.components.api.c2s.auth import current_user
  
  
 router = APIRouter()

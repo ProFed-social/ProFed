@@ -3,8 +3,8 @@
  
 from profed.core.projections import build_projection
 from profed.topics import incoming_activities
-from .storage import storage
- 
+from profed.components.api.c2s.v1.timelines.storage import storage 
+
  
 async def _init() -> None:
     store = await storage()
