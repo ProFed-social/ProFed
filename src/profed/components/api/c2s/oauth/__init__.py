@@ -16,6 +16,6 @@ async def init(config: dict) -> None:
     asyncio.create_task(projection.codes_handle_events(), name="c2s_oauth_codes")
  
  
-def create_router(deactivate: List[str]) -> APIRouter:
-    return router.router
+def mount_routers(parent, deactivate: List[str]) -> None:
+    parent.include_router(router.router)
 

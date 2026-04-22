@@ -4,8 +4,7 @@
 import asyncio
 from typing import List
 from fastapi import APIRouter
-from profed.components.api.active_routers import (narrow_deactivate_routers,
-                                                    get_active)
+from profed.components.api.active_routers import get_active
 from .apps      import router as apps
 from .instance  import router as instance
 from .accounts  import router as accounts
@@ -50,15 +49,15 @@ async def init(config: dict, deactivate: List[str]) -> None:
         r.init(config)
 
 
-def create_router(deactivate: List[str]) -> APIRouter:
+def mount_routers(parent, deactivate: List[str]) -> None:
     router = APIRouter(prefix="/v1")
     for r in get_active({"apps":      apps,
-                          "instance":  instance,
-                          "accounts":  accounts,
-                          "statuses":  statuses,
-                          "timelines": timelines},
-                         deactivate):
+                         "instance":  instance,
+                         "accounts":  accounts,
+                         "statuses":  statuses,
+                         "timelines": timelines},
+                        deactivate):
         if r.active:
             router.include_router(r.router)
-    return router
+    parent.include_router(router)
 

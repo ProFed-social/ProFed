@@ -10,11 +10,10 @@ def create_app(config):
     app = FastAPI()
 
     deactivate_routers = config.get("deactivate_routers", "").split()
-    for name, create_router in {"s2s": s2s.create_router,
-                                "c2s": c2s.create_router}.items():
+    for name, mount in {"s2s": s2s.mount_routers,
+                        "c2s": c2s.mount_routers}.items():
         if name not in deactivate_routers:
-            app.include_router(create_router(narrow_deactivate_routers(f"{name}_",
-                                                                       deactivate_routers)))
+            mount(app, narrow_deactivate_routers(f"{name}_", deactivate_routers))
 
     return app
 

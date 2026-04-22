@@ -4,7 +4,6 @@
 
 import asyncio
 from typing import List
-from fastapi import APIRouter
 from profed.components.api.active_routers import get_active
 from .webfinger import storage as webfinger_storage, projection as webfinger_projection
 from .actor     import storage as actor_storage,     projection as actor_projection
@@ -36,13 +35,11 @@ async def init(config: dict, deactivate: List[str]) -> None:
         asyncio.create_task(projection.handle_user_events(), name=task_name)
  
  
-def create_router(deactivate: List[str]) -> APIRouter:
-    router = APIRouter()
+def mount_routers(parent, deactivate: List[str]) -> None:
     for r in get_active({"webfinger": webfinger_router,
-                         "actor": actor_router,
-                         "inbox": inbox_router,
-                         "outbox": outbox_router},
+                         "actor":     actor_router,
+                         "inbox":     inbox_router,
+                         "outbox":    outbox_router},
                         deactivate):
-        router.include_router(r.router)
-    return router
+        parent.include_router(r.router)
 

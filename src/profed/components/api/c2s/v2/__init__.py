@@ -11,11 +11,11 @@ async def init(config: dict, deactivate: List[str]) -> None:
     for r in get_active({"instance": instance}, deactivate):
         r.init(config)
  
- 
-def create_router(deactivate: List[str]) -> APIRouter:
+
+def mount_routers(parent, deactivate: List[str]) -> None:
     router = APIRouter(prefix="/v2")
     for r in get_active({"instance": instance}, deactivate):
         if r.active:
             router.include_router(r.router)
-    return router
+    parent.include_router(router)
 

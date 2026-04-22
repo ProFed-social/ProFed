@@ -8,11 +8,11 @@ from profed.components.api.active_routers import narrow_deactivate_routers
 from . import oauth, v1, v2
  
  
-def create_router(deactivate: List[str]) -> APIRouter:
+def mount_routers(parent, deactivate: List[str]) -> None:
     api = APIRouter(prefix="/api")
-    api.include_router(v1.create_router(narrow_deactivate_routers("v1_", deactivate)))
-    api.include_router(v2.create_router(narrow_deactivate_routers("v2_", deactivate)))
+    v1.mount_routers(api, narrow_deactivate_routers("v1_", deactivate))
+    v2.mount_routers(api, narrow_deactivate_routers("v2_", deactivate))
+    parent.include_router(api)
     if "oauth" not in deactivate:
-        api.include_router(oauth.create_router(deactivate))
-    return api
+        oauth.mount_routers(parent, deactivate)
 

@@ -6,7 +6,7 @@ from typing import List
 from profed.components.api.active_routers import narrow_deactivate_routers
 from . import oauth
 from . import v1, v2
-from .router import create_router 
+from .router import mount_routers 
 
  
 async def init(config: dict, deactivate: List[str]) -> None:
