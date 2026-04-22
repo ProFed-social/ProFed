@@ -122,7 +122,6 @@ async def Api(config):
                                       ("s2s_outbox",    _init_outbox_router),
 
                                       ("c2s_oauth",     _init_c2s_oauth_router),
-                                      ("c2s_oauth",     _init_c2s_oauth_router),
                                       ("c2s_instance",  _init_c2s_instance_router),
                                       ("c2s_statuses",  _init_c2s_statuses_router),
                                       ("c2s_accounts",  _init_c2s_accounts_router),

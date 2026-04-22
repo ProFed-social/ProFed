@@ -27,3 +27,4 @@ def create_app(config):
         app.include_router(rt())
 
     return app
+

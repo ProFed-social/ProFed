@@ -25,7 +25,7 @@ class AppRegistration(BaseModel):
     website: str = ""
  
  
-@router.post("/api/v1/apps")
+@router.post("/apps")
 async def register_app(body: AppRegistration):
     client_id     = secrets.token_urlsafe(16)
     client_secret = secrets.token_urlsafe(32)
