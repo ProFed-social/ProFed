@@ -29,12 +29,18 @@ def _account_from_person(person, username: str) -> dict:
             "header":          "",
             "header_static":   "",
             "locked":          False,
+            "bot":             False,
             "created_at":      "1970-01-01T00:00:00.000Z",
             "followers_count": 0,
             "following_count": 0,
             "statuses_count":  0,
             "emojis":          [],
-            "fields":          []}
+            "fields":          [],
+            "source":          {"privacy":   "public",
+                                "sensitive": False,
+                                "language":  None,
+                                "note":      person.summary or "",
+                                "fields":    []}}
  
  
 @router.get("/accounts/verify_credentials")
