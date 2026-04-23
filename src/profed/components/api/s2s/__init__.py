@@ -13,7 +13,7 @@ from .webfinger import router as webfinger_router
 from .actor     import router as actor_router
 from .inbox     import router as inbox_router
 from .outbox    import router as outbox_router
- 
+from .nodeinfo  import router as nodeinfo_router 
  
 async def init(config: dict, deactivate: List[str]) -> None:
     for storage, projection, task_name in get_active({"webfinger": (webfinger_storage,
@@ -39,7 +39,8 @@ def mount_routers(parent, deactivate: List[str]) -> None:
     for r in get_active({"webfinger": webfinger_router,
                          "actor":     actor_router,
                          "inbox":     inbox_router,
-                         "outbox":    outbox_router},
+                         "outbox":    outbox_router,
+                         "nodeinfo":  nodeinfo_router},
                         deactivate):
         parent.include_router(r.router)
 
