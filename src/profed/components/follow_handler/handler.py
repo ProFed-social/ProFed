@@ -27,28 +27,23 @@ async def _handle_follow(username: str, activity: dict) -> None:
  
     follower_acct = await lookup_acct(follow.actor)
     if follower_acct is None:
-        logger.warning("WebFinger lookup failed for %s", follow.actor)
         return
-    logger.info("follow_handler: WebFinger resolved %r -> %r", follow.actor, follower_acct) 
 
     async with message_bus().topic("followers").publish() as publish:
             await publish({"type": "created",
                        "payload": {"follower": follower_acct,
                                    "following": following_acct}})
-    logger.info("follow_handler: published follower %r -> %r", follower_acct, following_acct)
  
     accept = AcceptActivity(id=f"{local_actor_url}#accepts/{follower_acct}",
                             actor=local_actor_url,
                             object=follow.model_dump(by_alias=True,
                                                      exclude_none=True))
-    logger.info("follow_handler: publishing Accept activity")
 
     async with message_bus().topic("activities").publish() as publish:
         await publish({"type": "created",
                        "payload": {"username": username,
                                    **accept.model_dump(by_alias=True,
                                                        exclude_none=True)}})
-    logger.info("follow_handler: Accept published successfully")
  
  
 async def _handle_undo_follow(username: str, activity: dict) -> None:

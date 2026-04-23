@@ -3,6 +3,7 @@
 
 from typing import Dict, Callable, Tuple, Any, Awaitable
 import asyncpg
+from profed.core.db_connections import fetch_pool
 
 def build_storage(table_name: str) \
     -> Tuple[Callable[[Dict[str, str]], Awaitable[None]],
@@ -59,11 +60,11 @@ def build_storage(table_name: str) \
 
     async def init(config: Dict[str, str]) -> None:
         nonlocal _instance
-        pool = await asyncpg.create_pool(host=config["host"],
-                                         port=int(config["port"]),
-                                         database=config["database"],
-                                         user=config["user"],
-                                         password=config["password"],)
+        pool = await fetch_pool(host=config["host"],
+                                port=int(config["port"]),
+                                database=config["database"],
+                                user=config["user"],
+                                password=config["password"],)
         _instance = _storage(pool)
 
 

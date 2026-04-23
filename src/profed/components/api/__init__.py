@@ -1,24 +1,21 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import logging
-import asyncpg
 import uvicorn
+
+from profed.core.db_connections import fetch_pool
 from .app import create_app
 
 from .active_routers import narrow_deactivate_routers
 from . import s2s, c2s
 
 
-logger = logging.getLogger(__name__)
-
-
 async def _reset_component_schema(config):
-    pool = await asyncpg.create_pool(host=config["host"],
-                                     port=int(config["port"]),
-                                     database=config["database"],
-                                     user=config["user"],
-                                     password=config["password"],)
+    pool = await fetch_pool(host=config["host"],
+                            port=int(config["port"]),
+                            database=config["database"],
+                            user=config["user"],
+                            password=config["password"],)
     async with pool.acquire() as conn:
         await conn.execute(f"DROP SCHEMA IF EXISTS api CASCADE")
         await conn.execute(f"CREATE SCHEMA api")

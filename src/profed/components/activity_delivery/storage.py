@@ -4,7 +4,8 @@
 import json
 from typing import Optional
 import asyncpg
- 
+from profed.core.db_connections import fetch_pool 
+
  
 class _Storage:
     def __init__(self, pool: asyncpg.Pool):
@@ -130,11 +131,11 @@ _instance: _Storage | None = None
  
 async def init(config: dict) -> None:
     global _instance
-    pool = await asyncpg.create_pool(host=config["host"],
-                                     port=int(config["port"]),
-                                     database=config["database"],
-                                     user=config["user"],
-                                     password=config["password"])
+    pool = await fetch_pool(host=config["host"],
+                            port=int(config["port"]),
+                            database=config["database"],
+                            user=config["user"],
+                            password=config["password"])
     _instance = _Storage(pool)
  
  

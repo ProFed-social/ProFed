@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 from typing import Dict, Optional
-from asyncpg import Pool, create_pool
+from asyncpg import Pool
 import json
- 
+from profed.core.db_connections import fetch_pool 
+
  
 class _storage:
     def __init__(self, pool: Pool):
@@ -51,11 +52,11 @@ _instance: _storage | None = None
  
 async def init(config: Dict[str, str]) -> None:
     global _instance
-    pool = await create_pool(host=config["host"],
-                             port=int(config["port"]),
-                             database=config["database"],
-                             user=config["user"],
-                             password=config["password"])
+    pool = await fetch_pool(host=config["host"],
+                            port=int(config["port"]),
+                            database=config["database"],
+                            user=config["user"],
+                            password=config["password"])
     _instance = _storage(pool)
  
  

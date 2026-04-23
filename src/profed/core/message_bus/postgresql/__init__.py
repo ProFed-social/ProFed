@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from typing import Dict
-import asyncpg
 from .bus import MessageBus
 from profed import topics
+from profed.core.db_connections import fetch_pool
 
 def _topic_names():
     return [v["name"]
@@ -14,11 +14,11 @@ def _topic_names():
  
  
 async def init(config: Dict[str, str]):
-    pool = await asyncpg.create_pool(host=config["host"],
-                                      port=int(config["port"]),
-                                      database=config["database"],
-                                      user=config["user"],
-                                      password=config["password"])
+    pool = await fetch_pool(host=config["host"],
+                            port=int(config["port"]),
+                            database=config["database"],
+                            user=config["user"],
+                            password=config["password"])
     async with pool.acquire() as conn:
         for name in _topic_names():
             await conn.execute(f"""

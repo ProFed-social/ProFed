@@ -29,11 +29,12 @@ async def bus(db):
     async def _create_fake_pool(*args, **kwargs):
         return FakePool(db)
 
-    with patch("profed.core.message_bus.postgresql.asyncpg.create_pool",
+    import profed.core.db_connections as _db
+    with patch("profed.core.db_connections.asyncpg.create_pool",
                new=_create_fake_pool):
         from profed.core.message_bus.postgresql import init
         bus = await init(CONFIG)
-
+    _db._pools.clear()
     return bus
 
 
