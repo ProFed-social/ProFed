@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing import ClassVar
+from typing import ClassVar, Union
 
 
 class ActivityStreamsObject(BaseModel):
@@ -15,9 +15,12 @@ class ActivityStreamsObject(BaseModel):
     def default_context(cls) -> list[str | dict[str, str]]:
         return list(cls._base_context)
 
-    context: list[str | dict[str, str]] = \
-            Field(default_factory=lambda: ActivityStreamsObject.default_context(),
-                  alias="@context")
+    context: list[str | dict] = Field(default_factory=list, alias="@context")
+
+    @field_validator("context", mode="before")
+    @classmethod
+    def coerce_context_to_list(cls, v: Union[str, list]) -> list:
+        return [v] if isinstance(v, str) else v
 
     id: str
     type: str
