@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
+import hashlib
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Annotated
 from profed.identity import actor_url_from_username, acct_from_username
@@ -16,9 +17,11 @@ def init(config: dict) -> None:
     global active
     active = True
 
+def _account_id(username: str) -> str:
+    return str(int(hashlib.sha256(username.encode()).hexdigest()[:15], 16))
  
 def _account_from_person(person, username: str) -> dict:
-    return {"id":              username,
+    return {"id":              _account_id(username),
             "username":        username,
             "acct":            acct_from_username(username),
             "display_name":    person.name or username,
