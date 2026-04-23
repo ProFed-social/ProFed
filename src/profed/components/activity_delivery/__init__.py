@@ -17,8 +17,10 @@ async def ActivityDelivery(config: dict) -> None:
     await asyncio.gather(followers_rebuild(),
                          deliveries_rebuild(),
                          keys_rebuild())
-    await asyncio.gather(followers_handle_events(),
-                         deliveries_handle_events(),
-                         keys_handle_events(),
-                         handle_activities(config))
+
+
+    asyncio.create_task(followers_handle_events(), name="activity_delivery_followers")
+    asyncio.create_task(deliveries_handle_events(), name="activity_delivery_deliveries")
+    asyncio.create_task(keys_handle_events(), name="activity_delivery_keys")
+    asyncio.create_task(handle_activities(config), name="activity_delivery_handler")
 

@@ -69,8 +69,7 @@ async def _handle_undo_follow(username: str, activity: dict) -> None:
 
 
 async def handle_incoming_activities() -> None:
-    async for event in message_bus().topic("incoming_activities").subscribe(
-            "follow_handler", 0):
+    async for event in message_bus().topic("incoming_activities").subscribe("follow_handler", 0):
         event_type, payload = incoming_activities["validate"](event)
         if event_type is None:
             logger.warning("follow_handler: ignoring invalid event: %r", event)
