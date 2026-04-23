@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
+import logging
 import asyncio
 from .storage import init as init_storage
 from .projections import (followers_handle_events,
@@ -11,9 +12,8 @@ from .projections import (followers_handle_events,
                            keys_rebuild)
 from .handler import handle_activities
 
-from logging import Logger
 
-logger = Logger(__name__)
+logger = logging.getLogger(__name__)
  
  
 async def ActivityDelivery(config: dict) -> None:
