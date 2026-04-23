@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 async def _handle_follow(username: str, activity: dict) -> None:
     try:
         follow = FollowActivity.model_validate(activity)
-    except Exception:
-        logger.warning("Invalid Follow activity: %r", activity)
+    except Exception as e:
+        logger.warning("Invalid Follow activity: %r – error: %s", activity, e)
         return
 
     following_acct = acct_from_username(username)
