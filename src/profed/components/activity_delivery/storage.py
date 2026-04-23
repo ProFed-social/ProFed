@@ -26,6 +26,11 @@ class _Storage:
                                                                 retry_after      INT,
                                                                 first_attempt_at FLOAT   NOT NULL,
                                                                 PRIMARY KEY (activity_id, recipient))""")
+            await conn.execute("""CREATE TABLE IF NOT EXISTS
+                                  activity_delivery.user_keys (username        TEXT PRIMARY KEY,
+                                                               public_key_pem  TEXT NOT NULL,
+                                                               private_key_pem TEXT NOT NULL)""")
+
  
     async def add_follower(self, following: str, follower: str) -> None:
         async with self._pool.acquire() as conn:
@@ -92,7 +97,33 @@ class _Storage:
                                       activity_id,
                                       recipient)
             return dict(row) if row is not None else None
+
+    async def upsert_user_key(self,
+                              username: str,
+                              public_key_pem: str,
+                              private_key_pem: str) -> None:
+        async with self._pool.acquire() as conn:
+            await conn.execute("""INSERT INTO
+                                  activity_delivery.user_keys (username,
+                                                               public_key_pem,
+                                                               private_key_pem)
+                                  VALUES ($1, $2, $3)
+                                  ON CONFLICT (username) DO UPDATE
+                                      SET public_key_pem  = EXCLUDED.public_key_pem,
+                                          private_key_pem = EXCLUDED.private_key_pem""",
+                               username, public_key_pem, private_key_pem)
  
+    async def get_user_key(self, username: str) -> tuple[str, str] | None:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow("""SELECT public_key_pem,
+                                                private_key_pem
+                                         FROM activity_delivery.user_keys
+                                         WHERE username = $1""",
+                                      username)
+        if row is None:
+            return None
+        return row["public_key_pem"], row["private_key_pem"]
+
  
 _instance: _Storage | None = None
  

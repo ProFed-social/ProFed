@@ -5,7 +5,8 @@ import logging
 import asyncio
  
 from profed.core.message_bus import message_bus
- 
+from profed.http_signatures import generate_key_pair 
+
 from .fetcher import fetch_mf2
 from .normalizer import normalize_mf2_to_profile
 from .state_reader import reading_state
@@ -40,8 +41,12 @@ async def run_import(username: str, url: str) -> None:
  
     event_type = "created" if current is None else "updated"
     async with message_bus().topic("users").publish() as publish:
-        await publish({"type": event_type,
-                       "payload": new_profile.model_dump(exclude_none=True)})
+        payload = new_profile.model_dump(exclude_none=True)
+        if event_type == "created":
+            public_pem, private_pem = generate_key_pair()
+            payload["public_key_pem"]  = public_pem
+            payload["private_key_pem"] = private_pem
+        await publish({"type": event_type, "payload": payload})
  
     logger.info("Published users.%s for %s", event_type, username)
 

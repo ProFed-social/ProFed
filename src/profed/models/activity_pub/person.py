@@ -26,14 +26,23 @@ class Person(Actor):
     inbox: str
     outbox: str
     resume: Resume | None = None
+    publicKey: dict | None = None
 
     @classmethod
     def from_user(cls, profile: UserProfile) -> "Person":
-        return cls(id=actor_url_from_username(profile.username),
+        actor_url = actor_url_from_username(profile.username)
+        public_key = (None
+                      if getattr(profile, "public_key_pem", None) is None else
+                      {"id":           f"{actor_url}#main-key",
+                       "type":         "Key",
+                       "owner":        actor_url,
+                       "publicKeyPem": profile.public_key_pem})
+        return cls(id=actor_url,
                    preferredUsername=profile.username,
                    name=profile.name,
                    summary=profile.summary,
                    resume=profile.resume,
-                   inbox=f"{actor_url_from_username(profile.username)}/inbox",
-                   outbox=f"{actor_url_from_username(profile.username)}/outbox")
+                   inbox=f"{actor_url}/inbox",
+                   outbox=f"{actor_url}/outbox",
+                   publicKey=public_key)
 

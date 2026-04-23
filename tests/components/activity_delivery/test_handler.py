@@ -55,7 +55,7 @@ class FakeStorage:
     async def get_followers(self, following): return {"bob@remote.example"}
     async def get_delivery_status(self, activity_id, recipient): return None
     async def upsert_delivery(self, payload): pass
- 
+    async def get_user_key(self, username): return None 
 
 class Cfg:
     def __init__(self, cfg: Dict[str, Dict[str, str]]):
@@ -206,4 +206,37 @@ async def test_deliver_publishes_attempt_on_failure(fake_bus, fake_storage):
             assert len(published) == 1
             assert published[0]["payload"]["success"] is False
             assert published[0]["payload"]["status_code"] == 500
+ 
+ 
+@pytest.mark.asyncio
+async def test_deliver_sends_signed_request_when_key_available(fake_bus, fake_storage):
+    from profed.http_signatures import generate_key_pair
+    public_pem, private_pem = generate_key_pair()
+    fake_storage.get_user_key = AsyncMock(return_value=(public_pem, private_pem))
+ 
+    def _mock_response(status=202):
+        r = MagicMock()
+        r.status_code = status
+        r.headers = {}
+        r.json.return_value = {"inbox": "https://remote.example/inbox/bob"}
+        return r
+ 
+    with Cfg({"profed": {"run": "activity_delivery"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get  = \
+                    AsyncMock(return_value=_mock_response())
+            mock_client.return_value.__aenter__.return_value.post = \
+                    AsyncMock(return_value=_mock_response())
+ 
+            await delivery.deliver({"initial_retry": 0},
+                                   "https://example.com/act/1",
+                                   ACTIVITY,
+                                   "bob@remote.example")
+ 
+            call_kwargs = mock_client.return_value.__aenter__.return_value.post.call_args
+            headers     = call_kwargs.kwargs["headers"]
+            assert "Signature" in headers
+            assert "Digest"    in headers
+            assert "Date"      in headers
 

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 from profed.core.projections import build_projection
-from profed.topics import followers, deliveries
+from profed.topics import followers, deliveries, users
 from .storage import storage
  
  
@@ -44,6 +44,27 @@ deliveries_handle_events, deliveries_rebuild, _ = \
                      on_snapshot_item=_delivery_attempted,
                      on_message_type={"attempted": _delivery_attempted})
  
+ 
+async def _keys_init() -> None:
+    pass
+ 
+ 
+async def _upsert_key(payload: dict) -> None:
+    if "public_key_pem" not in payload or "private_key_pem" not in payload:
+        return
+    await (await storage()).upsert_user_key(payload["username"],
+                                             payload["public_key_pem"],
+                                             payload["private_key_pem"])
+ 
+ 
+keys_handle_events, keys_rebuild, _ = \
+    build_projection(topic=users,
+                     subscriber="activity_delivery_keys",
+                     init=_keys_init,
+                     on_snapshot_item=_upsert_key,
+                     on_message_type={"created": _upsert_key,
+                                      "updated": _upsert_key})
+
  
 async def get_followers(following: str) -> set[str]:
     return await (await storage()).get_followers(following)

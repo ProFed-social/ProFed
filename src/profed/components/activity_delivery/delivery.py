@@ -5,13 +5,17 @@ import asyncio
 import logging
 import random
 import time
+import json
+from urllib.parse import urlparse
 from email.utils import parsedate_to_datetime
 from typing import Optional
  
 import httpx
  
+from profed.http_signatures import sign_request
 from profed.core.message_bus import message_bus
 from .projections import get_delivery_status
+from .storage import storage
  
  
 logger = logging.getLogger(__name__)
@@ -106,7 +110,72 @@ async def _publish_attempt(activity_id: str,
                                    "retry_after":      retry_after,
                                    "first_attempt_at": first_attempt_at}})
  
- 
+
+
+async def _build_signed_headers(activity: dict,
+                                inbox_url: str,
+                                body: bytes) -> dict[str, str]:
+    username = activity.get("actor", "").rstrip("/").split("/")[-1]
+    keys     = await (await storage()).get_user_key(username)
+    headers  = {"Content-Type": "application/activity+json",
+                "Host":         urlparse(inbox_url).netloc}
+    if keys is not None:
+        headers.update(sign_request("POST",
+                                    inbox_url,
+                                    body,
+                                    f"{activity.get('actor', '')}#main-key",
+                                    keys[1]))
+    return headers
+
+
+async def _post_to_inbox(inbox_url: str,
+                         activity: dict,
+                         client: httpx.AsyncClient) -> httpx.Response:
+    body    = json.dumps(activity).encode()
+    headers = await _build_signed_headers(activity, inbox_url, body)
+    return await client.post(inbox_url,
+                             content=body,
+                             headers=headers,
+                             timeout=REQUEST_TIMEOUT)
+
+
+async def _attempt_delivery(config: dict,
+                            activity_id: str,
+                            activity: dict,
+                            recipient_acct: str,
+                            attempt: int,
+                            first_at: float) -> None:
+    inbox_url = await _fetch_inbox_url(_actor_url_from_acct(recipient_acct),
+                                       config)
+    if inbox_url is None:
+        await _publish_attempt(activity_id, recipient_acct, attempt, False, None, None, first_at)
+        return
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await _post_to_inbox(inbox_url, activity, client)
+
+        status_code = response.status_code
+        success     = 200 <= status_code < 300
+        await _publish_attempt(activity_id,
+                               recipient_acct,
+                               attempt,
+                               success,
+                               status_code,
+                               _parse_retry_after(response.headers),
+                               first_at)
+
+        if not success and not status_code in PERMANENT_FAILURES:
+            asyncio.create_task(deliver(config, activity_id, activity, recipient_acct),
+                                name=f"retry:{activity_id}:{recipient_acct}")
+    except Exception:
+        logger.exception("HTTP error delivering %s → %s", activity_id, recipient_acct)
+
+        await _publish_attempt(activity_id, recipient_acct, attempt, False, None, None, first_at)
+        asyncio.create_task(deliver(config, activity_id, activity, recipient_acct),
+                            name=f"retry:{activity_id}:{recipient_acct}")
+
+
 async def deliver(config: dict,
                    activity_id: str,
                    activity: dict,
@@ -117,10 +186,7 @@ async def deliver(config: dict,
         return
  
     attempt  = 1 if status is None else status["attempt"] + 1
-    first_at = time.time() if status is None else status["first_attempt_at"]
-    retry_after = status.get("retry_after") if status else None
- 
-    delay = _next_delay(config, status, retry_after)
+    delay = _next_delay(config, status, status.get("retry_after") if status else None)
     if delay is None:
         logger.warning("Giving up on %s → %s after %d attempts",
                        activity_id, recipient_acct, attempt - 1)
@@ -128,38 +194,8 @@ async def deliver(config: dict,
  
     if delay > 0:
         await asyncio.sleep(delay)
- 
-    actor_url = _actor_url_from_acct(recipient_acct)
-    inbox_url = await _fetch_inbox_url(actor_url, config)
-    if inbox_url is None:
-        await _publish_attempt(activity_id, recipient_acct, attempt,
-                               False, None, None, first_at)
-        return
- 
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.post(inbox_url,
-                                         json=activity,
-                                         headers={"Content-Type": "application/activity+json"},
-                                         timeout=REQUEST_TIMEOUT)
-        status_code = response.status_code
-        retry_after = _parse_retry_after(response.headers)
-        success     = 200 <= status_code < 300
-        permanent   = status_code in PERMANENT_FAILURES
-        await _publish_attempt(activity_id, recipient_acct, attempt,
-                               success, status_code, retry_after, first_at)
-        if not success and not permanent:
-            asyncio.create_task(
-                deliver(config, activity_id, activity, recipient_acct),
-                name=f"retry:{activity_id}:{recipient_acct}")
-    except Exception:
-        logger.exception("HTTP error delivering %s → %s",
-                         activity_id, recipient_acct)
-        await _publish_attempt(activity_id, recipient_acct, attempt,
-                               False, None, None, first_at)
-        asyncio.create_task(
-            deliver(config, activity_id, activity, recipient_acct),
-            name=f"retry:{activity_id}:{recipient_acct}")
+
+    await _attempt_delivery(config, activity_id, activity, recipient_acct, attempt, time.time() if status is None else status["first_attempt_at"]) 
  
  
 def _actor_url_from_acct(acct: str) -> str:
