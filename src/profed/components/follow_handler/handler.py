@@ -29,22 +29,26 @@ async def _handle_follow(username: str, activity: dict) -> None:
     if follower_acct is None:
         logger.warning("WebFinger lookup failed for %s", follow.actor)
         return
- 
+    logger.info("follow_handler: WebFinger resolved %r -> %r", follow.actor, follower_acct) 
+
     async with message_bus().topic("followers").publish() as publish:
             await publish({"type": "created",
                        "payload": {"follower": follower_acct,
                                    "following": following_acct}})
+    logger.info("follow_handler: published follower %r -> %r", follower_acct, following_acct)
  
     accept = AcceptActivity(id=f"{local_actor_url}#accepts/{follower_acct}",
                             actor=local_actor_url,
                             object=follow.model_dump(by_alias=True,
                                                      exclude_none=True))
+    logger.info("follow_handler: publishing Accept activity")
 
     async with message_bus().topic("activities").publish() as publish:
         await publish({"type": "created",
                        "payload": {"username": username,
                                    **accept.model_dump(by_alias=True,
                                                        exclude_none=True)}})
+    logger.info("follow_handler: Accept published successfully")
  
  
 async def _handle_undo_follow(username: str, activity: dict) -> None:
@@ -69,6 +73,7 @@ async def handle_incoming_activities() -> None:
             "follow_handler", 0):
         event_type, payload = incoming_activities["validate"](event)
         if event_type is None:
+            logger.warning("follow_handler: ignoring invalid event: %r", event)
             continue
  
         activity = payload["activity"]
@@ -77,10 +82,10 @@ async def handle_incoming_activities() -> None:
  
         try:
             if activity_type == "Follow":
+                logger.info("follow_handler: handling Follow from %r to %r", activity.get("actor"), username) 
                 await _handle_follow(username, activity)
             elif activity_type == "Undo":
                 await _handle_undo_follow(username, activity)
         except Exception:
-            logger.exception("Error handling %s activity for %s",
-                             activity_type, username)
+            logger.exception("Error handling %s activity for %s", activity_type, username)
 
