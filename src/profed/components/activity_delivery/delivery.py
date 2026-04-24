@@ -67,7 +67,7 @@ def _next_delay(config: dict,
     max_tot  = int(config.get("max_total",        MAX_TOTAL))
  
     if status is None:
-        return retry_after if retry_after and retry_after > initial else initial
+        return 0
  
     first_attempt_at = status.get("first_attempt_at", time.time())
     if time.time() - first_attempt_at > max_tot:
