@@ -50,5 +50,12 @@ def test_original_dicts_are_not_mutated():
 def test_empty_database_cfg_is_harmless():
     component = {"host": "myhost", "custom": "value"}
     result = with_database_defaults(component, {})
-    assert result == component
+    expected = dict(component, **{"host": "myhost",
+                                  "port": "5432",
+                                  "database": "profed",
+                                  "user": "profed",
+                                  "password": None,
+                                  "pool_min_size": "1",
+                                  "pool_max_size": "30"})
+    assert result == expected
 

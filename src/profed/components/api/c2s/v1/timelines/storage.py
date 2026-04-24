@@ -52,7 +52,9 @@ async def init(config: Dict[str, str]) -> None:
                             port=int(config["port"]),
                             database=config["database"],
                             user=config["user"],
-                            password=config["password"])
+                            password=config["password"],
+                            min_size=int(config["pool_min_size"]),
+                            max_size=int(config["pool_max_size"]))
     _instance = _storage(pool)
  
  

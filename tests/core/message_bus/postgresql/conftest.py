@@ -16,7 +16,9 @@ CONFIG = {"backend": "postgresql",
           "port": "0",
           "database": "",
           "user": "",
-          "password": ""}
+          "password": "",
+          "pool_min_size": 1,
+          "pool_max_size": 1}
 
 
 @fixture

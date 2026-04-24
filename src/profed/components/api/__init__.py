@@ -15,7 +15,10 @@ async def _reset_component_schema(config):
                             port=int(config["port"]),
                             database=config["database"],
                             user=config["user"],
-                            password=config["password"],)
+                            password=config["password"],
+                            min_size=int(config["pool_min_size"]),
+                            max_size=int(config["pool_max_size"]))
+
     async with pool.acquire() as conn:
         await conn.execute(f"DROP SCHEMA IF EXISTS api CASCADE")
         await conn.execute(f"CREATE SCHEMA api")

@@ -106,5 +106,5 @@ async def test_no_database_section_leaves_message_bus_config_unchanged(mock_modu
         await message_bus.init_message_bus()
         bus = message_bus.message_bus()
         assert bus["host"] == "myhost"
-        assert "database" not in bus
+        assert bus["password"] is None
 

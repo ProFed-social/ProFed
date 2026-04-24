@@ -64,17 +64,17 @@ async def test_caught_up_not_set_before_messages_delivered(topic, db):
 @pytest.mark.asyncio
 async def test_caught_up_set_only_once(topic, db):
     caught_up = asyncio.Event()
-    # Start with empty topic: caught_up fires on the first idle loop
+
     async def consume():
         async for _ in topic.subscribe("test", caught_up=caught_up):
             pass
     task = asyncio.create_task(consume())
     await asyncio.wait_for(caught_up.wait(), timeout=2.0)
     assert caught_up.is_set()
-    # Clear and let the subscriber loop at least once more (min_wait = 0.05 s)
+
     caught_up.clear()
     await asyncio.sleep(0.2)
-    # backlog_done=True prevents a second caught_up.set()
+
     assert not caught_up.is_set()
     task.cancel()
     try:
