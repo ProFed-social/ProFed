@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import ClassVar, Union
+from typing import ClassVar
 
 
 class ActivityStreamsObject(BaseModel):
@@ -19,7 +19,7 @@ class ActivityStreamsObject(BaseModel):
 
     @field_validator("context", mode="before")
     @classmethod
-    def coerce_context_to_list(cls, v: Union[str, list]) -> list:
+    def coerce_context_to_list(cls, v: str | list) -> list:
         return [v] if isinstance(v, str) else v
 
     id: str
