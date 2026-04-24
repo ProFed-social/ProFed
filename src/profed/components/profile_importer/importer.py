@@ -46,6 +46,9 @@ async def run_import(username: str, url: str) -> None:
             public_pem, private_pem = generate_key_pair()
             payload["public_key_pem"]  = public_pem
             payload["private_key_pem"] = private_pem
+        elif current.public_key_pem is not None:
+            payload["public_key_pem"]  = current.public_key_pem
+            payload["private_key_pem"] = current.private_key_pem
         await publish({"type": event_type, "payload": payload})
  
     logger.info("Published users.%s for %s", event_type, username)

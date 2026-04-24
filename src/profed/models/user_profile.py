@@ -13,4 +13,4 @@ class UserProfile(BaseModel):
     summary: str | None = None
     resume: Resume | None = None
     public_key_pem: str | None = None
-
+    private_key_pem: str | None = Field(default=None, exclude=True)
