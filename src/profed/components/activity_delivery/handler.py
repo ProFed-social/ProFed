@@ -9,6 +9,8 @@ from profed.identity import acct_from_username
 from profed.topics import activities
 from .projections import get_followers
 from .delivery import deliver
+from .recipients import resolve_recipients
+
 
 async def handle_activities(config: dict) -> None:
     async for event in message_bus().topic("activities").subscribe(
@@ -18,13 +20,15 @@ async def handle_activities(config: dict) -> None:
             continue
 
         activity_id = payload.get("id")
-        username    = payload.get("username")
-        if not activity_id or not username:
+        if not activity_id:
             continue
-
-        following_acct = acct_from_username(username)
-        for follower_acct in await get_followers(following_acct):
+ 
+        followers = await get_followers(acct_from_username(
+            payload.get("username", "")))
+        recipients = await resolve_recipients(payload, followers)
+ 
+        for recipient in recipients:
             asyncio.create_task(
-                deliver(config, activity_id, payload, follower_acct),
-                name=f"deliver:{activity_id}:{follower_acct}")
+                deliver(config, activity_id, payload, recipient),
+                name=f"deliver:{activity_id}:{recipient}")
 
