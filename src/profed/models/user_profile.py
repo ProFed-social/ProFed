@@ -12,4 +12,5 @@ class UserProfile(BaseModel):
     name: str | None = None
     summary: str | None = None
     resume: Resume | None = None
+    public_key_pem: str | None = None
 
