@@ -35,21 +35,26 @@ async def run_import(username: str, url: str) -> None:
  
         current = get_state()
  
-    if new_profile == current:
-        logger.info("Profile for %s is unchanged", username)
-        return
- 
-    event_type = "created" if current is None else "updated"
+    if current is None:
+        public_pem, private_pem = generate_key_pair()
+        new_profile.public_key_pem = public_pem
+        new_profile.private_key_pem = private_pem
+
+        event_type = "created"
+    else:
+        new_profile.public_key_pem  = current.public_key_pem
+        new_profile.private_key_pem = current.private_key_pem
+
+        if new_profile == current:
+            logger.info("Profile for %s is unchanged", username)
+            return
+
+        event_type = "updated"
+
     async with message_bus().topic("users").publish() as publish:
         payload = new_profile.model_dump(exclude_none=True)
-        if event_type == "created":
-            public_pem, private_pem = generate_key_pair()
-            payload["public_key_pem"]  = public_pem
-            payload["private_key_pem"] = private_pem
-        elif current.public_key_pem is not None:
-            payload["public_key_pem"]  = current.public_key_pem
-            payload["private_key_pem"] = current.private_key_pem
+        payload["private_key_pem"] = new_profile.private_key_pem
         await publish({"type": event_type, "payload": payload})
- 
+
     logger.info("Published users.%s for %s", event_type, username)
 
