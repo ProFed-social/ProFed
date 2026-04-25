@@ -84,4 +84,13 @@ def test_create_status_too_long_returns_422(client, fake_bus):
 def test_statuses_active_flag_set_after_init():
     statuses_module.init({})
     assert statuses_module.active is True
+ 
+
+def test_create_status_activity_has_context_and_to(client, fake_bus):
+    client.post("/statuses", json={"status": "Hello Fediverse!"})
+    payload = fake_bus.topic("activities")._ctx.published[0]["payload"]
+    assert "@context" in payload
+    assert payload["@context"] == ["https://www.w3.org/ns/activitystreams"]
+    assert payload["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
+    assert payload["object"]["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
 

@@ -54,6 +54,7 @@ async def create_status(body: StatusCreate,
     activity_id = f"{actor_url}#create/{uuid.uuid4()}"
     activity = CreateActivity(id=activity_id,
                               actor=actor_url,
+                              to=note.to,
                               object=note.model_dump(by_alias=True,
                                                      exclude_none=True))
     payload = activity.model_dump(by_alias=True, exclude_none=True)

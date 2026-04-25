@@ -153,3 +153,40 @@ async def test_profile_importer_raises_without_url(fake_bus):
     with pytest.raises(ValueError, match="url"):
         await component.ProfileImporter({"username": "alice"})
 
+ 
+@pytest.mark.asyncio
+async def test_created_event_includes_key_pair(fake_bus):
+    with patch.object(importer, "fetch_mf2", new=AsyncMock(return_value=_mf2("Alice"))):
+        await importer.run_import("alice", "https://example.com/alice")
+    payload = _users(fake_bus).published[0]["payload"]
+    assert "public_key_pem" in payload
+    assert "private_key_pem" in payload
+    assert payload["public_key_pem"].startswith("-----BEGIN PUBLIC KEY-----")
+ 
+ 
+@pytest.mark.asyncio
+async def test_updated_event_preserves_key_pair(fake_bus):
+    _users(fake_bus).messages = [(1, {"type": "created",
+                                       "payload": {"username": "alice",
+                                                   "name": "Alice",
+                                                   "public_key_pem":  "pubkey",
+                                                   "private_key_pem": "privkey"}})]
+    with patch.object(importer, "fetch_mf2",
+                      new=AsyncMock(return_value=_mf2("Alice Renamed"))):
+        await importer.run_import("alice", "https://example.com/alice")
+    payload = _users(fake_bus).published[0]["payload"]
+    assert payload["public_key_pem"]  == "pubkey"
+    assert payload["private_key_pem"] == "privkey"
+ 
+ 
+@pytest.mark.asyncio
+async def test_unchanged_profile_with_keys_publishes_nothing(fake_bus):
+    _users(fake_bus).messages = [(1, {"type": "created",
+                                       "payload": {"username": "alice",
+                                                   "name": "Alice",
+                                                   "public_key_pem":  "pubkey",
+                                                   "private_key_pem": "privkey"}})]
+    with patch.object(importer, "fetch_mf2", new=AsyncMock(return_value=_mf2("Alice"))):
+        await importer.run_import("alice", "https://example.com/alice")
+    assert _users(fake_bus).published == []
+

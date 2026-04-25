@@ -12,6 +12,7 @@ class Activity(ActivityStreamsObject):
     actor: str
     object: dict[str, Any]
     published: str | None = None
+    to: list[str] | None = None
 
 
 class CreateActivity(Activity):
