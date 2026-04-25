@@ -37,7 +37,7 @@ async def _handle_follow(username: str, activity: dict) -> None:
                                    "following": following_acct}})
  
     logger.info("follow_handler: published follower %r -> %r", follower_acct, following_acct)
-    accept = AcceptActivity(id=f"{local_actor_url}#accepts/{follower_acct}",
+    accept = AcceptActivity(id=f"{follow.id}#accepts/",
                             actor=local_actor_url,
                             object=follow.model_dump(by_alias=True,
                                                      exclude_none=True))
