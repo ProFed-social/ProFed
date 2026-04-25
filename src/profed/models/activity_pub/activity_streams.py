@@ -11,14 +11,23 @@ class ActivityStreamsObject(BaseModel):
     _base_context: ClassVar[list[str | dict[str, str]]] = \
             ["https://www.w3.org/ns/activitystreams"]
 
-    context: list[str | dict] = Field(default_factory=lambda: ["https://www.w3.org/ns/activitystreams"],
-                                      alias="@context")
+    @classmethod
+    def default_context(cls) -> list[str | dict[str, str]]:
+        return list(cls._base_context)
+
+    context: list[str | dict] = Field(default_factory=list, alias="@context")
 
 
     @field_validator("context", mode="before")
     @classmethod
     def coerce_context_to_list(cls, v: str | list) -> list:
         return [v] if isinstance(v, str) else v
+ 
+    @model_validator(mode="after")
+    def set_default_context(self) -> "ActivityStreamsObject":
+        if not self.context:
+            self.context = self.__class__.default_context()
+        return self
 
     id: str
     type: str

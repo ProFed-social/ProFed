@@ -1,24 +1,19 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from pydantic import Field
-from profed.identity import actor_url_from_username
+from typing import ClassVar
 
+from profed.identity import actor_url_from_username
 from profed.models.resume import Resume
 from profed.models.user_profile import UserProfile
 from .actor import Actor
 
 
 class Person(Actor):
-    @classmethod
-    def default_context(cls) -> list[str | dict[str, str]]:
-        return super().default_context() + \
-                [{"profed": "https://profed.social/ns#",
-                  "resume": "profed:resume"}]
-
-    context: list[str | dict[str, str]] = \
-            Field(default_factory=lambda: Person.default_context(),
-                  alias="@context")
+    _base_context: ClassVar[list[str | dict[str, str]]] = \
+            ["https://www.w3.org/ns/activitystreams",
+             {"profed": "https://profed.social/ns#",
+              "resume": "profed:resume"}]
 
     type: str = "Person"
     name: str | None = None
