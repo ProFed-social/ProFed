@@ -11,11 +11,9 @@ class ActivityStreamsObject(BaseModel):
     _base_context: ClassVar[list[str | dict[str, str]]] = \
             ["https://www.w3.org/ns/activitystreams"]
 
-    @classmethod
-    def default_context(cls) -> list[str | dict[str, str]]:
-        return list(cls._base_context)
+    context: list[str | dict] = Field(default_factory=lambda: ["https://www.w3.org/ns/activitystreams"],
+                                      alias="@context")
 
-    context: list[str | dict] = Field(default_factory=list, alias="@context")
 
     @field_validator("context", mode="before")
     @classmethod

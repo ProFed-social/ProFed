@@ -41,7 +41,6 @@ async def _handle_follow(username: str, activity: dict) -> None:
                             actor=local_actor_url,
                             object=follow.model_dump(by_alias=True,
                                                      exclude_none=True))
-    accept.context = AcceptActivity.default_context()
 
     async with message_bus().topic("activities").publish() as publish:
         await publish({"type": "created",
