@@ -28,7 +28,7 @@ class AcceptActivity(Activity):
 class FollowActivity(ActivityStreamsObject):
     type: str = "Follow"
     actor: str
-    object: str  # the followed actor URL
+    object: str | None = None
  
     @field_validator("actor", "object")
     @classmethod

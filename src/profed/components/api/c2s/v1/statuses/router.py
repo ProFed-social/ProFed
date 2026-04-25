@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Annotated
 from profed.core.message_bus import message_bus
 from profed.identity import actor_url_from_username, acct_from_username
+from profed.models.activity_pub import CreateActivity, Note
 from profed.components.api.c2s.auth import current_user
  
  
@@ -45,21 +46,21 @@ async def create_status(body: StatusCreate,
     note_id    = f"{actor_url}/notes/{uuid.uuid4()}"
     created_at = datetime.now(timezone.utc).isoformat()
  
-    note = {"id":           note_id,
-            "type":         "Note",
-            "attributedTo": actor_url,
-            "content":      body.status,
-            "published":    created_at,
-            "to":           ["https://www.w3.org/ns/activitystreams#Public"]}
+    note = Note(id=note_id,
+                attributedTo=actor_url,
+                content=body.status,
+                published=created_at)
  
     activity_id = f"{actor_url}#create/{uuid.uuid4()}"
+    activity = CreateActivity(id=activity_id,
+                              actor=actor_url,
+                              object=note.model_dump(by_alias=True,
+                                                     exclude_none=True))
+    payload = activity.model_dump(by_alias=True, exclude_none=True)
+    payload["username"] = username
     async with message_bus().topic("activities").publish() as publish:
         await publish({"type":    "created",
-                       "payload": {"id":       activity_id,
-                                   "type":     "Create",
-                                   "actor":    actor_url,
-                                   "username": username,
-                                   "object":   note}})
+                       "payload": payload})
  
     return {"id":                note_id,
             "created_at":        created_at,

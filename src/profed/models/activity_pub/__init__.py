@@ -10,11 +10,13 @@ from .activity import (Activity,
                        AcceptActivity,
                        FollowActivity,
                        UndoFollowActivity)
-
+from .object import Note
 
 __all__ = ["ActivityStreamsObject",
            "Actor",
            "Person",
            "Activity", "CreateActivity", "UpdateActivity",
-           "AcceptActivity", "FollowActivity", "UndoFollowActivity"]
+           "AcceptActivity", "FollowActivity", "UndoFollowActivity",
+
+           Note]
 
