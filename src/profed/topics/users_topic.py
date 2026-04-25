@@ -43,8 +43,10 @@ def _payload_content(payload, ignore) -> Optional[Dict]:
         logger.warning(ignore(f"invalid payload: {payload!r}; {exc}"))
         return None
 
-    return profile.model_dump(exclude_none=True)
-
+    result = profile.model_dump(exclude_none=True)
+    if profile.private_key_pem is not None:
+        result["private_key_pem"] = profile.private_key_pem
+    return result
 
 def _payload(event: Dict) -> Optional[Dict]:
     if "payload" not in event:
