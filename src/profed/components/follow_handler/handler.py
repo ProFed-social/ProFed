@@ -7,8 +7,8 @@ from profed.core.message_bus import message_bus
 from profed.topics import incoming_activities
 from profed.identity import actor_url_from_username, acct_from_username
 from profed.models.activity_pub import (AcceptActivity,
-                                         FollowActivity,
-                                         UndoFollowActivity)
+                                        FollowActivity,
+                                        UndoFollowActivity)
 from .webfinger import lookup_acct
  
  
@@ -41,6 +41,7 @@ async def _handle_follow(username: str, activity: dict) -> None:
                             actor=local_actor_url,
                             object=follow.model_dump(by_alias=True,
                                                      exclude_none=True))
+    accept.context = AcceptActivity.default_context()
 
     async with message_bus().topic("activities").publish() as publish:
         await publish({"type": "created",
