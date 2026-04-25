@@ -133,6 +133,8 @@ async def _post_to_inbox(inbox_url: str,
                          client: httpx.AsyncClient) -> httpx.Response:
     body    = json.dumps(activity).encode()
     headers = await _build_signed_headers(activity, inbox_url, body)
+    logger.debug("POST %s headers: %r", inbox_url, headers)
+
     return await client.post(inbox_url,
                              content=body,
                              headers=headers,
