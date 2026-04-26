@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 from typing import Callable, Awaitable
-from profed.components.follow_handler.webfinger import lookup_acct
+from profed.federation.webfinger import lookup_acct
 
 
 async def resolve(payload: dict, followers: set[str]) -> set[str]:

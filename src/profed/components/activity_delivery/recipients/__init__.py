@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 from typing import Callable, Awaitable
-from profed.components.follow_handler.webfinger import lookup_acct
 from .accept import resolve as resolve_accept
  
 

@@ -9,7 +9,7 @@ from profed.identity import actor_url_from_username, acct_from_username
 from profed.models.activity_pub import (AcceptActivity,
                                         FollowActivity,
                                         UndoFollowActivity)
-from .webfinger import lookup_acct
+from profed.federation.webfinger import lookup_acct
  
  
 logger = logging.getLogger(__name__)

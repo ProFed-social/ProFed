@@ -9,8 +9,8 @@ from .projection import get_app, get_code
 from .service import (authorization_url,
                       exchange_code,
                       issue_code,
-                      consume_code,
-                      validate_token)
+                      consume_code)
+from ..common.oidc import validate_token, set_oidc_issuer
  
  
 router = APIRouter()
@@ -23,6 +23,7 @@ _pending: dict[str, tuple[str, str, str]] = {}
 def init(config: dict) -> None:
     global _config
     _config = config
+    set_oidc_issuer(config.get("oidc_issuer", ""))
  
  
 @router.get("/oauth/authorize")

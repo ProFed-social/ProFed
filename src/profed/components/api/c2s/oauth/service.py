@@ -3,45 +3,14 @@
  
 import time
 import secrets
-import httpx
 from typing import Optional
-from urllib.parse import urlencode, urlunparse, urlparse
-from authlib.jose import JsonWebKey, jwt
+from urllib.parse import urlencode
 from profed.core.message_bus import message_bus
- 
+from ..common.oidc import _fetch_oidc_config 
  
 _oidc_config: Optional[dict] = None
 _jwks: Optional[dict] = None
 CODE_TTL = 600
- 
- 
-async def _fetch_oidc_config(issuer: str) -> dict:
-    global _oidc_config
-    if _oidc_config is None:
-        parsed = urlparse(issuer)
-        url = urlunparse((parsed.scheme,
-                          parsed.netloc,
-                          "/.well-known/openid-configuration",
-                          "", "", ""))
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            _oidc_config = response.json()
-
-    return _oidc_config
- 
- 
-async def _fetch_jwks(issuer: str) -> dict:
-    global _jwks
-    if _jwks is None:
-        oidc_config = await _fetch_oidc_config(issuer)
-        async with httpx.AsyncClient() as client:
-            response = await client.get(oidc_config["jwks_uri"])
-            response.raise_for_status()
-            _jwks = response.json()
-
-    return _jwks
  
  
 async def authorization_url(issuer: str,
@@ -76,17 +45,6 @@ async def exchange_code(issuer: str,
         response.raise_for_status()
 
         return response.json()
- 
- 
-async def validate_token(issuer: str, token: str) -> Optional[dict]:
-    try:
-        jwks = await _fetch_jwks(issuer)
-        key = JsonWebKey.import_key_set(jwks)
-        claims = jwt.decode(token, key)
-        claims.validate()
-        return dict(claims)
-    except Exception:
-        return None
  
  
 async def issue_code(client_id: str,
