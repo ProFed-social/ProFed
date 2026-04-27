@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,8 +12,8 @@ from profed.core.config import config, raw
 from profed.core import message_bus
 from profed.components.activity_delivery import handler, delivery
 from profed.components.activity_delivery import storage as storage_module
- 
- 
+
+
 class FakePublishContext:
     def __init__(self, topic):
         self._topic = topic
@@ -22,8 +22,8 @@ class FakePublishContext:
             self._topic.published.append(msg)
         return publish
     async def __aexit__(self, *_): pass
- 
- 
+
+
 class FakeTopic:
     def __init__(self):
         self.messages = []
@@ -41,21 +41,22 @@ class FakeTopic:
                 caught_up.set()
         return generator()
     def publish(self): return FakePublishContext(self)
- 
- 
+
+
 class FakeMessageBus:
     def __init__(self): self._topics = {}
     def topic(self, name):
         if name not in self._topics:
             self._topics[name] = FakeTopic()
         return self._topics[name]
- 
- 
+
+
 class FakeStorage:
     async def get_followers(self, following): return {"bob@remote.example"}
     async def get_delivery_status(self, activity_id, recipient): return None
     async def upsert_delivery(self, payload): pass
-    async def get_user_key(self, username): return None 
+    async def get_user_key(self, username): return None
+
 
 class Cfg:
     def __init__(self, cfg: Dict[str, Dict[str, str]]):
@@ -72,29 +73,39 @@ class Cfg:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
             raise exc_val
- 
+
+
 @pytest.fixture
 def fake_bus():
     backup = message_bus._instance
     message_bus._instance = FakeMessageBus()
     yield message_bus._instance
     message_bus._instance = backup
- 
- 
+
+
 @pytest.fixture
 def fake_storage():
     storage_module._instance = FakeStorage()
     yield storage_module._instance
     storage_module._instance = None
- 
- 
+
+
+def _mock_post_response(status=202):
+    r = MagicMock()
+    r.status_code = status
+    r.headers = {}
+    return r
+
+
+INBOX_URL = "https://remote.example/inbox/bob"
+
 ACTIVITY = {"type": "created",
             "payload": {"id": "https://example.com/act/1",
                         "username": "alice",
                         "type": "Create",
                         "actor": "https://example.com/actors/alice"}}
 
- 
+
 @pytest.mark.asyncio
 async def test_handle_activities_creates_delivery_task(fake_bus, fake_storage):
     fake_bus.topic("activities").messages = [(1, ACTIVITY)]
@@ -105,14 +116,14 @@ async def test_handle_activities_creates_delivery_task(fake_bus, fake_storage):
              patch("profed.components.activity_delivery.handler.asyncio.create_task",
                    side_effect=lambda coro, **kw: asyncio.ensure_future(coro)):
             await handler.handle_activities({"domain": "example.com"})
-            await asyncio.sleep(0)  # let tasks run
+            await asyncio.sleep(0)
 
             mock_deliver.assert_awaited_once()
             call_kwargs = mock_deliver.call_args
             assert call_kwargs[0][1] == "https://example.com/act/1"
             assert call_kwargs[0][3] == "bob@remote.example"
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_handle_activities_missing_id_is_ignored(fake_bus, fake_storage):
     fake_bus.topic("activities").messages = [(1, {"type": "created",
@@ -128,8 +139,8 @@ async def test_handle_activities_missing_id_is_ignored(fake_bus, fake_storage):
             await asyncio.sleep(0)
 
             mock_deliver.assert_not_awaited()
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_deliver_skips_already_successful(fake_bus, fake_storage):
     storage_module._instance = FakeStorage()
@@ -141,33 +152,24 @@ async def test_deliver_skips_already_successful(fake_bus, fake_storage):
 
     with Cfg({"profed": {"run": "activity_delivery"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.activity_delivery.delivery.httpx.AsyncClient"):
-            await delivery.deliver({},
-                                   "https://example.com/act/1",
-                                   ACTIVITY,
-                                   "bob@remote.example")
+        await delivery.deliver({},
+                               "https://example.com/act/1",
+                               ACTIVITY,
+                               "bob@remote.example")
 
-            storage_module._instance.upsert_delivery = AsyncMock()
-            storage_module._instance.upsert_delivery.assert_not_awaited()
- 
- 
+        storage_module._instance.upsert_delivery = AsyncMock()
+        storage_module._instance.upsert_delivery.assert_not_awaited()
+
+
 @pytest.mark.asyncio
 async def test_deliver_publishes_attempt_on_success(fake_bus, fake_storage):
-    def _mock_response(status=202):
-        r = MagicMock()
-        r.status_code = status
-        r.headers = {}
-        r.raise_for_status = MagicMock()
-        r.json.return_value = {"inbox": "https://remote.example/inbox/bob"}
-        return r
-
     with Cfg({"profed": {"run": "activity_delivery"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.get  = \
-                    AsyncMock(return_value=_mock_response())
-            mock_client.return_value.__aenter__.return_value.post = \
-                    AsyncMock(return_value=_mock_response())
+        with patch("profed.components.activity_delivery.delivery._fetch_inbox_url",
+                   AsyncMock(return_value=INBOX_URL)), \
+             patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_post:
+            mock_post.return_value.__aenter__.return_value.post = \
+                    AsyncMock(return_value=_mock_post_response(status=202))
 
             await delivery.deliver({"initial_retry": 0},
                                    "https://example.com/act/1",
@@ -178,65 +180,50 @@ async def test_deliver_publishes_attempt_on_success(fake_bus, fake_storage):
             assert len(published) == 1
             assert published[0]["payload"]["success"] is True
             assert published[0]["payload"]["recipient"] == "bob@remote.example"
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_deliver_publishes_attempt_on_failure(fake_bus, fake_storage):
-    def _mock_response(status):
-        r = MagicMock()
-        r.status_code = status
-        r.headers = {}
-        r.raise_for_status = MagicMock()
-        r.json.return_value = {"inbox": "https://remote.example/inbox/bob"}
-        return r
     with Cfg({"profed": {"run": "activity_delivery"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.get  = \
-                    AsyncMock(return_value=_mock_response(200))
-            mock_client.return_value.__aenter__.return_value.post = \
-                    AsyncMock(return_value=_mock_response(500))
+        with patch("profed.components.activity_delivery.delivery._fetch_inbox_url",
+                   AsyncMock(return_value=INBOX_URL)), \
+             patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_post:
+            mock_post.return_value.__aenter__.return_value.post = \
+                    AsyncMock(return_value=_mock_post_response(status=500))
 
-            with patch.object(delivery, "deliver", wraps=delivery.deliver) as _:
-                await delivery.deliver({"initial_retry": 0},
-                                        "https://example.com/act/1",
-                                        ACTIVITY, "bob@remote.example")
+            await delivery.deliver({"initial_retry": 0},
+                                   "https://example.com/act/1",
+                                   ACTIVITY,
+                                   "bob@remote.example")
 
             published = fake_bus.topic("deliveries").published
             assert len(published) == 1
             assert published[0]["payload"]["success"] is False
             assert published[0]["payload"]["status_code"] == 500
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_deliver_sends_signed_request_when_key_available(fake_bus, fake_storage):
-    from profed.http_signatures import generate_key_pair
+    from profed.http.signatures import generate_key_pair
     public_pem, private_pem = generate_key_pair()
     fake_storage.get_user_key = AsyncMock(return_value=(public_pem, private_pem))
- 
-    def _mock_response(status=202):
-        r = MagicMock()
-        r.status_code = status
-        r.headers = {}
-        r.json.return_value = {"inbox": "https://remote.example/inbox/bob"}
-        return r
- 
+
     with Cfg({"profed": {"run": "activity_delivery"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.get  = \
-                    AsyncMock(return_value=_mock_response())
-            mock_client.return_value.__aenter__.return_value.post = \
-                    AsyncMock(return_value=_mock_response())
- 
+        with patch("profed.components.activity_delivery.delivery._fetch_inbox_url",
+                   AsyncMock(return_value=INBOX_URL)), \
+             patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_post:
+            mock_post.return_value.__aenter__.return_value.post = \
+                    AsyncMock(return_value=_mock_post_response(status=202))
+
             await delivery.deliver({"initial_retry": 0},
                                    "https://example.com/act/1",
                                    ACTIVITY,
                                    "bob@remote.example")
- 
-            call_kwargs = mock_client.return_value.__aenter__.return_value.post.call_args
+
+            call_kwargs = mock_post.return_value.__aenter__.return_value.post.call_args
             headers     = call_kwargs.kwargs["headers"]
             assert "Signature" in headers
             assert "Digest"    in headers
             assert "Date"      in headers
-

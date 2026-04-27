@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 import asyncio
+import httpx
 import logging
 import random
 import time
@@ -10,9 +11,8 @@ from urllib.parse import urlparse
 from email.utils import parsedate_to_datetime
 from typing import Optional
  
-import httpx
- 
-from profed.http_signatures import sign_request
+from profed.http.client import http 
+from profed.http.signatures import sign_request
 from profed.core.message_bus import message_bus
 from .projections import get_delivery_status
 from .storage import storage
@@ -40,18 +40,16 @@ async def _fetch_inbox_url(actor_url: str, config: dict) -> Optional[str]:
     if cached is not None and now < cached[2]:
         return cached[0]
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(actor_url,
+        data  = await http("GET").json(actor_url,
                                         headers={"Accept": "application/activity+json"},
                                         timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
-            inbox = response.json().get("inbox")
-            if isinstance(inbox, str):
-                mean   = float(config.get("inbox_cache_ttl", INBOX_CACHE_TTL_MEAN))
-                jitter = float(config.get("inbox_cache_ttl_jitter", INBOX_CACHE_TTL_JITTER))
-                ttl    = mean * random.uniform(1 - jitter, 1 + jitter)
-                _inbox_cache[actor_url] = (inbox, now, now + ttl)
-                return inbox
+        inbox = data.get("inbox")
+        if isinstance(inbox, str):
+            mean   = float(config.get("inbox_cache_ttl", INBOX_CACHE_TTL_MEAN))
+            jitter = float(config.get("inbox_cache_ttl_jitter", INBOX_CACHE_TTL_JITTER))
+            ttl    = mean * random.uniform(1 - jitter, 1 + jitter)
+            _inbox_cache[actor_url] = (inbox, now, now + ttl)
+            return inbox
     except Exception:
         logger.warning("Failed to fetch actor %s", actor_url)
     return None

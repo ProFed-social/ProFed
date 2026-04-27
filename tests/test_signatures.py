@@ -9,7 +9,7 @@ import pytest
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
  
-from profed.http_signatures import generate_key_pair, sign_request
+from profed.http.signatures import generate_key_pair, sign_request
 
 
 URL    = "https://remote.example/inbox/alice"

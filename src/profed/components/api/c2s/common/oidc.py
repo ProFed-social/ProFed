@@ -1,11 +1,11 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
-import httpx
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 from authlib.jose import JsonWebKey, jwt
- 
+from profed.http.client import http
+
 _oidc_issuer: str            = ""
 _oidc_config: Optional[dict] = None
 _jwks:        Optional[dict] = None
@@ -34,25 +34,18 @@ async def _fetch_oidc_config(issuer: str) -> dict:
                       "",
                       "",
                       ""))
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        _oidc_config = response.json()
-        return _oidc_config
+    _oidc_config = await http("GET").json(url)
+    return _oidc_config
 
  
 async def _fetch_jwks(issuer: str) -> dict:
     global _jwks
-    if _jwks is None:
+    if _jwks is not None:
         return _jwks
 
     oidc_config = await _fetch_oidc_config(issuer)
-    async with httpx.AsyncClient() as client:
-        response = await client.get(oidc_config["jwks_uri"])
-        response.raise_for_status()
-        _jwks = response.json()
-        return _jwks
- 
+    _jwks = await http("GET").json(oidc_config["jwks_uri"])
+    return _jwks 
  
 async def validate_token(issuer: str, token: str) -> Optional[dict]:
     try:

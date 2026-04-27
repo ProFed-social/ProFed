@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 import logging
-import httpx
 from typing import Optional
 from urllib.parse import urlparse, urlunparse, urlencode
- 
+from profed.http.client import http
+
+
 logger = logging.getLogger(__name__)
  
  
@@ -29,16 +30,12 @@ async def _fetch_webfinger(resource: str) -> dict | None:
                       urlencode({"resource": _normalize_resource(resource)}),
                       ""))
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(url,
-                                        headers={"Accept": "application/jrd+json"},
-                                        timeout=30.0)
-            response.raise_for_status()
-            return response.json()
+        return await http("GET").json(url,
+                                      headers={"Accept": "application/jrd+json"},
+                                      timeout=30.0)
     except Exception:
         logger.debug("WebFinger lookup failed for %r", resource, exc_info=True)
-        return None
- 
+        return None 
  
 async def lookup_acct(resource: str) -> Optional[str]:
     data = await _fetch_webfinger(resource)

@@ -5,7 +5,7 @@ import logging
 import asyncio
  
 from profed.core.message_bus import message_bus
-from profed.http_signatures import generate_key_pair 
+from profed.http.signatures import generate_key_pair 
 
 from .fetcher import fetch_mf2
 from .normalizer import normalize_mf2_to_profile

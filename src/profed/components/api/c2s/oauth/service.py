@@ -6,6 +6,7 @@ import secrets
 from typing import Optional
 from urllib.parse import urlencode
 from profed.core.message_bus import message_bus
+from profed.http.client import http
 from ..common.oidc import _fetch_oidc_config 
  
 _oidc_config: Optional[dict] = None
@@ -34,17 +35,14 @@ async def exchange_code(issuer: str,
                         callback_url: str,
                         code: str) -> dict:
     oidc_config = await _fetch_oidc_config(issuer)
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            oidc_config["token_endpoint"],
-            data={"grant_type":    "authorization_code",
-                  "code":           code,
-                  "redirect_uri":   callback_url,
-                  "client_id":      nc_client_id,
-                  "client_secret":  nc_client_secret})
-        response.raise_for_status()
 
-        return response.json()
+    return await http("POST").json(
+        oidc_config["token_endpoint"],
+        data={"grant_type":    "authorization_code",
+              "code":           code,
+              "redirect_uri":   callback_url,
+              "client_id":      nc_client_id,
+              "client_secret":  nc_client_secret})
  
  
 async def issue_code(client_id: str,
