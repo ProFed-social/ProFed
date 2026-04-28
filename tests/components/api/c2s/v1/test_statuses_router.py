@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
-from profed.components.api.c2s.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user
 
  
 class FakePublishContext:

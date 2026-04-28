@@ -3,7 +3,7 @@
  
 from fastapi import APIRouter
 from profed.identity import domain
-from profed.components.api.c2s.common.instance import build_common_response
+from profed.components.api.c2s.shared.instance import build_common_response
  
  
 router = APIRouter()

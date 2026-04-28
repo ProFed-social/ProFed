@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Annotated
 from profed.identity import actor_url_from_username, acct_from_username, account_id
 from profed.components.api.c2s.shared.actors.service import resolve_actor
-from profed.components.api.c2s.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user
 
  
 router = APIRouter()

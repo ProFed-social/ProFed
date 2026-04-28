@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.components.api.c2s.v1.timelines import router as timelines_module
 from profed.components.api.c2s.v1.timelines import storage as timelines_storage
-from profed.components.api.c2s.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user
 
  
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}

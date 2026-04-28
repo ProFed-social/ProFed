@@ -7,7 +7,7 @@ from typing import Optional
 from urllib.parse import urlencode
 from profed.core.message_bus import message_bus
 from profed.http.client import http
-from ..common.oidc import _fetch_oidc_config 
+from ..shared.oidc import _fetch_oidc_config 
  
 _oidc_config: Optional[dict] = None
 _jwks: Optional[dict] = None

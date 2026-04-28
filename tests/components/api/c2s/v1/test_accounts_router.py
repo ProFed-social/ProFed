@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core.config import config, raw
 from profed.components.api.c2s.v1.accounts import router as accounts_module
-from profed.components.api.c2s.auth import current_user 
+from profed.components.api.c2s.shared.auth import current_user 
  
 class Cfg:
     def __init__(self, cfg):

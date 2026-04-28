@@ -3,7 +3,7 @@
  
 from fastapi import APIRouter, Depends
 from typing import Annotated, Optional
-from profed.components.api.c2s.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user
 from .resolvers import resolve_search
  
 router = APIRouter()

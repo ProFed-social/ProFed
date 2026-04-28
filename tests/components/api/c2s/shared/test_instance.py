@@ -3,7 +3,7 @@
  
 import os
 from profed.core.config import config, raw
-from profed.components.api.c2s.common.instance import build_common_response
+from profed.components.api.c2s.shared.instance import build_common_response
  
  
 class Cfg:

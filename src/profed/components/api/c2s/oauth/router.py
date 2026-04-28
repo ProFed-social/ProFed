@@ -10,7 +10,7 @@ from .service import (authorization_url,
                       exchange_code,
                       issue_code,
                       consume_code)
-from ..common.oidc import validate_token, set_oidc_issuer
+from ..shared.oidc import validate_token, set_oidc_issuer
  
  
 router = APIRouter()

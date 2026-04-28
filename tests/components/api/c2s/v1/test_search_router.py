@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.components.api.c2s.v1.search import router, init
 from profed.components.api.c2s.v1.search.resolvers.accounts import _actor_to_account
-from profed.components.api.c2s.common.auth import current_user 
+from profed.components.api.c2s.shared.auth import current_user 
  
 @pytest.fixture
 def client():
