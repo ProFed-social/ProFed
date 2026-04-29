@@ -69,13 +69,6 @@ class parse_list:
         return parsed
 
 
-def components_from_raw(raw: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
-    parsers = parse_list(raw["profed"]["run"].split())
-    parsed = deepcopy(raw)
-    parsed.update(parsers.parse_all(raw))
-    return parsed
-
-
 def _apply_defaults(raw: Dict[str, Dict[str, str]],
                     defaults: Dict[str, Any] | None = None) -> Dict[str, Dict[str, str]]:
     if defaults is None:
@@ -86,6 +79,8 @@ def _apply_defaults(raw: Dict[str, Dict[str, str]],
         section_cfg = merged.setdefault(section, {})
         for key, value in values.items():
             section_cfg.setdefault(key, value)
+
+    return merged
 
 
 def components_from_raw(raw: Dict[str, Dict[str, str]],
