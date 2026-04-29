@@ -75,3 +75,25 @@ def components_from_raw(raw: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
     parsed.update(parsers.parse_all(raw))
     return parsed
 
+
+def _apply_defaults(raw: Dict[str, Dict[str, str]],
+                    defaults: Dict[str, Any] | None = None) -> Dict[str, Dict[str, str]]:
+    if defaults is None:
+        return raw
+
+    merged = deepcopy(raw)
+    for section, values in defaults.items():
+        section_cfg = merged.setdefault(section, {})
+        for key, value in values.items():
+            section_cfg.setdefault(key, value)
+
+
+def components_from_raw(raw: Dict[str, Dict[str, str]],
+                        defaults: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    parsed = deepcopy(_apply_defaults(raw, defaults))
+    run = parsed["profed"]["run"]
+    parsers = parse_list(run if isinstance(run, list) else run.split())
+    parsed.update(parsers.parse_all(raw))
+    return parsed
+
+

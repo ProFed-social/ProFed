@@ -11,21 +11,19 @@ from profed.core.component_manager import run
 from profed.core.message_bus import init_message_bus
 
 
-STANDARD_COMPONENTS = " ".join(("api",
-                                "user_activities",
-                                "activity_delivery",
-                                "follow_handler",
-                                "accept_handler"))
+STANDARD_COMPONENTS = ["api",
+                       "user_activities",
+                       "activity_delivery",
+                       "follow_handler",
+                       "accept_handler"]
 
 
 if __name__ == "__main__":
+    config.set_defaults({"profed": {"run": STANDARD_COMPONENTS}})
     cfg = config()
 
     level = cfg.get("logging", {}).get("level", "INFO")
     logging.getLogger().setLevel(getattr(logging, level.upper()))
-
-    cfg["profed"] = cfg.get("profed", {})
-    cfg["profed"]["run"] = cfg["profed"].get("run", STANDARD_COMPONENTS)
 
     run(cfg, [init_message_bus])
 
