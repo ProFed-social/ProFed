@@ -17,11 +17,11 @@ def mock_module():
 
 
 def test_component_manager_with_main(mock_module):
-    run({"example": {"foo": "bar"}, "profed": {"run": "example"}})
+    run({"example": {"foo": "bar"}, "profed": {"run": ["example"]}})
 
 
 def test_component_manager_without_main(mock_module):
-    run({"example": {"foo": "bar"}, "profed": {"run": "example"}})
+    run({"example": {"foo": "bar"}, "profed": {"run": ["example"]}})
 
 
 @mark.asyncio

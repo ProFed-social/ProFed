@@ -14,8 +14,6 @@ from .timelines import projection as timelines_projection
 from .timelines import router as timelines
 from profed.components.api.c2s.shared.actors import storage as actors_storage
 from profed.components.api.c2s.shared.actors import projection as actors_projection
-from profed.components.api.c2s.shared.known_accounts import storage as known_accounts_storage
-from profed.components.api.c2s.shared.known_accounts import projection as known_accounts_projection
 from .accounts.following import storage as following_storage
 from .accounts.following import projection as following_projection 
 
@@ -40,11 +38,6 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                    timelines_projection,
                                                    timelines_projection.handle_events,
                                                    "c2s_v1_timelines")),
-                          (["search", "accounts"],
-                           _projection_initializer(known_accounts_storage,
-                                                   known_accounts_projection,
-                                                   known_accounts_projection.handle_events,
-                                                   "c2s_v1_known_accounts")),
                           (["accounts"],
                            _projection_initializer(following_storage,
                                                    following_projection,

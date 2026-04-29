@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.components.api.c2s.v1.search import router, init
-from profed.components.api.c2s.v1.search.resolvers.accounts import _actor_to_account
+from profed.components.api.c2s.shared.search.resolvers.accounts import _actor_to_account
 from profed.components.api.c2s.shared.auth import current_user 
  
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_search_non_acct_returns_empty(client):
  
  
 def test_search_with_resolve_returns_account(client):
-    with patch("profed.components.api.c2s.v1.search.resolvers.accounts.lookup_by_acct",
+    with patch("profed.components.api.c2s.shared.search.resolvers.accounts.lookup_by_acct",
                AsyncMock(return_value=ROW)):
         response = client.get("/search?q=@alice@mastodon.social&resolve=true")
 
@@ -54,7 +54,7 @@ def test_search_with_resolve_returns_account(client):
  
  
 def test_search_type_filter_limits_resolvers(client):
-    with patch("profed.components.api.c2s.v1.search.resolvers.accounts.lookup_by_acct",
+    with patch("profed.components.api.c2s.shared.search.resolvers.accounts.lookup_by_acct",
                AsyncMock(return_value=None)):
         response = client.get("/search?q=@alice@mastodon.social&resolve=true&type=statuses")
 
