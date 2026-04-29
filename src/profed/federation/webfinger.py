@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 import logging
+from datetime import datetime
+from functools import wraps
 from typing import Optional
 from urllib.parse import urlparse, urlunparse, urlencode
 from profed.http.client import http
@@ -22,6 +24,25 @@ def _normalize_resource(resource: str) -> str:
             f"acct:{resource}")
  
  
+def cache(ttl: int):
+    cached_results = {}
+    def function_cache(f):
+        @wraps(f)
+        async def cached_function(resource: str):
+            nonlocal cached_results
+
+            cached_results = {k: v
+                              for k, v in cached_results.items()
+                              if (datetime.now() - v[0]).seconds <= ttl}
+            if resource not in cached_results:
+                cached_results[resource] = (datetime.now(), await f(resource))
+
+            return cached_results[resource][1]
+        return cached_function
+    return function_cache
+
+
+@cache(300)
 async def _fetch_webfinger(resource: str) -> dict | None:
     url = urlunparse(("https",
                       _domain_from_resource(resource),
