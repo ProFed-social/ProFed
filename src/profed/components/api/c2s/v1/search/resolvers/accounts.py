@@ -2,22 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 import logging
-from typing import Optional
-from profed.federation.webfinger import lookup_actor_url
+from profed.components.api.c2s.shared.known_accounts.service import lookup_by_acct
 from profed.identity import account_id
-from profed.http.client import http 
+
 
 logger = logging.getLogger(__name__)
  
- 
-async def _fetch_actor(actor_url: str) -> Optional[dict]:
-    try:
-        return await http("GET").json(actor_url,
-                                       headers={"Accept": "application/activity+json"},
-                                       timeout=10.0)
-    except Exception:
-        logger.warning("Failed to fetch actor %s", actor_url)
-        return None 
  
 def _actor_to_account(actor: dict, acct: str) -> dict:
     username, _ = acct.split("@", 1)
@@ -41,10 +31,9 @@ async def resolve(q: str, resolve: bool = False, limit: int = 20) -> dict:
         return {}
 
     acct = q.lstrip("@")
-    actor_url = await lookup_actor_url(acct)
-    if actor_url is not None:
-        actor = await _fetch_actor(actor_url)
-        if actor is not None:
-            return {"accounts": [_actor_to_account(actor, acct)]}
+    row = await lookup_by_acct(acct)
+    if row is None:
+        return {}
+    actor = row.get("actor_data") or {}
+    return {"accounts": [_actor_to_account(actor, acct)]}
 
-    return {}

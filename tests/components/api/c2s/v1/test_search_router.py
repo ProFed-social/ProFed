@@ -20,7 +20,12 @@ def client():
 ACTOR = {"id":   "https://mastodon.social/users/alice",
          "type": "Person",
          "name": "Alice"}
- 
+ROW = {"account_id":        123456,
+       "acct":              "alice@mastodon.social",
+       "actor_url":         "https://mastodon.social/users/alice",
+       "actor_data":        ACTOR,
+       "last_webfinger_at": "2026-04-28T12:00:00+00:00"} 
+
  
 def test_search_without_resolve_returns_empty(client):
     response = client.get("/search?q=@alice@mastodon.social")
@@ -37,11 +42,9 @@ def test_search_non_acct_returns_empty(client):
  
  
 def test_search_with_resolve_returns_account(client):
-    with patch("profed.components.api.c2s.v1.search.resolvers.accounts.lookup_actor_url",
-               AsyncMock(return_value="https://mastodon.social/users/alice")):
-        with patch("profed.components.api.c2s.v1.search.resolvers.accounts.http") as mock_http:
-            mock_http.return_value.json = AsyncMock(return_value=ACTOR)
-            response = client.get("/search?q=@alice@mastodon.social&resolve=true")
+    with patch("profed.components.api.c2s.v1.search.resolvers.accounts.lookup_by_acct",
+               AsyncMock(return_value=ROW)):
+        response = client.get("/search?q=@alice@mastodon.social&resolve=true")
 
     assert response.status_code == 200
     result = response.json()
@@ -51,7 +54,7 @@ def test_search_with_resolve_returns_account(client):
  
  
 def test_search_type_filter_limits_resolvers(client):
-    with patch("profed.components.api.c2s.v1.search.resolvers.accounts.lookup_actor_url",
+    with patch("profed.components.api.c2s.v1.search.resolvers.accounts.lookup_by_acct",
                AsyncMock(return_value=None)):
         response = client.get("/search?q=@alice@mastodon.social&resolve=true&type=statuses")
 

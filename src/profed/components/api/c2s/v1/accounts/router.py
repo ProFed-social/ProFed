@@ -4,8 +4,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Annotated
 from profed.identity import actor_url_from_username, acct_from_username, account_id
+from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
+                                                                     lookup_by_acct,
+                                                                     lookup_by_actor_url)
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.components.api.c2s.shared.auth import current_user
+from profed.core.message_bus import message_bus
 
  
 router = APIRouter()
@@ -54,4 +58,47 @@ async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
         raise HTTPException(status_code=404, detail="account_not_found")
 
     return _account_from_person(person, username)
+ 
+ 
+async def _resolve_account(id_or_acct: str, config: dict) -> dict | None:
+    if id_or_acct.startswith("https://"):
+        return await lookup_by_actor_url(id_or_acct, config)
+    if "@" in id_or_acct:
+        return await lookup_by_acct(id_or_acct, config)
+    try:
+        return await lookup_by_id(int(id_or_acct), config)
+    except ValueError:
+        return None
+ 
+ 
+@router.post("/accounts/{id}/follow")
+async def follow(id: str,
+                 claims: Annotated[dict, Depends(current_user)]):
+    username = claims.get("preferred_username") or claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="invalid_token")
+ 
+    row = await _resolve_account(id, {})
+    if row is None:
+        raise HTTPException(status_code=404, detail="account_not_found")
+ 
+    async with message_bus().topic("known_accounts").publish() as publish:
+        await publish({"type":    "follow_requested",
+                       "payload": {"account_id":    row["account_id"],
+                                   "following_user": username}})
+ 
+    actor_url = row["actor_url"]
+
+    follow_id = f"{actor_url_from_username(username)}#follows/{row['account_id']}"
+    async with message_bus().topic("activities").publish() as publish:
+        await publish({"type":    "created",
+                       "payload": {"id":       follow_id,
+                                   "type":     "Follow",
+                                   "actor":    actor_url_from_username(username),
+                                   "object":   actor_url,
+                                   "username": username}})
+ 
+    return {"id":       str(row["account_id"]),
+            "following": True,
+            "requested": True}
 

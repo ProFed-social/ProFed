@@ -60,7 +60,7 @@ def _is_fresh(row: dict, ttl: int) -> bool:
  
  
 async def lookup_by_id(account_id: int,
-                        config: dict | None = None) -> Optional[dict]:
+                       config: dict | None = None) -> Optional[dict]:
     ttl = int((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL))
     row = await (await storage()).get_by_id(account_id)
     if row is not None and _is_fresh(row, ttl):
@@ -71,7 +71,7 @@ async def lookup_by_id(account_id: int,
  
  
 async def lookup_by_acct(acct: str,
-                          config: dict | None = None) -> Optional[dict]:
+                         config: dict | None = None) -> Optional[dict]:
     ttl = int((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL))
     row = await (await storage()).get_by_acct(acct)
     if row is not None and _is_fresh(row, ttl):
@@ -80,7 +80,7 @@ async def lookup_by_acct(acct: str,
  
  
 async def lookup_by_actor_url(actor_url: str,
-                               config: dict | None = None) -> Optional[dict]:
+                              config: dict | None = None) -> Optional[dict]:
     ttl = int((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL))
     row = await (await storage()).get_by_actor_url(actor_url)
     if row is not None and _is_fresh(row, ttl):
