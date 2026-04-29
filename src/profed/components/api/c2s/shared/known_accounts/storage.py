@@ -44,7 +44,7 @@ class _Storage:
                                account_id,
                                acct,
                                actor_url,
-                               json.dumps(actor_data) if actor_data else None,
+                               actor_data,
                                last_webfinger_at)
  
     async def get_by_id(self, account_id: int) -> Optional[dict]:
