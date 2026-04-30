@@ -28,23 +28,23 @@ def _projection_initializer(storage, projection, handle_events, name):
 
  
 async def init(config: dict, deactivate: List[str]) -> None:
-    for routers, init in [(["accounts"],
-                           _projection_initializer(actors_storage,
-                                                   actors_projection,
-                                                   actors_projection.handle_user_events,
-                                                   "c2s_actor")),
-                          (["timelines"],
-                           _projection_initializer(timelines_storage,
-                                                   timelines_projection,
-                                                   timelines_projection.handle_events,
-                                                   "c2s_v1_timelines")),
-                          (["accounts"],
-                           _projection_initializer(following_storage,
-                                                   following_projection,
-                                                   following_projection.handle_events,
-                                                   "c2s_v1_following"))]:
+    for routers, init_fn in [(["accounts"],
+                              _projection_initializer(actors_storage,
+                                                      actors_projection,
+                                                      actors_projection.handle_user_events,
+                                                      "c2s_actor")),
+                             (["timelines"],
+                              _projection_initializer(timelines_storage,
+                                                      timelines_projection,
+                                                      timelines_projection.handle_events,
+                                                      "c2s_v1_timelines")),
+                             (["accounts"],
+                              _projection_initializer(following_storage,
+                                                      following_projection,
+                                                      following_projection.handle_events,
+                                                      "c2s_v1_following"))]:
         if any(r not in deactivate for r in routers):
-            await init(config)
+            await init_fn(config)
 
     for r in get_active({"apps": apps,
                          "instance": instance,

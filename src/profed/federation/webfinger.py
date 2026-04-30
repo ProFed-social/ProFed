@@ -57,6 +57,7 @@ async def _fetch_webfinger(resource: str) -> dict | None:
     except Exception:
         logger.debug("WebFinger lookup failed for %r", resource, exc_info=True)
         return None 
+
  
 async def lookup_acct(resource: str) -> Optional[str]:
     data = await _fetch_webfinger(resource)
