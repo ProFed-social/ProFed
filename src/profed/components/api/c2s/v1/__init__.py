@@ -30,7 +30,7 @@ def _projection_initializer(storage, projection, handle_events, name):
         logger.debug("v1 awaited ensure table")
         await projection.rebuild()
         logger.debug("v1 awaited projection rebuild")
-        asyncio.create_task(handle_events(), name=n:ame)
+        asyncio.create_task(handle_events(), name=name)
 
     return _init_projection
 
