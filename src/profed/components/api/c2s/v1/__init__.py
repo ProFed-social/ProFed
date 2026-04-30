@@ -20,8 +20,11 @@ from .accounts.following import projection as following_projection
 def _projection_initializer(storage, projection, handle_events, name):
     async def _init_projection(config: dict):
         await storage.init(config)
+        print("v1 awaited storage init")
         await (await storage.storage()).ensure_table()
+        print("v1 awaited ensure table")
         await projection.rebuild()
+        print("v1 awaited projection rebuild")
         asyncio.create_task(handle_events(), name=name)
 
     return _init_projection
@@ -45,6 +48,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       "c2s_v1_following"))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
+            print("v1 awaited projection initializer")
 
     for r in get_active({"apps": apps,
                          "instance": instance,
