@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import logging
 import asyncio
 from typing import List
 from fastapi import APIRouter
@@ -19,17 +18,11 @@ from .accounts.following import storage as following_storage
 from .accounts.following import projection as following_projection 
 
 
-logger = logging.getLogger(__name__)
-
-
 def _projection_initializer(storage, projection, handle_events, name):
     async def _init_projection(config: dict):
         await storage.init(config)
-        logger.debug("v1 awaited storage init")
         await (await storage.storage()).ensure_table()
-        logger.debug("v1 awaited ensure table")
         await projection.rebuild()
-        logger.debug("v1 awaited projection rebuild")
         asyncio.create_task(handle_events(), name=name)
 
     return _init_projection
@@ -53,7 +46,6 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       "c2s_v1_following"))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
-            logger.debug("v1 awaited projection initializer")
 
     for r in get_active({"apps": apps,
                          "instance": instance,

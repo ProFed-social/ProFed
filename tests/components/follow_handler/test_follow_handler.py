@@ -33,7 +33,7 @@ class FakeTopic:
         async def generator():
             for seq, event in self.messages:
                 if seq > last_seen:
-                    yield event
+                    yield (seq, event) if include_sequence_id else event
             if caught_up is not None:
                 caught_up.set()
         return generator()

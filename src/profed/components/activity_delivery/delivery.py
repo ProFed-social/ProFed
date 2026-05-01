@@ -3,6 +3,7 @@
  
 import asyncio
 import httpx
+import uuid
 import logging
 import random
 import time
@@ -106,8 +107,9 @@ async def _publish_attempt(activity_id: str,
                                    "attempt":          attempt,
                                    "status_code":      status_code,
                                    "retry_after":      retry_after,
-                                   "first_attempt_at": first_attempt_at}})
- 
+                                   "first_attempt_at": first_attempt_at}},
+                      message_id=uuid.uuid5(uuid.NAMESPACE_URL,
+                                            f"{activity_id}#{recipient}#{attempt}"))
 
 
 async def _build_signed_headers(activity: dict,

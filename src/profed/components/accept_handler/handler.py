@@ -3,15 +3,17 @@
  
 import logging
 from profed.core.message_bus import message_bus
+from profed.core.message_bus.source_key import source_key
 from profed.topics import incoming_activities
 from profed.identity import actor_url_from_username
 from profed.models.activity_pub import AcceptActivity
 from .storage import storage
  
 logger = logging.getLogger(__name__)
+_source_key = source_key("incoming_activities") 
+
  
- 
-async def _handle_accept(username: str, activity: dict) -> None:
+async def _handle_accept(username: str, activity: dict, seq: int) -> None:
     try:
         accept = AcceptActivity.model_validate(activity)
     except Exception as e:
@@ -30,15 +32,18 @@ async def _handle_accept(username: str, activity: dict) -> None:
  
     async with message_bus().topic("known_accounts").publish() as publish:
         await publish({"type":    "follow_accepted",
-                       "payload": {"account_id": account_id,
-                                   "following_user": username}})
+                       "payload": {"account_id":    account_id,
+                                   "following_user": username}},
+                      message_id=_source_key.message_id(seq))
     logger.info("accept_handler: follow_accepted for %r -> %r",
                 username,
                 accept.actor)
  
  
 async def handle_incoming_activities() -> None:
-    async for event in message_bus().topic("incoming_activities").subscribe("accept_handler", 0):
+    async for seq, event in \
+            message_bus().topic("incoming_activities").subscribe("accept_handler",
+                                                                 include_sequence_id=True):
         event_type, payload = incoming_activities["validate"](event)
         if event_type is None:
             logger.warning("accept_handler: ignoring invalid event: %r", event)
@@ -50,8 +55,7 @@ async def handle_incoming_activities() -> None:
  
         try:
             if activity_type == "Accept":
-                logger.info("accept_handler: handling Accept for %r", username)
-                await _handle_accept(username, activity)
+                await _handle_accept(username, activity, seq)
         except Exception:
             logger.exception("Error handling %s activity for %s",
                              activity_type,

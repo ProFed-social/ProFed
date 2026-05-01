@@ -6,9 +6,9 @@
 import uuid
 
 
-_SOURCE_KEYS = {
-    "users": "users"
-}
+_SOURCE_KEYS = {"users":               "users",
+                "incoming_activities": "incoming",
+                "activities":          "activity"}
 
 
 class SourceKey:
@@ -25,10 +25,12 @@ class SourceKey:
 
         self._prefix = source_id
 
-    def message_id(self, message_id: int) -> uuid.UUID:
-        if message_id < 0:
-            raise ValueError("message_id must be non-negative")
-        return uuid.UUID(bytes=self._prefix + message_id.to_bytes(8, "big", signed=False))
+
+    def message_id(self, sequence_id: int) -> uuid.UUID:
+        if sequence_id < 0:
+            raise ValueError("sequence_id must be non-negative")
+        return uuid.UUID(bytes=self._prefix + sequence_id.to_bytes(8, "big", signed=False))
+
 
 
 def source_key(source_topic: str) -> SourceKey:

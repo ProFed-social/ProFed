@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-import logging
 import asyncio
 from typing import List
 from profed.components.api.active_routers import narrow_deactivate_routers
@@ -13,17 +12,11 @@ from . import v1, v2
 from .router import mount_routers
 
 
-logger = logging.getLogger(__name__)
-
-
 def _projection_initializer(storage, projection, handle_events, name):
     async def _init(config: dict):
         await storage.init(config)
-        logger.debug("c2s awaited storage init")
         await (await storage.storage()).ensure_table()
-        logger.debug("c2s awaited ensure table")
         await projection.rebuild()
-        logger.debug("c2s awaited projection rebuild init")
         asyncio.create_task(handle_events(), name=name)
     return _init
 
@@ -38,12 +31,8 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                        "c2s_known_accounts"))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
-            logger.debug("c2s awaited projection init function")
     if "oauth" not in deactivate:
         await oauth.init(config)
-        logger.debug("c2s awaited oauth init")
     await v1.init(config, v1_deactivate)
-    logger.debug("c2s awaited v1 config")
     await v2.init(config, v2_deactivate)
-    logger.debug("c2s awaited v2 config")
 
