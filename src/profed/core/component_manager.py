@@ -31,7 +31,10 @@ def run(config, init=None):
             await asyncio.gather(*(fn() for fn in init))
 
         component_names = config["profed"]["run"]
-        components = [Component(name) for name in component_names]
+        components = [Component(name)
+                      for name in (component_names
+                                   if isinstance(component_names, list) else
+                                   component_names.split())]
         await asyncio.gather(*(component(config.get(component.name, {}))
                                for component in components))
 
