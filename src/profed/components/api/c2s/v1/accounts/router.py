@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Annotated
 from profed.identity import actor_url_from_username, acct_from_username, account_id
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
@@ -10,7 +10,7 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.components.api.c2s.shared.auth import current_user
 from profed.core.message_bus import message_bus
-
+from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
  
 router = APIRouter()
 active = False
@@ -60,6 +60,29 @@ async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
     return _account_from_person(person, username)
  
  
+@router.get("/accounts/relationships")
+async def relationships(id: list[str] = Query(default=[], alias="id[]"),
+                        claims: Annotated[dict, Depends(current_user)] = None):
+    username = claims.get("preferred_username") or claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="invalid_token")
+
+    account_ids = [int(i) for i in id if i.isdigit()]
+    rows        = await (await following_storage()).get_following(username,
+                                                                  filter=account_ids)
+    following_map = {row["account_id"]: row for row in rows}
+    return [{"id":              i,
+             "following":       following_map.get(int(i), {}).get("accepted", False),
+             "requested":       (int(i) in following_map and
+                                 not following_map[int(i)]["accepted"]),
+             "followed_by":     False,
+             "blocking":        False,
+             "muting":          False,
+             "domain_blocking": False,
+             "endorsed":        False,
+             "note":            ""} for i in id if i.isdigit()]
+
+
 async def _resolve_account(id_or_acct: str, config: dict) -> dict | None:
     if id_or_acct.startswith("https://"):
         return await lookup_by_actor_url(id_or_acct, config)

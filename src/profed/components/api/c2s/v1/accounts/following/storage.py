@@ -50,6 +50,28 @@ class _Storage(BaseStorage):
                                     account_id,
                                     following_user)
 
+    async def get_following(self,
+                            following_user: str,
+                            filter: list[int] | None = None) -> list[dict]:
+        sql = """SELECT account_id, following_user, accepted
+                 FROM api.following
+                 WHERE following_user = $1"""
+        if filter is not None:
+            sql += " AND account_id = ANY($2)"
+            return await self.fetch_all(sql, following_user, filter)
+        return await self.fetch_all(sql, following_user)
+
+    async def get_followers(self,
+                            account_id: int,
+                            filter: list[str] | None = None) -> list[dict]:
+        sql = """SELECT account_id, following_user, accepted
+                 FROM api.following
+                 WHERE account_id = $1"""
+        if filter is not None:
+            sql += " AND following_user = ANY($2)"
+            return await self.fetch_all(sql, account_id, filter)
+        return await self.fetch_all(sql, account_id)
+
 
 _instance: _Storage | None = None
 

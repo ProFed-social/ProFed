@@ -141,3 +141,59 @@ def test_follow_unknown_account_returns_404(client):
 
     assert response.status_code == 404
 
+
+FOLLOWING_ROW_PENDING  = {"account_id": 42, "following_user": "alice", "accepted": False}
+FOLLOWING_ROW_ACCEPTED = {"account_id": 42, "following_user": "alice", "accepted": True}
+
+
+def _mock_storage(rows):
+    mock = AsyncMock()
+    mock.get_following = AsyncMock(return_value=rows)
+    return AsyncMock(return_value=mock)
+
+
+def test_relationships_not_following(client):
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+                   _mock_storage([])):
+            response = client.get("/accounts/relationships?id[]=42")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data == [{"id":              "42",
+                     "following":       False,
+                     "requested":       False,
+                     "followed_by":     False,
+                     "blocking":        False,
+                     "muting":          False,
+                     "domain_blocking": False,
+                     "endorsed":        False,
+                     "note":            ""}]
+
+
+def test_relationships_follow_requested(client):
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+                   _mock_storage([FOLLOWING_ROW_PENDING])):
+            response = client.get("/accounts/relationships?id[]=42")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["following"] is False
+    assert data[0]["requested"] is True
+
+
+def test_relationships_following(client):
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+                   _mock_storage([FOLLOWING_ROW_ACCEPTED])):
+            response = client.get("/accounts/relationships?id[]=42")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["following"] is True
+    assert data[0]["requested"] is False
+
