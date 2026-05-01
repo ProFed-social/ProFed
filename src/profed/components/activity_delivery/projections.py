@@ -7,8 +7,7 @@ from .storage import storage
  
  
 async def _followers_init() -> None:
-    store = await storage()
-    await store.ensure_schema()
+    pass
  
  
 async def _follower_created(payload: dict) -> None:
@@ -29,8 +28,7 @@ followers_handle_events, followers_rebuild, _ = \
  
  
 async def _deliveries_init() -> None:
-    store = await storage()
-    await store.ensure_schema()
+    pass
  
  
 async def _delivery_attempted(payload: dict) -> None:
