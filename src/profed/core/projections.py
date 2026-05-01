@@ -1,9 +1,12 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import asyncio
 from typing import Optional, Dict, Callable, Awaitable, Tuple
 from profed.core.message_bus import message_bus
+
+logger = logging.getLogger(__name__)
 
 
 def build_projection(topic: Dict,
@@ -37,17 +40,18 @@ def build_projection(topic: Dict,
 
     async def rebuild():
         nonlocal last_seen
-
+        logger.debug("rebuild: starting init for topic %s", topic_name)
         await init()
-
+        logger.debug("rebuild: init done, fetching last_snapshot for topic %s", topic_name)
         last_seen, snapshot = await message_bus().topic(topic_name).last_snapshot()
-
+        logger.debug("rebuild: last_snapshot done, last_seen=%s, snapshot items=%s", last_seen, len(snapshot))
         for it in snapshot:
             item = topic["snapshot_validate"](it)
 
             if item is not None and verify_snapshot_item(item):
                 await on_snapshot_item(item)
 
+        logger.debug("rebuild: snapshot processed, creating drain task for topic %s", topic_name)
         caught_up = asyncio.Event()
         async def _drain():
             nonlocal last_seen
@@ -62,8 +66,10 @@ def build_projection(topic: Dict,
                 if caught_up.is_set():
                     return
 
+        logger.debug("rebuild: drain task created, waiting for caught_up for topic %s", topic_name)
         drain_task = asyncio.create_task(_drain())
         await caught_up.wait()
+        logger.debug("rebuild: caught_up received for topic %s", topic_name)
         drain_task.cancel()
         try:
             await drain_task
