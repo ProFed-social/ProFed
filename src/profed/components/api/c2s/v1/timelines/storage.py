@@ -3,7 +3,6 @@
  
 from typing import Dict, List, Optional
 import asyncpg
-import json
 from profed.core.db_connections import fetch_pool 
  
 class _storage:
@@ -25,7 +24,7 @@ class _storage:
             await conn.execute("""INSERT INTO api.c2s_home_timeline (username, activity)
                                    VALUES ($1, $2)""",
                                username,
-                               json.dumps(activity))
+                               activity)
  
     async def fetch(self,
                     username: str,
@@ -40,7 +39,7 @@ class _storage:
                                         LIMIT $2""",
                                     username,
                                     limit)
-            return [(row["id"], json.loads(row["activity"])) for row in rows]
+            return [(row["id"], row["activity"]) for row in rows]
  
  
 _instance: _storage | None = None

@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import json
 import pytest
 from unittest.mock import AsyncMock, Mock
 from profed.components.api.s2s.actor import storage as actor
@@ -70,7 +69,7 @@ async def test_fetch_actor_found(fake_pool):
     await store.delete("alice")
 
     async with fake_pool.acquire() as conn:
-        conn.fetchrow.return_value = {"payload": json.dumps({"name": "Alice"})}
+        conn.fetchrow.return_value = {"payload": {"name": "Alice"}}
         result = await store.fetch("alice")
         assert result is not None
         assert result["name"] == "Alice"

@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
-import json
 import pytest
 from unittest.mock import AsyncMock, Mock
 from profed.components.api.c2s.shared.actors import storage as actors
@@ -56,7 +55,7 @@ async def test_delete_deletes_row(fake_pool):
 async def test_fetch_returns_payload(fake_pool):
     store = await actors.storage()
     async with fake_pool.acquire() as conn:
-        conn.fetchrow.return_value = {"payload": json.dumps({"name": "Alice"})}
+        conn.fetchrow.return_value = {"payload": {"name": "Alice"}}
         result = await store.fetch("alice")
     assert result == {"name": "Alice"}
  

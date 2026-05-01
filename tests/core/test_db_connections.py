@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, ANY
 import profed.core.db_connections as db_connections
 from profed.core.db_connections import fetch_pool
 
@@ -23,7 +23,7 @@ async def test_fetch_pool_calls_create_pool():
         result = await fetch_pool(host="localhost", port=5432)
 
     assert result is fake_pool
-    mock.assert_awaited_once_with(host="localhost", port=5432)
+    mock.assert_awaited_once_with(host="localhost", port=5432, init=ANY)
 
 
 @pytest.mark.asyncio

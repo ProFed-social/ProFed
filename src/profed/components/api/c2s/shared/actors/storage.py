@@ -3,7 +3,6 @@
  
 from typing import Dict, Optional
 from asyncpg import Pool
-import json
 from profed.core.db_connections import fetch_pool 
 
  
@@ -22,7 +21,7 @@ class _storage:
             await conn.execute("""INSERT INTO api.c2s_actor (username, payload)
                                   VALUES ($1, $2)""",
                                username,
-                               json.dumps(payload))
+                               payload)
  
     async def update(self, username: str, payload: dict) -> None:
         async with self._pool.acquire() as conn:
@@ -30,7 +29,7 @@ class _storage:
                                   SET payload = $2
                                   WHERE username = $1""",
                                username,
-                               json.dumps(payload))
+                               payload)
  
     async def delete(self, username: str) -> None:
         async with self._pool.acquire() as conn:
@@ -44,7 +43,7 @@ class _storage:
                                          FROM api.c2s_actor
                                          WHERE username = $1""",
                                       username)
-        return json.loads(row["payload"]) if row is not None else None
+        return row["payload"] if row is not None else None
  
  
 _instance: _storage | None = None

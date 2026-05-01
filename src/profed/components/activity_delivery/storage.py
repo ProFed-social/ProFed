@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
-import json
 from typing import Optional
 import asyncpg
 from profed.core.db_connections import fetch_pool 
