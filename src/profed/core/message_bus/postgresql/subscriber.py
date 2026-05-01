@@ -1,13 +1,17 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from typing import Dict, Any, AsyncGenerator, Optional, Tuple
 import asyncio
 from asyncpg import Pool, Connection
 import json
 
+logger = logging.getLogger(__name__)
+
 MIN_WAIT = 0.05
 MAX_WAIT = 2.0
+
 
 def subscribe(pool: Pool,
               config: Dict[str, str],
@@ -112,8 +116,11 @@ def subscribe(pool: Pool,
         def _on_snapshot(conn, pid, channel, payload):
             snapshot_event.set()
 
+        logger.debug("subscriber: acquiring connection for %s/%s", subscriber, topic)
         async with pool.acquire() as conn:
+            logger.debug("subscriber: connection acquired for %s/%s", subscriber, topic)
             await _ensure_gap_table(conn)
+            logger.debug("subscriber: gap table ensured for %s/%s", subscriber, topic)
  
             try:
                 while True:
@@ -137,6 +144,7 @@ def subscribe(pool: Pool,
                     if not backlog_done:
                         backlog_done = True
                         if caught_up is not None:
+                            logger.debug("subscriber: setting caught_up for %s/%s", subscriber, topic)
                             caught_up.set()
                         await conn.add_listener(f"{config['schema']}_{topic}", _on_message)
                         await conn.add_listener(f"{config['schema']}_{topic}_snapshot", _on_snapshot)
