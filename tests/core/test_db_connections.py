@@ -23,7 +23,7 @@ async def test_fetch_pool_calls_create_pool():
         result = await fetch_pool(host="localhost", port=5432)
 
     assert result is fake_pool
-    mock.assert_awaited_once_with(host="localhost", port=5432, init=ANY)
+    mock.assert_awaited_once_with(host="localhost", port=5432, setup=ANY)
 
 
 @pytest.mark.asyncio

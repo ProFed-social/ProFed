@@ -18,6 +18,6 @@ _pools: dict[str, asyncpg.Pool] = {}
 async def fetch_pool(**kwargs) -> asyncpg.Pool:
     key = json.dumps(kwargs, sort_keys=True)
     if key not in _pools:
-        _pools[key] = await asyncpg.create_pool(**kwargs, init=_init_connection)
+        _pools[key] = await asyncpg.create_pool(**kwargs, setup=_init_connection)
     return _pools[key]
 
