@@ -12,6 +12,7 @@ class _Storage:
  
     async def ensure_schema(self) -> None:
         async with self._pool.acquire() as conn:
+            await conn.execute("DROP SCHEMA IF EXISTS activity_delivery CASCADE")
             await conn.execute("CREATE SCHEMA IF NOT EXISTS activity_delivery")
             await conn.execute("""CREATE TABLE IF NOT EXISTS
                                   activity_delivery.followers (following TEXT NOT NULL,

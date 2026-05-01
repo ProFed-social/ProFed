@@ -36,7 +36,7 @@ async def test_fetch_pool_reuses_pool_for_same_config():
         second = await fetch_pool(host="localhost", port=5432)
 
     assert first is second
-    mock.assert_awaited_once()  # create_pool called only once
+    mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio

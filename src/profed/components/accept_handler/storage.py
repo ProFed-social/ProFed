@@ -11,6 +11,7 @@ class _Storage:
  
     async def ensure_schema(self) -> None:
         async with self._pool.acquire() as conn:
+            await conn.execute("DROP SCHEMA IF EXISTS accept_handler CASCADE")
             await conn.execute("CREATE SCHEMA IF NOT EXISTS accept_handler")
             await conn.execute("""CREATE TABLE IF NOT EXISTS
                                   accept_handler.known_actor_ids (actor_url TEXT PRIMARY KEY,
