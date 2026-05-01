@@ -55,7 +55,6 @@ async def _fetch_webfinger(resource: str) -> dict | None:
                                       headers={"Accept": "application/jrd+json"},
                                       timeout=30.0)
     except Exception:
-        logger.debug("WebFinger lookup failed for %r", resource, exc_info=True)
         return None 
 
  
@@ -64,7 +63,6 @@ async def lookup_acct(resource: str) -> Optional[str]:
     if data is None:
         return None
     subject = data.get("subject", "")
-    logger.debug("lookup_acct %r -> subject=%r", resource, subject)
     return subject.removeprefix("acct:") if subject.startswith("acct:") else None
  
  
@@ -74,5 +72,4 @@ async def lookup_actor_url(acct: str) -> Optional[str]:
         for link in data.get("links", []):
             if link.get("rel") == "self" and link.get("type") == "application/activity+json":
                 return link.get("href")
-        logger.debug("lookup_actor_url %r: no self link found", acct)
 
