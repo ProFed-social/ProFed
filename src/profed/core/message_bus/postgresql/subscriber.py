@@ -128,15 +128,19 @@ def subscribe(pool: Pool,
                         snapshot_event.clear()
                         await _prune_gaps_from_snapshot(conn)
  
+                    logger.debug("subscriber: checking corruption for %s/%s", subscriber, topic)
                     if await _detect_corruption(conn):
                         raise RuntimeError(f"Corruption detected in topic '{topic}'")
+                    logger.debug("subscriber: corruption check done for %s/%s", subscriber, topic)
 
                     message_event.clear()
                     processed = False
+                    logger.debug("subscriber: fetching messages for %s/%s", subscriber, topic)
                     async for seen, message in _process_messages(conn, last_seen):
                         last_seen = seen
                         processed = True
                         yield message if not include_sequence_id else (seen, message)
+                    logger.debug("subscriber: messages fetched, processed=%s for %s/%s", processed, subscriber, topic)
 
                     if processed:
                         wait = min_wait

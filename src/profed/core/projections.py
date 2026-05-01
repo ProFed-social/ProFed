@@ -55,10 +55,12 @@ def build_projection(topic: Dict,
         caught_up = asyncio.Event()
         async def _drain():
             nonlocal last_seen
+            logger.debug("rebuild: _drain starting for topic %s", topic_name)
             async for seq, event in message_bus().topic(topic_name).subscribe(subscriber,
                                                                               last_seen,
                                                                               include_sequence_id=True,
-                                                                              caught_up=caught_up):
+                                                                              caught_up=caught_up)
+                logger.debug("rebuild: _drain got event %s for topic %s", seq, topic_name):
                 event_type, payload = topic["validate"](event)
                 if (event_type is not None and event_type in on_message_type and verify_event(event_type, payload)):
                     await on_message_type[event_type](payload)
