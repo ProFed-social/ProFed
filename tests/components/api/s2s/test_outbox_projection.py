@@ -59,7 +59,7 @@ def fake_storage():
     backup = storage._instance
     storage._instance = AsyncMock()
     storage._instance.add = AsyncMock()
-    storage._instance.ensure_table = AsyncMock()
+    storage._instance.ensure_schema = AsyncMock()
 
     yield storage._instance
 
@@ -96,7 +96,7 @@ def with_snapshots(snapshots):
 async def test_rebuild_success(fake_storage, fake_message_bus):
     await projection.rebuild()
 
-    fake_storage.ensure_table.assert_awaited_once()
+    fake_storage.ensure_schema.assert_awaited_once()
     fake_storage.add.assert_awaited_once_with("alice",
                                               {"username": "alice",
                                                "type": "created",
@@ -109,7 +109,7 @@ async def test_rebuild_success(fake_storage, fake_message_bus):
 async def test_rebuild_no_snapshot(fake_storage, fake_message_bus):
     await projection.rebuild()
 
-    fake_storage.ensure_table.assert_awaited_once()
+    fake_storage.ensure_schema.assert_awaited_once()
     fake_storage.add.assert_not_awaited()
 
 

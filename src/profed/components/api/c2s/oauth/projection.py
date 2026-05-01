@@ -3,7 +3,7 @@
  
 import time
 from typing import Optional
-from profed.core.projections import build_projection
+from profed.core.persistence.projections import build_projection
 from profed.topics import oauth_apps, oauth_codes
  
  

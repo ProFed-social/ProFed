@@ -62,7 +62,7 @@ def fake_storage():
     storage._instance.update = AsyncMock()
     storage._instance.delete = AsyncMock()
     storage._instance.fetch = AsyncMock()
-    storage._instance.ensure_table = AsyncMock()
+    storage._instance.ensure_schema = AsyncMock()
 
     yield storage._instance
 

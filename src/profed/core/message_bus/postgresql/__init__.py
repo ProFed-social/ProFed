@@ -4,7 +4,7 @@
 from typing import Dict
 from .bus import MessageBus
 from profed import topics
-from profed.core.db_connections import fetch_pool
+from profed.core.persistence.db_connections import fetch_pool
 
 def _topic_names():
     return [v["name"]

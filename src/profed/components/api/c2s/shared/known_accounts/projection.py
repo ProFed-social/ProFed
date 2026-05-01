@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 from datetime import datetime, timezone
-from profed.core.projections import build_projection
+from profed.core.persistence.projections import build_projection
 from profed.topics import known_accounts
 from .storage import storage
  
  
 async def _init() -> None:
-    await (await storage()).ensure_table()
+    await (await storage()).ensure_schema()
  
  
 async def _discovered(payload: dict) -> None:

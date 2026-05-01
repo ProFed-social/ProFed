@@ -3,7 +3,7 @@
 
 import uvicorn
 
-from profed.core.db_connections import fetch_pool
+from profed.core.persistence.db_connections import fetch_pool
 from .app import create_app
 
 from .active_routers import narrow_deactivate_routers

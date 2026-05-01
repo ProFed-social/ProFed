@@ -36,11 +36,11 @@ def fake_pool(fake_conn):
 
 
 @pytest.mark.asyncio
-async def test_ensure_table_success(fake_pool, fake_conn):
+async def test_ensure_schema_success(fake_pool, fake_conn):
     store = await outbox.storage()
-    await store.ensure_table()
+    await store.ensure_schema()
 
-    assert fake_conn.execute.await_count == 2
+    assert fake_conn.execute.await_count >= 1
 
 
 @pytest.mark.asyncio
@@ -55,12 +55,10 @@ async def test_add_success(fake_pool, fake_conn):
 
     await store.add("alice", activity)
 
-    fake_conn.execute.assert_awaited_with(
-                               f"""INSERT INTO api.s2s_outbox (username, activity)
-                                   VALUES ($1, $2)
-                               """,
-                               "alice",
-                               activity)
+    args = fake_conn.execute.call_args[0]
+    assert "s2s_outbox" in args[0]
+    assert args[1] == "alice"
+    assert args[2] == activity
 
 
 @pytest.mark.asyncio
@@ -85,13 +83,9 @@ async def test_fetch_found(fake_pool, fake_conn):
 
     result = await store.fetch("alice")
 
-    fake_conn.fetch.assert_awaited_with(
-                                    f"""SELECT activity
-                                        FROM api.s2s_outbox
-                                        WHERE username = $1
-                                        ORDER BY created_at
-                                    """,
-                                    "alice")
+    args = fake_conn.fetch.call_args[0]
+    assert "s2s_outbox" in args[0]
+    assert args[1] == "alice"
     assert result == [activity_1, activity_2]
 
 

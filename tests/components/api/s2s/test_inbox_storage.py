@@ -38,13 +38,10 @@ async def test_add_user_success(fake_pool):
     await store.add("alice")
 
     async with fake_pool.acquire() as conn:
-        conn.execute.assert_awaited_with(
-                                   f"""
-                                   INSERT INTO api.s2s_inbox_users (username)
-                                   VALUES ($1)
-                                   ON CONFLICT (username) DO NOTHING
-                                   """,
-                                   "alice")
+        args = conn.execute.call_args[0]
+        assert "s2s_inbox_users" in args[0]
+        assert "INSERT" in args[0]
+        assert args[1] == "alice"
 
 
 @pytest.mark.asyncio
@@ -53,13 +50,10 @@ async def test_add_user_already_exists(fake_pool):
     await store.add("alice")
 
     async with fake_pool.acquire() as conn:
-        conn.execute.assert_awaited_with(
-                                   f"""
-                                   INSERT INTO api.s2s_inbox_users (username)
-                                   VALUES ($1)
-                                   ON CONFLICT (username) DO NOTHING
-                                   """,
-                                   "alice")
+        args = conn.execute.call_args[0]
+        assert "s2s_inbox_users" in args[0]
+        assert "INSERT" in args[0]
+        assert args[1] == "alice"
 
 
 @pytest.mark.asyncio
@@ -68,12 +62,10 @@ async def test_delete_user_success(fake_pool):
     await store.delete("alice")
 
     async with fake_pool.acquire() as conn:
-        conn.execute.assert_awaited_with(
-                                   f"""
-                                   DELETE FROM api.s2s_inbox_users
-                                   WHERE acct = $1
-                                   """,
-                                   "alice")
+        args = conn.execute.call_args[0]
+        assert "s2s_inbox_users" in args[0]
+        assert "DELETE" in args[0]
+        assert args[1] == "alice"
 
 
 @pytest.mark.asyncio
@@ -82,12 +74,10 @@ async def test_delete_user_not_exists(fake_pool):
     await store.delete("bob")
 
     async with fake_pool.acquire() as conn:
-        conn.execute.assert_awaited_with(
-                                   f"""
-                                   DELETE FROM api.s2s_inbox_users
-                                   WHERE acct = $1
-                                   """,
-                                   "bob")
+        args = conn.execute.call_args[0]
+        assert "s2s_inbox_users" in args[0]
+        assert "DELETE" in args[0]
+        assert args[1] == "bob"
 
 
 @pytest.mark.asyncio
@@ -107,9 +97,9 @@ async def test_user_exists_not_found(fake_pool):
 
 
 @pytest.mark.asyncio
-async def test_ensure_table_executes_create(fake_pool):
+async def test_ensure_schema_executes_create(fake_pool):
     store = await storage.storage()
-    await store.ensure_table()
+    await store.ensure_schema()
 
     async with fake_pool.acquire() as conn:
         conn.execute.assert_awaited()

@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
-from profed.core.projections import build_projection
+from profed.core.persistence.projections import build_projection
 from profed.topics import followers, deliveries, users
 from .storage import storage
  

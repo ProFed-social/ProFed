@@ -62,7 +62,7 @@ def fake_storage():
     instance.add = AsyncMock()
     instance.delete = AsyncMock()
     instance.exists = AsyncMock()
-    instance.ensure_table = AsyncMock()
+    instance.ensure_schema = AsyncMock()
 
     storage.overwrite(instance)
 

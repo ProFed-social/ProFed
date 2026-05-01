@@ -3,8 +3,8 @@
 
 import pytest
 from unittest.mock import AsyncMock, patch, ANY
-import profed.core.db_connections as db_connections
-from profed.core.db_connections import fetch_pool
+from  profed.core.persistence import db_connections
+from profed.core.persistence.db_connections import fetch_pool
 
 
 @pytest.fixture(autouse=True)
@@ -18,7 +18,7 @@ def clear_pool_cache():
 async def test_fetch_pool_calls_create_pool():
     fake_pool = object()
 
-    with patch("profed.core.db_connections.asyncpg.create_pool",
+    with patch("profed.core.persistence.db_connections.asyncpg.create_pool",
                AsyncMock(return_value=fake_pool)) as mock:
         result = await fetch_pool(host="localhost", port=5432)
 
@@ -30,7 +30,7 @@ async def test_fetch_pool_calls_create_pool():
 async def test_fetch_pool_reuses_pool_for_same_config():
     fake_pool = object()
 
-    with patch("profed.core.db_connections.asyncpg.create_pool",
+    with patch("profed.core.persistence.db_connections.asyncpg.create_pool",
                AsyncMock(return_value=fake_pool)) as mock:
         first  = await fetch_pool(host="localhost", port=5432)
         second = await fetch_pool(host="localhost", port=5432)
@@ -43,7 +43,7 @@ async def test_fetch_pool_reuses_pool_for_same_config():
 async def test_fetch_pool_creates_separate_pools_for_different_configs():
     pool_a, pool_b = object(), object()
 
-    with patch("profed.core.db_connections.asyncpg.create_pool",
+    with patch("profed.core.persistence.db_connections.asyncpg.create_pool",
                AsyncMock(side_effect=[pool_a, pool_b])):
         result_a = await fetch_pool(host="localhost",  port=5432)
         result_b = await fetch_pool(host="otherserver", port=5432)
@@ -57,7 +57,7 @@ async def test_fetch_pool_creates_separate_pools_for_different_configs():
 async def test_fetch_pool_key_independent_of_kwarg_order():
     fake_pool = object()
 
-    with patch("profed.core.db_connections.asyncpg.create_pool",
+    with patch("profed.core.persistence.db_connections.asyncpg.create_pool",
                AsyncMock(return_value=fake_pool)) as mock:
         first  = await fetch_pool(host="localhost", port=5432)
         second = await fetch_pool(port=5432, host="localhost")

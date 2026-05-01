@@ -1,92 +1,62 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from typing import Dict, Callable, Tuple, Any, Awaitable
-import asyncpg
-from profed.core.db_connections import fetch_pool
+from typing import Callable, Dict, Tuple, Any, Awaitable
+from profed.core.persistence.base_storage import BaseStorage, init_pool
+
 
 def build_storage(table_name: str) \
-    -> Tuple[Callable[[Dict[str, str]], Awaitable[None]],
-             Callable[[], Awaitable[Any]],
-             Callable[[Any], None],
-             Callable[[Any], None]]:
-    class _storage:
-        def __init__(self, pool: asyncpg.Pool):
-            nonlocal table_name
+        -> Tuple[Callable[[Dict[str, str]], Awaitable[None]],
+                 Callable[[], Awaitable[Any]],
+                 Callable[[Any], None],
+                 Callable[[Any], None]]:
 
-            self._pool = pool
+    class _storage(BaseStorage):
+        def __init__(self, pool):
+            super().__init__(pool, None)
             self._table_name = table_name
 
-        async def ensure_table(self) -> None:
-            async with self._pool.acquire() as conn:
-                await conn.execute(f"""
-                                   CREATE TABLE IF NOT EXISTS api.{self._table_name} (
-                                       username TEXT PRIMARY KEY
-                                   )
-                                   """)
+        async def ensure_schema(self) -> None:
+            await super().ensure_schema()
+            await self.execute(f"""CREATE TABLE IF NOT EXISTS
+                               api.{self._table_name} (username TEXT PRIMARY KEY)""")
 
-        async def exists(self, username: str) -> str | None:
-            async with self._pool.acquire() as conn:
-                row = await conn.fetchrow(f"""
-                                          SELECT count(*) c
-                                          FROM api.{self._table_name}
-                                          WHERE username = $1
-                                          """,
-                                          username)
-                return (row["c"] > 0)
-
+        async def exists(self, username: str) -> bool:
+            row = await self.fetch_one(f"""SELECT count(*) c
+                                           FROM api.{self._table_name}
+                                           WHERE username = $1""",
+                                       username)
+            return row["c"] > 0
 
         async def add(self, username: str) -> None:
-            async with self._pool.acquire() as conn:
-                await conn.execute(f"""
-                                   INSERT INTO api.{self._table_name} (username)
+            await self.execute(f"""INSERT INTO
+                                   api.{self._table_name} (username)
                                    VALUES ($1)
-                                   ON CONFLICT (username) DO NOTHING
-                                   """,
-                                   username)
-
+                                   ON CONFLICT (username) DO NOTHING""",
+                               username)
 
         async def delete(self, username: str) -> None:
-            async with self._pool.acquire() as conn:
-                await conn.execute(f"""
-                                   DELETE FROM api.{self._table_name}
-                                   WHERE acct = $1
-                                   """,
-                                   username)
-
+            await self.execute(f"""DELETE FROM api.{self._table_name}
+                                   WHERE username = $1""",
+                               username)
 
     _instance: _storage | None = None
 
-
     async def init(config: Dict[str, str]) -> None:
         nonlocal _instance
-        pool = await fetch_pool(host=config["host"],
-                                port=int(config["port"]),
-                                database=config["database"],
-                                user=config["user"],
-                                password=config["password"],
-                                min_size=int(config["pool_min_size"]),
-                                max_size=int(config["pool_max_size"]))
-        _instance = _storage(pool)
-
+        _instance = _storage(await init_pool(config))
 
     async def storage() -> _storage:
-        nonlocal table_name, _instance
-
+        nonlocal _instance
         if _instance is None:
             raise RuntimeError(f"{table_name.capitalize()} storage is not initialized.")
         return _instance
 
-
-    def overwrite(s):
+    def overwrite(s) -> None:
         nonlocal _instance
-
         _instance = s
 
-
-    def reinit(pool):
+    def reinit(pool) -> None:
         overwrite(_storage(pool))
 
-
     return init, storage, overwrite, reinit
-

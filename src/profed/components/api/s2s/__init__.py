@@ -30,7 +30,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                                  "s2s_outbox")},
                                                      deactivate):
         await storage.init(config)
-        await (await storage.storage()).ensure_table()
+        await (await storage.storage()).ensure_schema()
         await projection.rebuild()
         asyncio.create_task(projection.handle_user_events(), name=task_name)
  

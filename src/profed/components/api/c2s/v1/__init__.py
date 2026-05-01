@@ -21,7 +21,7 @@ from .accounts.following import projection as following_projection
 def _projection_initializer(storage, projection, handle_events, name):
     async def _init_projection(config: dict):
         await storage.init(config)
-        await (await storage.storage()).ensure_table()
+        await (await storage.storage()).ensure_schema()
         await projection.rebuild()
         asyncio.create_task(handle_events(), name=name)
 
