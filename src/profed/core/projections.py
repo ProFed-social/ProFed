@@ -73,7 +73,9 @@ def build_projection(topic: Dict,
         drain_task.cancel()
         try:
             await drain_task
+            logger.debug("rebuild: drain task finished for topic %s", topic_name)
         except asyncio.CancelledError:
+            logger.debug("rebuild: drain task cancelled for topic %s", topic_name)
             pass
 
 
