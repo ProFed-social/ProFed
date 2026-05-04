@@ -27,6 +27,11 @@ async def _reset_component_schema(config):
 async def Api(config):
     await _reset_component_schema(config)
 
+    if "proxy_token" not in config:
+        raise RuntimeError(
+            "proxy_token is required in [api] config. "
+            'Set to empty string ("") to disable the token check.')
+
     deactivate = config.get("deactivate_routers", "").split()
 
     for name, init in {"s2s": s2s.init, "c2s": c2s.init}.items():
