@@ -122,6 +122,6 @@ async def follow(id: str,
                                    "username": username}})
  
     return {"id":       str(row["account_id"]),
-            "following": True,
+            "following": False,
             "requested": True}
 
