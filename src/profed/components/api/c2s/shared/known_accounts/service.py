@@ -5,21 +5,11 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from profed.core.message_bus import message_bus
 from profed.federation.webfinger import lookup_acct, lookup_actor_url
-from profed.http import http
+from profed.federation.actors import fetch_actor
 from profed.identity import account_id as compute_account_id
 from .storage import storage
  
 WEBFINGER_CACHE_TTL = 86400  # 1 day default
- 
- 
-async def _fetch_actor(actor_url: str) -> Optional[dict]:
-    try:
-        return await http("GET").json(
-            actor_url,
-            headers={"Accept": "application/activity+json"},
-            timeout=10.0)
-    except Exception:
-        return None
  
  
 async def _publish_discovered(account_id: int,
@@ -39,7 +29,7 @@ async def _publish_discovered(account_id: int,
 async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
     actor_url = await lookup_actor_url(acct)
     if actor_url is not None:
-        actor_data = await _fetch_actor(actor_url)
+        actor_data = await fetch_actor(actor_url)
         if actor_data is not None:
             aid = int(compute_account_id(acct))
             await _publish_discovered(aid, acct, actor_url, actor_data)
@@ -89,3 +79,4 @@ async def lookup_by_actor_url(actor_url: str,
     if acct is None:
         return row
     return await _do_webfinger_lookup(acct)
+

@@ -8,6 +8,8 @@ from profed.components.api.active_routers import get_active
 from .webfinger import storage as webfinger_storage, projection as webfinger_projection
 from .actor     import storage as actor_storage,     projection as actor_projection
 from .inbox     import storage as inbox_storage,     projection as inbox_projection
+from .inbox     import public_keys_storage as inbox_public_keys_storage, \
+                       public_keys_projection as inbox_public_keys_projection
 from .outbox    import storage as outbox_storage,    projection as outbox_projection
 from .webfinger import router as webfinger_router
 from .actor     import router as actor_router
@@ -25,6 +27,9 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       "inbox": (inbox_storage,
                                                                 inbox_projection,
                                                                 "s2s_inbox"),
+                                                      "inbox_public_keys": (inbox_public_keys_storage,
+                                                                            inbox_public_keys_projection,
+                                                                            "s2s_inbox_public_keys"),
                                                       "outbox": (outbox_storage,
                                                                  outbox_projection,
                                                                  "s2s_outbox")},

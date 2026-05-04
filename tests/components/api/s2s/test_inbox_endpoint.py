@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from profed.components.api.s2s.inbox.router import router as inbox_router
-
+from profed.components.api.s2s.inbox.service import verify_inbox_request
 
 @pytest.fixture
 def fake_accept_inbox_activity(monkeypatch):
@@ -14,7 +14,8 @@ def fake_accept_inbox_activity(monkeypatch):
 
     monkeypatch.setattr("profed.components.api.s2s.inbox.router.accept_inbox_activity",
                         fake)
-
+    monkeypatch.setattr("profed.components.api.s2s.inbox.router.verify_inbox_request",
+                        AsyncMock(return_value=True))
     return fake
 
 

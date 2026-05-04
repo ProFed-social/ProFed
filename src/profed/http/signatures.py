@@ -56,7 +56,67 @@ def sign_request(method: str,
                         f'headers="(request-target) host date digest",'
                         f'signature="{signature_b64}"')
  
-    return {"Date":      date,
+    return {"Host":      host,
+            "Date":      date,
             "Digest":    digest,
             "Signature": signature_header}
+
+
+def _parse_signature_header(header: str) -> dict:
+    return {key.strip(): value.strip().strip('"')
+            for key, _, value in (part.strip().partition("=")
+                                  for part in header.split(","))}
+
+
+def key_id_from_signature_header(header: str) -> str | None:
+    key_id = _parse_signature_header(header).get("keyId")
+
+    return key_id.split("#")[0] if key_id is not None else None
+
+
+def verify_request(method:         str,
+                   path:           str,
+                   headers:        dict,
+                   body:           bytes,
+                   public_key_pem: str) -> bool:
+    h = {k.lower(): v for k, v in headers.items()}
+
+    sig_header = h.get("signature", "")
+    if not sig_header:
+        return False
+
+    params        = _parse_signature_header(sig_header)
+    headers_list  = params.get("headers", "date").split()
+
+    signature_b64 = params.get("signature")
+    if not signature_b64:
+        return False
+
+    if "digest" in headers_list:
+        expected = "SHA-256=" + base64.b64encode(hashlib.sha256(body).digest()).decode()
+        if h.get("digest", "") != expected:
+            return False
+
+    parts = []
+    for hdr in headers_list:
+        if hdr == "(request-target)":
+            parts.append(f"(request-target): {method.lower()} {path}")
+        else:
+            value = h.get(hdr)
+            if value is None:
+                return False
+            parts.append(f"{hdr}: {value}")
+
+    signed_string = "\n".join(parts)
+
+    try:
+        public_key = serialization.load_pem_public_key(public_key_pem.encode())
+        public_key.verify(base64.b64decode(signature_b64),
+                          signed_string.encode(),
+                          padding.PKCS1v15(),
+                          hashes.SHA256())
+
+        return True
+    except Exception:
+        return False
 
