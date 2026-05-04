@@ -10,7 +10,7 @@ class Activity(ActivityStreamsObject):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     actor: str
-    object: dict[str, Any]
+    object: dict[str, Any] | str
     published: str | None = None
     to: list[str] | None = None
 
