@@ -30,7 +30,9 @@ INBOX_CACHE_TTL_MEAN   = 3600.0
 INBOX_CACHE_TTL_JITTER = 0.10
  
 PERMANENT_FAILURES = {403, 404, 410}
- 
+
+_INTERNAL_FIELDS = {"username"}
+
 
 _inbox_cache: dict[str, tuple[str, float, float]] = {}
  
@@ -133,7 +135,12 @@ async def _build_signed_headers(activity: dict,
 async def _post_to_inbox(inbox_url: str,
                          activity: dict,
                          client: httpx.AsyncClient) -> httpx.Response:
-    body    = json.dumps(activity).encode()
+    ap_activity = {k: v for k, v in activity.items()
+                   if k not in _INTERNAL_FIELDS}
+    if "@context" not in ap_activity:
+        ap_activity["@context"] = "https://www.w3.org/ns/activitystreams"
+    body    = json.dumps(ap_activity).encode()
+
     headers = await _build_signed_headers(activity, inbox_url, body)
     logger.debug("POST %s headers: %r", inbox_url, headers)
 
