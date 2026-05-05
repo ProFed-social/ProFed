@@ -62,6 +62,10 @@ class FakeConnection:
                 if lr[l_col] == rr[r_col]]
 
     async def fetch(self, query: str, *args):
+        if "MAX(LAST_EVENT_ID)" in query.upper():
+            ids = [s["last_event_id"]
+                   for s in self._db.snapshots[self._extract_table(query)]]
+            return [{"last_event_id": max(ids) if ids else None}]
         if "MIN(ID)" in query.upper():
             rows = self._fetch_single_table(self._extract_table(query), *args)
             min_id = min((r["id"] for r in rows), default=None)
@@ -83,6 +87,9 @@ class FakeConnection:
             return self._db.insert_message(self._extract_table(query), *args)
 
         return []
+
+    def fetch_all_snapshot_event_ids(self, table):
+        return [s["last_event_id"] for s in self.snapshots[table]]
 
     async def fetchrow(self, query: str, *args):
         rows = await self.fetch(query, *args)

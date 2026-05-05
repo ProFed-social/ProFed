@@ -117,14 +117,16 @@ async def _build_signed_headers(activity: dict,
                                 body: bytes) -> dict[str, str]:
     username = activity.get("actor", "").rstrip("/").split("/")[-1]
     keys     = await (await storage()).get_user_key(username)
-    headers  = {"Content-Type": "application/activity+json",
-                "Host":         urlparse(inbox_url).netloc}
+    headers  = {"Content-Type": "application/activity+json"}
     if keys is not None:
         headers.update(sign_request("POST",
                                     inbox_url,
                                     body,
                                     f"{activity.get('actor', '')}#main-key",
                                     keys[1]))
+    else:
+        headers["Host"] = urlparse(inbox_url).netloc
+
     return headers
 
 

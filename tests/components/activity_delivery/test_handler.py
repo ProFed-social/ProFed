@@ -17,10 +17,12 @@ from profed.components.activity_delivery import storage as storage_module
 class FakePublishContext:
     def __init__(self, topic):
         self._topic = topic
+
     async def __aenter__(self):
         async def publish(msg, message_id=None):
             self._topic.published.append(msg)
         return publish
+
     async def __aexit__(self, *_): pass
 
 
@@ -28,6 +30,7 @@ class FakeTopic:
     def __init__(self):
         self.messages = []
         self.published = []
+
     def subscribe(self,
                   subscriber,
                   last_seen=0,
@@ -40,11 +43,16 @@ class FakeTopic:
             if caught_up is not None:
                 caught_up.set()
         return generator()
+
     def publish(self): return FakePublishContext(self)
+
+    async def last_snapshot_id(self):
+        return 0
 
 
 class FakeMessageBus:
     def __init__(self): self._topics = {}
+
     def topic(self, name):
         if name not in self._topics:
             self._topics[name] = FakeTopic()

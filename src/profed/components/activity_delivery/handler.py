@@ -13,8 +13,10 @@ from .recipients import resolve_recipients
 
 
 async def handle_activities(config: dict) -> None:
-    async for event in message_bus().topic("activities").subscribe(
-            "activity_delivery", 0):
+    async for event in \
+            message_bus().topic("activities").\
+                subscribe("activity_delivery", 
+                          await message_bus().topic("activities").last_snapshot_id()):
         event_type, payload = activities["validate"](event)
         if event_type != "created" or payload is None:
             continue

@@ -5,7 +5,7 @@ from typing import Dict, AsyncGenerator, Optional
 import asyncio
 from asyncpg import Pool
 from .publisher import Publisher
-from .snapshot import SnapshotPublisher, last_snapshot
+from .snapshot import SnapshotPublisher, last_snapshot, last_snapshot_id
 from .subscriber import subscribe
 
 class Topic:
@@ -35,3 +35,7 @@ class Topic:
 
     def last_snapshot(self):
         return last_snapshot(self._pool, self._config["schema"], self._name)
+
+    def last_snapshot_id(self):
+        return last_snapshot_id(self._pool, self._config["schema"], self._name)
+

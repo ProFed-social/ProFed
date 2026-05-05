@@ -55,3 +55,13 @@ async def last_snapshot(pool: Pool, schema: str, topic: str):
                                   LIMIT 1
                                   """)
         return (row["last_event_id"], json.loads(row["payload"])) if row else (0, [])
+
+
+async def last_snapshot_id(pool: Pool, schema: str, topic: str) -> int:
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(f"""
+                                  SELECT MAX(last_event_id) AS last_event_id
+                                  FROM {schema}.{topic}_snapshots
+                                  """)
+        return row["last_event_id"] or 0
+
