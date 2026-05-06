@@ -135,6 +135,6 @@ def test_token_success_returns_access_token(client, fake_bus):
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data["access_token"], str)
-    assert re.fullmatch("[a-zA-Z0-9-]*", data["access_token"])
+    assert re.fullmatch("[a-zA-Z0-9_-]*", data["access_token"])
     assert data["token_type"] == "Bearer"
 

@@ -4,10 +4,12 @@
 from typing import Callable, Awaitable
 from .accept import resolve as resolve_accept
 from .follow import resolve as resolve_follow 
+from .undo import resolve as resolve_undo
 
 _RESOLVERS: dict[str, Callable[[dict, set[str]], Awaitable[set[str]]]] = {
     "Accept": resolve_accept,
     "Follow": resolve_follow,
+    "Undo": resolve_undo,
     # future entries:
     # "Create":   _resolve_create,   # notes: followers + mentions + reply-to author
     # "Like":     _resolve_like,      # followers + liked activity author
