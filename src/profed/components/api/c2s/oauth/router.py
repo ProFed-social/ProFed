@@ -5,11 +5,13 @@ import secrets
 from urllib.parse import urlencode
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
-from .projection import get_app, get_code
+from .projection import get_app, get_code, get_token
 from .service import (authorization_url,
                       exchange_code,
                       issue_code,
-                      consume_code)
+                      consume_code,
+                      issue_token,
+                      revoke_token)
 from ..shared.oidc import validate_token, set_oidc_issuer
  
  
@@ -104,7 +106,19 @@ async def token(request: Request):
         raise HTTPException(status_code=400, detail="invalid_grant")
  
     await consume_code(code)
-    return {"access_token": entry["id_token"],
+    access_token = await issue_token(client_id, entry["username"])
+    return {"access_token": access_token,
             "token_type":   "Bearer",
             "scope":        app["scopes"]}
+
+
+@router.post("/oauth/revoke")
+async def revoke(request: Request):
+    form  = await request.form()
+    token = form.get("token")
+
+    if token and get_token(token) is not None:
+        await revoke_token(token)
+
+    return {}
 

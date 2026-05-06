@@ -4,6 +4,7 @@
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated
+from profed.components.api.c2s.oauth.projection import get_token
 from .oidc import validate_token, get_oidc_issuer
 
 
@@ -12,8 +13,14 @@ _bearer = HTTPBearer()
  
 async def current_user(credentials: Annotated[HTTPAuthorizationCredentials,
                                               Depends(_bearer)]) -> dict:
+    token = get_token(credentials.credentials)
+    if token is not None:
+        return {"preferred_username": token["username"],
+                "sub":                token["username"]}
+
     claims = await validate_token(get_oidc_issuer(), credentials.credentials)
     if claims is None:
         raise HTTPException(status_code=401, detail="invalid_token")
+
     return claims
 

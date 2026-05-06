@@ -4,13 +4,39 @@
 import time
 from typing import Optional
 from profed.core.persistence.projections import build_projection
-from profed.topics import oauth_apps, oauth_codes
+from profed.topics import oauth_apps, oauth_codes, oauth_tokens
  
  
 _apps: dict[str, dict] = {}
 _codes: dict[str, dict] = {}
- 
- 
+_tokens: dict[str, dict] = {}
+
+
+def get_token(token: str) -> Optional[dict]:
+    return _tokens.get(token)
+
+
+async def _tokens_init() -> None:
+    _tokens.clear()
+
+
+async def _token_issued(payload: dict) -> None:
+    _tokens[payload["token"]] = payload
+
+
+async def _token_revoked(payload: dict) -> None:
+    _tokens.pop(payload["token"], None)
+
+
+tokens_handle_events, tokens_rebuild, _ = \
+    build_projection(topic=oauth_tokens,
+                     subscriber="api",
+                     init=_tokens_init,
+                     on_snapshot_item=_token_issued,
+                     on_message_type={"issued":  _token_issued,
+                                      "revoked": _token_revoked}) 
+
+
 def get_app(client_id: str) -> Optional[dict]:
     return _apps.get(client_id)
  

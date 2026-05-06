@@ -6,6 +6,7 @@ import secrets
 from typing import Optional
 from urllib.parse import urlencode
 from profed.core.message_bus import message_bus
+from profed.topics import oauth_tokens
 from profed.http.client import http
 from ..shared.oidc import _fetch_oidc_config 
  
@@ -65,4 +66,21 @@ async def consume_code(code: str) -> None:
     async with message_bus().topic("oauth_codes").publish() as publish:
         await publish({"type": "consumed",
                        "payload": {"code": code}})
+
+
+async def issue_token(client_id: str, username: str) -> str:
+    token = secrets.token_urlsafe(32)
+
+    async with message_bus().topic("oauth_tokens").publish() as publish:
+        await publish({"type":    "issued",
+                       "payload": {"token":     token,
+                                   "username":  username,
+                                   "client_id": client_id}})
+    return token
+
+
+async def revoke_token(token: str) -> None:
+    async with message_bus().topic("oauth_tokens").publish() as publish:
+        await publish({"type":    "revoked",
+                       "payload": {"token": token}})
 

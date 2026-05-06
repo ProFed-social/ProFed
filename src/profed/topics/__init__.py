@@ -8,6 +8,7 @@ from profed.topics import (activities_topic,
                            known_accounts_topic,
                            oauth_apps_topic,
                            oauth_codes_topic,
+                           oauth_tokens_topic,
                            users_topic)
 
 
@@ -18,5 +19,6 @@ incoming_activities = incoming_activities_topic.topic
 known_accounts = known_accounts_topic.topic
 oauth_apps = oauth_apps_topic.topic
 oauth_codes = oauth_codes_topic.topic
+oauth_tokens = oauth_tokens_topic.topic
 users = users_topic.topic
 
