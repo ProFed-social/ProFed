@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from datetime import timezone
 from typing import Optional
 from datetime import datetime
 from profed.core.persistence.base_storage import BaseStorage, init_pool
@@ -79,7 +80,9 @@ class _Storage(BaseStorage):
                            payload["attempt"],
                            payload.get("status_code"),
                            payload.get("retry_after"),
-                           datetime.fromisoformat(payload["first_attempt_at"]))
+                           (datetime.fromtimestamp(payload["first_attempt_at"], tz=timezone.utc)
+                            if isinstance(payload["first_attempt_at"], (int, float)) else
+                            datetime.fromisoformat(payload["first_attempt_at"])))
 
     async def get_delivery_status(self,
                                   activity_id: str,
