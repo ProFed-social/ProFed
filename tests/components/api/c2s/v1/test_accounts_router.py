@@ -197,3 +197,109 @@ def test_relationships_following(client):
     assert data[0]["following"] is True
     assert data[0]["requested"] is False
 
+
+def test_follow_publishes_follow_activity_id_in_known_accounts_event(client):
+    fake_bus = FakeMessageBus()
+
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW)), \
+             patch.object(message_bus, "_instance", fake_bus):
+            response = client.post("/accounts/123456/follow")
+
+    assert response.status_code == 200
+    known_accounts_events = fake_bus.topic("known_accounts")._ctx.published
+    payload = known_accounts_events[0]["payload"]
+    assert "follow_activity_id" in payload
+    follow_id = payload["follow_activity_id"]
+    assert follow_id.startswith("https://example.com/actors/alice#follows/")
+    activities_events = fake_bus.topic("activities")._ctx.published
+    assert activities_events[0]["payload"]["id"] == follow_id
+
+
+FOLLOWING_WITH_ACTIVITY_ID = {"account_id":         123456,
+                               "following_user":     "alice",
+                               "accepted":           False,
+                               "follow_activity_id": "https://example.com/actors/alice#follows/test-uuid"}
+
+
+def _mock_storage_with(row):
+    mock = AsyncMock()
+    mock.get_following = AsyncMock(return_value=[row] if row else [])
+    mock.get           = AsyncMock(return_value=row)
+    return AsyncMock(return_value=mock)
+
+
+def test_unfollow_publishes_known_accounts_event(client):
+    fake_bus = FakeMessageBus()
+
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW)), \
+             patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+                   _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
+             patch.object(message_bus, "_instance", fake_bus):
+            response = client.post("/accounts/123456/unfollow")
+
+    assert response.status_code == 200
+    assert response.json() == {"id": "123456", "following": False, "requested": False}
+    events = fake_bus.topic("known_accounts")._ctx.published
+    assert len(events) == 1
+    assert events[0]["type"] == "unfollow"
+    assert events[0]["payload"]["account_id"]    == 123456
+    assert events[0]["payload"]["following_user"] == "alice"
+
+
+def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
+    fake_bus = FakeMessageBus()
+
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW)), \
+             patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+                   _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
+             patch.object(message_bus, "_instance", fake_bus):
+            response = client.post("/accounts/123456/unfollow")
+
+    assert response.status_code == 200
+    events = fake_bus.topic("activities")._ctx.published
+    assert len(events) == 1
+    payload = events[0]["payload"]
+    assert payload["type"]  == "Undo"
+    assert payload["actor"] == "https://example.com/actors/alice"
+    obj = payload["object"]
+    assert obj["type"]   == "Follow"
+    assert obj["id"]     == FOLLOWING_WITH_ACTIVITY_ID["follow_activity_id"]
+    assert obj["actor"]  == "https://example.com/actors/alice"
+    assert obj["object"] == ROW["actor_url"]
+
+
+def test_unfollow_without_follow_activity_id_skips_undo(client):
+    fake_bus = FakeMessageBus()
+    following_no_id = {**FOLLOWING_WITH_ACTIVITY_ID, "follow_activity_id": None}
+
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW)), \
+             patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+                   _mock_storage_with(following_no_id)), \
+             patch.object(message_bus, "_instance", fake_bus):
+            response = client.post("/accounts/123456/unfollow")
+
+    assert response.status_code == 200
+    assert fake_bus.topic("activities")._ctx.published == []
+
+
+def test_unfollow_unknown_account_returns_404(client):
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=None)):
+            response = client.post("/accounts/999999/unfollow")
+
+    assert response.status_code == 404
+
