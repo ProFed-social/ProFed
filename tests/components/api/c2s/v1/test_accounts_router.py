@@ -277,7 +277,7 @@ def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
     assert obj["object"] == ROW["actor_url"]
 
 
-def test_unfollow_without_follow_activity_id_skips_undo(client):
+def test_unfollow_without_follow_activity_id_uses_fallback_id(client):
     fake_bus = FakeMessageBus()
     following_no_id = {**FOLLOWING_WITH_ACTIVITY_ID, "follow_activity_id": None}
 
@@ -291,7 +291,9 @@ def test_unfollow_without_follow_activity_id_skips_undo(client):
             response = client.post("/accounts/123456/unfollow")
 
     assert response.status_code == 200
-    assert fake_bus.topic("activities")._ctx.published == []
+    events = fake_bus.topic("activities")._ctx.published
+    assert len(events) == 1
+    assert events[0]["payload"]["object"]["id"].endswith("#follows/123456")
 
 
 def test_unfollow_unknown_account_returns_404(client):
