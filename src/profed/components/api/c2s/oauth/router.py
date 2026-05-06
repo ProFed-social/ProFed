@@ -5,7 +5,7 @@ import secrets
 from urllib.parse import urlencode
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
-from .projection import get_app, get_code, get_token
+from .projection import get_app, get_code, get_token, register_token
 from .service import (authorization_url,
                       exchange_code,
                       issue_code,
@@ -107,6 +107,8 @@ async def token(request: Request):
  
     await consume_code(code)
     access_token = await issue_token(client_id, entry["username"])
+    register_token(access_token, entry["username"], client_id)
+
     return {"access_token": access_token,
             "token_type":   "Bearer",
             "scope":        app["scopes"]}

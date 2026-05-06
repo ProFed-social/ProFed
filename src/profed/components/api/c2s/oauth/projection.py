@@ -16,6 +16,12 @@ def get_token(token: str) -> Optional[dict]:
     return _tokens.get(token)
 
 
+def register_token(token: str, username: str, client_id: str) -> None:
+    _tokens[token] = {"token":     token,
+                      "username":  username,
+                      "client_id": client_id}
+
+
 async def _tokens_init() -> None:
     _tokens.clear()
 
