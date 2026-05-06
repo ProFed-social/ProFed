@@ -22,10 +22,9 @@ async def _follow_accepted(payload: dict) -> None:
                                    True)
  
  
-async def _follow_retracted(payload: dict) -> None:
+async def _unfollow(payload: dict) -> None:
     await (await storage()).delete(payload["account_id"],
                                    payload["following_user"])
- 
  
 handle_events, rebuild, _ = \
     build_projection(topic=known_accounts,
@@ -33,6 +32,6 @@ handle_events, rebuild, _ = \
                      init=_init,
                      on_snapshot_item=None,
                      on_message_type={"follow_requested": _follow_requested,
-                                      "follow_accepted":  _follow_accepted,
-                                      "follow_retracted": _follow_retracted})
+                                      "follow_accepted": _follow_accepted,
+                                      "unfollow": _unfollow})
 

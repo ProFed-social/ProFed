@@ -125,3 +125,41 @@ async def follow(id: str,
             "following": False,
             "requested": True}
 
+
+@router.get("/accounts/familiar_followers")
+async def familiar_followers(id: list[str] = Query(default=[], alias="id[]"),
+                             claims: Annotated[dict, Depends(current_user)] = None):
+    return []
+
+
+@router.get("/accounts/{id}/featured_tags")
+async def featured_tags(id: str):
+    return []
+
+
+@router.get("/accounts/{id}/statuses")
+async def account_statuses(id: str,
+                           claims: Annotated[dict, Depends(current_user)] = None):
+    return []
+
+
+@router.post("/accounts/{id}/unfollow")
+async def unfollow(id: str,
+                   claims: Annotated[dict, Depends(current_user)]):
+    username = claims.get("preferred_username") or claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="invalid_token")
+
+    account = await _resolve_account(id, {})
+    if account is None:
+        raise HTTPException(status_code=404, detail="account_not_found")
+
+    async with message_bus().topic("known_accounts").publish() as publish:
+        await publish({"type": "unfollow",
+                       "payload": {"account_id": account["account_id"],
+                                   "following_user": username}})
+
+    return {"id": str(account["account_id"]),
+            "following": False,
+            "requested": False}
+
