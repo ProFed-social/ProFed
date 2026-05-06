@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import os
 from typing import Dict
+from datetime import datetime, timezone
 import asyncio
 
 from profed.core.config import config, raw
@@ -156,7 +157,7 @@ async def test_deliver_skips_already_successful(fake_bus, fake_storage):
         return_value={"success": True,
                       "attempt": 1,
                       "retry_after": None,
-                      "first_attempt_at": 1000.0})
+                      "first_attempt_at": datetime.now(timezone.utc)})
 
     with Cfg({"profed": {"run": "activity_delivery"},
               "api":    {"domain": "example.com"}}):

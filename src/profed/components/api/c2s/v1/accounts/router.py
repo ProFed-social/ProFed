@@ -1,8 +1,10 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
-from fastapi import APIRouter, Depends, HTTPException, Query
+
+import uuid
 from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from profed.identity import actor_url_from_username, acct_from_username, account_id
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
@@ -112,7 +114,7 @@ async def follow(id: str,
  
     actor_url = row["actor_url"]
 
-    follow_id = f"{actor_url_from_username(username)}#follows/{row['account_id']}"
+    follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
     async with message_bus().topic("activities").publish() as publish:
         await publish({"type":    "created",
                        "payload": {"id":       follow_id,

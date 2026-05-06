@@ -3,6 +3,7 @@
  
 import pytest
 from unittest.mock import AsyncMock, Mock
+from datetime import datetime, timezone
 from profed.components.activity_delivery import storage as storage_module
 from profed.components.activity_delivery.storage import _Storage
  
@@ -70,7 +71,7 @@ async def test_upsert_delivery(store, fake_conn):
                "attempt":     1,
                "status_code": 202,
                "retry_after": None,
-               "first_attempt_at": 1000.0}
+               "first_attempt_at": datetime.now(timezone.utc).isoformat()}
     await store.upsert_delivery(payload)
     fake_conn.execute.assert_awaited_once()
     call_args = fake_conn.execute.call_args[0]
@@ -95,7 +96,7 @@ async def test_get_delivery_status_found(store, fake_conn):
                                         "attempt":     1,
                                         "status_code": 202,
                                         "retry_after": None,
-                                        "first_attempt_at": 1000.0}
+                                        "first_attempt_at": datetime.now(timezone.utc).isoformat()}
     result = await store.get_delivery_status("https://example.com/act/1",
                                               "bob@remote.example")
     assert result["success"] is True

@@ -3,6 +3,9 @@
  
 import pytest
 from unittest.mock import AsyncMock, patch
+
+from datetime import datetime, timezone
+
 from profed.core import message_bus
 from profed.components.activity_delivery import projections
 from profed.components.activity_delivery import storage as storage_module
@@ -108,7 +111,7 @@ async def test_delivery_attempted_upserts_to_storage(fake_bus, fake_storage):
                "attempt":     1,
                "status_code": 202,
                "retry_after": None,
-               "first_attempt_at": 1000.0}
+               "first_attempt_at": datetime.now(timezone.utc).isoformat()}
     fake_bus.topic("deliveries").messages = [(1, {"type": "attempted",
                                                   "payload": payload})]
     await projections.deliveries_rebuild()

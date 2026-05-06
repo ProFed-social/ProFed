@@ -8,6 +8,7 @@ import logging
 import random
 import time
 import json
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 from email.utils import parsedate_to_datetime
 from typing import Optional
@@ -70,8 +71,9 @@ def _next_delay(config: dict,
     if status is None:
         return 0
  
-    first_attempt_at = status.get("first_attempt_at", time.time())
-    if time.time() - first_attempt_at > max_tot:
+
+    first_attempt_at = status.get("first_attempt_at", datetime.now(timezone.utc))
+    if (datetime.now(timezone.utc) - first_attempt_at).total_seconds() > max_tot:
         return None
  
     attempt = status["attempt"]
@@ -95,12 +97,12 @@ def _parse_retry_after(headers) -> int | None:
  
  
 async def _publish_attempt(activity_id: str,
-                            recipient: str,
-                            attempt: int,
-                            success: bool,
-                            status_code: int | None,
-                            retry_after: int | None,
-                            first_attempt_at: float) -> None:
+                           recipient: str,
+                           attempt: int,
+                           success: bool,
+                           status_code: int | None,
+                           retry_after: int | None,
+                           first_attempt_at: datetime) -> None:
     async with message_bus().topic("deliveries").publish() as publish:
         await publish({"type": "attempted",
                        "payload": {"activity_id":      activity_id,
@@ -109,7 +111,7 @@ async def _publish_attempt(activity_id: str,
                                    "attempt":          attempt,
                                    "status_code":      status_code,
                                    "retry_after":      retry_after,
-                                   "first_attempt_at": first_attempt_at}},
+                                   "first_attempt_at": first_attempt_at.isoformat()}},
                       message_id=uuid.uuid5(uuid.NAMESPACE_URL,
                                             f"{activity_id}#{recipient}#{attempt}"))
 
@@ -149,13 +151,18 @@ async def _post_to_inbox(inbox_url: str,
                              headers=headers,
                              timeout=REQUEST_TIMEOUT)
 
+ 
+def _actor_url_from_acct(acct: str) -> str:
+    username, host = acct.split("@", 1)
+    return f"https://{host}/users/{username}"
+
 
 async def _attempt_delivery(config: dict,
                             activity_id: str,
                             activity: dict,
                             recipient_acct: str,
                             attempt: int,
-                            first_at: float) -> None:
+                            first_at: datetime) -> None:
     inbox_url = await _fetch_inbox_url(_actor_url_from_acct(recipient_acct),
                                        config)
     if inbox_url is None:
@@ -188,9 +195,9 @@ async def _attempt_delivery(config: dict,
 
 
 async def deliver(config: dict,
-                   activity_id: str,
-                   activity: dict,
-                   recipient_acct: str) -> None:
+                  activity_id: str,
+                  activity: dict,
+                  recipient_acct: str) -> None:
     status = await get_delivery_status(activity_id, recipient_acct)
  
     if status is not None and status["success"]:
@@ -206,10 +213,10 @@ async def deliver(config: dict,
     if delay > 0:
         await asyncio.sleep(delay)
 
-    await _attempt_delivery(config, activity_id, activity, recipient_acct, attempt, time.time() if status is None else status["first_attempt_at"]) 
+    await _attempt_delivery(config,
+                            activity_id,
+                            activity,
+                            recipient_acct,
+                            attempt,
+                            datetime.now(timezone.utc) if status is None else status["first_attempt_at"]) 
  
- 
-def _actor_url_from_acct(acct: str) -> str:
-    username, host = acct.split("@", 1)
-    return f"https://{host}/users/{username}"
-

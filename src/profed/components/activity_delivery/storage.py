@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from typing import Optional
+from datetime import datetime
 from profed.core.persistence.base_storage import BaseStorage, init_pool
 
 
@@ -26,7 +27,7 @@ class _Storage(BaseStorage):
                                      attempt          INT   NOT NULL,
                                      status_code      INT,
                                      retry_after      INT,
-                                     first_attempt_at FLOAT NOT NULL,
+                                     first_attempt_at TIMESTAMPTZ NOT NULL,
                                      PRIMARY KEY (activity_id, recipient))""")
         await self.execute("""CREATE TABLE IF NOT EXISTS
                               activity_delivery.user_keys
@@ -78,7 +79,7 @@ class _Storage(BaseStorage):
                            payload["attempt"],
                            payload.get("status_code"),
                            payload.get("retry_after"),
-                           payload["first_attempt_at"])
+                           datetime.fromisoformat(payload["first_attempt_at"]))
 
     async def get_delivery_status(self,
                                   activity_id: str,

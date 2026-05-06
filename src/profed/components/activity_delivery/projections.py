@@ -51,8 +51,8 @@ async def _upsert_key(payload: dict) -> None:
     if "public_key_pem" not in payload or "private_key_pem" not in payload:
         return
     await (await storage()).upsert_user_key(payload["username"],
-                                             payload["public_key_pem"],
-                                             payload["private_key_pem"])
+                                            payload["public_key_pem"],
+                                            payload["private_key_pem"])
  
  
 keys_handle_events, keys_rebuild, _ = \
