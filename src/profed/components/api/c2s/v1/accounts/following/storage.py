@@ -15,21 +15,27 @@ class _Storage(BaseStorage):
                                                 REFERENCES api.known_accounts (account_id),
                                              following_user TEXT    NOT NULL,
                                              accepted       BOOLEAN NOT NULL DEFAULT FALSE,
+                                             follow_activity_id TEXT,
                                              PRIMARY KEY (account_id, following_user))""")
 
     async def upsert(self,
                      account_id: int,
                      following_user: str,
-                     accepted: bool) -> None:
+                     accepted: bool,
+                     follow_activity_id: str | None = None) -> None:
         await self.execute("""INSERT INTO api.following (account_id,
                                                          following_user,
-                                                         accepted)
-                              VALUES ($1, $2, $3)
+                                                         accepted,
+                                                         follow_activity_id)
+                              VALUES ($1, $2, $3, $4)
                               ON CONFLICT (account_id, following_user) DO UPDATE
-                                  SET accepted = EXCLUDED.accepted""",
+                                  SET accepted = EXCLUDED.accepted,
+                                      follow_activity_id = COALESCE(EXCLUDED.follow_activity_id,
+                                                                    api.following.follow_activity_id)""",
                            account_id,
                            following_user,
-                           accepted)
+                           accepted,
+                           follow_activity_id)
 
     async def delete(self,
                      account_id: int,
@@ -44,7 +50,8 @@ class _Storage(BaseStorage):
                   following_user: str) -> dict | None:
         return await self.fetch_one("""SELECT account_id,
                                               following_user,
-                                              accepted
+                                              accepted,
+                                              follow_activity_id
                                        FROM api.following
                                        WHERE account_id = $1 AND following_user = $2""",
                                     account_id,

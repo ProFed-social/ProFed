@@ -13,7 +13,8 @@ async def _init() -> None:
 async def _follow_requested(payload: dict) -> None:
     await (await storage()).upsert(payload["account_id"],
                                    payload["following_user"],
-                                   False)
+                                   False,
+                                   payload.get("follow_activity_id"))
  
  
 async def _follow_accepted(payload: dict) -> None:

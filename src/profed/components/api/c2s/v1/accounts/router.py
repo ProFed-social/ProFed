@@ -107,14 +107,15 @@ async def follow(id: str,
     if row is None:
         raise HTTPException(status_code=404, detail="account_not_found")
  
+    actor_url = row["actor_url"]
+    follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
+
     async with message_bus().topic("known_accounts").publish() as publish:
         await publish({"type":    "follow_requested",
                        "payload": {"account_id":    row["account_id"],
-                                   "following_user": username}})
+                                   "following_user": username,
+                                   "follow_activity_id": follow_id}})
  
-    actor_url = row["actor_url"]
-
-    follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
     async with message_bus().topic("activities").publish() as publish:
         await publish({"type":    "created",
                        "payload": {"id":       follow_id,
@@ -156,8 +157,9 @@ async def unfollow(id: str,
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
+    following = await (await following_storage()).get(account["account_id"], username)
+    follow_id = (following or {}).get("follow_activity_id")
     actor_url  = actor_url_from_username(username)
-    follow_id  = f"{actor_url}#follows/{account['account_id']}"
     undo_id    = f"{actor_url}#unfollows/{uuid.uuid4()}"
 
     async with message_bus().topic("known_accounts").publish() as publish:
@@ -165,16 +167,17 @@ async def unfollow(id: str,
                        "payload": {"account_id": account["account_id"],
                                    "following_user": username}})
 
-    async with message_bus().topic("activities").publish() as publish:
-        await publish({"type":    "created",
-                       "payload": {"id":       undo_id,
-                                   "type":     "Undo",
-                                   "actor":    actor_url,
-                                   "object":   {"id":     follow_id,
-                                                "type":   "Follow",
-                                                "actor":  actor_url,
-                                                "object": account["actor_url"]},
-                                   "username": username}})
+    if follow_id is not None:
+        async with message_bus().topic("activities").publish() as publish:
+            await publish({"type":    "created",
+                           "payload": {"id":       undo_id,
+                                       "type":     "Undo",
+                                       "actor":    actor_url,
+                                       "object":   {"id":     follow_id,
+                                                    "type":   "Follow",
+                                                    "actor":  actor_url,
+                                                    "object": account["actor_url"]},
+                                       "username": username}})
 
     return {"id": str(account["account_id"]),
             "following": False,
