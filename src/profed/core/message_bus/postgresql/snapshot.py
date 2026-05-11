@@ -4,7 +4,6 @@
 from typing import Callable, Dict, Any, Awaitable
 from asyncpg import Connection, Pool 
 from asyncpg.transaction import Transaction
-import json
 
 def _publish_snapshot(conn: Connection, topic: str, schema: str) \
         -> Callable[[Dict[str, Any], int], Awaitable[None]]:
@@ -13,7 +12,7 @@ def _publish_snapshot(conn: Connection, topic: str, schema: str) \
                            INSERT INTO {schema}.{topic}_snapshots (payload, last_event_id)
                            VALUES ($1, $2)
                            """,
-                           json.dumps(snapshot),
+                           snapshot,
                            last_event_id)
     return publish
 
@@ -54,7 +53,7 @@ async def last_snapshot(pool: Pool, schema: str, topic: str):
                                   ORDER BY last_event_id DESC
                                   LIMIT 1
                                   """)
-        return (row["last_event_id"], json.loads(row["payload"])) if row else (0, [])
+        return (row["last_event_id"],row["payload"]) if row else (0, [])
 
 
 async def last_snapshot_id(pool: Pool, schema: str, topic: str) -> int:
