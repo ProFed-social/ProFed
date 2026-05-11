@@ -15,6 +15,7 @@ class _Storage(BaseStorage):
         await self.execute("""CREATE TABLE IF NOT EXISTS
                               api.known_accounts (account_id        BIGINT      PRIMARY KEY,
                                                   acct              TEXT        UNIQUE NOT NULL,
+                                                  acct_local        TEXT        NOT NULL,
                                                   actor_url         TEXT        UNIQUE NOT NULL,
                                                   actor_data        JSONB,
                                                   last_webfinger_at TIMESTAMPTZ NOT NULL)""")
@@ -28,12 +29,14 @@ class _Storage(BaseStorage):
         await self.execute("""INSERT INTO
                               api.known_accounts (account_id,
                                                   acct,
+                                                  acct_local,
                                                   actor_url,
                                                   actor_data,
                                                   last_webfinger_at)
-                              VALUES ($1, $2, $3, $4, $5)
+                              VALUES ($1, $2, split_parts($2, '@', 1), $3, $4, $5)
                               ON CONFLICT (account_id) DO UPDATE
                                   SET acct              = EXCLUDED.acct,
+                                      acct_local        = EXCLUDED.acct_local,
                                       actor_url         = EXCLUDED.actor_url,
                                       actor_data        = EXCLUDED.actor_data,
                                       last_webfinger_at = EXCLUDED.last_webfinger_at""",
@@ -60,7 +63,7 @@ class _Storage(BaseStorage):
                                               actor_data,
                                               last_webfinger_at
                                        FROM api.known_accounts
-                                       WHERE acct = $1""",
+                                       WHERE acct = $1 OR acct_local = $1""",
                                     acct)
 
     async def get_by_actor_url(self, actor_url: str) -> Optional[dict]:

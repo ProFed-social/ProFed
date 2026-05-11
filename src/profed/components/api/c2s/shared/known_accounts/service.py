@@ -22,22 +22,21 @@ async def _publish_discovered(account_id: int,
                                    "acct": acct,
                                    "actor_url": actor_url,
                                    "actor_data": actor_data,
-                                   "last_webfinger_at": 
-                                        datetime.now(timezone.utc).isoformat()}})
+                                   "last_webfinger_at": datetime.now(timezone.utc).isoformat()}})
  
  
 async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
     actor_url = await lookup_actor_url(acct)
-    if actor_url is not None:
-        actor_data = await fetch_actor(actor_url)
-        if actor_data is not None:
-            aid = int(compute_account_id(acct))
-            await _publish_discovered(aid, acct, actor_url, actor_data)
-            return {"account_id": aid,
-                    "acct":       acct,
-                    "actor_url":  actor_url,
-                    "actor_data": actor_data}
-    return None
+    actor_data = await fetch_actor(actor_url) if actor_url is not None else None
+    if actor_data is None:
+        return None
+
+    aid = int(compute_account_id(acct))
+    await _publish_discovered(aid, acct, actor_url, actor_data)
+    return {"account_id": aid,
+            "acct":       acct,
+            "actor_url":  actor_url,
+            "actor_data": actor_data}
  
  
 def _is_fresh(row: dict, ttl: int) -> bool:
@@ -46,37 +45,38 @@ def _is_fresh(row: dict, ttl: int) -> bool:
         last = datetime.fromisoformat(last)
     if last.tzinfo is None:
         last = last.replace(tzinfo=timezone.utc)
+
     return datetime.now(timezone.utc) - last < timedelta(seconds=ttl)
- 
+
+
+def _ttl(config):
+    return int((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL))
+
  
 async def lookup_by_id(account_id: int,
                        config: dict | None = None) -> Optional[dict]:
-    ttl = int((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL))
     row = await (await storage()).get_by_id(account_id)
-    if row is not None and _is_fresh(row, ttl):
-        return row
     if row is not None:
-        return await _do_webfinger_lookup(row["acct"]) or row
+        return (row
+                if _is_fresh(row, _ttl(config)) else
+                await _do_webfinger_lookup(row["acct"]) or row)
     return None
  
  
 async def lookup_by_acct(acct: str,
                          config: dict | None = None) -> Optional[dict]:
-    ttl = int((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL))
     row = await (await storage()).get_by_acct(acct)
-    if row is not None and _is_fresh(row, ttl):
-        return row
-    return await _do_webfinger_lookup(acct)
+    return (row
+            if row is not None and _is_fresh(row, _ttl(config)) else
+            await _do_webfinger_lookup(acct))
  
  
 async def lookup_by_actor_url(actor_url: str,
                               config: dict | None = None) -> Optional[dict]:
-    ttl = int((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL))
     row = await (await storage()).get_by_actor_url(actor_url)
-    if row is not None and _is_fresh(row, ttl):
+    if row is not None and _is_fresh(row, _ttl(config)):
         return row
+
     acct = await lookup_acct(actor_url)
-    if acct is None:
-        return row
-    return await _do_webfinger_lookup(acct)
+    return row if acct is None else await _do_webfinger_lookup(acct)
 

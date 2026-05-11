@@ -85,16 +85,12 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
              "note":            ""} for i in id if i.isdigit()]
 
 
-async def _resolve_account(id_or_acct: str, config: dict) -> dict | None:
-    if id_or_acct.startswith("https://"):
-        return await lookup_by_actor_url(id_or_acct, config)
-    if "@" in id_or_acct:
-        return await lookup_by_acct(id_or_acct, config)
-    try:
-        return await lookup_by_id(int(id_or_acct), config)
-    except ValueError:
-        return None
- 
+async def _resolve_account(query: str, config: dict) -> dict | None:
+    return (await lookup_by_actor_url(query, config)
+            if query.startswith("https://") else
+            await lookup_by_id(int(query), config)
+            if query.isdigit() else
+            await lookup_by_acct(query, config)) 
  
 @router.post("/accounts/{id}/follow")
 async def follow(id: str,
