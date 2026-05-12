@@ -9,7 +9,7 @@ import asyncio
  
  
 async def init(config: dict) -> None:
-    await projection.tokens_reset_last_seen()
+    await projection.tokens_reset_last_seen(0)
     await projection.apps_rebuild()
     await projection.codes_rebuild()
     await projection.tokens_rebuild()
