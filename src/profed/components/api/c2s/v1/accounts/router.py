@@ -69,20 +69,31 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
 
-    account_ids = [int(i) for i in id if i.isdigit()]
-    rows        = await (await following_storage()).get_following(username,
-                                                                  filter=account_ids)
+    async def _resolve_account_id(query):
+        row = await _resolve_account(query, {})
+        if row is not None:
+            return row["account_id"]
+        return None
+
+    resolved = {query: account_id
+                for query, account_id in ((q, int(q)
+                                              if q.isdigit() else
+                                              await _resolve_account_id(q))
+                                          for q in id)
+                if account_id is not None}
+
+    rows = await (await following_storage()).get_following(username, filter=list(resolved.values()))
     following_map = {row["account_id"]: row for row in rows}
-    return [{"id":              i,
-             "following":       following_map.get(int(i), {}).get("accepted", False),
-             "requested":       (int(i) in following_map and
-                                 not following_map[int(i)]["accepted"]),
+    return [{"id":              str(resolved[query]),
+             "following":       following_map.get(resolved[query], {}).get("accepted", False),
+             "requested":       (resolved[query] in following_map and
+                                 not following_map[resolved[query]]["accepted"]),
              "followed_by":     False,
              "blocking":        False,
              "muting":          False,
              "domain_blocking": False,
              "endorsed":        False,
-             "note":            ""} for i in id if i.isdigit()]
+             "note":            ""} for query in id if query in resolved]
 
 
 async def _resolve_account(query: str, config: dict) -> dict | None:
@@ -94,15 +105,6 @@ async def _resolve_account(query: str, config: dict) -> dict | None:
             await lookup_by_acct(f"{query}@{domain}" if "@" not in query else query, config)
             or (await lookup_by_acct(query, config) if "@" not in query else None))
 
-
-async def _resolve_account(query: str, config: dict) -> dict | None:
-    domain = config.get("domain", "")
-    return (await lookup_by_actor_url(query, config)
-            if query.startswith("https://") else
-            await lookup_by_id(int(query), config)
-            if query.isdigit() else
-            await lookup_by_acct(f"{query}@{domain}", config)
-            or await lookup_by_acct(query, config))
  
 @router.post("/accounts/{id}/follow")
 async def follow(id: str,
