@@ -33,7 +33,7 @@ class _Storage(BaseStorage):
                                                   actor_url,
                                                   actor_data,
                                                   last_webfinger_at)
-                              VALUES ($1, $2, split_parts($2, '@', 1), $3, $4, $5)
+                              VALUES ($1, $2, split_part($2, '@', 1), $3, $4, $5)
                               ON CONFLICT (account_id) DO UPDATE
                                   SET acct              = EXCLUDED.acct,
                                       acct_local        = EXCLUDED.acct_local,
