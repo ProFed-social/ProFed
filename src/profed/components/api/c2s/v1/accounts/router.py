@@ -86,11 +86,14 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
 
 
 async def _resolve_account(query: str, config: dict) -> dict | None:
+    domain = config.get("domain", "")
     return (await lookup_by_actor_url(query, config)
             if query.startswith("https://") else
             await lookup_by_id(int(query), config)
             if query.isdigit() else
-            await lookup_by_acct(query, config)) 
+            await lookup_by_acct(f"{query}@{domain}" if "@" not in query else query, config)
+            or (await lookup_by_acct(query, config) if "@" not in query else None))
+
 
 async def _resolve_account(query: str, config: dict) -> dict | None:
     domain = config.get("domain", "")
