@@ -91,6 +91,15 @@ async def _resolve_account(query: str, config: dict) -> dict | None:
             await lookup_by_id(int(query), config)
             if query.isdigit() else
             await lookup_by_acct(query, config)) 
+
+async def _resolve_account(query: str, config: dict) -> dict | None:
+    domain = config.get("domain", "")
+    return (await lookup_by_actor_url(query, config)
+            if query.startswith("https://") else
+            await lookup_by_id(int(query), config)
+            if query.isdigit() else
+            await lookup_by_acct(f"{query}@{domain}", config)
+            or await lookup_by_acct(query, config))
  
 @router.post("/accounts/{id}/follow")
 async def follow(id: str,
