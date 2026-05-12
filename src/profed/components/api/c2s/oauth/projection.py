@@ -34,7 +34,7 @@ async def _token_revoked(payload: dict) -> None:
     _tokens.pop(payload["token"], None)
 
 
-tokens_handle_events, tokens_rebuild, _ = \
+tokens_handle_events, tokens_rebuild, tokens_reset_last_seen = \
     build_projection(topic=oauth_tokens,
                      subscriber="api",
                      init=_tokens_init,
