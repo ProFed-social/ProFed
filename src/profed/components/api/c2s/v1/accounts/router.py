@@ -76,7 +76,7 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
         return None
 
     resolved = {query: account_id
-                for query, account_id in ((q, int(q)
+                async for query, account_id in ((q, int(q)
                                               if q.isdigit() else
                                               await _resolve_account_id(q))
                                           for q in id)
