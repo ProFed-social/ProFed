@@ -14,7 +14,9 @@ from profed.components.api.c2s.shared.auth import current_user
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Account, Relationship
 from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
- 
+from profed.components.api.c2s.v1.accounts.followers.storage import storage as c2s_followers_storage
+
+
 router = APIRouter()
 active = False
  
@@ -177,4 +179,67 @@ async def unfollow(id: str,
     return {"id": str(account["account_id"]),
             "following": False,
             "requested": False}
+
+
+def _account_from_known_account(row: dict) -> Account:
+    actor_data  = row.get("actor_data") or {}
+    username    = row["acct"].split("@")[0]
+    icon        = actor_data.get("icon") or {}
+    image       = actor_data.get("image") or {}
+    return Account(id=            str(row["account_id"]),
+                   username=      username,
+                   acct=          row["acct"],
+                   display_name=  actor_data.get("name") or username,
+                   note=          actor_data.get("summary") or "",
+                   url=           row["actor_url"],
+                   avatar=        icon.get("url") if isinstance(icon, dict) else None,
+                   avatar_static=  icon.get("url") if isinstance(icon, dict) else None,
+                   header=        image.get("url") if isinstance(image, dict) else None,
+                   header_static=  image.get("url") if isinstance(image, dict) else None,
+                   locked=        actor_data.get("manuallyApprovesFollowers", False),
+                   bot=           actor_data.get("type") == "Service")
+
+
+@router.get("/accounts/lookup")
+async def lookup(acct: str,
+                 claims: Annotated[dict, Depends(current_user)] = None):
+    row = await _resolve_account(acct, {})
+    if row is None:
+        raise HTTPException(status_code=404, detail="account_not_found")
+    return _account_from_known_account(row)
+
+
+@router.get("/accounts/{id}")
+async def get_account(id: str,
+                      claims: Annotated[dict, Depends(current_user)] = None):
+    row = await _resolve_account(id, {})
+    if row is None:
+        raise HTTPException(status_code=404, detail="account_not_found")
+    return _account_from_known_account(row)
+
+
+@router.get("/accounts/{id}/followers")
+async def account_followers(id: str,
+                            claims: Annotated[dict, Depends(current_user)] = None):
+    row = await _resolve_account(id, {})
+    if row is None:
+        raise HTTPException(status_code=404, detail="account_not_found")
+
+    return [_account_from_known_account(a)
+            async for a in (await lookup_by_acct(acct)
+                            for acct in await (await c2s_followers_storage()).get_followers(row["acct"]))
+            if a is not None]
+
+
+@router.get("/accounts/{id}/following")
+async def account_following(id: str,
+                            claims: Annotated[dict, Depends(current_user)] = None):
+    row = await _resolve_account(id, {})
+    if row is None:
+        raise HTTPException(status_code=404, detail="account_not_found")
+
+    rows = await (await following_storage()).get_following(row["acct"].split("@")[0])
+    return [_account_from_known_account(a)
+            async for a in (await lookup_by_id(r["account_id"], {}) for r in rows)
+            if a is not None]
 

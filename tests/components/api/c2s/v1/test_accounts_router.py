@@ -305,3 +305,175 @@ def test_unfollow_unknown_account_returns_404(client):
 
     assert response.status_code == 404
 
+
+ROW_FULL = {"account_id": 123456,
+            "acct": "bob@remote.example",
+            "actor_url": "https://remote.example/actors/bob",
+            "actor_data": {"type": "Person",
+                           "name": "Bob Example",
+                           "summary": "A test user",
+                           "icon": {"url": "https://remote.example/avatar.png"},
+                           "image": {"url": "https://remote.example/header.png"},
+                           "manuallyApprovesFollowers": False}}
+
+
+ROW_FOLLOWING = {"account_id": 789,
+                 "acct": "alice@other.example",
+                 "actor_url": "https://other.example/actors/alice",
+                 "actor_data": {"type": "Person", "name": "Alice"}}
+
+
+def test_account_from_known_account_returns_correct_fields():
+    from profed.components.api.c2s.v1.accounts.router import _account_from_known_account
+
+    result = _account_from_known_account(ROW_FULL)
+
+    assert result.id == "123456"
+    assert result.username == "bob"
+    assert result.acct == "bob@remote.example"
+    assert result.display_name == "Bob Example"
+    assert result.note == "A test user"
+    assert result.url == "https://remote.example/actors/bob"
+    assert result.avatar == "https://remote.example/avatar.png"
+    assert result.header == "https://remote.example/header.png"
+    assert result.locked is False
+    assert result.bot is False
+
+
+def test_account_from_known_account_falls_back_to_username_for_display_name():
+    from profed.components.api.c2s.v1.accounts.router import _account_from_known_account
+
+    row    = {**ROW, "actor_data": {"type": "Person"}}
+
+    result = _account_from_known_account(row)
+
+    assert result.display_name == "bob"
+
+
+def test_lookup_returns_account(client):
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=ROW_FULL)):
+        response = client.get("/accounts/lookup?acct=bob@remote.example")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"]       == "123456"
+    assert data["username"] == "bob"
+    assert data["acct"]     == "bob@remote.example"
+
+
+def test_lookup_returns_404_when_not_found(client):
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=None)):
+        response = client.get("/accounts/lookup?acct=nobody@example.com")
+
+    assert response.status_code == 404
+
+
+def test_get_account_returns_account(client):
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=ROW_FULL)):
+        response = client.get("/accounts/123456")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "123456"
+
+
+def test_get_account_returns_404_when_not_found(client):
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=None)):
+        response = client.get("/accounts/999999")
+
+    assert response.status_code == 404
+
+
+def test_account_followers_returns_accounts(client):
+    mock_followers = AsyncMock()
+    mock_followers.get_followers = AsyncMock(return_value=["alice@other.example"])
+
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=ROW_FULL)), \
+         patch("profed.components.api.c2s.v1.accounts.router.c2s_followers_storage",
+               AsyncMock(return_value=mock_followers)), \
+         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
+               AsyncMock(return_value=ROW_FOLLOWING)):
+        response = client.get("/accounts/123456/followers")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data)           == 1
+    assert data[0]["username"] == "alice"
+
+
+def test_account_followers_skips_unknown_followers(client):
+    mock_followers = AsyncMock()
+    mock_followers.get_followers = AsyncMock(return_value=["unknown@gone.example"])
+
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=ROW_FULL)), \
+         patch("profed.components.api.c2s.v1.accounts.router.c2s_followers_storage",
+               AsyncMock(return_value=mock_followers)), \
+         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
+               AsyncMock(return_value=None)):
+        response = client.get("/accounts/123456/followers")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_account_followers_returns_404_when_account_not_found(client):
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=None)):
+        response = client.get("/accounts/999999/followers")
+
+    assert response.status_code == 404
+
+
+def test_account_following_returns_accounts_for_known_user(client):
+    mock_storage = AsyncMock()
+    mock_storage.get_following = AsyncMock(
+        return_value=[{"account_id":        789,
+                       "accepted":           True,
+                       "follow_activity_id": None}])
+
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=ROW_FULL)), \
+         patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+               AsyncMock(return_value=mock_storage)), \
+         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
+               AsyncMock(return_value=ROW_FOLLOWING)):
+        response = client.get("/accounts/123456/following")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data)           == 1
+    assert data[0]["id"]       == "789"
+    assert data[0]["username"] == "alice"
+
+
+def test_account_following_skips_unresolvable_accounts(client):
+    mock_storage = AsyncMock()
+    mock_storage.get_following = AsyncMock(
+        return_value=[{"account_id":        789,
+                       "accepted":           True,
+                       "follow_activity_id": None}])
+
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=ROW_FULL)), \
+         patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+               AsyncMock(return_value=mock_storage)), \
+         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
+               AsyncMock(return_value=None)):
+        response = client.get("/accounts/123456/following")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_account_following_returns_404_when_account_not_found(client):
+    with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+               AsyncMock(return_value=None)):
+        response = client.get("/accounts/999999/following")
+
+    assert response.status_code == 404
+

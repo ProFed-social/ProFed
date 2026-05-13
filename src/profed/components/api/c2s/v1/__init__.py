@@ -16,6 +16,8 @@ from profed.components.api.c2s.shared.actors import storage as actors_storage
 from profed.components.api.c2s.shared.actors import projection as actors_projection
 from .accounts.following import storage as following_storage
 from .accounts.following import projection as following_projection 
+from .accounts.followers import storage   as followers_storage
+from .accounts.followers import projection as followers_projection
 
 
 def _projection_initializer(storage, projection, handle_events, name):
@@ -43,7 +45,12 @@ async def init(config: dict, deactivate: List[str]) -> None:
                               _projection_initializer(following_storage,
                                                       following_projection,
                                                       following_projection.handle_events,
-                                                      "c2s_v1_following"))]:
+                                                      "c2s_v1_following")),
+                             (["accounts"],
+                              _projection_initializer(followers_storage,
+                                                      followers_projection,
+                                                      followers_projection.handle_events,
+                                                      "c2s_v1_followers"))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
 
