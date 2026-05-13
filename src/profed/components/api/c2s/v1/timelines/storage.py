@@ -42,6 +42,13 @@ class _storage(BaseStorage):
                                     limit)
         return [(row["id"], row["activity"]) for row in rows]
 
+    async def get_by_id(self, status_id: str) -> tuple[str, dict] | None:
+        row = await self.fetch_one("""SELECT id::text, activity
+                                       FROM api.c2s_home_timeline
+                                       WHERE id = $1::uuid""",
+                                   status_id)
+        return (row["id"], row["activity"]) if row else None
+
 
 _instance: _storage | None = None
 
