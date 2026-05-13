@@ -12,6 +12,7 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.components.api.c2s.shared.auth import current_user
 from profed.core.message_bus import message_bus
+from profed.models.mastodon import Account, Relationship
 from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
  
 router = APIRouter()
@@ -22,30 +23,19 @@ def init(config: dict) -> None:
     global active
     active = True
 
-def _account_from_person(person, username: str) -> dict:
-    return {"id":              account_id(acct_from_username(username)),
-            "username":        username,
-            "acct":            acct_from_username(username),
-            "display_name":    person.name or username,
-            "note":            person.summary or "",
-            "url":             actor_url_from_username(username),
-            "avatar":          None,
-            "avatar_static":   None,
-            "header":          None,
-            "header_static":   None,
-            "locked":          False,
-            "bot":             False,
-            "created_at":      "1970-01-01T00:00:00.000Z",
-            "followers_count": 0,
-            "following_count": 0,
-            "statuses_count":  0,
-            "emojis":          [],
-            "fields":          [],
-            "source":          {"privacy":   "public",
-                                "sensitive": False,
-                                "language":  None,
-                                "note":      person.summary or "",
-                                "fields":    []}}
+
+def _account_from_person(person, username: str) -> Account:
+    return Account(id=           account_id(acct_from_username(username)),
+                   username=     username,
+                   acct=         acct_from_username(username),
+                   display_name= person.name or username,
+                   note=         person.summary or "",
+                   url=          actor_url_from_username(username),
+                   source=       {"privacy":   "public",
+                                  "sensitive": False,
+                                  "language":  None,
+                                  "note":      person.summary or "",
+                                  "fields":    []})
  
  
 @router.get("/accounts/verify_credentials")
@@ -84,16 +74,11 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
 
     rows = await (await following_storage()).get_following(username, filter=list(resolved.values()))
     following_map = {row["account_id"]: row for row in rows}
-    return [{"id":              str(resolved[query]),
-             "following":       following_map.get(resolved[query], {}).get("accepted", False),
-             "requested":       (resolved[query] in following_map and
-                                 not following_map[resolved[query]]["accepted"]),
-             "followed_by":     False,
-             "blocking":        False,
-             "muting":          False,
-             "domain_blocking": False,
-             "endorsed":        False,
-             "note":            ""} for query in id if query in resolved]
+    return [Relationship(id=str(resolved[query]),
+                         following=following_map.get(resolved[query], {}).get("accepted", False),
+                         requested=(resolved[query] in following_map and
+                                    not following_map[resolved[query]]["accepted"]))
+            for query in id if query in resolved]
 
 
 async def _resolve_account(query: str, config: dict) -> dict | None:

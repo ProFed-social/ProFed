@@ -66,8 +66,7 @@ def test_actor_to_account_maps_fields():
     acct   = "alice@mastodon.social"
     result = _actor_to_account(ACTOR, acct)
 
-    assert result["username"]     == "alice"
-    assert result["acct"]         == acct
-    assert result["display_name"] == "Alice"
-    assert result["url"]          == ACTOR["id"]
-
+    assert result.username     == "alice"
+    assert result.acct         == acct
+    assert result.display_name == "Alice"
+    assert result.url          == ACTOR["id"]

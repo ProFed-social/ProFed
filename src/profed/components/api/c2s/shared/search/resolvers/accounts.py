@@ -4,29 +4,23 @@
 import logging
 from profed.components.api.c2s.shared.known_accounts.service import lookup_by_acct
 from profed.identity import account_id
+from profed.models.mastodon import Account
 
 
 logger = logging.getLogger(__name__)
  
  
-def _actor_to_account(actor: dict, acct: str) -> dict:
+def _actor_to_account(actor: dict, acct: str) -> Account:
     username, _ = acct.split("@", 1)
-    return {"id":              account_id(acct),
-            "username":        username,
-            "acct":            acct,
-            "display_name":    actor.get("name") or username,
-            "note":            actor.get("summary") or "",
-            "url":             actor.get("url") or actor.get("id", ""),
-            "avatar":          "",
-            "header":          "",
-            "followers_count": 0,
-            "following_count": 0,
-            "statuses_count":  0,
-            "emojis":          [],
-            "fields":          []}
+    return Account(id=account_id(acct),
+                   username=username,
+                   acct=acct,
+                   display_name=actor.get("name") or username,
+                   note=actor.get("summary") or "",
+                   url=actor.get("url") or actor.get("id", ""))
  
  
-async def resolve(q: str, resolve: bool = False, limit: int = 20) -> dict:
+async def resolve(q: str, resolve: bool = False, limit: int = 20) -> dict[str, Account]:
     if "@" not in q or not resolve:
         return {}
 
