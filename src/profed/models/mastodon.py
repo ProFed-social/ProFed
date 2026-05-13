@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from typing import Any
 
@@ -18,7 +19,7 @@ class Account(BaseModel):
     header_static: str | None = None
     locked: bool = False
     bot: bool = False
-    created_at: str = "1970-01-01T00:00:00.000Z"
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     followers_count: int = 0
     following_count: int = 0
     statuses_count: int = 0
