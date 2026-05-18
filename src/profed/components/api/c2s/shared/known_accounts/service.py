@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from profed.core.message_bus import message_bus
@@ -9,6 +10,7 @@ from profed.federation.actors import fetch_actor
 from profed.identity import account_id as compute_account_id
 from .storage import storage
 from profed.models.mastodon import Account
+
  
 WEBFINGER_CACHE_TTL = 86400  # 1 day default
  
@@ -80,6 +82,15 @@ async def lookup_by_actor_url(actor_url: str,
 
     acct = await lookup_acct(actor_url)
     return row if acct is None else await _do_webfinger_lookup(acct)
+
+
+
+async def lookup_multiple(actor_urls: list[str],
+                          config: dict | None = None) -> dict[str, Account]:
+    raws = await asyncio.gather(*(lookup_by_actor_url(url, config) for url in actor_urls))
+    return {url: make_account(raw)
+            for url, raw in zip(actor_urls, raws)
+            if raw is not None}
 
 
 def make_account(raw: dict) -> Account:

@@ -68,3 +68,29 @@ class Status(BaseModel):
     muted: bool = False
     pinned: bool = False
 
+
+class Status(BaseModel):
+    id: str
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    in_reply_to_id: str | None = None
+    in_reply_to_account_id: str | None = None
+    sensitive: bool = False
+    spoiler_text: str = ""
+    visibility: str = "public"
+    language: str | None = None
+    uri: str = ""
+    url: str = ""
+    replies_count: int = 0
+    reblogs_count: int = 0
+    favourites_count: int = 0
+    content: str = ""
+    reblog: Any | None = None
+    application: Any | None = None
+    account: Account
+    media_attachments: list[Any] = Field(default_factory=list)
+    mentions: list[Any] = Field(default_factory=list)
+    tags: list[Any] = Field(default_factory=list)
+    emojis: list[Any] = Field(default_factory=list)
+    card: Any | None = None
+    poll: Any | None = None
+

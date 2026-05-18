@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core import message_bus
@@ -51,9 +51,15 @@ def client(fake_bus):
     return TestClient(app)
  
  
+class FakePerson:
+    name    = "Alice"
+    summary = ""
+
+
 def test_create_status_publishes_activity(client, fake_bus):
-    response = client.post("/statuses",
-                           json={"status": "Hello Fediverse!"})
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=FakePerson())):
+        response = client.post("/statuses", json={"status": "Hello Fediverse!"})
 
     assert response.status_code == 200
     published = fake_bus.topic("activities")._ctx.published
@@ -66,13 +72,16 @@ def test_create_status_publishes_activity(client, fake_bus):
  
  
 def test_create_status_returns_status_object(client, fake_bus):
-    response = client.post("/statuses",
-                           json={"status": "Hello Fediverse!"})
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=FakePerson())):
+        response = client.post("/statuses", json={"status": "Hello Fediverse!"})
     data = response.json()
-    assert data["content"] == "Hello Fediverse!"
-    assert data["visibility"] == "public"
-    assert "id" in data
- 
+
+    assert data["content"]          == "Hello Fediverse!"
+    assert data["visibility"]        == "public"
+    assert "id"                      in data
+    assert data["account"]["username"] == "alice" 
+
  
 def test_create_status_too_long_returns_422(client, fake_bus):
     response = client.post("/statuses",
@@ -87,7 +96,10 @@ def test_statuses_active_flag_set_after_init():
  
 
 def test_create_status_activity_has_context_and_to(client, fake_bus):
-    client.post("/statuses", json={"status": "Hello Fediverse!"})
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=FakePerson())):
+        client.post("/statuses", json={"status": "Hello Fediverse!"})
+
     payload = fake_bus.topic("activities")._ctx.published[0]["payload"]
     assert "@context" in payload
     assert payload["@context"] == ["https://www.w3.org/ns/activitystreams"]

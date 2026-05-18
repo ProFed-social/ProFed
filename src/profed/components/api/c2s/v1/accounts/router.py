@@ -5,15 +5,16 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from profed.identity import actor_url_from_username, acct_from_username, account_id
+from profed.identity import actor_url_from_username
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
                                                                      lookup_by_actor_url,
                                                                      make_account)
+from profed.components.api.c2s.shared.actors.service import resolve_actor, local_account
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.components.api.c2s.shared.auth import current_user
 from profed.core.message_bus import message_bus
-from profed.models.mastodon import Account, Relationship
+from profed.models.mastodon import Relationship
 from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
 from profed.components.api.c2s.v1.accounts.followers.storage import storage as c2s_followers_storage
 
@@ -26,20 +27,6 @@ def init(config: dict) -> None:
     global active
     active = True
 
-
-def _account_from_person(person, username: str) -> Account:
-    return Account(id=           account_id(acct_from_username(username)),
-                   username=     username,
-                   acct=         acct_from_username(username),
-                   display_name= person.name or username,
-                   note=         person.summary or "",
-                   url=          actor_url_from_username(username),
-                   source=       {"privacy":   "public",
-                                  "sensitive": False,
-                                  "language":  None,
-                                  "note":      person.summary or "",
-                                  "fields":    []})
- 
  
 @router.get("/accounts/verify_credentials")
 async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
@@ -52,7 +39,7 @@ async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
     if person is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    return _account_from_person(person, username)
+    return local_account(username, person)
  
  
 @router.get("/accounts/relationships")

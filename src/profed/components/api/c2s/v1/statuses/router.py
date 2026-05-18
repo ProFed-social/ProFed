@@ -9,7 +9,9 @@ from typing import Annotated
 from profed.core.message_bus import message_bus
 from profed.identity import actor_url_from_username, acct_from_username
 from profed.models.activity_pub import CreateActivity, Note
+from profed.models.mastodon import Status
 from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.actors.service import resolve_actor, local_account
  
  
 router = APIRouter()
@@ -63,41 +65,14 @@ async def create_status(body: StatusCreate,
         await publish({"type":    "created",
                        "payload": payload})
  
-    return {"id":                note_id,
-            "created_at":        created_at,
-            "visibility":        body.visibility,
-            "sensitive":         body.sensitive,
-            "spoiler_text":      body.spoiler_text,
-            "language":          body.language,
-            "uri":               note_id,
-            "url":               note_id,
-            "content":           body.status,
-            "account":           {"id":              username,
-                                  "username":        username,
-                                  "acct":            acct_from_username(username),
-                                  "display_name":    username,
-                                  "locked":          False,
-                                  "created_at":      "1970-01-01T00:00:00.000Z",
-                                  "note":            "",
-                                  "url":             actor_url,
-                                  "avatar":          "",
-                                  "avatar_static":   "",
-                                  "header":          "",
-                                  "header_static":   "",
-                                  "followers_count": 0,
-                                  "following_count": 0,
-                                  "statuses_count":  0,
-                                  "emojis":          [],
-                                  "fields":          []},
-            "media_attachments": [],
-            "mentions":          [],
-            "tags":              [],
-            "emojis":            [],
-            "card":              None,
-            "poll":              None,
-            "in_reply_to_id":    None,
-            "reblog":            None,
-            "replies_count":     0,
-            "reblogs_count":     0,
-            "favourites_count":  0}
+    return Status(id=          note_id,
+                  created_at=  created_at,
+                  visibility=  body.visibility,
+                  sensitive=   body.sensitive,
+                  spoiler_text=body.spoiler_text,
+                  language=    body.language,
+                  uri=         note_id,
+                  url=         note_id,
+                  content=     body.status,
+                  account=     local_account(username, await resolve_actor(username)))
 
