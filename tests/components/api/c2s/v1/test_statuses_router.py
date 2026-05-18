@@ -106,3 +106,56 @@ def test_create_status_activity_has_context_and_to(client, fake_bus):
     assert payload["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
     assert payload["object"]["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
 
+
+def test_get_status_returns_404(client, fake_bus):
+    response = client.get("/statuses/some-id")
+
+    assert response.status_code == 404
+
+
+def test_delete_status_publishes_delete_activity(client, fake_bus):
+    response = client.delete("/statuses/notes-123")
+
+    assert response.status_code == 200
+    published = fake_bus.topic("activities")._ctx.published
+    assert len(published)                       == 1
+    assert published[0]["type"]                == "deleted"
+    assert published[0]["payload"]["type"]     == "Delete"
+    assert published[0]["payload"]["username"] == "alice"
+
+
+def test_status_context_returns_empty_context(client, fake_bus):
+    response = client.get("/statuses/some-id/context")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ancestors"]   == []
+    assert data["descendants"] == []
+
+
+def test_favourite_returns_404(client, fake_bus):
+    response = client.post("/statuses/some-id/favourite")
+
+    assert response.status_code == 404
+
+
+def test_reblog_returns_404(client, fake_bus):
+    response = client.post("/statuses/some-id/reblog")
+
+    assert response.status_code == 404
+
+
+def test_favourited_by_returns_empty_list(client, fake_bus):
+    response = client.get("/statuses/some-id/favourited_by")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_reblogged_by_returns_empty_list(client, fake_bus):
+    response = client.get("/statuses/some-id/reblogged_by")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+

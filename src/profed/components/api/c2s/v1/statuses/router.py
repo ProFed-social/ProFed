@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from typing import Annotated
 from profed.core.message_bus import message_bus
 from profed.identity import actor_url_from_username, acct_from_username
-from profed.models.activity_pub import CreateActivity, Note
-from profed.models.mastodon import Status
+from profed.models.activity_pub import CreateActivity, DeleteActivity, Note
+from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor, local_account
  
@@ -75,4 +75,70 @@ async def create_status(body: StatusCreate,
                   url=         note_id,
                   content=     body.status,
                   account=     local_account(username, await resolve_actor(username)))
+
+
+@router.get("/statuses/{id}")
+async def get_status(id: str,
+                     claims: Annotated[dict, Depends(current_user)] = None):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.delete("/statuses/{id}")
+async def delete_status(id: str,
+                        claims: Annotated[dict, Depends(current_user)]):
+    username = claims.get("preferred_username") or claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="invalid_token")
+    actor_url   = actor_url_from_username(username)
+    activity    = DeleteActivity(id=f"{actor_url}#delete/{id}",
+                                 actor=actor_url,
+                                 object=id)
+    payload = activity.model_dump(by_alias=True, exclude_none=True)
+    payload["username"] = username
+    async with message_bus().topic("activities").publish() as publish:
+        await publish({"type":    "deleted",
+                       "payload": payload})
+    return {}
+
+
+@router.get("/statuses/{id}/context")
+async def status_context(id: str,
+                         claims: Annotated[dict, Depends(current_user)] = None):
+    return StatusContext()
+
+
+@router.post("/statuses/{id}/favourite")
+async def favourite_status(id: str,
+                           claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.post("/statuses/{id}/unfavourite")
+async def unfavourite_status(id: str,
+                             claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.post("/statuses/{id}/reblog")
+async def reblog_status(id: str,
+                        claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.post("/statuses/{id}/unreblog")
+async def unreblog_status(id: str,
+                          claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.get("/statuses/{id}/favourited_by")
+async def favourited_by(id: str,
+                        claims: Annotated[dict, Depends(current_user)] = None):
+    return []
+
+
+@router.get("/statuses/{id}/reblogged_by")
+async def reblogged_by(id: str,
+                       claims: Annotated[dict, Depends(current_user)] = None):
+    return []
 

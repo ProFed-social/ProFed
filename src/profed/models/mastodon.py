@@ -94,3 +94,8 @@ class Status(BaseModel):
     card: Any | None = None
     poll: Any | None = None
 
+
+class StatusContext(BaseModel):
+    ancestors:   list[Status] = []
+    descendants: list[Status] = []
+

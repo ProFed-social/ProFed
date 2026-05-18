@@ -22,6 +22,11 @@ class CreateActivity(Activity):
 class UpdateActivity(Activity):
     type: str = "Update"
 
+
+class DeleteActivity(Activity):
+    type: str = "Delete"
+
+
 class AcceptActivity(Activity):
     type: str = "Accept"
  
