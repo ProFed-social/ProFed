@@ -8,6 +8,7 @@ from profed.federation.webfinger import lookup_acct, lookup_actor_url
 from profed.federation.actors import fetch_actor
 from profed.identity import account_id as compute_account_id
 from .storage import storage
+from profed.models.mastodon import Account
  
 WEBFINGER_CACHE_TTL = 86400  # 1 day default
  
@@ -79,4 +80,23 @@ async def lookup_by_actor_url(actor_url: str,
 
     acct = await lookup_acct(actor_url)
     return row if acct is None else await _do_webfinger_lookup(acct)
+
+
+def make_account(raw: dict) -> Account:
+    actor_data = raw.get("actor_data") or {}
+    username = raw["acct"].split("@")[0]
+    icon = actor_data.get("icon") or {}
+    image = actor_data.get("image") or {}
+    return Account(id=str(raw["account_id"]),
+                   username=username,
+                   acct=raw["acct"],
+                   display_name=actor_data.get("name") or username,
+                   note=actor_data.get("summary") or "",
+                   url=raw["actor_url"],
+                   avatar=icon.get("url") if isinstance(icon, dict) else None,
+                   avatar_static=icon.get("url") if isinstance(icon, dict) else None,
+                   header=image.get("url") if isinstance(image, dict) else None,
+                   header_static=image.get("url") if isinstance(image, dict) else None,
+                   locked=actor_data.get("manuallyApprovesFollowers", False),
+                   bot=actor_data.get("type") == "Service")
 

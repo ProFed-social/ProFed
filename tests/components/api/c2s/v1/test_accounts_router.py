@@ -323,33 +323,6 @@ ROW_FOLLOWING = {"account_id": 789,
                  "actor_data": {"type": "Person", "name": "Alice"}}
 
 
-def test_account_from_known_account_returns_correct_fields():
-    from profed.components.api.c2s.v1.accounts.router import _account_from_known_account
-
-    result = _account_from_known_account(ROW_FULL)
-
-    assert result.id == "123456"
-    assert result.username == "bob"
-    assert result.acct == "bob@remote.example"
-    assert result.display_name == "Bob Example"
-    assert result.note == "A test user"
-    assert result.url == "https://remote.example/actors/bob"
-    assert result.avatar == "https://remote.example/avatar.png"
-    assert result.header == "https://remote.example/header.png"
-    assert result.locked is False
-    assert result.bot is False
-
-
-def test_account_from_known_account_falls_back_to_username_for_display_name():
-    from profed.components.api.c2s.v1.accounts.router import _account_from_known_account
-
-    row    = {**ROW, "actor_data": {"type": "Person"}}
-
-    result = _account_from_known_account(row)
-
-    assert result.display_name == "bob"
-
-
 def test_lookup_returns_account(client):
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(return_value=ROW_FULL)):

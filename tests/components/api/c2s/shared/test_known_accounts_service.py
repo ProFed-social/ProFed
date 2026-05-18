@@ -5,11 +5,11 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import profed.components.api.c2s.shared.known_accounts.storage as storage_module
-from profed.components.api.c2s.shared.known_accounts.service import (
-    lookup_by_id,
-    lookup_by_acct,
-    lookup_by_actor_url,
-    WEBFINGER_CACHE_TTL)
+from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
+                                                                     lookup_by_acct,
+                                                                     lookup_by_actor_url,
+                                                                     make_account,
+                                                                     WEBFINGER_CACHE_TTL)
  
  
 NOW   = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -115,4 +115,63 @@ async def test_lookup_by_actor_url_returns_stale_row_when_webfinger_fails(fake_s
         result = await lookup_by_actor_url(ACTOR_URL)
 
     assert result == stale_row
+
+
+ROW_FULL = {"account_id": 123456,
+            "acct":       "bob@remote.example",
+            "actor_url":  "https://remote.example/actors/bob",
+            "actor_data": {"type":                     "Person",
+                           "name":                     "Bob Example",
+                           "summary":                  "A test user",
+                           "icon":                     {"url": "https://remote.example/avatar.png"},
+                           "image":                    {"url": "https://remote.example/header.png"},
+                           "manuallyApprovesFollowers": False}}
+
+
+ROW_MINIMAL = {"account_id": 42,
+               "acct":       "carol@other.example",
+               "actor_url":  "https://other.example/actors/carol",
+               "actor_data": {"type": "Person"}}
+
+
+ROW_BOT = {"account_id": 99,
+           "acct":       "bot@example.com",
+           "actor_url":  "https://example.com/actors/bot",
+           "actor_data": {"type": "Service"}}
+
+
+def test_make_account_returns_correct_fields():
+    result = make_account(ROW_FULL)
+
+    assert result.id           == "123456"
+    assert result.username     == "bob"
+    assert result.acct         == "bob@remote.example"
+    assert result.display_name == "Bob Example"
+    assert result.note         == "A test user"
+    assert result.url          == "https://remote.example/actors/bob"
+    assert result.avatar       == "https://remote.example/avatar.png"
+    assert result.header       == "https://remote.example/header.png"
+    assert result.locked       is False
+    assert result.bot          is False
+
+
+def test_make_account_falls_back_to_username_for_display_name():
+    result = make_account(ROW_MINIMAL)
+
+    assert result.display_name == "carol"
+
+
+def test_make_account_sets_bot_flag_for_service_type():
+    result = make_account(ROW_BOT)
+
+    assert result.bot is True
+
+
+def test_make_account_handles_missing_actor_data():
+    row    = {**ROW_MINIMAL, "actor_data": None}
+    result = make_account(row)
+
+    assert result.display_name == "carol"
+    assert result.avatar       is None
+    assert result.header       is None
 
