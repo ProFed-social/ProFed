@@ -72,3 +72,24 @@ def test_timelines_active_flag_set_after_init():
     timelines_module.init({})
     assert timelines_module.active is True
 
+
+def test_public_timeline_returns_empty_list(client):
+    response = client.get("/timelines/public")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_public_timeline_accepts_local_flag(client):
+    response = client.get("/timelines/public?local=true")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_hashtag_timeline_returns_empty_list(client):
+    response = client.get("/timelines/tag/python")
+
+    assert response.status_code == 200
+    assert response.json() == []
+

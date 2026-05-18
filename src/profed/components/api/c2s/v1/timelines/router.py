@@ -53,3 +53,21 @@ async def home_timeline(claims: Annotated[dict, Depends(current_user)],
                                              for _, activity in rows}))
     return [_activity_to_status(row_id, activity, accounts) for row_id, activity in rows]
 
+
+@router.get("/timelines/public")
+async def public_timeline(claims: Annotated[dict, Depends(current_user)],
+                          limit: int = Query(default=20, ge=1, le=40),
+                          max_id: Optional[str] = Query(default=None),
+                          since_id: Optional[str] = Query(default=None),
+                          local: bool = Query(default=False)):
+    return []
+
+
+@router.get("/timelines/tag/{hashtag}")
+async def hashtag_timeline(hashtag: str,
+                           claims: Annotated[dict, Depends(current_user)],
+                           limit: int = Query(default=20, ge=1, le=40),
+                           max_id: Optional[str] = Query(default=None),
+                           since_id: Optional[str] = Query(default=None),
+                           local: bool = Query(default=False)):
+    return []
