@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Annotated, Optional
 from profed.components.api.c2s.shared.auth import current_user
 
@@ -48,4 +48,45 @@ async def get_conversations(claims: Annotated[dict, Depends(current_user)],
 @router.get("/filters")
 async def get_filters(claims: Annotated[dict, Depends(current_user)]):
     return []
+
+
+@router.post("/lists")
+async def create_list(claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=422, detail="lists_not_supported")
+
+
+@router.get("/lists/{id}")
+async def get_list(id: str,
+                   claims: Annotated[dict, Depends(current_user)] = None):
+    raise HTTPException(status_code=404, detail="list_not_found")
+
+
+@router.put("/lists/{id}")
+async def update_list(id: str,
+                      claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="list_not_found")
+
+
+@router.delete("/lists/{id}")
+async def delete_list(id: str,
+                      claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="list_not_found")
+
+
+@router.get("/lists/{id}/accounts")
+async def get_list_accounts(id: str,
+                            claims: Annotated[dict, Depends(current_user)] = None):
+    raise HTTPException(status_code=404, detail="list_not_found")
+
+
+@router.post("/lists/{id}/accounts")
+async def add_list_accounts(id: str,
+                            claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="list_not_found")
+
+
+@router.delete("/lists/{id}/accounts")
+async def remove_list_accounts(id: str,
+                              claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="list_not_found")
 

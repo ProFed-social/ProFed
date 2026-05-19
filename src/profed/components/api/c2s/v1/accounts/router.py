@@ -297,3 +297,42 @@ async def get_suggestions(claims: Annotated[dict, Depends(current_user)],
                           limit: int = Query(default=40, ge=1, le=80)):
     return []
 
+
+@router.get("/endorsements")
+async def get_endorsements(claims: Annotated[dict, Depends(current_user)]):
+    return []
+
+
+@router.post("/accounts/{id}/pin")
+async def pin_account(id: str,
+                      claims: Annotated[dict, Depends(current_user)]):
+    return Relationship(id=id, endorsed=True)
+
+
+@router.post("/accounts/{id}/unpin")
+async def unpin_account(id: str,
+                        claims: Annotated[dict, Depends(current_user)]):
+    return Relationship(id=id, endorsed=False)
+
+
+@router.get("/accounts/{id}/lists")
+async def account_lists(id: str,
+                        claims: Annotated[dict, Depends(current_user)] = None):
+    return []
+
+
+@router.get("/domain_blocks")
+async def get_domain_blocks(claims: Annotated[dict, Depends(current_user)],
+                            limit: int = Query(default=100, ge=1, le=200)):
+    return []
+
+
+@router.post("/domain_blocks")
+async def add_domain_block(claims: Annotated[dict, Depends(current_user)]):
+    return {}
+
+
+@router.delete("/domain_blocks")
+async def remove_domain_block(claims: Annotated[dict, Depends(current_user)]):
+    return {}
+

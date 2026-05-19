@@ -154,3 +154,38 @@ async def unbookmark_status(id: str,
                             claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
+
+@router.post("/statuses/{id}/pin")
+async def pin_status(id: str,
+                     claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.post("/statuses/{id}/unpin")
+async def unpin_status(id: str,
+                       claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.put("/statuses/{id}")
+async def edit_status(id: str,
+                      claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.get("/statuses/{id}/history")
+async def status_history(id: str,
+                         claims: Annotated[dict, Depends(current_user)] = None):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.get("/statuses/{id}/source")
+async def status_source(id: str,
+                        claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.get("/scheduled_statuses")
+async def get_scheduled_statuses(claims: Annotated[dict, Depends(current_user)]):
+    return []
+
