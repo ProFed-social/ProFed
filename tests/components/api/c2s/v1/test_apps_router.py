@@ -80,3 +80,12 @@ def test_register_app_default_scopes(client, fake_bus):
 def test_register_app_missing_required_fields_returns_422(client):
     response = client.post("/apps", json={"scopes": "read"})
     assert response.status_code == 422
+
+
+def test_verify_app_credentials_returns_app_info(client):
+    response = client.get("/apps/verify_credentials")
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "ProFed"
+
+

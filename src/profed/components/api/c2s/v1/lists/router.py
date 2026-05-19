@@ -38,3 +38,14 @@ async def get_favourites(claims: Annotated[dict, Depends(current_user)],
                          since_id: Optional[str] = Query(default=None)):
     return []
 
+
+@router.get("/conversations")
+async def get_conversations(claims: Annotated[dict, Depends(current_user)],
+                            limit: int = Query(default=20, ge=1, le=40)):
+    return []
+
+
+@router.get("/filters")
+async def get_filters(claims: Annotated[dict, Depends(current_user)]):
+    return []
+

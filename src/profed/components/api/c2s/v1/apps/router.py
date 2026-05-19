@@ -46,3 +46,11 @@ async def register_app(body: AppRegistration):
             "scopes":        body.scopes,
             "website":       body.website}
 
+
+@router.get("/apps/verify_credentials")
+async def verify_app_credentials():
+    return {"name":         "ProFed",
+            "website":      None,
+            "scopes":       "read write follow push",
+            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob"}
+

@@ -498,3 +498,30 @@ def test_authorize_follow_request_returns_relationship(client):
 def test_reject_follow_request_returns_relationship(client):
     assert client.post("/follow_requests/123/reject").status_code == 200
 
+
+def test_get_preferences_returns_defaults(client):
+    response = client.get("/preferences")
+    assert response.status_code == 200
+    assert response.json()["posting:default:visibility"] == "public"
+
+
+def test_update_credentials_returns_account(client):
+    with patch("profed.components.api.c2s.v1.accounts.router.resolve_actor",
+               AsyncMock(return_value=FakePerson())):
+        response = client.patch("/accounts/update_credentials")
+
+    assert response.status_code == 200
+    assert response.json()["username"] == "alice"
+
+
+def test_get_featured_tags_returns_empty_list(client):
+    assert client.get("/featured_tags").json() == []
+
+
+def test_get_followed_tags_returns_empty_list(client):
+    assert client.get("/followed_tags").json() == []
+
+
+def test_get_suggestions_returns_empty_list(client):
+    assert client.get("/suggestions").json() == []
+

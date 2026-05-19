@@ -1,7 +1,9 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from typing import Annotated
+from profed.components.api.c2s.shared.auth import current_user
 from profed.identity import domain
 from profed.components.api.c2s.shared.instance import build_common_response
  
@@ -32,4 +34,29 @@ async def instance():
                  registrations=False,
                  approval_required=False,
                  invites_enabled=False)
- 
+
+
+@router.get("/custom_emojis")
+async def custom_emojis():
+    return []
+
+
+@router.get("/announcements")
+async def announcements():
+    return []
+
+
+@router.get("/instance/peers")
+async def instance_peers():
+    return []
+
+
+@router.get("/instance/rules")
+async def instance_rules():
+    return []
+
+
+@router.get("/instance/activity")
+async def instance_activity():
+    return []
+

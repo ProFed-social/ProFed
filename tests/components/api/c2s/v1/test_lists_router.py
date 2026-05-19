@@ -38,3 +38,11 @@ def test_lists_active_flag_set_after_init():
 
     assert lists_module.active is True
 
+
+def test_get_conversations_returns_empty_list(client):
+    assert client.get("/conversations").json() == []
+
+
+def test_get_filters_returns_empty_list(client):
+    assert client.get("/filters").json() == []
+

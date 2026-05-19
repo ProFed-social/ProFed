@@ -142,3 +142,15 @@ async def reblogged_by(id: str,
                        claims: Annotated[dict, Depends(current_user)] = None):
     return []
 
+
+@router.post("/statuses/{id}/bookmark")
+async def bookmark_status(id: str,
+                          claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+
+
+@router.post("/statuses/{id}/unbookmark")
+async def unbookmark_status(id: str,
+                            claims: Annotated[dict, Depends(current_user)]):
+    raise HTTPException(status_code=404, detail="status_not_found")
+

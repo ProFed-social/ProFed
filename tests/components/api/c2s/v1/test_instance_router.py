@@ -64,3 +64,23 @@ def test_instance_active_flag_set_after_init():
     instance_module.init({})
     assert instance_module.active is True
 
+
+def test_custom_emojis_returns_empty_list(client):
+    assert client.get("/custom_emojis").json() == []
+
+
+def test_announcements_returns_empty_list(client):
+    assert client.get("/announcements").json() == []
+
+
+def test_instance_peers_returns_empty_list(client):
+    assert client.get("/instance/peers").json() == []
+
+
+def test_instance_rules_returns_empty_list(client):
+    assert client.get("/instance/rules").json() == []
+
+
+def test_instance_activity_returns_empty_list(client):
+    assert client.get("/instance/activity").json() == []
+

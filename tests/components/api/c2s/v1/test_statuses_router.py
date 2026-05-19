@@ -159,3 +159,14 @@ def test_reblogged_by_returns_empty_list(client, fake_bus):
     assert response.json() == []
 
 
+def test_bookmark_returns_404(client, fake_bus):
+    response = client.post("/statuses/note-123/bookmark")
+
+    assert response.status_code == 404
+
+
+def test_unbookmark_returns_404(client, fake_bus):
+    response = client.post("/statuses/note-123/unbookmark")
+
+    assert response.status_code == 404
+

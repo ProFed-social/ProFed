@@ -266,3 +266,34 @@ async def reject_follow_request(id: str,
                                 claims: Annotated[dict, Depends(current_user)]):
     return Relationship(id=id)
 
+
+@router.get("/preferences")
+async def get_preferences(claims: Annotated[dict, Depends(current_user)]):
+    return {"posting:default:visibility": "public",
+            "posting:default:sensitive":   False,
+            "posting:default:language":    None,
+            "reading:expand:media":        "default",
+            "reading:expand:spoilers":     False}
+
+
+@router.patch("/accounts/update_credentials")
+async def update_credentials(claims: Annotated[dict, Depends(current_user)]):
+    username = claims.get("preferred_username") or claims.get("sub")
+    return local_account(username, await resolve_actor(username))
+
+
+@router.get("/featured_tags")
+async def get_featured_tags(claims: Annotated[dict, Depends(current_user)]):
+    return []
+
+
+@router.get("/followed_tags")
+async def get_followed_tags(claims: Annotated[dict, Depends(current_user)]):
+    return []
+
+
+@router.get("/suggestions")
+async def get_suggestions(claims: Annotated[dict, Depends(current_user)],
+                          limit: int = Query(default=40, ge=1, le=80)):
+    return []
+
