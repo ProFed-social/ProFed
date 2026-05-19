@@ -212,3 +212,57 @@ async def account_following(id: str,
             async for a in (await lookup_by_id(r["account_id"], {}) for r in following)
             if a is not None]
 
+
+@router.post("/accounts/{id}/block")
+async def block_account(id: str,
+                        claims: Annotated[dict, Depends(current_user)]):
+    return Relationship(id=id, blocking=True)
+
+
+@router.post("/accounts/{id}/unblock")
+async def unblock_account(id: str,
+                          claims: Annotated[dict, Depends(current_user)]):
+    return Relationship(id=id, blocking=False)
+
+
+@router.post("/accounts/{id}/mute")
+async def mute_account(id: str,
+                       claims: Annotated[dict, Depends(current_user)]):
+    return Relationship(id=id, muting=True)
+
+
+@router.post("/accounts/{id}/unmute")
+async def unmute_account(id: str,
+                         claims: Annotated[dict, Depends(current_user)]):
+    return Relationship(id=id, muting=False)
+
+
+@router.get("/blocks")
+async def get_blocks(claims: Annotated[dict, Depends(current_user)],
+                     limit: int = Query(default=40, ge=1, le=80)):
+    return []
+
+
+@router.get("/mutes")
+async def get_mutes(claims: Annotated[dict, Depends(current_user)],
+                    limit: int = Query(default=40, ge=1, le=80)):
+    return []
+
+
+@router.get("/follow_requests")
+async def get_follow_requests(claims: Annotated[dict, Depends(current_user)],
+                              limit: int = Query(default=40, ge=1, le=80)):
+    return []
+
+
+@router.post("/follow_requests/{id}/authorize")
+async def authorize_follow_request(id: str,
+                                   claims: Annotated[dict, Depends(current_user)]):
+    return Relationship(id=id)
+
+
+@router.post("/follow_requests/{id}/reject")
+async def reject_follow_request(id: str,
+                                claims: Annotated[dict, Depends(current_user)]):
+    return Relationship(id=id)
+

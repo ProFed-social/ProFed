@@ -450,3 +450,51 @@ def test_account_following_returns_404_when_account_not_found(client):
 
     assert response.status_code == 404
 
+
+def test_block_account_returns_relationship_with_blocking_true(client):
+    response = client.post("/accounts/123/block")
+
+    assert response.status_code == 200
+    assert response.json()["blocking"] is True
+
+
+def test_unblock_account_returns_relationship_with_blocking_false(client):
+    response = client.post("/accounts/123/unblock")
+
+    assert response.status_code == 200
+    assert response.json()["blocking"] is False
+
+
+def test_mute_account_returns_relationship_with_muting_true(client):
+    response = client.post("/accounts/123/mute")
+
+    assert response.status_code == 200
+    assert response.json()["muting"] is True
+
+
+def test_unmute_account_returns_relationship_with_muting_false(client):
+    response = client.post("/accounts/123/unmute")
+
+    assert response.status_code == 200
+    assert response.json()["muting"] is False
+
+
+def test_get_blocks_returns_empty_list(client):
+    assert client.get("/blocks").json() == []
+
+
+def test_get_mutes_returns_empty_list(client):
+    assert client.get("/mutes").json() == []
+
+
+def test_get_follow_requests_returns_empty_list(client):
+    assert client.get("/follow_requests").json() == []
+
+
+def test_authorize_follow_request_returns_relationship(client):
+    assert client.post("/follow_requests/123/authorize").status_code == 200
+
+
+def test_reject_follow_request_returns_relationship(client):
+    assert client.post("/follow_requests/123/reject").status_code == 200
+
