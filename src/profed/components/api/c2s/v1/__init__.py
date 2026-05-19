@@ -14,6 +14,7 @@ from .timelines import projection as timelines_projection
 from .timelines import router as timelines
 from .notifications import router as notifications
 from .lists         import router as lists
+from .media         import router as media
 from profed.components.api.c2s.shared.actors import storage as actors_storage
 from profed.components.api.c2s.shared.actors import projection as actors_projection
 from .accounts.following import storage as following_storage
@@ -62,7 +63,8 @@ async def init(config: dict, deactivate: List[str]) -> None:
                          "statuses": statuses,
                          "timelines": timelines,
                          "notifications": notifications,
-                         "lists": lists},
+                         "lists": lists,
+                         "media": media},
                         deactivate):
         r.init(config)
 
@@ -75,7 +77,8 @@ def mount_routers(parent, deactivate: List[str]) -> None:
                          "statuses": statuses,
                          "timelines": timelines,
                          "notifications": notifications,
-                         "lists": lists},
+                         "lists": lists,
+                         "media": media},
                         deactivate):
         if r.active:
             router.include_router(r.router)
