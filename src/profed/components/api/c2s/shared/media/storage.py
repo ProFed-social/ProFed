@@ -18,11 +18,17 @@ class _Storage(BaseStorage):
                                          content_type   TEXT    NOT NULL,
                                          size           INTEGER NOT NULL,
                                          uploader       TEXT    NOT NULL,
+                                         source_url     TEXT,
+                                         content_hash   TEXT,
+                                         last_modified  TEXT,
+                                         etag           TEXT,
                                          width          INTEGER,
                                          height         INTEGER,
                                          preview_width  INTEGER,
                                          preview_height INTEGER,
                                          description    TEXT)""")
+        await self.execute("""CREATE INDEX IF NOT EXISTS
+                              api_media_source_url ON api.media (source_url)""")
 
     async def insert(self,
                      file_id:        str,
@@ -31,6 +37,10 @@ class _Storage(BaseStorage):
                      content_type:   str,
                      size:           int,
                      uploader:       str,
+                     source_url:     str | None = None,
+                     content_hash:   str | None = None,
+                     last_modified:  str | None = None,
+                     etag:           str | None = None,
                      width:          int | None = None,
                      height:         int | None = None,
                      preview_width:  int | None = None,
@@ -42,11 +52,15 @@ class _Storage(BaseStorage):
                                        content_type,
                                        size,
                                        uploader,
+                                       source_url,
+                                       content_hash,
+                                       last_modified,
+                                       etag,
                                        width,
                                        height,
                                        preview_width,
                                        preview_height)
-                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                               ON CONFLICT (file_id) DO NOTHING""",
                            file_id,
                            url,
@@ -54,6 +68,10 @@ class _Storage(BaseStorage):
                            content_type,
                            size,
                            uploader,
+                           source_url,
+                           content_hash,
+                           last_modified,
+                           etag,
                            width,
                            height,
                            preview_width,
@@ -70,6 +88,12 @@ class _Storage(BaseStorage):
 
     async def delete(self, file_id: str) -> None:
         await self.execute("DELETE FROM api.media WHERE file_id = $1", file_id)
+
+    async def get_by_source_url(self, source_url: str) -> Optional[dict]:
+        return await self.fetch_one("""SELECT * FROM api.media
+                                       WHERE source_url = $1
+                                       ORDER BY file_id DESC LIMIT 1""",
+                                    source_url)
 
 
 _instance: _Storage | None = None
