@@ -7,6 +7,8 @@ from typing import List
 from profed.components.api.active_routers import narrow_deactivate_routers
 from profed.components.api.c2s.shared.known_accounts import storage as known_accounts_storage
 from profed.components.api.c2s.shared.known_accounts import projection as known_accounts_projection
+from profed.components.api.c2s.shared.media import storage as media_db_storage
+from profed.components.api.c2s.shared.media import projection as media_projection
 from . import oauth
 from . import v1, v2
 from .router import mount_routers
@@ -28,7 +30,12 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                _projection_initializer(known_accounts_storage,
                                                        known_accounts_projection,
                                                        known_accounts_projection.handle_events,
-                                                       "c2s_known_accounts"))]:
+                                                       "c2s_known_accounts")),
+                              (["v1_media", "v2_media"],
+                               _projection_initializer(media_db_storage,
+                                                       media_projection,
+                                                       media_projection.handle_events,
+                                                       "c2s_media"))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
     if "oauth" not in deactivate:

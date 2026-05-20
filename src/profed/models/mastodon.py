@@ -99,3 +99,24 @@ class StatusContext(BaseModel):
     ancestors:   list[Status] = []
     descendants: list[Status] = []
 
+
+class MediaAttachmentMeta(BaseModel):
+    width:  int | None = None
+    height: int | None = None
+
+
+class MediaAttachmentMetadata(BaseModel):
+    original: MediaAttachmentMeta | None = None
+    small:    MediaAttachmentMeta | None = None
+
+
+class MediaAttachment(BaseModel):
+    id:          str
+    type:        str = "image"
+    url:         str
+    preview_url: str | None = None
+    remote_url:  str | None = None
+    description: str | None = None
+    blurhash:    str | None = None
+    meta:        MediaAttachmentMetadata | None = None
+
