@@ -49,14 +49,13 @@ def validate_media_event(event) -> Tuple[Optional[str], Optional[Dict]]:
         logger.warning(_ignore(f"missing or invalid payload: {event!r}"))
         return None, None
 
-    if event_type == "uploaded":
-        return _validate_uploaded(payload)
+    def unknown_event_type(payload):
+        logger.warning(_ignore(f"unknown event type {event_type!r}"))
+        return None, None
 
-    if event_type == "deleted":
-        return _validate_deleted(payload)
-
-    logger.warning(_ignore(f"unknown event type {event_type!r}"))
-    return None, None
+    return ({"uploaded": _validate_uploaded,
+             "deleted": _validate_deleted}.get(event_type,
+                                               unknown_event_type))(payload)
 
 
 def validate_media_snapshot_item(item) -> Optional[Dict]:
