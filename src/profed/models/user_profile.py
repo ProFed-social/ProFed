@@ -12,5 +12,10 @@ class UserProfile(BaseModel):
     name: str | None = None
     summary: str | None = None
     resume: Resume | None = None
+    avatar_source_url: str | None = None
+    avatar_url: str | None = None
+    header_source_url: str | None = None
+    header_url: str | None = None
     public_key_pem: str | None = None
     private_key_pem: str | None = Field(default=None, exclude=True)
+
