@@ -2,19 +2,24 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+from datetime import datetime, timezone
 
 
 @pytest.mark.asyncio
 async def test_gap_detected_and_late_message_processed(topic, db):
     db.insert_message("public.test", {"v": "a"})
-    db.messages["public.test"].append({"id": 3, "payload": {"v": "c"}})
+    db.messages["public.test"].append({"id": 3,
+                                       "emitted_at": datetime.now(timezone.utc).isoformat(),
+                                       "payload": {"v": "c"}})
 
     subscriber = topic.subscribe("test")
 
     first = await subscriber.__anext__()
     assert first["v"] == "a"
 
-    db.messages["public.test"].append({"id": 2, "payload": {"v": "b"}})
+    db.messages["public.test"].append({"id": 2,
+                                       "emitted_at": datetime.now(timezone.utc).isoformat(),
+                                       "payload": {"v": "b"}})
 
     second = await subscriber.__anext__()
     third = await subscriber.__anext__()

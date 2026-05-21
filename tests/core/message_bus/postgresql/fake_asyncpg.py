@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import re
+from datetime import datetime, timezone
 from collections import defaultdict
 
 
@@ -145,7 +146,8 @@ class InMemoryDatabase:
         if message_id is None or message_id not in (m["message_id"] for m in table_messages):
             table_messages.append({"id": new_id,
                                    "payload": payload,
-                                   "message_id": message_id})
+                                   "message_id": message_id,
+                                   "emitted_at": datetime.now(timezone.utc)})
             return [{"id": new_id}]
         return None
 

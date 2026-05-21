@@ -27,7 +27,8 @@ async def init(config: Dict[str, str]):
                 CREATE TABLE IF NOT EXISTS {config['schema']}.{name} (
                     id         BIGSERIAL PRIMARY KEY,
                     payload    JSONB     NOT NULL,
-                    message_id UUID      UNIQUE
+                    message_id UUID      UNIQUE,
+                    emitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
             await conn.execute(f"""

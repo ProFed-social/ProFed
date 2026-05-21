@@ -22,12 +22,16 @@ class FakeTopic:
                   subscriber:str,
                   last_seen: int = 0,
                   include_sequence_id: bool = False,
+                  include_emitted_at:  bool = False,
                   caught_up=None):
         async def generator():
             for message in self.messages:
                 if message[0] > last_seen:
                     self.last_seen = message[0]
-                    yield (message[0], message[1]) if include_sequence_id else message[1]
+                    next_result = (((message[0],) if include_sequence_id else ()) +
+                                   ((None,)       if include_emitted_at  else ()) +
+                                   (message[1],))
+                    yield next_result if len(next_result) > 1 else next_result[0]
             if caught_up is not None:
                 caught_up.set()
         return generator()

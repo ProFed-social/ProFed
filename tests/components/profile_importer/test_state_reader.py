@@ -28,11 +28,15 @@ class FakeTopic:
                   subscriber: str,
                   last_seen: int = 0,
                   include_sequence_id: bool = False,
+                  include_emitted_at:  bool = False,
                   caught_up: asyncio.Event = None):
         async def generator():
             for seq, event in self.messages:
                 if seq > last_seen:
-                    yield event
+                    next_result = (((seq,)  if include_sequence_id else ()) +
+                                   ((None,) if include_emitted_at  else ()) +
+                                   (event,))
+                    yield next_result if len(next_result) > 1 else next_result[0]
             if caught_up is not None:
                 caught_up.set()
             await asyncio.sleep(10_000)  # cancelled by context exit

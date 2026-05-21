@@ -15,6 +15,7 @@ def subscribe(pool: Pool,
               subscriber: str,
               last_seen: int,
               include_sequence_id: bool = False,
+              include_emitted_at:  bool = False,
               caught_up: Optional[asyncio.Event] = None) \
         -> AsyncGenerator[Dict[str, Any], None]:
     min_wait = float(config.get("minimum_message_wait", MIN_WAIT))
@@ -55,7 +56,7 @@ def subscribe(pool: Pool,
 
     async def _fetch_new_messages(conn: Connection, last_seen: int):
         return await conn.fetch(f"""
-                                SELECT id, payload
+                                SELECT id, payload, emitted_at
                                 FROM {config['schema']}.{topic}
                                 WHERE id > $1
                                 ORDER BY id
@@ -71,7 +72,7 @@ def subscribe(pool: Pool,
                 if row["id"] != last_seen + 1:
                     break
                 last_seen = row["id"]
-                yield last_seen, row["payload"]
+                yield last_seen, row["emitted_at"], row["payload"]
             else:
                 continue
             break
@@ -127,10 +128,14 @@ def subscribe(pool: Pool,
 
                     message_event.clear()
                     processed = False
-                    async for seen, message in _process_messages(conn, last_seen):
-                        last_seen = seen
-                        processed = True
-                        yield message if not include_sequence_id else (seen, message)
+
+                    async for seen, emitted_at, message in _process_messages(conn, last_seen):
+                        last_seen   = seen
+                        processed   = True
+                        next_result = (((seen,)       if include_sequence_id else ()) +
+                                       ((emitted_at,) if include_emitted_at  else ()) +
+                                       (message,))
+                        yield next_result if len(next_result) > 1 else next_result[0]
 
                     if processed:
                         wait = min_wait

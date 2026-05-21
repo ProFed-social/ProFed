@@ -72,11 +72,15 @@ class FakeTopic:
                   subscriber,
                   last_seen=0,
                   include_sequence_id=False,
+                  include_emitted_at=False,
                   caught_up=None):
         async def generator():
             for seq, event in self.messages:
                 if seq > last_seen:
-                    yield event
+                    next_result = (((seq,)  if include_sequence_id else ()) +
+                                   ((None,) if include_emitted_at  else ()) +
+                                   (event,))
+                    yield next_result if len(next_result) > 1 else next_result[0]
             if caught_up is not None:
                 caught_up.set()
             await asyncio.sleep(10_000)
@@ -283,8 +287,6 @@ async def test_should_redownload_returns_true_when_head_request_fails():
  
     assert result is True
  
- 
-# ─── _download_and_store ──────────────────────────────────────────────────────
  
 @pytest.mark.asyncio
 async def test_download_and_store_returns_existing_url_when_hash_unchanged(fake_bus):

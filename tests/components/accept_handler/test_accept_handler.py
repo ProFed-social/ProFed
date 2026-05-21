@@ -30,11 +30,15 @@ class FakeTopic:
                   subscriber,
                   last_seen=0,
                   include_sequence_id=False,
+                  include_emitted_at=False,
                   caught_up=None):
         async def generator():
             for seq, event in self.messages:
                 if seq > last_seen:
-                    yield (seq, event) if include_sequence_id else event
+                    next_result = (((seq,)  if include_sequence_id else ()) +
+                                   ((None,) if include_emitted_at  else ()) +
+                                   (event,))
+                    yield next_result if len(next_result) > 1 else next_result[0]
             if caught_up is not None:
                 caught_up.set()
         return generator()

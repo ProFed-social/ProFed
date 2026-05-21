@@ -24,6 +24,7 @@ class Topic:
                   subscriber: str,
                   last_seen: int = 0,
                   include_sequence_id: bool = False,
+                  include_emitted_at:  bool = False,
                   caught_up: Optional[asyncio.Event] = None) -> AsyncGenerator[Dict[str, str], None]:
         return subscribe(self._pool,
                          self._config,
@@ -31,6 +32,7 @@ class Topic:
                          subscriber,
                          last_seen,
                          include_sequence_id,
+                         include_emitted_at,
                          caught_up)
 
     def last_snapshot(self):

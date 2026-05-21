@@ -12,7 +12,8 @@ def build_projection(topic: Dict,
                      on_message_type: Dict[str, Callable[[Dict], Awaitable[None]]],
                      on_snapshot_item: Callable[[Dict], Awaitable[None]],
                      verify_event: Optional[Callable[[str, Dict], bool]] = None,
-                     verify_snapshot_item: Optional[Callable[[Dict], bool]] = None) \
+                     verify_snapshot_item: Optional[Callable[[Dict], bool]] = None,
+                     with_emitted_at: bool = False) \
         -> Tuple[Callable[[], Awaitable[None]],
                  Callable[[], Awaitable[None]],
                  Callable[[int], None]]:
@@ -26,13 +27,19 @@ def build_projection(topic: Dict,
     topic_name = topic["name"]
 
     async def handle_events():
-        async for event in message_bus().topic(topic_name).subscribe(subscriber, last_seen):
+        async for emitted_at, event in message_bus().topic(topic_name).subscribe(subscriber,
+                                                                                 last_seen,
+                                                                                 include_emitted_at=True):
             event_type, payload = topic["validate"](event)
 
             if (event_type is not None and
                 event_type in on_message_type and
                 verify_event(event_type, payload)):
-                await on_message_type[event_type](payload)
+
+                    await on_message_type[event_type](*([payload] +
+                                                        ([emitted_at]
+                                                         if with_emitted_at else
+                                                         [])))
 
 
     async def rebuild():
@@ -49,18 +56,20 @@ def build_projection(topic: Dict,
         async def _drain():
             nonlocal last_seen
             try:
-                async for seq, event in \
-                        message_bus().topic(topic_name).subscribe(subscriber,
-                                                                  last_seen,
-                                                                  include_sequence_id=True,
-                                                                  caught_up=caught_up):
+                async for seq, emitted_at, event in message_bus().topic(topic_name).subscribe(subscriber,
+                                                                                              last_seen,
+                                                                                              include_sequence_id=True,
+                                                                                              include_emitted_at=True,
+                                                                                              caught_up=caught_up):
                     event_type, payload = topic["validate"](event)
                     if (event_type is not None and
                         event_type in on_message_type and
                         verify_event(event_type, payload)):
-                            await on_message_type[event_type](payload)
+                            await on_message_type[event_type](*([payload] +
+                                                                ([emitted_at]
+                                                                 if with_emitted_at else
+                                                                 [])))
                     last_seen = seq
-
                     if caught_up.is_set():
                         return
             except Exception:
