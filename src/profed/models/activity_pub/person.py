@@ -18,6 +18,8 @@ class Person(Actor):
     type: str = "Person"
     name: str | None = None
     summary: str | None = None
+    icon:  dict | None = None
+    image: dict | None = None
     inbox: str
     outbox: str
     resume: Resume | None = None
@@ -32,6 +34,10 @@ class Person(Actor):
                        "type":         "Key",
                        "owner":        actor_url,
                        "publicKeyPem": profile.public_key_pem})
+        icon  = ({"type": "Image", "url": profile.avatar_url}
+                 if getattr(profile, "avatar_url", None) else None)
+        image = ({"type": "Image", "url": profile.header_url}
+                 if getattr(profile, "header_url", None) else None)
         return cls(id=actor_url,
                    preferredUsername=profile.username,
                    name=profile.name,
@@ -39,5 +45,7 @@ class Person(Actor):
                    resume=profile.resume,
                    inbox=f"{actor_url}/inbox",
                    outbox=f"{actor_url}/outbox",
-                   publicKey=public_key)
+                   publicKey=public_key,
+                   icon=icon,
+                   image=image)
 
