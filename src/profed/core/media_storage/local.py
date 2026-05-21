@@ -65,7 +65,7 @@ class LocalFileStorage:
 
 
 async def init(config: dict) -> LocalFileStorage:
-    base_path = config.get("path",     "/var/lib/profed/media")
+    base_path = config.get("path", "/var/lib/profed/media")
     base_url  = config.get("base_url", "/media")
     return LocalFileStorage(base_path=base_path,
                             base_url= base_url)
