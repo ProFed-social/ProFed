@@ -1,7 +1,11 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.models.mastodon import Account, Relationship
+from profed.models.mastodon import (Account,
+                                    Relationship,
+                                    MediaAttachment,
+                                    MediaAttachmentMeta,
+                                    MediaAttachmentMetadata)
 
 
 def test_account_minimal():
@@ -57,4 +61,22 @@ def test_relationship_following():
     r = Relationship(id="123", following=True)
     assert r.following is True
     assert r.requested is False
+
+
+def test_media_attachment_minimal():
+    m = MediaAttachment(id="abc", url="https://example.com/media/ab/abc")
+
+    assert m.type == "image"
+    assert m.preview_url is None
+
+
+def test_media_attachment_with_meta():
+    m = MediaAttachment(id="abc",
+                        url="https://example.com/media/ab/abc",
+                        meta=MediaAttachmentMetadata(
+                            original=MediaAttachmentMeta(width=1280, height=720),
+                            small=MediaAttachmentMeta(width=400, height=225)))
+
+    assert m.meta.original.width == 1280
+    assert m.meta.small.height   == 225
 
