@@ -68,11 +68,19 @@ def normalize_mf2_to_profile(mf2_data: dict, username: str) -> Optional[UserProf
                       skills=[{"name": s} for s in (t for t in (_to_text(v) for v in rprops.get("skill", [])) if t is not None)],
                       projects=[e for e in (_normalize_entry(x) for x in rprops.get("project", [])) if e])
 
+    contact     = props.get("contact", [])
+    hcard_props = (contact[0].get("properties", {})
+                   if contact and isinstance(contact[0], dict)
+                   else {})
+
     return UserProfile(username=username,
                        name=name,
                        summary=_to_text(_first(props.get("summary", []) or props.get("note", []))),
                        resume=to_resume(h_resume),
-                       avatar_source_url=_to_url(_first(props.get("photo", []))),
-                       header_source_url=_to_url(_first(props.get("featured", []))) or
-                                         _to_url(_first(props.get("x-header", []))))
+                       avatar_source_url=_to_url(_first(props.get("photo", []))) or
+                                         _to_url(_first(hcard_props.get("photo", []))),
+                       header_source_url=_to_url(_first(props.get("featured",  []))) or
+                                         _to_url(_first(hcard_props.get("featured",  []))) or
+                                         _to_url(_first(props.get("x-header",  []))) or
+                                         _to_url(_first(hcard_props.get("x-header",  []))))
 
