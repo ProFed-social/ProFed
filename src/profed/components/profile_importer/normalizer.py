@@ -16,7 +16,15 @@ def _to_text(value: Any) -> Optional[str]:
         raw = value.get("value") or value.get("html", "")
         return raw.strip() or None
     return None
- 
+
+
+def _to_url(value: Any) -> Optional[str]:
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, dict):
+        return value.get("value") or value.get("url")
+    return None
+
  
 def _normalize_entry(item: Any) -> dict:
     if isinstance(item, str):
@@ -41,23 +49,30 @@ def normalize_mf2_to_profile(mf2_data: dict, username: str) -> Optional[UserProf
     items = mf2_data.get("items", [])
     if not items:
         return None
+
     h_resume = next((i for i in items if "h-resume" in i.get("type", [])), None)
-    h_card   = next((i for i in items if "h-card"   in i.get("type", [])), None)
-    primary = h_resume or h_card
+    primary = h_resume or next((i for i in items if "h-card" in i.get("type", [])), None)
     if primary is None:
         return None
+
     props   = primary.get("properties", {})
     name    = _to_text(_first(props.get("name", [])))
-    summary = _to_text(_first(props.get("summary", []) or props.get("note", [])))
-    resume: Optional[Resume] = None
-    if h_resume is not None:
+
+    def to_resume(h_resume):
+        if h_resume is None:
+            return None
+
         rprops = h_resume.get("properties", {})
-        resume = Resume(experience=[e for e in (_normalize_entry(x) for x in rprops.get("experience", [])) if e],
-                        education =[e for e in (_normalize_entry(x) for x in rprops.get("education",  [])) if e],
-                        skills    =[{"name": s}
-                                    for s in (t
-                                              for t in (_to_text(v) for v in rprops.get("skill", []))
-                                              if t is not None)],
-                        projects  =[e for e in (_normalize_entry(x) for x in rprops.get("project", [])) if e])
-    return UserProfile(username=username, name=name, summary=summary, resume=resume)
+        return Resume(experience=[e for e in (_normalize_entry(x) for x in rprops.get("experience", [])) if e],
+                      education=[e for e in (_normalize_entry(x) for x in rprops.get("education",  [])) if e],
+                      skills=[{"name": s} for s in (t for t in (_to_text(v) for v in rprops.get("skill", [])) if t is not None)],
+                      projects=[e for e in (_normalize_entry(x) for x in rprops.get("project", [])) if e])
+
+    return UserProfile(username=username,
+                       name=name,
+                       summary=_to_text(_first(props.get("summary", []) or props.get("note", []))),
+                       resume=to_resume(h_resume),
+                       avatar_source_url=_to_url(_first(props.get("photo", []))),
+                       header_source_url=_to_url(_first(props.get("featured", []))) or
+                                         _to_url(_first(props.get("x-header", []))))
 
