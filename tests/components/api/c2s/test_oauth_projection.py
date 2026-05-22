@@ -6,16 +6,6 @@ import pytest
 from profed.core import message_bus
 from profed.components.api.c2s.oauth import projection
  
-from _fakes import FakeMessageBus
-
- 
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
- 
  
 APP = {"client_id":     "abc123",
        "client_secret": "secret",

@@ -7,60 +7,9 @@ import pytest
 from profed.core import message_bus
 from profed.components.profile_importer import state_reader
 
-class FakeLastSnapshot:
-    def __init__(self, event_id=0, items=None):
-        self._event_id = event_id
-        self._items = items or []
- 
-    async def __call__(self):
-        return self._event_id, self._items
- 
- 
-class FakeTopic:
-    def __init__(self):
-        self.messages = []
-        self._last_snapshot = FakeLastSnapshot()
- 
-    def last_snapshot(self):
-        return self._last_snapshot()
- 
-    def subscribe(self,
-                  subscriber: str,
-                  last_seen: int = 0,
-                  include_sequence_id: bool = False,
-                  include_emitted_at:  bool = False,
-                  caught_up: asyncio.Event = None):
-        async def generator():
-            for seq, event in self.messages:
-                if seq > last_seen:
-                    next_result = (((seq,)  if include_sequence_id else ()) +
-                                   ((None,) if include_emitted_at  else ()) +
-                                   (event,))
-                    yield next_result if len(next_result) > 1 else next_result[0]
-            if caught_up is not None:
-                caught_up.set()
-            await asyncio.sleep(10_000)  # cancelled by context exit
-        return generator()
- 
- 
-class FakeMessageBus:
-    def __init__(self):
-        self._topics = {}
- 
-    def topic(self, name: str):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
- 
- 
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
- 
- 
+from _fakes import FakeLastSnapshot
+
+
 def _users(fake_bus):
     return fake_bus.topic("users")
 
@@ -140,12 +89,13 @@ async def test_malformed_event_is_ignored(fake_bus):
 
 @pytest.mark.asyncio
 async def test_snapshot_state_is_applied(fake_bus):
-    _users(fake_bus)._last_snapshot = FakeLastSnapshot(event_id=5,
-                                                       items=[{"username": "alice",
-                                                               "name": "Alice From Snapshot"}])
+    _users(fake_bus).snapshots = [await FakeLastSnapshot(event_id=5,
+                                                         items=[{"username": "alice",
+                                                                 "name": "Alice From Snapshot"}])()]
     async with state_reader.reading_state("alice") as (get_state, caught_up):
         await caught_up.wait()
         profile = get_state()
+    print(profile)
     assert profile.name == "Alice From Snapshot"
  
  

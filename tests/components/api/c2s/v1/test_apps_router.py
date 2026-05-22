@@ -6,17 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core import message_bus
 from profed.components.api.c2s.v1.apps.router import router
- 
-from _fakes import FakeMessageBus
 
- 
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
- 
  
 @pytest.fixture
 def client(fake_bus):

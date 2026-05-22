@@ -7,16 +7,6 @@ from profed.core import message_bus
 from profed.components.accept_handler import handler
 import profed.components.accept_handler.storage as storage_module
 
-from _fakes import FakeMessageBus
-
-
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
-
 
 @pytest.fixture
 def fake_storage():

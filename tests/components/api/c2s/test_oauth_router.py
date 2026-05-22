@@ -10,8 +10,6 @@ from fastapi.testclient import TestClient
 from profed.core import message_bus
 from profed.components.api.c2s.oauth import router as oauth_router_module
 from profed.components.api.c2s.oauth import projection
- 
-from _fakes import FakeMessageBus
 
  
 CONFIG = {"oidc_issuer":      "https://cloud.example.com/",
@@ -25,15 +23,7 @@ APP = {"client_id":     "abc123",
        "redirect_uris": "https://app.example.com/callback",
        "scopes":        "read write"}
  
- 
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
- 
- 
+
 @pytest.fixture
 def client(fake_bus):
     oauth_router_module.init(CONFIG)

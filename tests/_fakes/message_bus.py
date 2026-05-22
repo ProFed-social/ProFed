@@ -17,6 +17,10 @@ class FakePublishContext:
 
     async def __aenter__(self):
         async def _publish(event, message_id=None):
+            if message_id is not None:
+                if message_id in self._topic._published_ids:
+                    return
+                self._topic._published_ids.add(message_id)
             seq = len(self._topic.messages) + 1
             self._topic.messages.append((seq, event))
             self._topic.published.append(event)
@@ -32,6 +36,7 @@ class FakeTopic:
         self.published = []
         self.snapshots = []
         self.last_seen = 0
+        self._published_ids = set()
 
     async def last_snapshot(self):
         return self.snapshots[-1] if self.snapshots else (0, [])

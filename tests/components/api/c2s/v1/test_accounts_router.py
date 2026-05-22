@@ -82,6 +82,7 @@ ROW = {"account_id": 123456,
        "actor_url":  "https://remote.example/actors/bob",
        "actor_data": {"type": "Person", "name": "Bob"}}
 
+
 def test_follow_by_numeric_id_publishes_events(client):
     fake_bus = FakeMessageBus()
 

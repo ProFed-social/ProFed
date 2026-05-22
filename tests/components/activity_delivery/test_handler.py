@@ -14,8 +14,6 @@ from profed.core import message_bus
 from profed.components.activity_delivery import handler, delivery
 from profed.components.activity_delivery import storage as storage_module
 
-from _fakes import FakeMessageBus
-
 
 class FakeStorage:
     async def get_followers(self, following): return {"bob@remote.example"}
@@ -39,14 +37,6 @@ class Cfg:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
             raise exc_val
-
-
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
 
 
 @pytest.fixture

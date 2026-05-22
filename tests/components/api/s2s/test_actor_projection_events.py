@@ -8,19 +8,6 @@ from profed.core import message_bus
 from profed.components.api.s2s.actor import storage
 from profed.components.api.s2s.actor import projection
 
-from _fakes import FakeMessageBus
-
-
-@pytest.fixture
-def fake_message_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    projection.reset_last_seen(0)
-
-    yield message_bus._instance
-
-    message_bus._instance = backup
-
 
 @pytest.fixture
 def fake_storage():
@@ -55,7 +42,7 @@ def with_events(events):
                    "name": "Alice",
                    "summary": "Engineer",
                    "resume": {"experience": []}}}])
-async def test_handle_user_events_created(fake_storage, fake_message_bus):
+async def test_handle_user_events_created(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.add.assert_awaited_once()
@@ -70,7 +57,7 @@ async def test_handle_user_events_created(fake_storage, fake_message_bus):
                    "name": "Alice Updated",
                    "summary": "Architect",
                    "resume": {"experience": []}}}])
-async def test_handle_user_events_updated(fake_storage, fake_message_bus):
+async def test_handle_user_events_updated(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.update.assert_awaited_once()
@@ -81,7 +68,7 @@ async def test_handle_user_events_updated(fake_storage, fake_message_bus):
 @pytest.mark.asyncio
 @with_events([{"type": "deleted",
                "payload": {"username": "alice"}}])
-async def test_handle_user_events_deleted(fake_storage, fake_message_bus):
+async def test_handle_user_events_deleted(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.delete.assert_awaited_once()
@@ -92,7 +79,7 @@ async def test_handle_user_events_deleted(fake_storage, fake_message_bus):
 @pytest.mark.asyncio
 @with_events([{"type": "unknown",
                "payload": {"username": "alice"}}])
-async def test_handle_user_events_ignores_unknown_type(fake_storage, fake_message_bus):
+async def test_handle_user_events_ignores_unknown_type(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.add.assert_not_awaited()
@@ -109,7 +96,7 @@ async def test_handle_user_events_ignores_unknown_type(fake_storage, fake_messag
                "payload": {"username": "new",
                            "name": "New User",
                            "resume": {"experience": []}}}])
-async def test_handle_user_events_skips_messages_before_last_seen(fake_storage, fake_message_bus):
+async def test_handle_user_events_skips_messages_before_last_seen(fake_storage, fake_bus):
     projection.reset_last_seen(2)
     await projection.handle_user_events()
 
@@ -118,7 +105,7 @@ async def test_handle_user_events_skips_messages_before_last_seen(fake_storage, 
 
 @pytest.mark.asyncio
 @with_events([{"type": "created"}])
-async def test_handle_user_events_missing_payload(fake_storage, fake_message_bus):
+async def test_handle_user_events_missing_payload(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.add.assert_not_awaited()
@@ -132,7 +119,7 @@ async def test_handle_user_events_missing_payload(fake_storage, fake_message_bus
                "payload": {
                   # missing username
                   "name": "Alice"}}])
-async def test_handle_user_events_malformed_payload_raises(fake_storage, fake_message_bus):
+async def test_handle_user_events_malformed_payload_raises(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.add.assert_not_awaited()

@@ -6,16 +6,6 @@ from unittest.mock import AsyncMock, patch
 from profed.core import message_bus
 from profed.components.follow_handler import handler
  
-from _fakes import FakeMessageBus
-
- 
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
- 
  
 FOLLOW_ACTIVITY = {"id": "https://mastodon.social/alice#follows/1",
                    "type": "Follow",

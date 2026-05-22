@@ -8,42 +8,6 @@ from profed.components.api.s2s.inbox import storage as storage_module
 from profed.components.api.s2s.inbox.service import accept_inbox_activity
 
 
-class FakePublishContext:
-    def __init__(self): self.published = []
-
-    async def __aenter__(self):
-        async def pub(msg, **_): self.published.append(msg)
-        return pub
-
-    async def __aexit__(self, *_): pass
-
-
-class FakeTopic:
-    def __init__(self): self._ctx = FakePublishContext()
-
-    def publish(self): return self._ctx
-
-    @property
-    def published(self): return self._ctx.published
-
-
-class FakeMessageBus:
-    def __init__(self): self._topics = {}
-
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
-
-
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
-
-
 @pytest.fixture
 def fake_storage():
     instance = Mock()

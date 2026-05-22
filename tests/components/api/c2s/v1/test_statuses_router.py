@@ -9,18 +9,8 @@ from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.auth import current_user
 
-from _fakes import FakeMessageBus
-
  
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
- 
- 
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
  
  
 @pytest.fixture

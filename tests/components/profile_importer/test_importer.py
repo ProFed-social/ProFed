@@ -12,8 +12,6 @@ from profed.core import message_bus
 from profed.components.profile_importer import importer
 from profed.core.media_storage import StoredFile
 from profed.models.user_profile import UserProfile
- 
-from _fakes import FakeMessageBus
 
  
 IMAGE_BYTES = b"\xff\xd8\xff\xe0test"
@@ -37,14 +35,6 @@ def _fake_http_client(headers=None, content=b"", status_code=200):
 
     return client
 
-
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
- 
  
 def _users(fake_bus):
     return fake_bus.topic("users")

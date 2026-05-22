@@ -8,19 +8,6 @@ from profed.core import message_bus
 from profed.components.api.s2s.outbox import storage
 from profed.components.api.s2s.outbox import projection
 
-from _fakes import FakeMessageBus
-
-
-@pytest.fixture
-def fake_message_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    projection.reset_last_seen(0)
-
-    yield message_bus._instance
-
-    message_bus._instance = backup
-
 
 @pytest.fixture
 def fake_storage():
@@ -32,6 +19,11 @@ def fake_storage():
     yield storage._instance
 
     storage._instance = backup
+
+
+@pytest.fixture(autouse=True)
+def reset_projection():
+    projection.reset_last_seen(0)
 
 
 def with_activities(activities):
@@ -61,7 +53,7 @@ def with_snapshots(snapshots):
                     "type": "created",
                     "actor": "https://example.com/actors/alice",
                     "object": {"id": "https://example.com/actors/alice"}}])])
-async def test_rebuild_success(fake_storage, fake_message_bus):
+async def test_rebuild_success(fake_storage, fake_bus):
     await projection.rebuild()
 
     fake_storage.ensure_schema.assert_awaited_once()
@@ -74,7 +66,7 @@ async def test_rebuild_success(fake_storage, fake_message_bus):
 
 @pytest.mark.asyncio
 @with_snapshots([(0, [])])
-async def test_rebuild_no_snapshot(fake_storage, fake_message_bus):
+async def test_rebuild_no_snapshot(fake_storage, fake_bus):
     await projection.rebuild()
 
     fake_storage.ensure_schema.assert_awaited_once()
@@ -87,7 +79,7 @@ async def test_rebuild_no_snapshot(fake_storage, fake_message_bus):
                     "type": "created",
                     "actor": "https://example.com/actors/alice",
                     "object": {"id": "https://example.com/actors/alice"}}])])
-async def test_rebuild_add_failure(fake_storage, fake_message_bus):
+async def test_rebuild_add_failure(fake_storage, fake_bus):
     fake_storage.add.side_effect = RuntimeError("DB error")
 
     with pytest.raises(RuntimeError, match="DB error"):
@@ -104,7 +96,7 @@ async def test_rebuild_add_failure(fake_storage, fake_message_bus):
                     "type": "Update",
                     "actor": "https://example.com/actors/alice",
                     "object": {"id": "https://example.com/actors/alice"}}])])
-async def test_rebuild_multiple_activities(fake_storage, fake_message_bus):
+async def test_rebuild_multiple_activities(fake_storage, fake_bus):
     await projection.rebuild()
 
     assert fake_storage.add.await_count == 2
@@ -115,7 +107,7 @@ async def test_rebuild_multiple_activities(fake_storage, fake_message_bus):
                   [{"type": "created",
                     "actor": "https://example.com/actors/alice",
                     "object": {"id": "https://example.com/actors/alice"}}])])
-async def test_rebuild_invalid_snapshot_item(fake_storage, fake_message_bus):
+async def test_rebuild_invalid_snapshot_item(fake_storage, fake_bus):
     await projection.rebuild()
 
     fake_storage.add.assert_not_awaited()
@@ -138,7 +130,7 @@ async def test_rebuild_invalid_snapshot_item(fake_storage, fake_message_bus):
                     "type": "created",
                     "actor": "https://example.com/actors/bob",
                     "object": {"id": "https://example.com/actors/bob"}}])])
-async def test_rebuild_multiple_items_some_malformed(fake_storage, fake_message_bus):
+async def test_rebuild_multiple_items_some_malformed(fake_storage, fake_bus):
     await projection.rebuild()
 
     assert fake_storage.add.await_count == 2
@@ -150,7 +142,7 @@ async def test_rebuild_multiple_items_some_malformed(fake_storage, fake_message_
                                "type": "created",
                                "actor": "https://example.com/actors/alice",
                                "object": {"id": "https://example.com/actors/alice"}}}])
-async def test_handle_user_events_created(fake_storage, fake_message_bus):
+async def test_handle_user_events_created(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.add.assert_awaited_once_with("alice",
@@ -166,7 +158,7 @@ async def test_handle_user_events_created(fake_storage, fake_message_bus):
                                "type": "Update",
                                "actor": "https://example.com/actors/alice",
                                "object": {"id": "https://example.com/actors/alice"}}}])
-async def test_handle_user_events_ignores_unknown_event_type(fake_storage, fake_message_bus):
+async def test_handle_user_events_ignores_unknown_event_type(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.add.assert_not_awaited()
@@ -177,7 +169,7 @@ async def test_handle_user_events_ignores_unknown_event_type(fake_storage, fake_
                    "payload": {"type": "created",
                                "actor": "https://example.com/actors/alice",
                                "object": {"id": "https://example.com/actors/alice"}}}])
-async def test_handle_user_events_ignores_malformed_event(fake_storage, fake_message_bus):
+async def test_handle_user_events_ignores_malformed_event(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.add.assert_not_awaited()
@@ -193,7 +185,7 @@ async def test_handle_user_events_ignores_malformed_event(fake_storage, fake_mes
                                "type": "created",
                                "actor": "https://example.com/actors/alice",
                                "object": {"id": "https://example.com/actors/alice"}}}])
-async def test_handle_user_events_continues_after_malformed_event(fake_storage, fake_message_bus):
+async def test_handle_user_events_continues_after_malformed_event(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     fake_storage.add.assert_awaited_once_with("alice",

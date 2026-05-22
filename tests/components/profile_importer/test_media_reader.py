@@ -6,62 +6,7 @@ import pytest
 from profed.core import message_bus
 from profed.components.profile_importer import media_reader
 
-
-class FakeLastSnapshot:
-    def __init__(self, event_id=0, items=None):
-        self._event_id = event_id
-        self._items    = items or []
-
-    async def __call__(self):
-        return self._event_id, self._items
-
-
-class FakeTopic:
-    def __init__(self):
-        self.messages      = []
-        self._last_snapshot = FakeLastSnapshot()
-
-    def last_snapshot(self):
-        return self._last_snapshot()
-
-    def subscribe(self,
-                  subscriber,
-                  last_seen=0,
-                  include_sequence_id=False,
-                  include_emitted_at=False,
-                  caught_up=None):
-        async def generator():
-            for seq, event in self.messages:
-                if seq > last_seen:
-                    next_result = (((seq,)  if include_sequence_id else ()) +
-                                   ((None,) if include_emitted_at  else ()) +
-                                   (event,))
-                    yield next_result if len(next_result) > 1 else next_result[0]
-            if caught_up is not None:
-                caught_up.set()
-            await asyncio.sleep(10_000)
-        return generator()
-
-
-class FakeMessageBus:
-    def __init__(self):
-        self._topics = {}
-
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
-
-
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-
-    yield message_bus._instance
-
-    message_bus._instance = backup
-
+from _fakes import FakeLastSnapshot
 
 def _media(fake_bus):
     return fake_bus.topic("media")
@@ -129,11 +74,10 @@ async def test_reading_media_state_deleted_event_removes_entry(fake_bus):
 
 @pytest.mark.asyncio
 async def test_reading_media_state_snapshot_is_applied(fake_bus):
-    _media(fake_bus)._last_snapshot = FakeLastSnapshot(
-        event_id=5,
-        items=[{"file_id":    "snap",
-                "url":        "https://cdn.example.com/ab/snap",
-                "source_url": "https://example.com/photo.jpg"}])
+    _media(fake_bus).snapshots = [await FakeLastSnapshot(event_id=5,
+                                                         items=[{"file_id":    "snap",
+                                                                 "url":        "https://cdn.example.com/ab/snap",
+                                                                 "source_url": "https://example.com/photo.jpg"}])()]
     urls = frozenset(["https://example.com/photo.jpg"])
 
     async with media_reader.reading_media_state(urls) as (state, caught_up):

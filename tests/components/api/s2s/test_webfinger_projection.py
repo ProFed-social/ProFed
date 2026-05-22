@@ -9,19 +9,6 @@ from profed.core import message_bus
 from profed.components.api.s2s.webfinger import storage
 from profed.components.api.s2s.webfinger.projection import rebuild, reset_last_seen
 
-from _fakes import FakeMessageBus
-
-
-@pytest.fixture
-def fake_message_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    reset_last_seen(0)
-
-    yield message_bus._instance
-
-    message_bus._instance = backup
-
 
 @pytest.fixture
 def fake_storage():
@@ -37,8 +24,8 @@ def fake_storage():
 
 
 @pytest.mark.asyncio
-async def test_rebuild_success(fake_message_bus, fake_storage):
-    fake_message_bus.topic("users").snapshots = [
+async def test_rebuild_success(fake_bus, fake_storage):
+    fake_bus.topic("users").snapshots = [
                 (42, [{"username": "alice"}])
             ]
     await rebuild()
@@ -46,15 +33,15 @@ async def test_rebuild_success(fake_message_bus, fake_storage):
 
 
 @pytest.mark.asyncio
-async def test_rebuild_no_snapshot(fake_message_bus, fake_storage):
-    fake_message_bus.topic("users").snapshots = [(None, [])]
+async def test_rebuild_no_snapshot(fake_bus, fake_storage):
+    fake_bus.topic("users").snapshots = [(None, [])]
     await rebuild()
     fake_storage.add.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_rebuild_add_failure(fake_message_bus, fake_storage):
-    fake_message_bus.topic("users").snapshots = [
+async def test_rebuild_add_failure(fake_bus, fake_storage):
+    fake_bus.topic("users").snapshots = [
                 (42, [{"username": "alice"}])
             ]
     fake_storage.add.side_effect = RuntimeError("DB error")
@@ -64,8 +51,8 @@ async def test_rebuild_add_failure(fake_message_bus, fake_storage):
 
 
 @pytest.mark.asyncio
-async def test_projection_multiple_users(fake_message_bus, fake_storage):
-    fake_message_bus.topic("users").snapshots = [
+async def test_projection_multiple_users(fake_bus, fake_storage):
+    fake_bus.topic("users").snapshots = [
                 (10, [{"username": "alice"},
                       {"username": "bob"}])
             ]
@@ -74,8 +61,8 @@ async def test_projection_multiple_users(fake_message_bus, fake_storage):
 
 
 @pytest.mark.asyncio
-async def test_projection_invalid_payload(fake_message_bus, fake_storage):
-    fake_message_bus.topic("users").snapshots = [
+async def test_projection_invalid_payload(fake_bus, fake_storage):
+    fake_bus.topic("users").snapshots = [
             (5, [{"no_username": "alice"}])
             ]
     await rebuild()
@@ -83,8 +70,8 @@ async def test_projection_invalid_payload(fake_message_bus, fake_storage):
 
 
 @pytest.mark.asyncio
-async def test_projection_multiple_users_some_malformed(fake_message_bus, fake_storage):
-    fake_message_bus.topic("users").snapshots = [
+async def test_projection_multiple_users_some_malformed(fake_bus, fake_storage):
+    fake_bus.topic("users").snapshots = [
             (10,
              [{"username": "alice"},
               {"username": 42},

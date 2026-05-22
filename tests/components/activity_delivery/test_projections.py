@@ -9,16 +9,7 @@ from datetime import datetime, timezone
 from profed.core import message_bus
 from profed.components.activity_delivery import projections
 from profed.components.activity_delivery import storage as storage_module
- 
-from _fakes import FakeMessageBus
 
- 
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
  
 class FakeStorage:
     def __init__(self):
