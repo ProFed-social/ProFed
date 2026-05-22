@@ -9,44 +9,7 @@ from profed.core import message_bus
 from profed.components.api.s2s.inbox import storage
 from profed.components.api.s2s.inbox.projection import rebuild, reset_last_seen
 
-
-class FakeTopic:
-    def __init__(self):
-        self.last_seen = 0
-        self.snapshots = []
-        self.messages = []
-
-    async def last_snapshot(self):
-        return self.snapshots[-1] if len(self.snapshots) > 0 else (0, [])
-
-    def subscribe(self,
-                  subscriber:str,
-                  last_seen: int = 0,
-                  include_sequence_id: bool = False,
-                  include_emitted_at:  bool = False,
-                  caught_up=None):
-        async def generator():
-            for message in self.messages:
-                if message[0] > last_seen:
-                    self.last_seen = message[0]
-                    next_result = (((message[0],) if include_sequence_id else ()) +
-                                   ((None,)       if include_emitted_at  else ()) +
-                                   (message[1],))
-                    yield next_result if len(next_result) > 1 else next_result[0]
-            if caught_up is not None:
-                caught_up.set()
-
-        return generator()
-
-
-class FakeMessageBus:
-    def __init__(self):
-        self._topics = {}
-
-    def topic(self, name: str):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
+from _fakes import FakeMessageBus
 
 
 @pytest.fixture

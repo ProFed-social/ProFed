@@ -10,6 +10,15 @@ from profed.core import message_bus
 from profed.components.activity_delivery import projections
 from profed.components.activity_delivery import storage as storage_module
  
+from _fakes import FakeMessageBus
+
+ 
+@pytest.fixture
+def fake_bus():
+    backup = message_bus._instance
+    message_bus._instance = FakeMessageBus()
+    yield message_bus._instance
+    message_bus._instance = backup
  
 class FakeStorage:
     def __init__(self):
@@ -24,7 +33,7 @@ class FakeStorage:
     async def remove_follower(self, following, follower):
         self.followers.pop((following, follower), None)
  
-    async def get_followers(self, following):
+    async def get_followers(self, following): 
         return {f for (fw, f) in self.followers if fw == following}
  
     async def upsert_delivery(self, payload):
@@ -35,47 +44,6 @@ class FakeStorage:
  
     async def get_delivery_status(self, activity_id, recipient):
         return self.deliveries.get((activity_id, recipient))
- 
- 
-class FakeTopic:
-    def __init__(self):
-        self.messages = []
- 
-    async def last_snapshot(self):
-        return 0, []
-
-    def subscribe(self,
-                  subscriber,
-                  last_seen=0,
-                  include_sequence_id=False,
-                  include_emitted_at=False,
-                  caught_up=None):
-        async def generator():
-            for seq, event in self.messages:
-                if seq > last_seen:
-                    next_result = (((seq,)  if include_sequence_id else ()) +
-                                   ((None,) if include_emitted_at  else ()) +
-                                   (event,))
-                    yield next_result if len(next_result) > 1 else next_result[0]
-            if caught_up is not None:
-                caught_up.set()
-        return generator()
- 
- 
-class FakeMessageBus:
-    def __init__(self): self._topics = {}
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
- 
- 
-@pytest.fixture
-def fake_bus():
-    backup = message_bus._instance
-    message_bus._instance = FakeMessageBus()
-    yield message_bus._instance
-    message_bus._instance = backup
  
  
 @pytest.fixture

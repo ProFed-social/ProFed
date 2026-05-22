@@ -11,6 +11,8 @@ from profed.components.api.c2s.v2.media import router as media_module
 from profed.components.api.c2s.shared.auth import current_user
 from profed.core.media_storage import StoredFile
 
+from _fakes import FakeMessageBus
+
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
 UPLOADER = "alice@test.example"
@@ -20,24 +22,6 @@ def make_jpeg(width: int = 100, height: int = 80) -> bytes:
     buf = io.BytesIO()
     Image.new("RGB", (width, height), color=(128, 64, 32)).save(buf, format="JPEG")
     return buf.getvalue()
-
-
-class FakePublishContext:
-    def __init__(self): self.published = []
-    async def __aenter__(self):
-        async def publish(msg): self.published.append(msg)
-        return publish
-    async def __aexit__(self, *_): pass
-
-
-class FakeTopic:
-    def __init__(self): self._ctx = FakePublishContext()
-    def publish(self): return self._ctx
-
-
-class FakeBus:
-    def __init__(self): self._media = FakeTopic()
-    def topic(self, name): return self._media
 
 
 class FakeStorage:
@@ -59,7 +43,7 @@ def client():
 
 @pytest.fixture(autouse=True)
 def mocks():
-    bus     = FakeBus()
+    bus     = FakeMessageBus()
     storage = FakeStorage()
     with patch("profed.components.api.c2s.shared.media.upload.message_bus", return_value=bus), \
          patch("profed.components.api.c2s.shared.media.upload.media_storage", return_value=storage), \
@@ -83,7 +67,7 @@ def test_upload_publishes_event(client, mocks):
     bus, _ = mocks
     client.post("/media", files={"file": ("photo.jpg", make_jpeg(), "image/jpeg")})
 
-    published = bus.topic("media")._ctx.published
+    published = bus.topic("media").published
     assert len(published) == 1
     assert published[0]["type"] == "uploaded"
     assert published[0]["payload"]["content_type"] == "image/jpeg"

@@ -11,6 +11,9 @@ from profed.core.config import config, raw
 from profed.components.api.c2s.v1.accounts import router as accounts_module
 from profed.components.api.c2s.shared.auth import current_user 
  
+from _fakes import FakeMessageBus
+
+
 class Cfg:
     def __init__(self, cfg):
         raw.paths = []
@@ -43,35 +46,6 @@ def client():
     app.include_router(accounts_module.router)
     app.dependency_overrides[current_user] = lambda: CLAIMS
     return TestClient(app)
- 
-
-class FakePublishContext:
-    def __init__(self):
-        self.published = []
-
-    async def __aenter__(self):
-        async def publish(msg): self.published.append(msg)
-        return publish
-
-    async def __aexit__(self, *_): pass
-
-
-class FakeTopic:
-    def __init__(self):
-        self._ctx = FakePublishContext()
-
-    def publish(self):
-        return self._ctx
-
-
-class FakeMessageBus:
-    def __init__(self):
-        self._topics = {}
-
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
  
 
 def test_verify_credentials_returns_account(client):
@@ -121,12 +95,12 @@ def test_follow_by_numeric_id_publishes_events(client):
     assert response.status_code == 200
     data = response.json()
     assert data["requested"] is True
-    known_accounts_events = fake_bus.topic("known_accounts")._ctx.published
+    known_accounts_events = fake_bus.topic("known_accounts").published
     assert len(known_accounts_events) == 1
     assert known_accounts_events[0]["type"] == "follow_requested"
     assert known_accounts_events[0]["payload"]["account_id"] == 123456
     assert known_accounts_events[0]["payload"]["following_user"] == "alice"
-    activities_events = fake_bus.topic("activities")._ctx.published
+    activities_events = fake_bus.topic("activities").published
     assert len(activities_events) == 1
     assert activities_events[0]["payload"]["type"] == "Follow"
     assert activities_events[0]["payload"]["object"] == ROW["actor_url"]
@@ -209,12 +183,12 @@ def test_follow_publishes_follow_activity_id_in_known_accounts_event(client):
             response = client.post("/accounts/123456/follow")
 
     assert response.status_code == 200
-    known_accounts_events = fake_bus.topic("known_accounts")._ctx.published
+    known_accounts_events = fake_bus.topic("known_accounts").published
     payload = known_accounts_events[0]["payload"]
     assert "follow_activity_id" in payload
     follow_id = payload["follow_activity_id"]
     assert follow_id.startswith("https://example.com/actors/alice#follows/")
-    activities_events = fake_bus.topic("activities")._ctx.published
+    activities_events = fake_bus.topic("activities").published
     assert activities_events[0]["payload"]["id"] == follow_id
 
 
@@ -245,7 +219,7 @@ def test_unfollow_publishes_known_accounts_event(client):
 
     assert response.status_code == 200
     assert response.json() == {"id": "123456", "following": False, "requested": False}
-    events = fake_bus.topic("known_accounts")._ctx.published
+    events = fake_bus.topic("known_accounts").published
     assert len(events) == 1
     assert events[0]["type"] == "unfollow"
     assert events[0]["payload"]["account_id"]    == 123456
@@ -265,7 +239,7 @@ def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
             response = client.post("/accounts/123456/unfollow")
 
     assert response.status_code == 200
-    events = fake_bus.topic("activities")._ctx.published
+    events = fake_bus.topic("activities").published
     assert len(events) == 1
     payload = events[0]["payload"]
     assert payload["type"]  == "Undo"
@@ -291,7 +265,7 @@ def test_unfollow_without_follow_activity_id_uses_fallback_id(client):
             response = client.post("/accounts/123456/unfollow")
 
     assert response.status_code == 200
-    events = fake_bus.topic("activities")._ctx.published
+    events = fake_bus.topic("activities").published
     assert len(events) == 1
     assert events[0]["payload"]["object"]["id"].endswith("#follows/123456")
 

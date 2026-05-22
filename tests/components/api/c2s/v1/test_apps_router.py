@@ -7,27 +7,8 @@ from fastapi.testclient import TestClient
 from profed.core import message_bus
 from profed.components.api.c2s.v1.apps.router import router
  
- 
-class FakePublishContext:
-    def __init__(self): self.published = []
-    async def __aenter__(self):
-        async def pub(msg, **_): self.published.append(msg)
-        return pub
-    async def __aexit__(self, *_): pass
- 
- 
-class FakeTopic:
-    def __init__(self): self._ctx = FakePublishContext()
-    def publish(self): return self._ctx
- 
- 
-class FakeMessageBus:
-    def __init__(self): self._topics = {}
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
- 
+from _fakes import FakeMessageBus
+
  
 @pytest.fixture
 def fake_bus():
@@ -62,7 +43,7 @@ def test_register_app_publishes_event(client, fake_bus):
                 json={"client_name":   "Tusky",
                       "redirect_uris": "tusky://callback",
                       "scopes":        "read write"})
-    published = fake_bus.topic("oauth_apps")._ctx.published
+    published = fake_bus.topic("oauth_apps").published
     assert len(published) == 1
     assert published[0]["type"] == "created"
     payload = published[0]["payload"]

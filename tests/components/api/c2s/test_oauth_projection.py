@@ -6,49 +6,8 @@ import pytest
 from profed.core import message_bus
 from profed.components.api.c2s.oauth import projection
  
- 
-class FakeTopic:
-    def __init__(self):
-        self.messages = []
-        self.published = []
- 
-    async def last_snapshot(self):
-        return 0, []
- 
-    def subscribe(self,
-                  subscriber,
-                  last_seen=0,
-                  include_sequence_id=False,
-                  include_emitted_at=False,
-                  caught_up=None):
-        async def generator():
-            for seq, event in self.messages:
-                if seq > last_seen:
-                    next_result = (((seq,)  if include_sequence_id else ()) +
-                                   ((None,) if include_emitted_at  else ()) +
-                                   (event,))
-                    yield next_result if len(next_result) > 1 else next_result[0]
-            if caught_up is not None:
-                caught_up.set()
-        return generator()
- 
-    def publish(self):
-        class _Ctx:
-            async def __aenter__(self_):
-                async def pub(msg, **_): self_.topic.published.append(msg)
-                self_.topic = self
-                return pub
-            async def __aexit__(self_, *_): pass
-        return _Ctx()
- 
- 
-class FakeMessageBus:
-    def __init__(self): self._topics = {}
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
- 
+from _fakes import FakeMessageBus
+
  
 @pytest.fixture
 def fake_bus():

@@ -11,6 +11,8 @@ from profed.core import message_bus
 from profed.components.api.c2s.oauth import router as oauth_router_module
 from profed.components.api.c2s.oauth import projection
  
+from _fakes import FakeMessageBus
+
  
 CONFIG = {"oidc_issuer":      "https://cloud.example.com/",
           "oidc_client_id":  "profed",
@@ -22,27 +24,6 @@ APP = {"client_id":     "abc123",
        "client_name":   "TestApp",
        "redirect_uris": "https://app.example.com/callback",
        "scopes":        "read write"}
- 
- 
-class FakePublishContext:
-    def __init__(self): self.published = []
-    async def __aenter__(self):
-        async def pub(msg, **_): self.published.append(msg)
-        return pub
-    async def __aexit__(self, *_): pass
- 
- 
-class FakeTopic:
-    def __init__(self): self._ctx = FakePublishContext()
-    def publish(self): return self._ctx
- 
- 
-class FakeMessageBus:
-    def __init__(self): self._topics = {}
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
  
  
 @pytest.fixture

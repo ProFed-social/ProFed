@@ -9,27 +9,8 @@ from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.auth import current_user
 
- 
-class FakePublishContext:
-    def __init__(self): self.published = []
-    async def __aenter__(self):
-        async def pub(msg, **_): self.published.append(msg)
-        return pub
-    async def __aexit__(self, *_): pass
- 
- 
-class FakeTopic:
-    def __init__(self): self._ctx = FakePublishContext()
-    def publish(self): return self._ctx
- 
- 
-class FakeMessageBus:
-    def __init__(self): self._topics = {}
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
- 
+from _fakes import FakeMessageBus
+
  
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
  
@@ -62,7 +43,7 @@ def test_create_status_publishes_activity(client, fake_bus):
         response = client.post("/statuses", json={"status": "Hello Fediverse!"})
 
     assert response.status_code == 200
-    published = fake_bus.topic("activities")._ctx.published
+    published = fake_bus.topic("activities").published
     assert len(published) == 1
     assert published[0]["type"] == "created"
     assert published[0]["payload"]["type"] == "Create"
@@ -100,7 +81,7 @@ def test_create_status_activity_has_context_and_to(client, fake_bus):
                AsyncMock(return_value=FakePerson())):
         client.post("/statuses", json={"status": "Hello Fediverse!"})
 
-    payload = fake_bus.topic("activities")._ctx.published[0]["payload"]
+    payload = fake_bus.topic("activities").published[0]["payload"]
     assert "@context" in payload
     assert payload["@context"] == ["https://www.w3.org/ns/activitystreams"]
     assert payload["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
@@ -117,7 +98,7 @@ def test_delete_status_publishes_delete_activity(client, fake_bus):
     response = client.delete("/statuses/notes-123")
 
     assert response.status_code == 200
-    published = fake_bus.topic("activities")._ctx.published
+    published = fake_bus.topic("activities").published
     assert len(published)                       == 1
     assert published[0]["type"]                == "deleted"
     assert published[0]["payload"]["type"]     == "Delete"

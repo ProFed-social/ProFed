@@ -6,55 +6,8 @@ from unittest.mock import AsyncMock, patch
 from profed.core import message_bus
 from profed.components.follow_handler import handler
  
- 
-class FakePublishContext:
-    def __init__(self, topic):
-        self._topic = topic
- 
-    async def __aenter__(self):
-        async def publish(message, message_id=None):
-            self._topic.published.append(message)
-        return publish
- 
-    async def __aexit__(self, exc_type, exc, tb):
-        pass
- 
- 
-class FakeTopic:
-    def __init__(self):
-        self.messages = []
-        self.published = []
- 
-    def subscribe(self,
-                  subscriber,
-                  last_seen=0,
-                  include_sequence_id=False,
-                  include_emitted_at=False,
-                  caught_up=None):
-        async def generator():
-            for seq, event in self.messages:
-                if seq > last_seen:
-                    next_result = (((seq,)  if include_sequence_id else ()) +
-                                   ((None,) if include_emitted_at  else ()) +
-                                   (event,))
-                    yield next_result if len(next_result) > 1 else next_result[0]
-            if caught_up is not None:
-                caught_up.set()
-        return generator()
- 
-    def publish(self):
-        return FakePublishContext(self)
- 
- 
-class FakeMessageBus:
-    def __init__(self):
-        self._topics = {}
- 
-    def topic(self, name):
-        if name not in self._topics:
-            self._topics[name] = FakeTopic()
-        return self._topics[name]
- 
+from _fakes import FakeMessageBus
+
  
 @pytest.fixture
 def fake_bus():
