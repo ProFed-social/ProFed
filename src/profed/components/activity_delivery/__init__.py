@@ -11,6 +11,9 @@ from .projections import (followers_handle_events,
                           keys_handle_events,
                           keys_rebuild)
 from .handler import handle_activities
+
+
+using_schemata = ["activity_delivery"]
  
  
 async def ActivityDelivery(config: dict) -> None:

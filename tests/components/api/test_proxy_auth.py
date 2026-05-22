@@ -67,10 +67,7 @@ def test_missing_proxy_token_config_raises_on_startup():
     from unittest.mock import AsyncMock, patch
     import asyncio
     from profed.components.api import Api
-    async def _run():
-        with patch("profed.components.api._reset_component_schema",
-                   AsyncMock()):
-            await Api({})
+
     with pytest.raises(RuntimeError, match="proxy_token"):
-        asyncio.get_event_loop().run_until_complete(_run())
+        asyncio.get_event_loop().run_until_complete(Api({}))
 

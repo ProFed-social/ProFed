@@ -5,6 +5,7 @@
 import asyncio
 import importlib
 
+from profed.core.persistence.schemata import reset_schemata
 
 class ComponentError(Exception):
     pass
@@ -17,10 +18,13 @@ class Component:
         try:
             mod = importlib.import_module(f"profed.components.{self.name}")
             self.entry = getattr(mod, "".join(n.capitalize() for n in self.name.split("_")))
+            self.using_schemata = getattr(mod, "using_schemata", [])
         except Exception as e:
             raise ComponentError(f"Error in component {self.name}: {e}")
  
     async def __call__(self, cfg) -> None:
+        await reset_schemata(self.using_schemata, cfg)
+
         if self.entry is not None:
             await (self.entry(cfg))
     

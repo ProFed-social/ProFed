@@ -3,30 +3,16 @@
 
 import uvicorn
 
-from profed.core.persistence.db_connections import fetch_pool
 from .app import create_app
 
 from .active_routers import narrow_deactivate_routers
 from . import s2s, c2s
 
 
-async def _reset_component_schema(config):
-    pool = await fetch_pool(host=config["host"],
-                            port=int(config["port"]),
-                            database=config["database"],
-                            user=config["user"],
-                            password=config["password"],
-                            min_size=int(config["pool_min_size"]),
-                            max_size=int(config["pool_max_size"]))
-
-    async with pool.acquire() as conn:
-        await conn.execute(f"DROP SCHEMA IF EXISTS api CASCADE")
-        await conn.execute(f"CREATE SCHEMA api")
+using_schemata = ["api"]
 
 
 async def Api(config):
-    await _reset_component_schema(config)
-
     if "proxy_token" not in config:
         raise RuntimeError(
             "proxy_token is required in [api] config. "
