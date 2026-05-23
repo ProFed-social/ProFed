@@ -5,9 +5,12 @@ from .message_bus import (FakeLastSnapshot,
                           FakeMessageBus,
                           FakePublishContext,
                           FakeTopic)
+from .media_storage import FakeMediaStorage
+
  
 __all__ = ["FakeLastSnapshot",
            "FakeMessageBus",
            "FakePublishContext",
-           "FakeTopic"]
+           "FakeTopic",
+           "FakeMediaStorage"]
  
