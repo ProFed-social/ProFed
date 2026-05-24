@@ -238,13 +238,13 @@ async def test_download_and_store_returns_existing_url_when_hash_unchanged(fake_
                                                      existing,
                                                      "alice@example.com")
  
-    assert result == "https://cdn.example.com/old"
+    assert result == ("https://cdn.example.com/old", None)
  
  
 @pytest.mark.asyncio
 async def test_download_and_store_stores_new_file_when_hash_differs(fake_bus):
     client   = _fake_http_client(content=b"new content",
-                                  headers={"content-type": "image/jpeg"})
+                                 headers={"content-type": "image/jpeg"})
     existing = {"url": "https://cdn.example.com/old", "content_hash": IMAGE_HASH}
     stored   = StoredFile(file_id="new",
                           url="https://cdn.example.com/new",
@@ -259,7 +259,7 @@ async def test_download_and_store_stores_new_file_when_hash_differs(fake_bus):
                                                      existing,
                                                      "alice@example.com")
  
-    assert result == "https://cdn.example.com/new"
+    assert result[0] == "https://cdn.example.com/new"
     published = fake_bus.topic("media").published
     assert len(published) == 1
     assert published[0]["payload"]["source_url"] == "https://example.com/img.jpg"
@@ -275,7 +275,7 @@ async def test_download_and_store_returns_existing_url_on_http_error(fake_bus):
                                                      existing,
                                                      "alice@example.com")
  
-    assert result == "https://cdn.example.com/old"
+    assert result == ("https://cdn.example.com/old", None)
  
  
 @pytest.mark.asyncio
@@ -287,7 +287,7 @@ async def test_download_and_store_returns_none_when_no_existing_and_download_fai
                                                      None,
                                                      "alice@example.com")
  
-    assert result is None
+    assert result == (None, None)
  
  
 @pytest.mark.asyncio
@@ -295,11 +295,14 @@ async def test_sync_images_downloads_when_should_redownload_is_true(monkeypatch)
     monkeypatch.setattr(importer, "_should_redownload",
                         AsyncMock(return_value=True))
     monkeypatch.setattr(importer, "_download_and_store",
-                        AsyncMock(return_value="https://cdn.example.com/new"))
+                        AsyncMock(return_value=("https://cdn.example.com/new", "abc")))
+    monkeypatch.setattr(importer, "scale_image", AsyncMock())
     profile = UserProfile(username="alice",
                           avatar_source_url="https://example.com/photo.jpg")
  
-    result = await importer._sync_images("alice@example.com", profile, {})
+    result, tasks = await importer._sync_images("alice@example.com", profile, {})
+    if tasks:
+        await asyncio.gather(*tasks)
  
     assert result.avatar_url == "https://cdn.example.com/new"
  
@@ -309,12 +312,15 @@ async def test_sync_images_reuses_url_when_not_stale(monkeypatch):
     monkeypatch.setattr(importer, "_should_redownload", AsyncMock(return_value=False))
     download_mock = AsyncMock()
     monkeypatch.setattr(importer, "_download_and_store", download_mock)
+    monkeypatch.setattr(importer, "scale_image", AsyncMock())
     profile     = UserProfile(username="alice",
                               avatar_source_url="https://example.com/photo.jpg")
     media_state = {"https://example.com/photo.jpg": {"url": "https://cdn.example.com/existing"}}
  
-    result = await importer._sync_images("alice@example.com", profile, media_state)
- 
+    result, tasks = await importer._sync_images("alice@example.com", profile, media_state)
+    if tasks:
+        await asyncio.gather(*tasks)
+  
     download_mock.assert_not_called()
     assert result.avatar_url == "https://cdn.example.com/existing"
  
@@ -323,10 +329,12 @@ async def test_sync_images_reuses_url_when_not_stale(monkeypatch):
 async def test_sync_images_skips_when_no_source_url(monkeypatch):
     redownload_mock = AsyncMock()
     monkeypatch.setattr(importer, "_should_redownload", redownload_mock)
+    monkeypatch.setattr(importer, "scale_image", AsyncMock())
     profile = UserProfile(username="alice")
  
-    result = await importer._sync_images("alice@example.com", profile, {})
+    result, tasks = await importer._sync_images("alice@example.com", profile, {})
  
+    assert tasks == []
     redownload_mock.assert_not_called()
     assert result.avatar_url is None
  
@@ -365,7 +373,7 @@ async def test_fetch_remote_profile_returns_none_when_no_hresume(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_import_returns_early_when_profile_not_found(fake_bus, monkeypatch):
     monkeypatch.setattr(importer, "_fetch_remote_profile", AsyncMock(return_value=None))
-    monkeypatch.setattr(importer, "_get_current_state",   AsyncMock(return_value=None))
+    monkeypatch.setattr(importer, "_get_current_state", AsyncMock(return_value=None))
  
     await importer.run_import("alice", "https://example.com/alice/")
  
@@ -376,9 +384,9 @@ async def test_run_import_returns_early_when_profile_not_found(fake_bus, monkeyp
 async def test_run_import_publishes_created_for_new_profile(fake_bus, monkeypatch):
     profile = UserProfile(username="alice", name="Alice")
     monkeypatch.setattr(importer, "_fetch_remote_profile", AsyncMock(return_value=profile))
-    monkeypatch.setattr(importer, "_get_current_state",   AsyncMock(return_value=None))
-    monkeypatch.setattr(importer, "_get_media_state",     AsyncMock(return_value={}))
-    monkeypatch.setattr(importer, "_sync_images",         AsyncMock(return_value=profile))
+    monkeypatch.setattr(importer, "_get_current_state", AsyncMock(return_value=None))
+    monkeypatch.setattr(importer, "_get_media_state", AsyncMock(return_value={}))
+    monkeypatch.setattr(importer, "_sync_images", AsyncMock(return_value=(profile, [])))
  
     await importer.run_import("alice", "https://example.com/alice/")
  
@@ -392,9 +400,9 @@ async def test_run_import_publishes_updated_when_profile_changed(fake_bus, monke
     old     = UserProfile(username="alice", name="Alice Old")
     updated = UserProfile(username="alice", name="Alice New")
     monkeypatch.setattr(importer, "_fetch_remote_profile", AsyncMock(return_value=updated))
-    monkeypatch.setattr(importer, "_get_current_state",   AsyncMock(return_value=old))
-    monkeypatch.setattr(importer, "_get_media_state",     AsyncMock(return_value={}))
-    monkeypatch.setattr(importer, "_sync_images",         AsyncMock(return_value=updated))
+    monkeypatch.setattr(importer, "_get_current_state", AsyncMock(return_value=old))
+    monkeypatch.setattr(importer, "_get_media_state", AsyncMock(return_value={}))
+    monkeypatch.setattr(importer, "_sync_images", AsyncMock(return_value=(updated, [])))
  
     await importer.run_import("alice", "https://example.com/alice/")
  
@@ -405,11 +413,74 @@ async def test_run_import_publishes_updated_when_profile_changed(fake_bus, monke
 async def test_run_import_publishes_nothing_when_profile_unchanged(fake_bus, monkeypatch):
     profile = UserProfile(username="alice", name="Alice")
     monkeypatch.setattr(importer, "_fetch_remote_profile", AsyncMock(return_value=profile))
-    monkeypatch.setattr(importer, "_get_current_state",   AsyncMock(return_value=profile))
-    monkeypatch.setattr(importer, "_get_media_state",     AsyncMock(return_value={}))
-    monkeypatch.setattr(importer, "_sync_images",         AsyncMock(return_value=profile))
+    monkeypatch.setattr(importer, "_get_current_state", AsyncMock(return_value=profile))
+    monkeypatch.setattr(importer, "_get_media_state", AsyncMock(return_value={}))
+    monkeypatch.setattr(importer, "_sync_images", AsyncMock(return_value=(profile, [])))
  
     await importer.run_import("alice", "https://example.com/alice/")
  
     assert fake_bus.topic("users").published == []
  
+
+@pytest.mark.asyncio
+async def test_sync_images_spawns_avatar_variants_when_new_download(monkeypatch):
+    monkeypatch.setattr(importer, "_should_redownload", AsyncMock(return_value=True))
+    monkeypatch.setattr(importer, "_download_and_store",
+                        AsyncMock(return_value=("https://cdn.example.com/new", "fid")))
+    scale_mock = AsyncMock()
+    monkeypatch.setattr(importer, "scale_image", scale_mock)
+    profile = UserProfile(username="alice", avatar_source_url="https://example.com/photo.jpg")
+
+    _, tasks = await importer._sync_images("alice@example.com", profile, {})
+    await asyncio.gather(*tasks)
+
+    assert len(tasks) == 2
+    scale_mock.assert_any_call("fid", "large", width=400, height=400)
+    scale_mock.assert_any_call("fid", "small", width=80,  height=80)
+
+
+@pytest.mark.asyncio
+async def test_sync_images_spawns_header_variant_when_new_download(monkeypatch):
+    monkeypatch.setattr(importer, "_should_redownload", AsyncMock(return_value=True))
+    monkeypatch.setattr(importer, "_download_and_store",
+                        AsyncMock(return_value=("https://cdn.example.com/new", "hid")))
+    scale_mock = AsyncMock()
+    monkeypatch.setattr(importer, "scale_image", scale_mock)
+    profile = UserProfile(username="alice", header_source_url="https://example.com/banner.jpg")
+
+    _, tasks = await importer._sync_images("alice@example.com", profile, {})
+    await asyncio.gather(*tasks)
+
+    assert len(tasks) == 1
+    scale_mock.assert_called_once_with("hid", "wide", width=1500)
+
+
+@pytest.mark.asyncio
+async def test_sync_images_no_variants_when_hash_unchanged(monkeypatch):
+    monkeypatch.setattr(importer, "_should_redownload", AsyncMock(return_value=True))
+    monkeypatch.setattr(importer, "_download_and_store",
+                        AsyncMock(return_value=("https://cdn.example.com/old", None)))
+    scale_mock = AsyncMock()
+    monkeypatch.setattr(importer, "scale_image", scale_mock)
+    profile = UserProfile(username="alice", avatar_source_url="https://example.com/photo.jpg")
+
+    _, tasks = await importer._sync_images("alice@example.com", profile, {})
+
+    assert tasks == []
+    scale_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sync_images_sets_avatar_small_url_to_same_url_initially(monkeypatch):
+    monkeypatch.setattr(importer, "_should_redownload", AsyncMock(return_value=True))
+    monkeypatch.setattr(importer, "_download_and_store",
+                        AsyncMock(return_value=("https://cdn.example.com/new", "fid")))
+    monkeypatch.setattr(importer, "scale_image", AsyncMock())
+    profile = UserProfile(username="alice", avatar_source_url="https://example.com/photo.jpg")
+
+    result, tasks = await importer._sync_images("alice@example.com", profile, {})
+    await asyncio.gather(*tasks)
+
+    assert result.avatar_url       == "https://cdn.example.com/new"
+    assert result.avatar_small_url == "https://cdn.example.com/new"
+

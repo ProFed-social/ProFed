@@ -28,16 +28,6 @@ class Person(Actor):
     @classmethod
     def from_user(cls, profile: UserProfile) -> "Person":
         actor_url = actor_url_from_username(profile.username)
-        public_key = (None
-                      if getattr(profile, "public_key_pem", None) is None else
-                      {"id":           f"{actor_url}#main-key",
-                       "type":         "Key",
-                       "owner":        actor_url,
-                       "publicKeyPem": profile.public_key_pem})
-        icon  = ({"type": "Image", "url": profile.avatar_url}
-                 if getattr(profile, "avatar_url", None) else None)
-        image = ({"type": "Image", "url": profile.header_url}
-                 if getattr(profile, "header_url", None) else None)
         return cls(id=actor_url,
                    preferredUsername=profile.username,
                    name=profile.name,
@@ -45,7 +35,14 @@ class Person(Actor):
                    resume=profile.resume,
                    inbox=f"{actor_url}/inbox",
                    outbox=f"{actor_url}/outbox",
-                   publicKey=public_key,
-                   icon=icon,
-                   image=image)
+                   publicKey=(None
+                              if getattr(profile, "public_key_pem", None) is None else
+                              {"id":           f"{actor_url}#main-key",
+                               "type":         "Key",
+                               "owner":        actor_url,
+                               "publicKeyPem": profile.public_key_pem}),
+                   icon=({"type": "Image", "url": profile.avatar_url}
+                         if getattr(profile, "avatar_url", None) else None),
+                   image=({"type": "Image", "url": profile.header_url}
+                          if getattr(profile, "header_url", None) else None))
 

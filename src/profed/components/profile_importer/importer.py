@@ -11,6 +11,7 @@ from uuid import uuid4
  
 from profed.core.message_bus import message_bus
 from profed.core.media_storage import media_storage
+from profed.core.media_storage.variants import scale_image
 from profed.identity import acct_from_username
 from profed.http.signatures import generate_key_pair 
 from profed.models import UserProfile
@@ -23,6 +24,9 @@ from .media_reader import reading_media_state
  
 logger = logging.getLogger(__name__)
 
+_VARIANTS_FOR = {"avatar_url": [("large", {"width": 400, "height": 400}),
+                                ("small", {"width": 80,  "height": 80})],
+                 "header_url": [("wide",  {"width": 1500})]}
 
 async def _should_redownload(source_url:    str,
                              last_modified: str | None,
@@ -52,25 +56,23 @@ async def _should_redownload(source_url:    str,
 
 async def _download_and_store(source_url:   str,
                               existing:     dict | None,
-                              uploader:     str) -> str | None:
+                              uploader:     str) -> tuple[str | None, str | None]:
     try:
         async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(source_url, timeout=10.0)
             response.raise_for_status()
     except Exception as exc:
         logger.warning("Failed to download image from %s: %s", source_url, exc)
-        return existing["url"] if existing else None
+        return (existing["url"] if existing else None, None)
 
     new_hash = hashlib.sha256(response.content).hexdigest()
     if existing and existing.get("content_hash") == new_hash:
-        return existing["url"]
+        return (existing["url"], None)
 
-    content_type  = response.headers.get("content-type",
+    content_type = response.headers.get("content-type",
                                           "image/jpeg").split(";")[0].strip()
-    file_id       = str(uuid4()).replace("-", "")
-    stored        = await media_storage().store(file_id,
-                                               response.content,
-                                               content_type)
+    file_id = str(uuid4()).replace("-", "")
+    stored = await media_storage().store(file_id, response.content, content_type)
     async with message_bus().topic("media").publish() as publish:
         await publish({"type": "uploaded",
                        "payload": {"file_id": file_id,
@@ -83,7 +85,7 @@ async def _download_and_store(source_url:   str,
                                    "last_modified": response.headers.get("last-modified",
                                                                          datetime.now(timezone.utc).isoformat()),
                                    "etag": response.headers.get("etag")}})
-    return stored.url
+    return (stored.url, file_id)
 
 
 async def _fetch_remote_profile(url: str, username: str) -> UserProfile | None:
@@ -115,22 +117,31 @@ def _field_of(existing, field_name):
 
 
 async def _sync_images(uploader, new_profile, media_state):
+    tasks = {}
+    last_url = None
     for source_attr, url_attr in [("avatar_source_url", "avatar_url"),
+                                  ("avatar_source_url", "avatar_small_url"),
                                   ("header_source_url", "header_url")]:
         source_url = getattr(new_profile, source_attr)
         if not source_url:
             continue
-        existing = media_state.get(source_url)
 
-        new_url = (await _download_and_store(source_url, existing, uploader)
-                   if await _should_redownload(source_url,
-                                               _field_of(existing, "last_modified"),
-                                               _field_of(existing, "etag")) else
-                   _field_of(existing, "url"))
+        existing = media_state.get(source_url)
+        if (source_url not in tasks and
+            await _should_redownload(source_url,
+                                     _field_of(existing, "last_modified"),
+                                     _field_of(existing, "etag"))):
+            new_url, file_id = await _download_and_store(source_url, existing, uploader)
+            if file_id is not None:
+                for variant, dims in _VARIANTS_FOR.get(url_attr, []):
+                    tasks.setdefault(source_url, {})[variant] =  asyncio.create_task(scale_image(file_id, variant, **dims))
+        else:
+            new_url = _field_of(existing, "url") or last_url
+        last_url = new_url
 
         setattr(new_profile, url_attr, new_url) 
 
-    return new_profile
+    return new_profile, [t for v in tasks.values() for t in v.values()]
 
 
 async def _cancel_task_unconditionally(task):
@@ -150,9 +161,9 @@ async def run_import(username: str, url: str) -> None:
 
     media_state = await _get_media_state(new_profile.avatar_source_url,
                                          new_profile.header_source_url)
-    new_profile = await _sync_images(acct_from_username(username),
-                                     new_profile,
-                                     media_state)
+    new_profile, variant_tasks = await _sync_images(acct_from_username(username),
+                                                    new_profile,
+                                                    media_state)
     current = await current_state_task
 
     if current is None:
@@ -177,4 +188,7 @@ async def run_import(username: str, url: str) -> None:
         await publish({"type": event_type, "payload": payload})
 
     logger.info("Published users.%s for %s", event_type, username)
+
+    if variant_tasks:
+        await asyncio.gather(*variant_tasks)
 

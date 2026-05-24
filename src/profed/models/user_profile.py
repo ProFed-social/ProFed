@@ -14,6 +14,7 @@ class UserProfile(BaseModel):
     resume: Resume | None = None
     avatar_source_url: str | None = None
     avatar_url: str | None = None
+    avatar_small_url:  str | None = None
     header_source_url: str | None = None
     header_url: str | None = None
     public_key_pem: str | None = None
