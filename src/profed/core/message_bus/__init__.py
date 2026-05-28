@@ -4,8 +4,8 @@
 from importlib import import_module
 from profed.core.config import config
 from profed.core.config.database import with_database_defaults
+from .tick import start_tickers, TICK
 
-TICK = "Tick"
 
 _instance = None
 
@@ -25,7 +25,7 @@ async def init_message_bus(topic_names):
     init = getattr(mod, "init")
     _instance = await init(cfg, topic_names)
 
-    return getattr(_instance, "aclose", None)
+    return start_tickers(_instance, cfg, topic_names)
 
 def message_bus():
     if _instance is None:
