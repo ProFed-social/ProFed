@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import sys
 from .component_parser import components_from_raw, ConfigError
 from .raw import raw_config, force_reload_raw
 

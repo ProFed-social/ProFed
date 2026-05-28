@@ -24,3 +24,17 @@ oauth_codes = oauth_codes_topic.topic
 oauth_tokens = oauth_tokens_topic.topic
 users = users_topic.topic
 
+
+
+def names():
+    return [activities["name"],
+            deliveries["name"],
+            followers["name"],
+            incoming_activities["name"],
+            known_accounts["name"],
+            media["name"],
+            oauth_apps["name"],
+            oauth_codes["name"],
+            oauth_tokens["name"],
+            users["name"]]
+

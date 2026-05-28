@@ -7,7 +7,8 @@ from profed.core.config.database import with_database_defaults
 
 _instance = None
 
-async def init_message_bus():
+
+async def init_message_bus(topic_names):
     global _instance
     if _instance is not None:
         return _instance
@@ -20,7 +21,8 @@ async def init_message_bus():
  
     mod = import_module(f".{typ}", package=__name__)
     init = getattr(mod, "init")
-    _instance = await init(cfg)
+    _instance = await init(cfg, topic_names)
+
 
 def message_bus():
     if _instance is None:

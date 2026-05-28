@@ -3,17 +3,11 @@
 
 from typing import Dict
 from .bus import MessageBus
-from profed import topics
 from profed.core.persistence.db_connections import fetch_pool
 
-def _topic_names():
-    return [v["name"]
-            for v in vars(topics).values()
-            if isinstance(v, dict)
-            and {"name", "validate", "snapshot_validate"} <= v.keys()]
- 
- 
-async def init(config: Dict[str, str]):
+
+
+async def init(config: Dict[str, str], topic_names):
     pool = await fetch_pool(host=config["host"],
                             port=int(config["port"]),
                             database=config["database"],
@@ -22,7 +16,7 @@ async def init(config: Dict[str, str]):
                             min_size=int(config["pool_min_size"]),
                             max_size=int(config["pool_max_size"]))
     async with pool.acquire() as conn:
-        for name in _topic_names():
+        for name in topic_names:
             await conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {config['schema']}.{name} (
                     id         BIGSERIAL   PRIMARY KEY,
@@ -33,14 +27,17 @@ async def init(config: Dict[str, str]):
                     emitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
+
             await conn.execute(f"""
                 CREATE INDEX IF NOT EXISTS {name}_event_type_idx
                 ON {config['schema']}.{name} (event_type)
             """)
+
             await conn.execute(f"""
                 CREATE INDEX IF NOT EXISTS {name}_object_id_idx
                 ON {config['schema']}.{name} (object_id)
             """)
+
             await conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {config['schema']}.{name}_snapshots (
                     id            BIGSERIAL PRIMARY KEY,
@@ -48,5 +45,6 @@ async def init(config: Dict[str, str]):
                     last_event_id BIGINT   NOT NULL
                 )
             """)
+
     return MessageBus(config, pool)
 

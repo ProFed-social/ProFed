@@ -35,7 +35,7 @@ async def bus(db):
     with patch("profed.core.persistence.db_connections.asyncpg.create_pool",
                new=_create_fake_pool):
         from profed.core.message_bus.postgresql import init
-        bus = await init(CONFIG)
+        bus = await init(CONFIG, ["test"])
     _db._pools.clear()
     return bus
 
