@@ -5,6 +5,8 @@
 import asyncio
 import importlib
 
+from contextlib import asynccontextmanager
+
 from profed.core.persistence.schemata import reset_schemata
 
 class ComponentError(Exception):
@@ -30,17 +32,29 @@ class Component:
     
 
 def run(config, init=None):
-    async def main():
-        if init is not None:
-            await asyncio.gather(*(fn() for fn in init))
+    @asynccontextmanager
+    async def _lifecycle(init):
+        shutdowns = ([sd
+                      for sd in await asyncio.gather(*(fn() for fn in init))
+                      if sd is not None]
+                     if init is not None else
+                     [])
 
-        component_names = config["profed"]["run"]
-        components = [Component(name)
-                      for name in (component_names
-                                   if isinstance(component_names, list) else
-                                   component_names.split())]
-        await asyncio.gather(*(component(config.get(component.name, {}))
-                               for component in components))
+        yield
+
+        if shutdowns:
+            await asyncio.gather(*shutdowns)
+
+    async def main():
+        async with _lifecycle(init):
+            component_names = config["profed"]["run"]
+            components = [Component(name)
+                          for name in (component_names
+                                       if isinstance(component_names, list) else
+                                       component_names.split())]
+
+            await asyncio.gather(*(component(config.get(component.name, {}))
+                                   for component in components))
 
     asyncio.run(main())
-
+ 

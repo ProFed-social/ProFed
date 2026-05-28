@@ -91,6 +91,7 @@ class FakeConnection:
                                            object_id=args[1],
                                            payload=args[2],
                                            message_id=args[3] if len(args) > 3 else None)
+
         return []
 
     def fetch_all_snapshot_event_ids(self, table):
@@ -162,6 +163,7 @@ class InMemoryDatabase:
                                    "message_id": message_id,
                                    "emitted_at": datetime.now(timezone.utc)})
             return [{"id": new_id}]
+
         return None
 
     def fetch_messages(self, table, last_seen):

@@ -3,8 +3,7 @@
 
 import asyncio
 from typing import Optional, Dict, Callable, Awaitable, Tuple, Any
-from profed.core.message_bus import message_bus
-
+from profed.core.message_bus import message_bus, TICK
 
 class _EventHandlerSignature:
     def __init__(self,
@@ -62,11 +61,20 @@ def build_projection(topic: Dict,
     topic_name = topic["name"]
 
     async def _dispatch(event_type, object_id, emitted_at, payload):
-        validated = topic["validate"](event_type, payload)
-        if (validated is not None and
-            event_type in on_message_type and
-            verify_event(event_type, validated)):
+        if event_type not in on_message_type:
+            return
 
+        def _get_validated():
+            validated = topic["validate"](event_type, payload)
+            return (validated
+                    if validated is not None and
+                       verify_event(event_type, validated) else
+                    None)
+
+        validated = (payload
+                     if event_type == TICK else
+                     _get_validated())
+        if validated is not None:
             await event_handler_signature(on_message_type[event_type],
                                           event_type,
                                           object_id,

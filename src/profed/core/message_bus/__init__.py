@@ -5,13 +5,15 @@ from importlib import import_module
 from profed.core.config import config
 from profed.core.config.database import with_database_defaults
 
+TICK = "Tick"
+
 _instance = None
 
 
 async def init_message_bus(topic_names):
     global _instance
     if _instance is not None:
-        return _instance
+        return None
 
     cfg = config().get("message_bus", {})
     typ = cfg.get("type", "postgresql")
@@ -23,6 +25,7 @@ async def init_message_bus(topic_names):
     init = getattr(mod, "init")
     _instance = await init(cfg, topic_names)
 
+    return getattr(_instance, "aclose", None)
 
 def message_bus():
     if _instance is None:

@@ -4,6 +4,7 @@
 from typing import Dict
 import asyncpg
 
+
 class MessageBus:
     def __init__(self, config: Dict[str, str], pool: asyncpg.Pool):
         self._config = config
@@ -16,3 +17,4 @@ class MessageBus:
     async def health_check(self):
         async with self._pool.acquire() as conn:
             await conn.fetchval("SELECT 1")
+

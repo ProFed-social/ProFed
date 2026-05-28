@@ -9,7 +9,6 @@ from .publisher import Publisher
 from .snapshot import SnapshotPublisher, last_snapshot, last_snapshot_id
 from .subscriber import subscribe
 
-
 class Topic:
     def __init__(self, pool: Pool, config: Dict[str, str], name: str):
         self._pool = pool

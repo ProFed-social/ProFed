@@ -47,4 +47,3 @@ async def init(config: Dict[str, str], topic_names):
             """)
 
     return MessageBus(config, pool)
-

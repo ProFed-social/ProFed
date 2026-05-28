@@ -37,8 +37,8 @@ async def bus(db):
         from profed.core.message_bus.postgresql import init
         bus = await init(CONFIG, ["test"])
     _db._pools.clear()
-    return bus
 
+    return bus
 
 @fixture
 def topic(bus):
