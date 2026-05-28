@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from typing import Dict, Any, AsyncGenerator, Optional, Tuple
+from typing import Dict, Any, AsyncGenerator, Tuple
 import asyncio
 from asyncpg import Pool, Connection
 
@@ -14,10 +14,8 @@ def subscribe(pool: Pool,
               topic: str,
               subscriber: str,
               last_seen: int,
-              include_sequence_id: bool = False,
-              include_emitted_at:  bool = False,
-              caught_up: Optional[asyncio.Event] = None) \
-        -> AsyncGenerator[Dict[str, Any], None]:
+              caught_up: asyncio.Event | None = None) \
+        -> AsyncGenerator[Tuple[int, str, str, Any, Dict[str, Any]], None]:
     min_wait = float(config.get("minimum_message_wait", MIN_WAIT))
     max_wait = float(config.get("maximum_message_wait", MAX_WAIT))
 
@@ -56,7 +54,7 @@ def subscribe(pool: Pool,
 
     async def _fetch_new_messages(conn: Connection, last_seen: int):
         return await conn.fetch(f"""
-                                SELECT id, payload, emitted_at
+                                SELECT id, event_type, object_id, payload, emitted_at
                                 FROM {config['schema']}.{topic}
                                 WHERE id > $1
                                 ORDER BY id
@@ -72,11 +70,14 @@ def subscribe(pool: Pool,
                 if row["id"] != last_seen + 1:
                     break
                 last_seen = row["id"]
-                yield last_seen, row["emitted_at"], row["payload"]
+                yield (last_seen,
+                       row["event_type"],
+                       row["object_id"],
+                       row["emitted_at"],
+                       row["payload"])
             else:
                 continue
             break
-
 
     async def _accept_gaps(conn: Connection,
                            last_seen: int,
@@ -101,7 +102,7 @@ def subscribe(pool: Pool,
             return gap_id
         return last_seen
 
-    async def read_messages(last_seen) -> AsyncGenerator[Dict[str, Any] | Tuple[int, Dict[str, Any]], None]:
+    async def read_messages(last_seen) -> AsyncGenerator[Tuple[int, str, str, Any, Dict[str, Any]], None]:
         wait: float = min_wait
         backlog_done = False
         message_event = asyncio.Event()
@@ -129,13 +130,10 @@ def subscribe(pool: Pool,
                     message_event.clear()
                     processed = False
 
-                    async for seen, emitted_at, message in _process_messages(conn, last_seen):
-                        last_seen   = seen
+                    async for msg in _process_messages(conn, last_seen):
+                        last_seen   = msg[0]
                         processed   = True
-                        next_result = (((seen,)       if include_sequence_id else ()) +
-                                       ((emitted_at,) if include_emitted_at  else ()) +
-                                       (message,))
-                        yield next_result if len(next_result) > 1 else next_result[0]
+                        yield msg
 
                     if processed:
                         wait = min_wait
@@ -158,5 +156,5 @@ def subscribe(pool: Pool,
                     await conn.remove_listener(f"{config['schema']}_{topic}", _on_message)
                     await conn.remove_listener(f"{config['schema']}_{topic}_snapshot", _on_snapshot)
 
-
     return read_messages(last_seen)
+

@@ -15,6 +15,7 @@ from profed.federation.webfinger import lookup_acct
  
 logger = logging.getLogger(__name__)
 _source_key = source_key("incoming_activities") 
+
  
 async def _handle_follow(username: str, activity: dict, seq: int) -> None:
     try:
@@ -33,10 +34,10 @@ async def _handle_follow(username: str, activity: dict, seq: int) -> None:
     logger.info("follow_handler: WebFinger resolved %r -> %r", follow.actor, follower_acct)
 
     async with message_bus().topic("followers").publish() as publish:
-        await publish({"type":    "created",
-                       "payload": {"follower": follower_acct,
-                                   "following": following_acct}},
-                      message_id=_source_key.message_id(seq)) 
+        await publish(event_type="created",
+                      object_id=f"{follower_acct}|{following_acct}",
+                      payload={},
+                      message_id=_source_key.message_id(seq))
 
     logger.info("follow_handler: published follower %r -> %r", follower_acct, following_acct)
     accept = AcceptActivity(id=f"{follow.id}#accepts/",
@@ -45,11 +46,12 @@ async def _handle_follow(username: str, activity: dict, seq: int) -> None:
                                                      exclude_none=True))
 
     async with message_bus().topic("activities").publish() as publish:
-        await publish({"type":    "created",
-                       "payload": {"username": username,
-                                   **accept.model_dump(by_alias=True,
-                                                       exclude_none=True)}},
+        await publish(event_type="Accept",
+                      object_id=accept.id,
+                      payload={"username": username,
+                               "activity": accept.as_event_payload()},
                       message_id=_source_key.message_id(seq))
+
     logger.info("follow_handler: Accept published for %r", follower_acct)
  
  
@@ -65,31 +67,28 @@ async def _handle_undo_follow(username: str, activity: dict, seq: int) -> None:
         return
  
     async with message_bus().topic("followers").publish() as publish:
-        await publish({"type":    "deleted",
-                       "payload": {"follower": follower_acct,
-                                   "following": acct_from_username(username)}},
+        await publish(event_type="deleted",
+                      object_id=f"{follower_acct}|{acct_from_username(username)}",
+                      payload={},
                       message_id=_source_key.message_id(seq))
 
 
 async def handle_incoming_activities() -> None:
-    async for seq, event in \
-            message_bus().topic("incoming_activities").subscribe("follow_handler",
-                                                                 0,
-                                                                 include_sequence_id=True):
-        event_type, payload = incoming_activities["validate"](event)
-        if event_type is None:
-            logger.warning("follow_handler: ignoring invalid event: %r", event)
+    async for seq, event_type, object_id, _, payload \
+            in message_bus().topic("incoming_activities").subscribe("follow_handler"):
+        validated = incoming_activities["validate"](event_type, payload)
+        if validated is None:
+            logger.warning("follow_handler: ignoring invalid event: %r", event_type)
             continue
- 
-        activity = payload["activity"]
-        username = payload["username"]
-        activity_type = activity.get("type")
- 
-        try:
-            if activity_type == "Follow":
-                await _handle_follow(username, activity, seq)
-            elif activity_type == "Undo":
-                await _handle_undo_follow(username, activity, seq)
-        except Exception:
-            logger.exception("Error handling %s activity for %s", activity_type, username)
+
+        username = validated["username"]
+        activity = {"id":   object_id,
+                    "type": event_type,
+                    **validated["activity"]}
+
+        async def _unknown_type(u, a, s):
+            logger.debug(f"ignoring event in follow_handler: {event_type}")
+
+        await {"Follow": _handle_follow,
+               "Undo": _handle_undo_follow}.get(event_type, _unknown_type)(username, activity, seq)
 

@@ -11,27 +11,38 @@ async def _init() -> None:
     await (await storage()).ensure_schema()
 
 
-async def _on_discovered(payload: dict) -> None:
-    actor_data     = payload.get("actor_data", {})
-    public_key     = actor_data.get("publicKey", {})
-    public_key_pem = public_key.get("publicKeyPem")
+async def _store_key(actor_url: str,
+                     acct: str | None,
+                     actor_data: dict,
+                     last_webfinger_at: str | datetime) -> None:
+    public_key_pem = actor_data.get("publicKey", {}).get("publicKeyPem")
     if public_key_pem is None:
         return
+    last = (datetime.fromisoformat(last_webfinger_at)
+            if isinstance(last_webfinger_at, str) else
+            last_webfinger_at)
+    await (await storage()).upsert(actor_url, acct, public_key_pem, last)
 
-    last = payload.get("last_webfinger_at",
-                       datetime.now(timezone.utc).isoformat())
-    if isinstance(last, str):
-        last = datetime.fromisoformat(last)
 
-    await (await storage()).upsert(payload["actor_url"],
-                                   payload.get("acct"),
-                                   public_key_pem,
-                                   last)
+async def _discovered(object_id: str, payload: dict) -> None:
+    await _store_key(payload["actor_url"],
+                     payload.get("acct"),
+                     payload.get("actor_data", {}),
+                     payload.get("last_webfinger_at",
+                                 datetime.now(timezone.utc).isoformat()))
+
+
+async def _discovered_snapshot(item: dict) -> None:
+    await _store_key(item["actor_url"],
+                     item.get("acct"),
+                     item.get("actor_data", {}),
+                     item.get("last_webfinger_at",
+                              datetime.now(timezone.utc).isoformat()))
 
 
 handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=known_accounts,
                          subscriber="s2s_inbox_public_keys",
                          init=_init,
-                         on_snapshot_item=_on_discovered,
-                         on_message_type={"discovered": _on_discovered})
+                         on_snapshot_item=_discovered_snapshot,
+                         on_message_type={"discovered": _discovered})

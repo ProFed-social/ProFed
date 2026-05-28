@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict
 
 
 logger = logging.getLogger(__name__)
 
 
-_REQUIRED_UPLOADED = {"file_id", "url", "content_type", "size", "uploader"}
-_REQUIRED_DELETED  = {"file_id"}
+_REQUIRED_UPLOADED       = {"url", "content_type", "size", "uploader"}
+_REQUIRED_VARIANTS_ADDED = {"variants"}
 
 
 def _ignore(msg: str) -> str:
@@ -18,44 +18,61 @@ def _ignore(msg: str) -> str:
 
 def _validate_uploaded(payload: dict) -> Optional[Dict]:
     missing = _REQUIRED_UPLOADED - payload.keys()
+
     if missing:
         logger.warning(_ignore(f"uploaded payload missing fields {missing}: {payload!r}"))
-        return None, None
+        return None
+
     if not isinstance(payload["size"], int):
         logger.warning(_ignore(f"size is not an integer: {payload!r}"))
-        return None, None
-    return "uploaded", payload
+        return None
+
+    return payload
 
 
 def _validate_deleted(payload: dict) -> Optional[Dict]:
-    if "file_id" not in payload:
-        logger.warning(_ignore(f"deleted payload missing file_id: {payload!r}"))
-        return None, None
-    return "deleted", payload
+    if payload != {}:
+        logger.warning(_ignore(f"deleted payload must be empty: {payload!r}"))
+        return None
+
+    return {}
 
 
-def validate_media_event(event) -> Tuple[Optional[str], Optional[Dict]]:
-    if not isinstance(event, dict):
-        logger.warning(_ignore(f"event is not a JSON object: {event!r}"))
-        return None, None
-
-    event_type = event.get("type")
-    if not isinstance(event_type, str):
-        logger.warning(_ignore(f"missing or invalid event type: {event!r}"))
-        return None, None
-
-    payload = event.get("payload")
+def _validate_variants_added(payload: dict) -> Optional[Dict]:
     if not isinstance(payload, dict):
-        logger.warning(_ignore(f"missing or invalid payload: {event!r}"))
-        return None, None
+        logger.warning(_ignore(f"variants_added payload not a dict: {payload!r}"))
+        return None
 
-    def unknown_event_type(payload):
+    for variant_name, variant_data in payload.items():
+        if not isinstance(variant_name, str) or not variant_name:
+            logger.warning(_ignore(f"invalid variant name: {variant_name!r}"))
+            return None
+
+        if not isinstance(variant_data, dict):
+            logger.warning(_ignore(f"variant {variant_name} data not a dict: {variant_data!r}"))
+            return None
+
+        missing = {"url", "width", "height", "content_type"} - variant_data.keys()
+        if missing:
+            logger.warning(_ignore(f"variant {variant_name} missing fields {missing}"))
+            return None
+
+    return payload
+
+
+def validate_media_event(event_type: str, payload: Dict) -> Optional[Dict]:
+    if not isinstance(payload, dict):
+        logger.warning(_ignore(f"payload not a dict: {payload!r}"))
+        return None
+
+    validators = {"uploaded":       _validate_uploaded,
+                  "deleted":        _validate_deleted,
+                  "variants_added": _validate_variants_added}
+    if event_type not in validators:
         logger.warning(_ignore(f"unknown event type {event_type!r}"))
-        return None, None
+        return None
 
-    return ({"uploaded": _validate_uploaded,
-             "deleted": _validate_deleted}.get(event_type,
-                                               unknown_event_type))(payload)
+    return validators[event_type](payload)
 
 
 def validate_media_snapshot_item(item) -> Optional[Dict]:

@@ -31,6 +31,10 @@ class FakeStorage:
                           content_type=content_type,
                           size=len(data))
 
+    def url_for(self, file_id, variant=None):
+        suffix = f"_{variant}" if variant else ""
+        return f"https://example.com/media/ab/{file_id}{suffix}"
+
 
 @pytest.fixture
 def client():
@@ -69,7 +73,8 @@ def test_upload_publishes_event(client, mocks):
 
     published = bus.topic("media").published
     assert len(published) == 1
-    assert published[0]["type"] == "uploaded"
+    assert published[0]["event_type"] == "uploaded"
+    assert published[0]["object_id"]
     assert published[0]["payload"]["content_type"] == "image/jpeg"
     assert published[0]["payload"]["uploader"] == UPLOADER
 

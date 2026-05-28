@@ -34,10 +34,8 @@ async def verify_inbox_request(method:  str,
     public_key_pem, from_projection = await _get_public_key_pem(actor_url)
     if public_key_pem is None:
         return False
-
     if verify_request(method, path, headers, body, public_key_pem):
         return True
-
     if not from_projection:
         return False
 
@@ -53,14 +51,18 @@ async def accept_inbox_activity(username: str, activity: dict) -> bool:
 
     if not await inbox_users.exists(username):
         return False
-
     if not _valid_activity(activity):
         raise ValueError("Malformed ActivityPub activity")
+    if "id" not in activity:
+        raise ValueError("ActivityPub activity has no id")
 
     async with message_bus().topic("incoming_activities").publish() as publish:
-        await publish({"type":    "incoming",
-                       "payload": {"username": username,
-                                   "activity": activity}})
-
+        await publish(event_type=activity["type"],
+                      object_id=activity["id"],
+                      payload={"username": username,
+                               "activity": {k: v
+                                            for k, v in activity.items()
+                                            if k not in ("id", "type")}})
 
     return True
+

@@ -16,8 +16,11 @@ class LocalFileStorage:
     def _path_for(self, file_id: str) -> Path:
         return self._base / file_id[:2] / file_id
 
-    def url_for(self, file_id: str) -> str:
-        return f"{self._base_url}/{file_id[:2]}/{file_id}"
+    def url_for(self,
+                file_id: str,
+                variant: str | None = None) -> str:
+        suffix = f"_{variant}" if variant else ""
+        return f"{self._base_url}/{file_id[:2]}/{file_id}{suffix}"
 
     async def store(self,
                     file_id:      str,

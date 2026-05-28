@@ -35,7 +35,8 @@ def test_register_app_publishes_event(client, fake_bus):
                       "scopes":        "read write"})
     published = fake_bus.topic("oauth_apps").published
     assert len(published) == 1
-    assert published[0]["type"] == "created"
+    assert published[0]["event_type"] == "created"
+    assert published[0]["object_id"] 
     payload = published[0]["payload"]
     assert payload["client_name"] == "Tusky"
     assert payload["redirect_uris"] == "tusky://callback"

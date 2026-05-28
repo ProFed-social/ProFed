@@ -12,26 +12,23 @@ def build_users_projection(storage):
         store = await storage()
         await store.ensure_schema()
 
-
     async def _apply_snapshot_item(data: dict) -> None:
         nonlocal storage
 
         store = await storage()
         await store.add(data["username"])
 
-
-    async def _created(data: dict) -> None:
+    async def _created(object_id: str, payload: dict) -> None:
         nonlocal storage
 
         store = await storage()
-        await store.add(data["username"])
+        await store.add(object_id)
 
-
-    async def _deleted(data: dict) -> None:
+    async def _deleted(object_id: str, payload: dict) -> None:
         nonlocal storage
 
         store = await storage()
-        await store.delete(data["username"])
+        await store.delete(object_id)
 
     return build_projection(topic=users,
                             subscriber="api",

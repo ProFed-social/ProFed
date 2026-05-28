@@ -2,18 +2,53 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
-from typing import Optional, Dict, Callable, Awaitable, Tuple
+from typing import Optional, Dict, Callable, Awaitable, Tuple, Any
 from profed.core.message_bus import message_bus
+
+
+class _EventHandlerSignature:
+    def __init__(self,
+                 *,
+                 include_event_type: bool = False,
+                 include_emitted_at: bool = False):
+        self._include_event_type = include_event_type
+        self._include_emitted_at = include_emitted_at
+
+    def __and__(self,
+                other: "_EventHandlerSignature") -> "_EventHandlerSignature":
+        return _EventHandlerSignature(
+            include_event_type=self._include_event_type or other._include_event_type,
+            include_emitted_at=self._include_emitted_at or other._include_emitted_at)
+
+    async def __call__(self,
+                       handler:    Callable[..., Awaitable[None]],
+                       event_type: str,
+                       object_id:  str,
+                       emitted_at: Any,
+                       payload:    Dict) -> None:
+        args = []
+        if self._include_event_type:
+            args.append(event_type)
+        args.extend([object_id, payload])
+        if self._include_emitted_at:
+            args.append(emitted_at)
+
+        await handler(*args)
+
+
+standard        = _EventHandlerSignature()
+with_event_type = _EventHandlerSignature(include_event_type=True)
+with_emitted_at = _EventHandlerSignature(include_emitted_at=True)
 
 
 def build_projection(topic: Dict,
                      subscriber: str,
                      init: Callable[[], Awaitable[None]],
-                     on_message_type: Dict[str, Callable[[Dict], Awaitable[None]]],
+                     on_message_type: Dict[str, Callable[..., Awaitable[None]]],
                      on_snapshot_item: Callable[[Dict], Awaitable[None]],
                      verify_event: Optional[Callable[[str, Dict], bool]] = None,
                      verify_snapshot_item: Optional[Callable[[Dict], bool]] = None,
-                     with_emitted_at: bool = False) \
+                     event_handler_signature: _EventHandlerSignature = standard) \
         -> Tuple[Callable[[], Awaitable[None]],
                  Callable[[], Awaitable[None]],
                  Callable[[int], None]]:
@@ -26,21 +61,22 @@ def build_projection(topic: Dict,
     last_seen = 0
     topic_name = topic["name"]
 
+    async def _dispatch(event_type, object_id, emitted_at, payload):
+        validated = topic["validate"](event_type, payload)
+        if (validated is not None and
+            event_type in on_message_type and
+            verify_event(event_type, validated)):
+
+            await event_handler_signature(on_message_type[event_type],
+                                          event_type,
+                                          object_id,
+                                          emitted_at,
+                                          validated)
+
     async def handle_events():
-        async for emitted_at, event in message_bus().topic(topic_name).subscribe(subscriber,
-                                                                                 last_seen,
-                                                                                 include_emitted_at=True):
-            event_type, payload = topic["validate"](event)
-
-            if (event_type is not None and
-                event_type in on_message_type and
-                verify_event(event_type, payload)):
-
-                    await on_message_type[event_type](*([payload] +
-                                                        ([emitted_at]
-                                                         if with_emitted_at else
-                                                         [])))
-
+        async for _, event_type, object_id, emitted_at, payload \
+                in message_bus().topic(topic_name).subscribe(subscriber, last_seen):
+            await _dispatch(event_type, object_id, emitted_at, payload)
 
     async def rebuild():
         nonlocal last_seen
@@ -48,7 +84,6 @@ def build_projection(topic: Dict,
         last_seen, snapshot = await message_bus().topic(topic_name).last_snapshot()
         for it in snapshot:
             item = topic["snapshot_validate"](it)
-
             if item is not None and verify_snapshot_item(item):
                 await on_snapshot_item(item)
 
@@ -56,20 +91,12 @@ def build_projection(topic: Dict,
         async def _drain():
             nonlocal last_seen
             try:
-                async for seq, emitted_at, event in message_bus().topic(topic_name).subscribe(subscriber,
-                                                                                              last_seen,
-                                                                                              include_sequence_id=True,
-                                                                                              include_emitted_at=True,
-                                                                                              caught_up=caught_up):
-                    event_type, payload = topic["validate"](event)
-                    if (event_type is not None and
-                        event_type in on_message_type and
-                        verify_event(event_type, payload)):
-                            await on_message_type[event_type](*([payload] +
-                                                                ([emitted_at]
-                                                                 if with_emitted_at else
-                                                                 [])))
-                    last_seen = seq
+                async for sequence_id, event_type, object_id, emitted_at, payload \
+                        in message_bus().topic(topic_name).subscribe(subscriber,
+                                                                     last_seen,
+                                                                     caught_up=caught_up):
+                    await _dispatch(event_type, object_id, emitted_at, payload)
+                    last_seen = sequence_id
                     if caught_up.is_set():
                         return
             except Exception:
@@ -84,9 +111,9 @@ def build_projection(topic: Dict,
         except asyncio.CancelledError:
             pass
 
-
     def reset_last_seen(new_last_seen):
         nonlocal last_seen
         last_seen = new_last_seen
 
     return handle_events, rebuild, reset_last_seen
+

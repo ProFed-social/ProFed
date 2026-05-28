@@ -40,8 +40,10 @@ class FakeConnection:
                                     args[0])
             else:
                 self._db.insert_message(self._extract_table(query),
-                                        args[0],
-                                        i=args[1])
+                                        args[2],
+                                        message_id=args[3] if len(args) > 3 else None,
+                                        event_type=args[0],
+                                        object_id=args[1])
         elif "DELETE" in query:
             self._db.delete_gaps(self._extract_table(query),
                                  args[0])
@@ -84,8 +86,11 @@ class FakeConnection:
                              l_col.lower(),
                              r_col.lower())
         elif "INSERT INTO" in query:
-            return self._db.insert_message(self._extract_table(query), *args)
-
+            return self._db.insert_message(self._extract_table(query),
+                                           event_type=args[0],
+                                           object_id=args[1],
+                                           payload=args[2],
+                                           message_id=args[3] if len(args) > 3 else None)
         return []
 
     def fetch_all_snapshot_event_ids(self, table):
@@ -140,11 +145,19 @@ class InMemoryDatabase:
         self.gaps = defaultdict(set)
         self.connections = []
 
-    def insert_message(self, table, payload, message_id = None, i = None):
+    def insert_message(self,
+                       table,
+                       payload,
+                       message_id=None,
+                       i=None,
+                       event_type=None,
+                       object_id=None):
         table_messages = self.messages[table]
         new_id = i if i is not None else len(table_messages) + 1
         if message_id is None or message_id not in (m["message_id"] for m in table_messages):
             table_messages.append({"id": new_id,
+                                   "event_type": event_type,
+                                   "object_id": object_id,
                                    "payload": payload,
                                    "message_id": message_id,
                                    "emitted_at": datetime.now(timezone.utc)})
@@ -179,3 +192,4 @@ class InMemoryDatabase:
         self.gaps[table] = {row
                             for row in self.gaps[table]
                             if row >= row_id}
+

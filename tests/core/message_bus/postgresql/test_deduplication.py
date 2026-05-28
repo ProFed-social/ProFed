@@ -9,9 +9,9 @@ from profed.core.message_bus.source_key import source_key
 async def test_subscribe_with_sequence_id_yields_id_and_message(topic, db):
     db.insert_message("public.test", {"v": "a"}, i=7)
 
-    subscriber = topic.subscribe(subscriber="test", include_sequence_id=True)
+    subscriber = topic.subscribe(subscriber="test")
 
-    sequence_id, message = await subscriber.__anext__()
+    sequence_id, _, _, _, message = await subscriber.__anext__()
 
     assert sequence_id == 7
     assert message == {"v": "a"}
@@ -22,8 +22,8 @@ async def test_publish_with_dedupe_key_inserts_once(topic, db):
     key = source_key("users").message_id(1)
 
     async with topic.publish() as publish:
-        first = await publish({"x": 1}, message_id=key)
-        second = await publish({"x": 1}, message_id=key)
+        first  = await publish("created", "o1", {"x": 1}, message_id=key)
+        second = await publish("created", "o1", {"x": 1}, message_id=key)
 
     assert first is 1
     assert second is None
@@ -36,8 +36,8 @@ async def test_publish_with_different_dedupe_keys_inserts_both(topic, db):
     key2 = source_key("users").message_id(2)
 
     async with topic.publish() as publish:
-        assert await publish({"x": 1}, message_id=key1) is 1 
-        assert await publish({"x": 2}, message_id=key2) is 2
+        assert await publish("created", "o1", {"x": 1}, message_id=key1) == 1
+        assert await publish("created", "o2", {"x": 2}, message_id=key2) == 2
 
     assert len(db.messages["public.test"]) == 2
 
@@ -47,11 +47,11 @@ async def test_subscribe_with_message_id_sees_only_one_deduplicated_message(topi
     key = source_key("users").message_id(1)
 
     async with topic.publish() as publish:
-        await publish({"x": 1}, message_id=key)
-        await publish({"x": 1}, message_id=key)
+        await publish("created", "o1", {"x": 1}, message_id=key)
+        await publish("created", "o1", {"x": 1}, message_id=key)
 
-    subscriber = topic.subscribe(subscriber="test", include_sequence_id=True)
-    sequence_id, message = await subscriber.__anext__()
+    subscriber = topic.subscribe(subscriber="test")
+    sequence_id, _, _, _, message = await subscriber.__anext__()
 
     assert sequence_id == 1
     assert message == {"x": 1}

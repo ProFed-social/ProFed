@@ -20,13 +20,13 @@ async def _publish_discovered(account_id: int,
                               actor_url: str,
                               actor_data: dict) -> None:
     async with message_bus().topic("known_accounts").publish() as publish:
-        await publish({"type": "discovered",
-                       "payload": {"account_id": account_id,
-                                   "acct": acct,
-                                   "actor_url": actor_url,
-                                   "actor_data": actor_data,
-                                   "last_webfinger_at": datetime.now(timezone.utc).isoformat()}})
- 
+        await publish(event_type="discovered",
+                      object_id=str(account_id),
+                      payload={"acct": acct,
+                               "actor_url": actor_url,
+                               "actor_data":  actor_data,
+                               "last_webfinger_at": datetime.now(timezone.utc).isoformat()}) 
+
  
 async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
     actor_url = await lookup_actor_url(acct)

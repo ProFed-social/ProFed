@@ -27,14 +27,17 @@ async def reading_state(username: str):
             state["value"] = validated
  
     async def _update() -> None:
-        async for event in message_bus().topic("users").subscribe(_SUBSCRIBER,
-                                                                  start_id,
-                                                                  caught_up=caught_up):
-            event_type, payload = users_topic["validate"](event)
-            if payload is None or payload.get("username") != username:
+        async for _, event_type, object_id, _, payload \
+                in message_bus().topic("users").subscribe(_SUBSCRIBER, start_id, caught_up=caught_up):
+            if object_id != username:
                 continue
+
+            validated = users_topic["validate"](event_type, payload)
+            if validated is None:
+                continue
+            
             if event_type in ("created", "updated"):
-                state["value"] = payload
+                state["value"] = {**validated, "username": object_id}
             elif event_type == "deleted":
                 state["value"] = None
  

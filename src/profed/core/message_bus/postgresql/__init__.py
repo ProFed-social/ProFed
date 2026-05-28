@@ -25,11 +25,21 @@ async def init(config: Dict[str, str]):
         for name in _topic_names():
             await conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {config['schema']}.{name} (
-                    id         BIGSERIAL PRIMARY KEY,
-                    payload    JSONB     NOT NULL,
-                    message_id UUID      UNIQUE,
+                    id         BIGSERIAL   PRIMARY KEY,
+                    event_type TEXT        NOT NULL,
+                    object_id  TEXT        NOT NULL,
+                    payload    JSONB       NOT NULL DEFAULT '{{}}'::jsonb,
+                    message_id UUID        UNIQUE,
                     emitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
+            """)
+            await conn.execute(f"""
+                CREATE INDEX IF NOT EXISTS {name}_event_type_idx
+                ON {config['schema']}.{name} (event_type)
+            """)
+            await conn.execute(f"""
+                CREATE INDEX IF NOT EXISTS {name}_object_id_idx
+                ON {config['schema']}.{name} (object_id)
             """)
             await conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {config['schema']}.{name}_snapshots (

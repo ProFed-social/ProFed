@@ -5,18 +5,23 @@ import hashlib
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
  
 import httpx
  
-from profed.core import message_bus
 from profed.components.profile_importer import importer
 from profed.core.media_storage import StoredFile
 from profed.models.user_profile import UserProfile
 
  
 IMAGE_BYTES = b"\xff\xd8\xff\xe0test"
-IMAGE_HASH  = hashlib.sha256(IMAGE_BYTES).hexdigest()
- 
+IMAGE_HASH = hashlib.sha256(IMAGE_BYTES).hexdigest()
+TS = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+def _msg(seq, event_type, object_id, payload):
+    return (seq, event_type, object_id, TS, payload) 
+
  
 def _fake_http_client(headers=None, content=b"", status_code=200):
     response = MagicMock()
@@ -52,31 +57,27 @@ async def test_new_profile_publishes_created(fake_bus):
  
     published = _users(fake_bus).published
     assert len(published) == 1
-    assert published[0]["type"] == "created"
-    assert published[0]["payload"]["username"] == "alice"
+    assert published[0]["event_type"]      == "created"
+    assert published[0]["object_id"]       == "alice"
     assert published[0]["payload"]["name"] == "Alice"
 
 
 @pytest.mark.asyncio
 async def test_changed_profile_publishes_updated(fake_bus):
-    _users(fake_bus).messages = [(1, {"type": "created",
-                                      "payload": {"username": "alice",
-                                                  "name": "Alice"}})]
+    _users(fake_bus).messages = [_msg(1, "created", "alice", {"name": "Alice"})]
     with patch.object(importer, "fetch_mf2",
                       new=AsyncMock(return_value=_mf2("Alice Renamed"))):
         await importer.run_import("alice", "https://example.com/alice")
  
     published = _users(fake_bus).published
     assert len(published) == 1
-    assert published[0]["type"] == "updated"
+    assert published[0]["event_type"] == "updated"
     assert published[0]["payload"]["name"] == "Alice Renamed"
 
 
 @pytest.mark.asyncio
 async def test_unchanged_profile_publishes_nothing(fake_bus):
-    _users(fake_bus).messages = [(1, {"type": "created",
-                                      "payload": {"username": "alice",
-                                                  "name": "Alice"}}) ]
+    _users(fake_bus).messages = [_msg(1, "created", "alice", {"name": "Alice"})]
     with patch.object(importer, "fetch_mf2", new=AsyncMock(return_value=_mf2("Alice"))):
         await importer.run_import("alice", "https://example.com/alice")
     assert _users(fake_bus).published == []
@@ -133,11 +134,10 @@ async def test_created_event_includes_key_pair(fake_bus):
  
 @pytest.mark.asyncio
 async def test_updated_event_preserves_key_pair(fake_bus):
-    _users(fake_bus).messages = [(1, {"type": "created",
-                                       "payload": {"username": "alice",
-                                                   "name": "Alice",
-                                                   "public_key_pem":  "pubkey",
-                                                   "private_key_pem": "privkey"}})]
+    _users(fake_bus).messages = [_msg(1, "created", "alice",
+                                      {"name":            "Alice",
+                                       "public_key_pem":  "pubkey",
+                                       "private_key_pem": "privkey"})]
     with patch.object(importer, "fetch_mf2",
                       new=AsyncMock(return_value=_mf2("Alice Renamed"))):
         await importer.run_import("alice", "https://example.com/alice")
@@ -148,11 +148,10 @@ async def test_updated_event_preserves_key_pair(fake_bus):
  
 @pytest.mark.asyncio
 async def test_unchanged_profile_with_keys_publishes_nothing(fake_bus):
-    _users(fake_bus).messages = [(1, {"type": "created",
-                                       "payload": {"username": "alice",
-                                                   "name": "Alice",
-                                                   "public_key_pem":  "pubkey",
-                                                   "private_key_pem": "privkey"}})]
+    _users(fake_bus).messages = [_msg(1, "created", "alice",
+                                      {"name":            "Alice",
+                                       "public_key_pem":  "pubkey",
+                                       "private_key_pem": "privkey"})]
     with patch.object(importer, "fetch_mf2", new=AsyncMock(return_value=_mf2("Alice"))):
         await importer.run_import("alice", "https://example.com/alice")
     assert _users(fake_bus).published == []
@@ -392,7 +391,7 @@ async def test_run_import_publishes_created_for_new_profile(fake_bus, monkeypatc
  
     published = fake_bus.topic("users").published
     assert len(published) == 1
-    assert published[0]["type"] == "created"
+    assert published[0]["event_type"] == "created"
  
  
 @pytest.mark.asyncio
@@ -406,7 +405,7 @@ async def test_run_import_publishes_updated_when_profile_changed(fake_bus, monke
  
     await importer.run_import("alice", "https://example.com/alice/")
  
-    assert fake_bus.topic("users").published[0]["type"] == "updated"
+    assert fake_bus.topic("users").published[0]["event_type"] == "updated"
  
  
 @pytest.mark.asyncio

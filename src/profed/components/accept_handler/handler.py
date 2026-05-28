@@ -23,41 +23,38 @@ async def _handle_accept(username: str, activity: dict, seq: int) -> None:
     follow_object = accept.object
     if not isinstance(follow_object, dict) or \
        follow_object.get("actor") != actor_url_from_username(username):
-        return
+            return
  
     account_id = await (await storage()).get_by_actor_url(accept.actor)
     if account_id is None:
         logger.warning("accept_handler: unknown actor %r", accept.actor)
         return
- 
+
     async with message_bus().topic("known_accounts").publish() as publish:
-        await publish({"type":    "follow_accepted",
-                       "payload": {"account_id":    account_id,
-                                   "following_user": username}},
+        await publish(event_type="follow_accepted",
+                      object_id=str(account_id),
+                      payload={"following_user": username},
                       message_id=_source_key.message_id(seq))
-    logger.info("accept_handler: follow_accepted for %r -> %r",
-                username,
-                accept.actor)
+
+    logger.info("accept_handler: follow_accepted for %r -> %r", username, accept.actor)
  
- 
+
 async def handle_incoming_activities() -> None:
-    async for seq, event in \
-            message_bus().topic("incoming_activities").subscribe("accept_handler",
-                                                                 include_sequence_id=True):
-        event_type, payload = incoming_activities["validate"](event)
-        if event_type is None:
-            logger.warning("accept_handler: ignoring invalid event: %r", event)
+    async for seq, event_type, object_id, _, payload in \
+              message_bus().topic("incoming_activities").subscribe("accept_handler"):
+        validated = incoming_activities["validate"](event_type, payload)
+        if validated is None:
             continue
- 
-        activity      = payload["activity"]
-        username      = payload["username"]
-        activity_type = activity.get("type")
- 
+
+        username = validated["username"]
+        activity = {"id":   object_id,
+                    "type": event_type,
+                    **validated["activity"]}
+
         try:
-            if activity_type == "Accept":
+            if event_type == "Accept":
                 await _handle_accept(username, activity, seq)
         except Exception:
-            logger.exception("Error handling %s activity for %s",
-                             activity_type,
-                             username)
+            activity_type = activity.get("type")
+            logger.exception("Error handling %s activity for %s", activity_type, username)
 

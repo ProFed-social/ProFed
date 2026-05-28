@@ -35,11 +35,10 @@ def test_create_status_publishes_activity(client, fake_bus):
     assert response.status_code == 200
     published = fake_bus.topic("activities").published
     assert len(published) == 1
-    assert published[0]["type"] == "created"
-    assert published[0]["payload"]["type"] == "Create"
+    assert published[0]["event_type"] == "Create"
     assert published[0]["payload"]["username"] == "alice"
-    assert published[0]["payload"]["object"]["type"] == "Note"
-    assert published[0]["payload"]["object"]["content"] == "Hello Fediverse!"
+    assert published[0]["payload"]["activity"]["object"]["type"] == "Note"
+    assert published[0]["payload"]["activity"]["object"]["content"] == "Hello Fediverse!"
  
  
 def test_create_status_returns_status_object(client, fake_bus):
@@ -48,9 +47,9 @@ def test_create_status_returns_status_object(client, fake_bus):
         response = client.post("/statuses", json={"status": "Hello Fediverse!"})
     data = response.json()
 
-    assert data["content"]          == "Hello Fediverse!"
-    assert data["visibility"]        == "public"
-    assert "id"                      in data
+    assert data["content"] == "Hello Fediverse!"
+    assert data["visibility"] == "public"
+    assert "id" in data
     assert data["account"]["username"] == "alice" 
 
  
@@ -71,11 +70,10 @@ def test_create_status_activity_has_context_and_to(client, fake_bus):
                AsyncMock(return_value=FakePerson())):
         client.post("/statuses", json={"status": "Hello Fediverse!"})
 
-    payload = fake_bus.topic("activities").published[0]["payload"]
-    assert "@context" in payload
-    assert payload["@context"] == ["https://www.w3.org/ns/activitystreams"]
-    assert payload["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
-    assert payload["object"]["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
+    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    assert activity["@context"] == ["https://www.w3.org/ns/activitystreams"]
+    assert activity["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
+    assert activity["object"]["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
 
 
 def test_get_status_returns_404(client, fake_bus):
@@ -89,9 +87,8 @@ def test_delete_status_publishes_delete_activity(client, fake_bus):
 
     assert response.status_code == 200
     published = fake_bus.topic("activities").published
-    assert len(published)                       == 1
-    assert published[0]["type"]                == "deleted"
-    assert published[0]["payload"]["type"]     == "Delete"
+    assert len(published) == 1
+    assert published[0]["event_type"] == "Delete"
     assert published[0]["payload"]["username"] == "alice"
 
 
@@ -100,7 +97,7 @@ def test_status_context_returns_empty_context(client, fake_bus):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["ancestors"]   == []
+    assert data["ancestors"] == []
     assert data["descendants"] == []
 
 

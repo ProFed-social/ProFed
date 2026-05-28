@@ -15,18 +15,37 @@ class _storage(BaseStorage):
                               api.c2s_home_timeline
                                     (id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
                                      username   TEXT        NOT NULL,
+                                     status_id  TEXT        NOT NULL,
                                      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                                     activity   JSONB       NOT NULL)""")
+                                     activity   JSONB       NOT NULL,
+                                     UNIQUE (username, status_id))""")
         await self.execute("""CREATE INDEX IF NOT EXISTS
                               c2s_home_timeline_username_idx
                               ON api.c2s_home_timeline (username,
                                                         created_at DESC)""")
 
-    async def add(self, username: str, activity: dict) -> None:
-        await self.execute("""INSERT INTO api.c2s_home_timeline (username, activity)
-                              VALUES ($1, $2)""",
+    async def add(self, username:  str, status_id: str, activity: dict) -> None:
+        await self.execute("""INSERT INTO api.c2s_home_timeline
+                                          (username, status_id, activity)
+                              VALUES ($1, $2, $3)
+                              ON CONFLICT (username, status_id) DO NOTHING""",
                            username,
+                           status_id,
                            activity)
+
+    async def update_status(self, username:  str, status_id: str, activity: dict) -> None:
+        await self.execute("""UPDATE api.c2s_home_timeline
+                              SET activity = $3
+                              WHERE username = $1 AND status_id = $2""",
+                           username,
+                           status_id,
+                           activity)
+
+    async def delete_status(self, username:  str, status_id: str) -> None:
+        await self.execute("""DELETE FROM api.c2s_home_timeline
+                              WHERE username = $1 AND status_id = $2""",
+                           username,
+                           status_id)
 
     async def fetch(self,
                     username: str,
@@ -42,11 +61,11 @@ class _storage(BaseStorage):
                                     limit)
         return [(row["id"], row["activity"]) for row in rows]
 
-    async def get_by_id(self, status_id: str) -> tuple[str, dict] | None:
+    async def get_by_id(self, ident: str) -> tuple[str, dict] | None:
         row = await self.fetch_one("""SELECT id::text, activity
                                        FROM api.c2s_home_timeline
                                        WHERE id = $1::uuid""",
-                                   status_id)
+                                   ident)
         return (row["id"], row["activity"]) if row else None
 
 

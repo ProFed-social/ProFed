@@ -10,8 +10,8 @@ async def _init() -> None:
     await (await storage()).ensure_schema()
 
 
-async def _uploaded(payload: dict) -> None:
-    await (await storage()).insert(file_id=payload["file_id"],
+async def _uploaded(object_id: str, payload: dict) -> None:
+    await (await storage()).insert(file_id=object_id,
                                    url=payload["url"],
                                    preview_url=payload.get("preview_url"),
                                    content_type=payload["content_type"],
@@ -23,17 +23,35 @@ async def _uploaded(payload: dict) -> None:
                                    etag=payload.get("etag"),
                                    width=payload.get("width"),
                                    height=payload.get("height"),
-                                   preview_width=payload.get("preview_width"),
+                                   preview_width= payload.get("preview_width"),
                                    preview_height=payload.get("preview_height"))
 
 
-async def _deleted(payload: dict) -> None:
-    await (await storage()).delete(payload["file_id"])
+async def _deleted(object_id: str, payload: dict) -> None:
+    await (await storage()).delete(object_id)
+
+
+async def _uploaded_snapshot(item: dict) -> None:
+    await (await storage()).insert(**{k: item.get(k)
+                                      for k in ("file_id",
+                                                "url",
+                                                "preview_url",
+                                                "content_type",
+                                                "size",
+                                                "uploader",
+                                                "source_url",
+                                                "content_hash",
+                                                "last_modified",
+                                                "etag",
+                                                "width",
+                                                "height",
+                                                "preview_width",
+                                                "preview_height")})
 
 
 handle_events, rebuild, _ = build_projection(topic=media,
                                              subscriber="api_c2s_media",
                                              init=_init,
-                                             on_snapshot_item=_uploaded,
+                                             on_snapshot_item=_uploaded_snapshot,
                                              on_message_type={"uploaded": _uploaded,
                                                               "deleted": _deleted})

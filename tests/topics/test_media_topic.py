@@ -1,80 +1,79 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.topics.media_topic import validate_media_event, validate_media_snapshot_item
+from profed.topics.media_topic import (validate_media_event,
+                                       validate_media_snapshot_item)
 
 
-UPLOADED = {"type":    "uploaded",
-            "payload": {"file_id":      "abc123",
-                        "url":          "https://example.com/media/ab/abc123",
-                        "content_type": "image/jpeg",
-                        "size":          45678,
-                        "uploader":     "alice@example.com"}}
+UPLOADED = {"url":          "https://example.com/media/ab/abc123",
+            "content_type": "image/jpeg",
+            "size":          45678,
+            "uploader":     "alice@example.com"}
 
 
-DELETED = {"type":    "deleted",
-           "payload": {"file_id": "abc123"}}
+def test_valid_uploaded_event_returns_payload():
+    payload = validate_media_event("uploaded", UPLOADED)
 
-
-def test_valid_uploaded_event_returns_type_and_payload():
-    event_type, payload = validate_media_event(UPLOADED)
-
-    assert event_type          == "uploaded"
-    assert payload["file_id"]  == "abc123"
+    assert payload is not None
     assert payload["size"]     == 45678
     assert payload["uploader"] == "alice@example.com"
 
 
-def test_valid_deleted_event_returns_type_and_payload():
-    event_type, payload = validate_media_event(DELETED)
-
-    assert event_type         == "deleted"
-    assert payload["file_id"] == "abc123"
+def test_valid_deleted_event_returns_empty_payload():
+    assert validate_media_event("deleted", {}) == {}
 
 
-def test_missing_required_field_in_uploaded_returns_none():
-    event = {"type":    "uploaded",
-             "payload": {"file_id": "abc123",
-                         "url":     "https://example.com/media/ab/abc123"}}
-    event_type, payload = validate_media_event(event)
+def test_valid_variants_added_event_returns_payload():
+    variants = {"small": {"url":          "https://example.com/media/ab/abc123_small",
+                          "width":        80,
+                          "height":       80,
+                          "content_type": "image/jpeg"}}
 
-    assert event_type is None
-    assert payload    is None
-
-
-def test_non_integer_size_in_uploaded_returns_none():
-    event = {**UPLOADED,
-             "payload": {**UPLOADED["payload"], "size": "45678"}}
-    event_type, payload = validate_media_event(event)
-
-    assert event_type is None
+    assert validate_media_event("variants_added", variants) == variants
 
 
-def test_missing_file_id_in_deleted_returns_none():
-    event_type, payload = validate_media_event({"type": "deleted", "payload": {}})
+def test_uploaded_missing_required_field_returns_none():
+    bad = {k: v for k, v in UPLOADED.items() if k != "size"}
 
-    assert event_type is None
+    assert validate_media_event("uploaded", bad) is None
+
+
+def test_uploaded_non_integer_size_returns_none():
+    bad = {**UPLOADED, "size": "45678"}
+
+    assert validate_media_event("uploaded", bad) is None
+
+
+def test_deleted_with_non_empty_payload_returns_none():
+    assert validate_media_event("deleted", {"file_id": "x"}) is None
+
+
+def test_variants_added_missing_field_in_variant_returns_none():
+    bad = {"small": {"url": "u", "width": 80}}
+
+    assert validate_media_event("variants_added", bad) is None
+
+
+def test_variants_added_non_dict_variant_returns_none():
+    bad = {"small": "not a dict"}
+
+    assert validate_media_event("variants_added", bad) is None
 
 
 def test_unknown_event_type_returns_none():
-    event_type, payload = validate_media_event({"type": "processed", "payload": {}})
-
-    assert event_type is None
+    assert validate_media_event("processed", {}) is None
 
 
-def test_non_dict_event_returns_none():
-    event_type, payload = validate_media_event("not a dict")
-
-    assert event_type is None
-    assert payload    is None
+def test_non_dict_payload_returns_none():
+    assert validate_media_event("uploaded", "not a dict") is None
 
 
 def test_valid_snapshot_item_returns_item():
-    item = {"file_id": "abc123", "url": "https://example.com/media/ab/abc123"}
+    item = {"file_id": "abc123", "url": "https://example.com"}
 
     assert validate_media_snapshot_item(item) == item
 
 
 def test_snapshot_item_without_file_id_returns_none():
-    assert validate_media_snapshot_item({"url": "https://example.com"}) is None
+    assert validate_media_snapshot_item({"url": "x"}) is None
 

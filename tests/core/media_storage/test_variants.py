@@ -75,24 +75,6 @@ async def test_scale_image_no_dimensions_raises(fake_bus, fake_media_storage):
 
 
 @pytest.mark.asyncio
-async def test_scale_image_publishes_variants_added(fake_bus, fake_media_storage):
-    await fake_media_storage.store("orig", _jpeg(800, 600), "image/jpeg")
-
-    await scale_image("orig", "large", width=200, height=200)
-
-    published = fake_bus.topic("media").published
-    assert len(published) == 1
-
-    event = published[0]
-    assert event["type"] == "variants_added"
-    assert event["payload"] == {"file_id":  "orig",
-                                "variants": {"large": {"url":          "https://fake.example.com/orig_large",
-                                                       "width":        200,
-                                                       "height":       200,
-                                                       "content_type": "image/jpeg"}}}
-
-
-@pytest.mark.asyncio
 async def test_scale_image_png_with_alpha_preserves_rgba(fake_bus, fake_media_storage):
     await fake_media_storage.store("orig", _png(400, 400, mode="RGBA"), "image/png")
 

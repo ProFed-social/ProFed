@@ -99,21 +99,19 @@ def _parse_retry_after(headers) -> int | None:
 async def _publish_attempt(activity_id: str,
                            recipient: str,
                            attempt: int,
-                           success: bool,
+                           event_type: str,
                            status_code: int | None,
                            retry_after: int | None,
                            first_attempt_at: datetime) -> None:
     async with message_bus().topic("deliveries").publish() as publish:
-        await publish({"type": "attempted",
-                       "payload": {"activity_id":      activity_id,
-                                   "recipient":        recipient,
-                                   "success":          success,
-                                   "attempt":          attempt,
-                                   "status_code":      status_code,
-                                   "retry_after":      retry_after,
-                                   "first_attempt_at": first_attempt_at.isoformat()}},
+        await publish(event_type=event_type,
+                      object_id=f"{activity_id}|{recipient}",
+                      payload={"attempt": attempt,
+                               "status_code": status_code,
+                               "retry_after": retry_after,
+                               "first_attempt_at": first_attempt_at.isoformat()},
                       message_id=uuid.uuid5(uuid.NAMESPACE_URL,
-                                            f"{activity_id}#{recipient}#{attempt}"))
+                                            f"{activity_id}#{recipient}#{attempt}#{event_type}"))
 
 
 async def _build_signed_headers(activity: dict,
@@ -163,33 +161,28 @@ async def _attempt_delivery(config: dict,
                             recipient_acct: str,
                             attempt: int,
                             first_at: datetime) -> None:
-    inbox_url = await _fetch_inbox_url(_actor_url_from_acct(recipient_acct),
-                                       config)
-    if inbox_url is None:
-        await _publish_attempt(activity_id, recipient_acct, attempt, False, None, None, first_at)
-        return
+    inbox_url = await _fetch_inbox_url(_actor_url_from_acct(recipient_acct), config)
 
+    if inbox_url is None:
+        await _publish_attempt(activity_id, recipient_acct, attempt, "delivery_failed", None, None, first_at)
+        return
     try:
         async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await _post_to_inbox(inbox_url, activity, client)
 
-        status_code = response.status_code
-        success     = 200 <= status_code < 300
+        success = 200 <= response.status_code < 300
         await _publish_attempt(activity_id,
                                recipient_acct,
                                attempt,
-                               success,
-                               status_code,
+                               "delivery_succeeded" if success else "delivery_failed",
+                               response.status_code,
                                _parse_retry_after(response.headers),
                                first_at)
-
-        if not success and not status_code in PERMANENT_FAILURES:
-            asyncio.create_task(deliver(config, activity_id, activity, recipient_acct),
-                                name=f"retry:{activity_id}:{recipient_acct}")
     except Exception:
         logger.exception("HTTP error delivering %s → %s", activity_id, recipient_acct)
 
-        await _publish_attempt(activity_id, recipient_acct, attempt, False, None, None, first_at)
+        await _publish_attempt(activity_id, recipient_acct, attempt, "delivery_failed", None, None, first_at)
+
         asyncio.create_task(deliver(config, activity_id, activity, recipient_acct),
                             name=f"retry:{activity_id}:{recipient_acct}")
 
@@ -206,6 +199,11 @@ async def deliver(config: dict,
     attempt  = 1 if status is None else status["attempt"] + 1
     delay = _next_delay(config, status, status.get("retry_after") if status else None)
     if delay is None:
+        await _publish_attempt(activity_id, recipient_acct, attempt - 1,
+                               "delivery_gave_up",
+                               None,
+                               None,
+                               status["first_attempt_at"])
         logger.warning("Giving up on %s → %s after %d attempts",
                        activity_id, recipient_acct, attempt - 1)
         return

@@ -11,7 +11,7 @@ from uuid import uuid4
  
 from profed.core.message_bus import message_bus
 from profed.core.media_storage import media_storage
-from profed.core.media_storage.variants import scale_image
+from profed.media import scale_image
 from profed.identity import acct_from_username
 from profed.http.signatures import generate_key_pair 
 from profed.models import UserProfile
@@ -74,17 +74,18 @@ async def _download_and_store(source_url:   str,
     file_id = str(uuid4()).replace("-", "")
     stored = await media_storage().store(file_id, response.content, content_type)
     async with message_bus().topic("media").publish() as publish:
-        await publish({"type": "uploaded",
-                       "payload": {"file_id": file_id,
-                                   "url": stored.url,
-                                   "content_type": content_type,
-                                   "size": stored.size,
-                                   "uploader": uploader,
-                                   "source_url": source_url,
-                                   "content_hash": new_hash,
-                                   "last_modified": response.headers.get("last-modified",
-                                                                         datetime.now(timezone.utc).isoformat()),
-                                   "etag": response.headers.get("etag")}})
+        await publish(event_type="uploaded",
+                      object_id=file_id,
+                      payload={"url": stored.url,
+                               "content_type": content_type,
+                               "size": stored.size,
+                               "uploader": uploader,
+                               "source_url": source_url,
+                               "content_hash": new_hash,
+                               "last_modified": response.headers.get("last-modified",
+                                                                     datetime.now(timezone.utc).isoformat()),
+                               "etag": response.headers.get("etag")})
+
     return (stored.url, file_id)
 
 
@@ -134,7 +135,7 @@ async def _sync_images(uploader, new_profile, media_state):
             new_url, file_id = await _download_and_store(source_url, existing, uploader)
             if file_id is not None:
                 for variant, dims in _VARIANTS_FOR.get(url_attr, []):
-                    tasks.setdefault(source_url, {})[variant] =  asyncio.create_task(scale_image(file_id, variant, **dims))
+                    tasks.setdefault(source_url, {})[variant] = scale_image(file_id, variant, **dims)
         else:
             new_url = _field_of(existing, "url") or last_url
         last_url = new_url
@@ -185,7 +186,8 @@ async def run_import(username: str, url: str) -> None:
     async with message_bus().topic("users").publish() as publish:
         payload = new_profile.model_dump(exclude_none=True)
         payload["private_key_pem"] = new_profile.private_key_pem
-        await publish({"type": event_type, "payload": payload})
+        username = payload.pop("username")
+        await publish(event_type=event_type, object_id=username, payload=payload)
 
     logger.info("Published users.%s for %s", event_type, username)
 

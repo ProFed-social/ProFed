@@ -17,21 +17,25 @@ def fake_storage():
     storage_module.overwrite(None)
 
 
-ACTIVITY = {"type":  "Follow",
+ACTIVITY = {"id": "https://mastodon.social/alice#follows/1",
+            "type": "Follow",
             "actor": "https://mastodon.social/users/alice",
             "object": "https://example.com/actors/cdonat"}
 
 
 @pytest.mark.asyncio
-async def test_publishes_event_with_type_and_payload(fake_bus, fake_storage):
+async def test_publishes_event_with_event_type_and_payload(fake_bus, fake_storage):
     await accept_inbox_activity("cdonat", ACTIVITY)
     
     published = fake_bus.topic("incoming_activities").published
     
     assert len(published) == 1
-    assert published[0]["type"] == "incoming"
+    assert published[0]["event_type"] == "Follow"
+    assert published[0]["object_id"] == ACTIVITY["id"]
     assert published[0]["payload"]["username"] == "cdonat"
-    assert published[0]["payload"]["activity"] == ACTIVITY
+    assert published[0]["payload"]["activity"]["actor"] == ACTIVITY["actor"]
+    assert "id"   not in published[0]["payload"]["activity"]
+    assert "type" not in published[0]["payload"]["activity"]
 
 
 @pytest.mark.asyncio

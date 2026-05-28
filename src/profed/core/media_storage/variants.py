@@ -3,32 +3,36 @@
 
 import asyncio
 import io
+from typing import Awaitable, Callable, Optional
 from PIL import Image
 from profed.core.media_storage import media_storage
-from profed.core.message_bus  import message_bus
 
 
-async def scale_image(file_id,
-                      variant,
+OnComplete = Callable[[str, str, int, int, str], Awaitable[None]]
+
+
+async def scale_image(media_id:    str,
+                      variant:     str,
                       *,
-                      width  = None,
-                      height = None):
+                      width:       Optional[int]      = None,
+                      height:      Optional[int]      = None,
+                      on_complete: Optional[OnComplete] = None) -> tuple[int, int]:
     if width is None and height is None:
         raise ValueError("scale_image: at least one of width, height must be set")
     storage  = media_storage()
-    original = await storage.retrieve(file_id)
-    scaled, final_w, final_h, content_type = await asyncio.to_thread(_scale_pillow,
-                                                                     original,
-                                                                     width,
-                                                                     height)
-    stored = await storage.store(f"{file_id}_{variant}", scaled, content_type)
-    async with message_bus().topic("media").publish() as publish:
-        await publish({"type":    "variants_added",
-                       "payload": {"file_id":  file_id,
-                                   "variants": {variant: {"url":          stored.url,
-                                                          "width":        final_w,
-                                                          "height":       final_h,
-                                                          "content_type": content_type}}}})
+    (scaled,
+     final_w,
+     final_h,
+     content_type) = await asyncio.to_thread(_scale_pillow,
+                                             await storage.retrieve(media_id),
+                                             width,
+                                             height)
+    await storage.store(f"{media_id}_{variant}", scaled, content_type)
+
+    if on_complete is not None:
+        await on_complete(media_id, variant, final_w, final_h, content_type)
+
+    return final_w, final_h
 
 
 def _scale_pillow(image_bytes, width, height):

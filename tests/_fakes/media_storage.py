@@ -9,9 +9,10 @@ class FakeMediaStorage:
         self._files    = {}
         self._base_url = base_url.rstrip("/")
  
-    def url_for(self, file_id: str) -> str:
-        return f"{self._base_url}/{file_id}"
- 
+    def url_for(self, file_id: str, variant: str | None = None) -> str:
+        suffix = f"_{variant}" if variant else ""
+        return f"{self._base_url}/{file_id}{suffix}" 
+
     async def store(self,
                     file_id:      str,
                     data:         bytes,

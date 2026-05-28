@@ -5,56 +5,42 @@ from profed.topics.incoming_activities_topic import (validate_incoming_activitie
                                                      validate_incoming_activities_snapshot_item)
 
 
-PAYLOAD = {"username": "alice", "activity": {"type": "Follow", "actor": "https://remote/bob"}}
-VALID   = {"type": "Follow", "payload": PAYLOAD}
+PAYLOAD = {"username": "alice",
+           "activity": {"actor": "https://remote/bob"}}
 
 
-def test_valid_event_returns_type_and_payload():
-    event_type, payload = validate_incoming_activities_event(VALID)
+def test_valid_follow_event_returns_payload():
+    payload = validate_incoming_activities_event("Follow", PAYLOAD)
 
-    assert event_type == "Follow"
+    assert payload is not None
     assert payload["username"] == "alice"
 
+def test_valid_create_event_returns_payload():
+    assert validate_incoming_activities_event("Create", PAYLOAD) is not None
 
-def test_non_dict_returns_none():
-    assert validate_incoming_activities_event("x") == (None, None)
+def test_unknown_verb_returns_none():
+    assert validate_incoming_activities_event("Foo", PAYLOAD) is None
 
+def test_non_dict_payload_returns_none():
+    assert validate_incoming_activities_event("Follow", "x") is None
 
-def test_missing_type_returns_none():
-    event_type, _ = validate_incoming_activities_event({"payload": PAYLOAD})
+def test_missing_username_returns_none():
+    bad = {"activity": {}}
 
-    assert event_type is None
+    assert validate_incoming_activities_event("Follow", bad) is None
 
+def test_empty_username_returns_none():
+    bad = {"username": "", "activity": {}}
 
-def test_empty_type_returns_none():
-    event_type, _ = validate_incoming_activities_event({"type": "", "payload": PAYLOAD})
+    assert validate_incoming_activities_event("Follow", bad) is None
 
-    assert event_type is None
+def test_missing_activity_returns_none():
+    bad = {"username": "alice"}
 
+    assert validate_incoming_activities_event("Follow", bad) is None
 
-def test_missing_payload_returns_none():
-    event_type, _ = validate_incoming_activities_event({"type": "Follow"})
-
-    assert event_type is None
-
-
-def test_missing_username_in_payload_returns_none():
-    bad = {"type": "Follow", "payload": {"activity": {}}}
-    event_type, _ = validate_incoming_activities_event(bad)
-
-    assert event_type is None
-
-
-def test_missing_activity_in_payload_returns_none():
-    bad = {"type": "Follow", "payload": {"username": "alice"}}
-    event_type, _ = validate_incoming_activities_event(bad)
-
-    assert event_type is None
-
-
-def test_snapshot_item_is_not_supported():
+def test_snapshot_item_is_always_none():
     assert validate_incoming_activities_snapshot_item({"username": "alice"}) is None
-
 
 def test_snapshot_item_handles_none_input():
     assert validate_incoming_activities_snapshot_item(None) is None

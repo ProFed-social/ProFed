@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from typing import ClassVar
+from typing import Any, ClassVar
 
 
 class ActivityStreamsObject(BaseModel):
@@ -28,6 +28,32 @@ class ActivityStreamsObject(BaseModel):
         if not self.context:
             self.context = self.__class__.default_context()
         return self
+
+    def as_event_payload(self, exclude: tuple[str, ...] = ("id", "type")) -> dict[str, Any]:
+        return {k: v
+                for k, v in self.model_dump(by_alias=True,
+                                            exclude_none=True).items()
+                if k not in exclude}
+
+    @classmethod
+    def from_payload(cls,
+                     object_id: str,
+                     event_type: str,
+                     payload: dict[str, Any]) -> "ActivityStreamsObject":
+        def all_subs(c):
+            yield c
+            for sub in c.__subclasses__():
+                yield from all_subs(sub)
+
+        target = next((c
+                       for c in all_subs(cls)
+                       if "type" in c.model_fields and
+                          c.model_fields["type"].default == event_type),
+                      cls)
+
+        return target.model_validate({"id": object_id,
+                                      "type": event_type,
+                                      **payload})
 
     id: str
     type: str

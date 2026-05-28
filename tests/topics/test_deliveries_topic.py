@@ -1,71 +1,49 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
+from profed.topics.deliveries_topic import (validate_deliveries_event,
+                                            validate_deliveries_snapshot_item)
 
-from profed.topics.deliveries_topic import validate_deliveries_event, validate_deliveries_snapshot_item
-
-
-PAYLOAD = {"activity_id": "act:1", "recipient": "https://remote/inbox", "success": True, "attempt": 1}
-VALID   = {"type": "attempted", "payload": PAYLOAD}
-
-
-def test_valid_event_returns_type_and_payload():
-    event_type, payload = validate_deliveries_event(VALID)
-
-    assert event_type == "attempted"
-    assert payload["activity_id"] == "act:1"
+PAYLOAD = {"attempt":          1,
+           "first_attempt_at": "2026-01-01T00:00:00Z"}
 
 
-def test_non_dict_returns_none():
-    assert validate_deliveries_event("x") == (None, None)
+def test_valid_delivery_succeeded_returns_payload():
+    payload = validate_deliveries_event("delivery_succeeded", PAYLOAD)
+
+    assert payload is not None
+    assert payload["attempt"] == 1
 
 
-def test_unknown_type_returns_none():
-    event_type, _ = validate_deliveries_event({"type": "sent", "payload": PAYLOAD})
-
-    assert event_type is None
+def test_valid_delivery_failed_returns_payload():
+    assert validate_deliveries_event("delivery_failed", PAYLOAD) is not None
 
 
-def test_missing_activity_id_returns_none():
-    bad = {"type": "attempted", "payload": {k: v for k, v in PAYLOAD.items() if k != "activity_id"}}
-    event_type, _ = validate_deliveries_event(bad)
-
-    assert event_type is None, "expected None for missing activity_id"
+def test_valid_delivery_gave_up_returns_payload():
+    assert validate_deliveries_event("delivery_gave_up", PAYLOAD) is not None
 
 
-def test_missing_recipient_returns_none():
-    bad = {"type": "attempted", "payload": {k: v for k, v in PAYLOAD.items() if k != "recipient"}}
-    event_type, _ = validate_deliveries_event(bad)
-
-    assert event_type is None, "expected None for missing recipient"
+def test_old_attempted_event_type_returns_none():
+    assert validate_deliveries_event("attempted", PAYLOAD) is None
 
 
-def test_missing_success_returns_none():
-    bad = {"type": "attempted", "payload": {k: v for k, v in PAYLOAD.items() if k != "success"}}
-    event_type, _ = validate_deliveries_event(bad)
-
-    assert event_type is None, "expected None for missing success"
+def test_non_dict_payload_returns_none():
+    assert validate_deliveries_event("delivery_succeeded", "x") is None
 
 
 def test_missing_attempt_returns_none():
-    bad = {"type": "attempted", "payload": {k: v for k, v in PAYLOAD.items() if k != "attempt"}}
-    event_type, _ = validate_deliveries_event(bad)
-
-    assert event_type is None, "expected None for missing attempt"
-
-
-
-def test_non_integer_attempt_returns_none():
-    bad = {"type": "attempted", "payload": {**PAYLOAD, "attempt": "1"}}
-    event_type, _ = validate_deliveries_event(bad)
-
-    assert event_type is None
+    assert validate_deliveries_event("delivery_succeeded", {}) is None
 
 
 def test_zero_attempt_returns_none():
-    bad = {"type": "attempted", "payload": {**PAYLOAD, "attempt": 0}}
-    event_type, _ = validate_deliveries_event(bad)
+    bad = {**PAYLOAD, "attempt": 0}
 
-    assert event_type is None
+    assert validate_deliveries_event("delivery_succeeded", bad) is None
+
+
+def test_non_integer_attempt_returns_none():
+    bad = {**PAYLOAD, "attempt": "1"}
+
+    assert validate_deliveries_event("delivery_succeeded", bad) is None
 
 
 def test_valid_snapshot_item_returns_item():
@@ -73,5 +51,5 @@ def test_valid_snapshot_item_returns_item():
 
 
 def test_invalid_snapshot_item_returns_none():
-    assert validate_deliveries_snapshot_item({"activity_id": "x"}) is None
+    assert validate_deliveries_snapshot_item({}) is None
 

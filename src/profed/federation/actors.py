@@ -27,12 +27,12 @@ async def fetch_and_register_actor(actor_url: str) -> Optional[str]:
     if acct is not None:
         aid = int(compute_account_id(acct))
         async with message_bus().topic("known_accounts").publish() as publish:
-            await publish({"type": "discovered",
-                           "payload": {"account_id": aid,
-                                       "acct": acct,
-                                       "actor_url": actor_url,
-                                       "actor_data": actor_data,
-                                       "last_webfinger_at": datetime.now(timezone.utc).isoformat()}})
+            await publish(event_type="discovered",
+                          object_id=str(aid),
+                          payload={"acct": acct,
+                                   "actor_url": actor_url,
+                                   "actor_data": actor_data,
+                                   "last_webfinger_at": datetime.now(timezone.utc).isoformat()})
 
     return (actor_data.get("publicKey") or {}).get("publicKeyPem")
 

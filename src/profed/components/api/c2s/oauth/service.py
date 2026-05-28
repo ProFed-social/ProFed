@@ -52,35 +52,33 @@ async def issue_code(client_id: str,
     code = secrets.token_urlsafe(32)
 
     async with message_bus().topic("oauth_codes").publish() as publish:
-        await publish({"type": "issued",
-                       "payload": {"code":       code,
-                                   "client_id":  client_id,
-                                   "username":   username,
-                                   "id_token":   id_token,
-                                   "expires_at": time.time() + CODE_TTL}})
-
+        await publish(event_type="issued",
+                      object_id=code,
+                      payload={"client_id": client_id,
+                               "username": username,
+                               "id_token": id_token,
+                               "expires_at": time.time() + CODE_TTL})
     return code
  
  
 async def consume_code(code: str) -> None:
     async with message_bus().topic("oauth_codes").publish() as publish:
-        await publish({"type": "consumed",
-                       "payload": {"code": code}})
+        await publish(event_type="consumed", object_id=code, payload={})
 
 
 async def issue_token(client_id: str, username: str) -> str:
     token = secrets.token_urlsafe(32)
 
     async with message_bus().topic("oauth_tokens").publish() as publish:
-        await publish({"type":    "issued",
-                       "payload": {"token":     token,
-                                   "username":  username,
-                                   "client_id": client_id}})
+        await publish(event_type="issued",
+                      object_id=token,
+                      payload={"username": username,
+                               "client_id": client_id})
+
     return token
 
 
 async def revoke_token(token: str) -> None:
     async with message_bus().topic("oauth_tokens").publish() as publish:
-        await publish({"type":    "revoked",
-                       "payload": {"token": token}})
+        await publish(event_type="revoked", object_id=token, payload={})
 

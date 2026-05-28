@@ -98,13 +98,13 @@ def test_follow_by_numeric_id_publishes_events(client):
     assert data["requested"] is True
     known_accounts_events = fake_bus.topic("known_accounts").published
     assert len(known_accounts_events) == 1
-    assert known_accounts_events[0]["type"] == "follow_requested"
-    assert known_accounts_events[0]["payload"]["account_id"] == 123456
+    assert known_accounts_events[0]["event_type"] == "follow_requested"
+    assert known_accounts_events[0]["object_id"] == "123456"
     assert known_accounts_events[0]["payload"]["following_user"] == "alice"
     activities_events = fake_bus.topic("activities").published
     assert len(activities_events) == 1
-    assert activities_events[0]["payload"]["type"] == "Follow"
-    assert activities_events[0]["payload"]["object"] == ROW["actor_url"]
+    assert activities_events[0]["event_type"] == "Follow"
+    assert activities_events[0]["payload"]["activity"]["object"] == ROW["actor_url"]
 
 
 def test_follow_unknown_account_returns_404(client):
@@ -190,7 +190,7 @@ def test_follow_publishes_follow_activity_id_in_known_accounts_event(client):
     follow_id = payload["follow_activity_id"]
     assert follow_id.startswith("https://example.com/actors/alice#follows/")
     activities_events = fake_bus.topic("activities").published
-    assert activities_events[0]["payload"]["id"] == follow_id
+    assert activities_events[0]["object_id"] == follow_id
 
 
 FOLLOWING_WITH_ACTIVITY_ID = {"account_id":         123456,
@@ -222,8 +222,8 @@ def test_unfollow_publishes_known_accounts_event(client):
     assert response.json() == {"id": "123456", "following": False, "requested": False}
     events = fake_bus.topic("known_accounts").published
     assert len(events) == 1
-    assert events[0]["type"] == "unfollow"
-    assert events[0]["payload"]["account_id"]    == 123456
+    assert events[0]["event_type"] == "unfollow"
+    assert events[0]["object_id"] == "123456"
     assert events[0]["payload"]["following_user"] == "alice"
 
 
@@ -242,13 +242,13 @@ def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
     assert response.status_code == 200
     events = fake_bus.topic("activities").published
     assert len(events) == 1
-    payload = events[0]["payload"]
-    assert payload["type"]  == "Undo"
-    assert payload["actor"] == "https://example.com/actors/alice"
-    obj = payload["object"]
-    assert obj["type"]   == "Follow"
-    assert obj["id"]     == FOLLOWING_WITH_ACTIVITY_ID["follow_activity_id"]
-    assert obj["actor"]  == "https://example.com/actors/alice"
+    assert events[0]["event_type"] == "Undo"
+    activity = events[0]["payload"]["activity"]
+    assert activity["actor"]      == "https://example.com/actors/alice"
+    obj = activity["object"]
+    assert obj["type"] == "Follow"
+    assert obj["id"] == FOLLOWING_WITH_ACTIVITY_ID["follow_activity_id"]
+    assert obj["actor"] == "https://example.com/actors/alice"
     assert obj["object"] == ROW["actor_url"]
 
 
@@ -268,7 +268,7 @@ def test_unfollow_without_follow_activity_id_uses_fallback_id(client):
     assert response.status_code == 200
     events = fake_bus.topic("activities").published
     assert len(events) == 1
-    assert events[0]["payload"]["object"]["id"].endswith("#follows/123456")
+    assert events[0]["payload"]["activity"]["object"]["id"].endswith("#follows/123456")
 
 
 def test_unfollow_unknown_account_returns_404(client):

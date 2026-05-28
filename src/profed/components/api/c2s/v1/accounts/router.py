@@ -96,18 +96,17 @@ async def follow(id: str,
     follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
 
     async with message_bus().topic("known_accounts").publish() as publish:
-        await publish({"type":    "follow_requested",
-                       "payload": {"account_id":    row["account_id"],
-                                   "following_user": username,
-                                   "follow_activity_id": follow_id}})
- 
+        await publish(event_type="follow_requested",
+                      object_id=str(row["account_id"]),
+                      payload={"following_user": username,
+                               "follow_activity_id": follow_id})
+
     async with message_bus().topic("activities").publish() as publish:
-        await publish({"type":    "created",
-                       "payload": {"id":       follow_id,
-                                   "type":     "Follow",
-                                   "actor":    actor_url_from_username(username),
-                                   "object":   actor_url,
-                                   "username": username}})
+        await publish(event_type="Follow",
+                      object_id=follow_id,
+                      payload={"username": username,
+                               "activity": {"actor": actor_url_from_username(username),
+                                            "object": actor_url}})
  
     return {"id":       str(row["account_id"]),
             "following": False,
@@ -149,20 +148,19 @@ async def unfollow(id: str,
     undo_id    = f"{actor_url}#unfollows/{uuid.uuid4()}"
 
     async with message_bus().topic("known_accounts").publish() as publish:
-        await publish({"type": "unfollow",
-                       "payload": {"account_id": account["account_id"],
-                                   "following_user": username}})
+        await publish(event_type="unfollow",
+                      object_id=str(account["account_id"]),
+                      payload={"following_user": username})
 
     async with message_bus().topic("activities").publish() as publish:
-        await publish({"type":    "created",
-                       "payload": {"id":       undo_id,
-                                   "type":     "Undo",
-                                   "actor":    actor_url,
-                                   "object":   {"id":     follow_id,
-                                                "type":   "Follow",
-                                                "actor":  actor_url,
-                                                "object": account["actor_url"]},
-                                   "username": username}})
+        await publish(event_type="Undo",
+                      object_id=undo_id,
+                      payload={"username": username,
+                               "activity": {"actor": actor_url,
+                                            "object": {"id": follow_id,
+                                                       "type": "Follow",
+                                                       "actor": actor_url,
+                                                       "object": account["actor_url"]}}})
 
     return {"id": str(account["account_id"]),
             "following": False,

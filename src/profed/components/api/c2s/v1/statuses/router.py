@@ -59,22 +59,26 @@ async def create_status(body: StatusCreate,
                               to=note.to,
                               object=note.model_dump(by_alias=True,
                                                      exclude_none=True))
-    payload = activity.model_dump(by_alias=True, exclude_none=True)
-    payload["username"] = username
+
     async with message_bus().topic("activities").publish() as publish:
-        await publish({"type":    "created",
-                       "payload": payload})
- 
-    return Status(id=          note_id,
-                  created_at=  created_at,
-                  visibility=  body.visibility,
-                  sensitive=   body.sensitive,
+        await publish(event_type="Create",
+                      object_id=activity_id,
+                      payload={"username": username,
+                               "activity": {k: v
+                                            for k, v in activity.model_dump(by_alias=True,
+                                                                            exclude_none=True).items()
+                                            if k not in ("id", "type")}})
+
+    return Status(id=note_id,
+                  created_at=created_at,
+                  visibility=body.visibility,
+                  sensitive=body.sensitive,
                   spoiler_text=body.spoiler_text,
-                  language=    body.language,
-                  uri=         note_id,
-                  url=         note_id,
-                  content=     body.status,
-                  account=     local_account(username, await resolve_actor(username)))
+                  language=body.language,
+                  uri=note_id,
+                  url=note_id,
+                  content=body.status,
+                  account=local_account(username, await resolve_actor(username)))
 
 
 @router.get("/statuses/{id}")
@@ -89,15 +93,17 @@ async def delete_status(id: str,
     username = claims.get("preferred_username") or claims.get("sub")
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
-    actor_url   = actor_url_from_username(username)
-    activity    = DeleteActivity(id=f"{actor_url}#delete/{id}",
-                                 actor=actor_url,
-                                 object=id)
-    payload = activity.model_dump(by_alias=True, exclude_none=True)
-    payload["username"] = username
+    actor_url = actor_url_from_username(username)
+
+    activity = DeleteActivity(id=f"{actor_url}#delete/{id}",
+                              actor=actor_url,
+                              object=id)
+
     async with message_bus().topic("activities").publish() as publish:
-        await publish({"type":    "deleted",
-                       "payload": payload})
+        await publish(event_type="Delete",
+                      object_id=f"{actor_url}#delete/{id}",
+                      payload={"username": username,
+                               "activity": activity.as_event_payload()})
     return {}
 
 

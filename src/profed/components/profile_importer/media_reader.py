@@ -30,26 +30,28 @@ async def reading_media_state(source_urls: frozenset):
         if src in source_urls:
             state[src] = payload
 
-    def update_deleted(payload):
+    def update_deleted(file_id):
         nonlocal state
 
         for src, entry in list(state.items()):
-            if entry.get("file_id") == payload.get("file_id"):
+            if entry.get("file_id") == file_id:
                 del state[src]
 
     async def _update() -> None:
         nonlocal state
 
-        async for event in message_bus().topic("media").subscribe(_SUBSCRIBER,
-                                                                  start_id,
-                                                                  caught_up=caught_up):
-            event_type, payload = media_topic["validate"](event)
-            if payload is None:
+        async for _, event_type, object_id, _, payload in \
+                message_bus().topic("media").subscribe(_SUBSCRIBER,
+                                                       start_id,
+                                                       caught_up=caught_up):
+            validated = media_topic["validate"](event_type, payload)
+            if validated is None:
                 continue
 
-            {"uploaded": update_uploaded,
-             "deleted": update_deleted}.get(event_type,
-                                            lambda p: p)(payload)
+            if event_type == "uploaded":
+                update_uploaded({**validated, "file_id": object_id})
+            elif event_type == "deleted":
+                update_deleted(object_id)
 
     task = asyncio.create_task(_update())
     try:

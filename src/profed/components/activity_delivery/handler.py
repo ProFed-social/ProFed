@@ -13,24 +13,19 @@ from .recipients import resolve_recipients
 
 
 async def handle_activities(config: dict) -> None:
-    async for event in \
-            message_bus().topic("activities").\
-                subscribe("activity_delivery", 
-                          await message_bus().topic("activities").last_snapshot_id()):
-        event_type, payload = activities["validate"](event)
-        if event_type != "created" or payload is None:
+    async for _, event_type, object_id, _, payload in \
+          message_bus().topic("activities").subscribe("activity_delivery",
+                                                      await message_bus().topic("activities").last_snapshot_id()):
+        validated = activities["validate"](event_type, payload)
+        if validated is None:
             continue
 
-        activity_id = payload.get("id")
-        if not activity_id:
-            continue
- 
-        followers = await get_followers(acct_from_username(
-            payload.get("username", "")))
-        recipients = await resolve_recipients(payload, followers)
- 
-        for recipient in recipients:
-            asyncio.create_task(
-                deliver(config, activity_id, payload, recipient),
-                name=f"deliver:{activity_id}:{recipient}")
+        activity = {"id":   object_id,
+                    "type": event_type,
+                    **validated["activity"]}
+        for recipient in \
+                await resolve_recipients(activity,
+                                         await get_followers(acct_from_username(validated["username"]))):
+            asyncio.create_task(deliver(config, object_id, activity, recipient),
+                                name=f"deliver:{object_id}:{recipient}")
 

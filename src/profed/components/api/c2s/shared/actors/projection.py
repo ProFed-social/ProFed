@@ -16,19 +16,19 @@ async def _apply_snapshot_item(data: dict) -> None:
     await store.add(data["username"], data)
  
  
-async def _created(data: dict) -> None:
+async def _created(object_id: str, payload: dict) -> None:
     store = await storage()
-    await store.add(data["username"], data)
- 
- 
-async def _updated(data: dict) -> None:
+    await store.add(object_id, {**payload, "username": object_id})
+
+
+async def _updated(object_id: str, payload: dict) -> None:
     store = await storage()
-    await store.update(data["username"], data)
- 
- 
-async def _deleted(data: dict) -> None:
+    await store.update(object_id, {**payload, "username": object_id})
+
+
+async def _deleted(object_id: str, payload: dict) -> None:
     store = await storage()
-    await store.delete(data["username"])
+    await store.delete(object_id)
  
  
 handle_user_events, rebuild, reset_last_seen = \

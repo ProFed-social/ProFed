@@ -10,21 +10,25 @@ async def _init() -> None:
     await (await storage()).ensure_schema()
 
 
-async def _follower_created(payload: dict) -> None:
-    await (await storage()).add_follower(payload["following"],
-                                         payload["follower"])
+async def _follower_created(object_id: str, payload: dict) -> None:
+    follower, following = object_id.split("|", 1)
+    await (await storage()).add_follower(following, follower)
 
 
-async def _follower_deleted(payload: dict) -> None:
-    await (await storage()).remove_follower(payload["following"],
-                                            payload["follower"])
+async def _follower_deleted(object_id: str, payload: dict) -> None:
+    follower, following = object_id.split("|", 1)
+    await (await storage()).remove_follower(following, follower)
+
+
+async def _follower_snapshot(item: dict) -> None:
+    await (await storage()).add_follower(item["following"], item["follower"])
 
 
 handle_events, rebuild, _ = build_projection(
     topic=            followers_topic,
     subscriber=       "api_c2s_followers",
     init=             _init,
-    on_snapshot_item= _follower_created,
+    on_snapshot_item= _follower_snapshot,
     on_message_type=  {"created": _follower_created,
                        "deleted": _follower_deleted})
 
