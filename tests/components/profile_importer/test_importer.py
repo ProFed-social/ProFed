@@ -34,9 +34,9 @@ def _fake_http_client(headers=None, content=b"", status_code=200):
 
     client = MagicMock()
     client.__aenter__ = AsyncMock(return_value=client)
-    client.__aexit__  = AsyncMock(return_value=False)
-    client.head       = AsyncMock(return_value=response)
-    client.get        = AsyncMock(return_value=response)
+    client.__aexit__ = AsyncMock(return_value=False)
+    client.head = AsyncMock(return_value=response)
+    client.get = AsyncMock(return_value=response)
 
     return client
 
@@ -45,9 +45,12 @@ def _users(fake_bus):
     return fake_bus.topic("users")
  
  
-def _mf2(name):
+def _mf2(name=None, summary=None):
     return {"items": [{"type": ["h-card"],
-                       "properties": {"name": [name]}}]}
+                       "properties": {key: [value]
+                                      for key, value in {"name": name,
+                                                         "summary": summary}.items()
+                                      if value is not None}}]}
 
 
 @pytest.mark.asyncio
@@ -57,22 +60,42 @@ async def test_new_profile_publishes_created(fake_bus):
  
     published = _users(fake_bus).published
     assert len(published) == 1
-    assert published[0]["event_type"]      == "created"
-    assert published[0]["object_id"]       == "alice"
+    assert published[0]["event_type"] == "created"
+    assert published[0]["object_id"] == "alice"
     assert published[0]["payload"]["name"] == "Alice"
 
 
 @pytest.mark.asyncio
-async def test_changed_profile_publishes_updated(fake_bus):
+async def test_changed_name_publishes_profile_edited(fake_bus):
     _users(fake_bus).messages = [_msg(1, "created", "alice", {"name": "Alice"})]
-    with patch.object(importer, "fetch_mf2",
+
+    with patch.object(importer,
+                      "fetch_mf2",
                       new=AsyncMock(return_value=_mf2("Alice Renamed"))):
         await importer.run_import("alice", "https://example.com/alice")
- 
+
     published = _users(fake_bus).published
     assert len(published) == 1
-    assert published[0]["event_type"] == "updated"
-    assert published[0]["payload"]["name"] == "Alice Renamed"
+    assert published[0]["event_type"] == "profile_edited"
+    assert published[0]["payload"] == {"name": "Alice Renamed"}
+
+
+@pytest.mark.asyncio
+async def test_changed_summary_publishes_profile_edited(fake_bus):
+    _users(fake_bus).messages = [_msg(1,
+                                      "created",
+                                      "alice",
+                                      {"name": "Alice", "summary": "Old"})]
+
+    with patch.object(importer, "fetch_mf2",
+                      new=AsyncMock(return_value=_mf2("Alice", "New"))):
+        await importer.run_import("alice", "https://example.com/alice")
+
+    published = _users(fake_bus).published
+    assert len(published) == 1
+    assert published[0]["event_type"] == "profile_edited"
+    assert published[0]["payload"]["summary"] == "New"
+    assert "name" not in published[0]["payload"]
 
 
 @pytest.mark.asyncio
@@ -133,24 +156,30 @@ async def test_created_event_includes_key_pair(fake_bus):
  
  
 @pytest.mark.asyncio
-async def test_updated_event_preserves_key_pair(fake_bus):
-    _users(fake_bus).messages = [_msg(1, "created", "alice",
-                                      {"name":            "Alice",
-                                       "public_key_pem":  "pubkey",
+async def test_update_does_not_emit_keys_generated(fake_bus):
+    _users(fake_bus).messages = [_msg(1,
+                                      "created",
+                                      "alice",
+                                      {"name": "Alice",
+                                       "public_key_pem": "pubkey",
                                        "private_key_pem": "privkey"})]
+
     with patch.object(importer, "fetch_mf2",
                       new=AsyncMock(return_value=_mf2("Alice Renamed"))):
         await importer.run_import("alice", "https://example.com/alice")
-    payload = _users(fake_bus).published[0]["payload"]
-    assert payload["public_key_pem"]  == "pubkey"
-    assert payload["private_key_pem"] == "privkey"
- 
+
+    published = _users(fake_bus).published
+    assert all(p["event_type"] != "keys_generated" for p in published)
+    assert all(p["event_type"] != "created" for p in published)
+
  
 @pytest.mark.asyncio
 async def test_unchanged_profile_with_keys_publishes_nothing(fake_bus):
-    _users(fake_bus).messages = [_msg(1, "created", "alice",
-                                      {"name":            "Alice",
-                                       "public_key_pem":  "pubkey",
+    _users(fake_bus).messages = [_msg(1,
+                                      "created",
+                                      "alice",
+                                      {"name": "Alice",
+                                       "public_key_pem": "pubkey",
                                        "private_key_pem": "privkey"})]
     with patch.object(importer, "fetch_mf2", new=AsyncMock(return_value=_mf2("Alice"))):
         await importer.run_import("alice", "https://example.com/alice")
@@ -160,13 +189,13 @@ async def test_unchanged_profile_with_keys_publishes_nothing(fake_bus):
 @pytest.mark.asyncio
 async def test_should_redownload_returns_true_when_no_cache_info():
     assert await importer._should_redownload("https://example.com/img.jpg",
-                                              None,
-                                              None) is True
+                                             None,
+                                             None) is True
  
  
 @pytest.mark.asyncio
 async def test_should_redownload_returns_false_when_last_modified_unchanged():
-    lm     = "Thu, 01 Jan 2026 00:00:00 GMT"
+    lm = "Thu, 01 Jan 2026 00:00:00 GMT"
     client = _fake_http_client(headers={"last-modified": lm})
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client):
@@ -181,8 +210,8 @@ async def test_should_redownload_returns_true_when_last_modified_is_newer():
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client):
         result = await importer._should_redownload("https://example.com/img.jpg",
-                                                    "Thu, 01 Jan 2026 00:00:00 GMT",
-                                                    None)
+                                                   "Thu, 01 Jan 2026 00:00:00 GMT",
+                                                   None)
  
     assert result is True
  
@@ -193,8 +222,8 @@ async def test_should_redownload_falls_back_to_etag_when_no_last_modified_in_res
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client):
         result = await importer._should_redownload("https://example.com/img.jpg",
-                                                    "Thu, 01 Jan 2026 00:00:00 GMT",
-                                                    '"abc123"')
+                                                   "Thu, 01 Jan 2026 00:00:00 GMT",
+                                                   '"abc123"')
  
     assert result is False
  
@@ -205,8 +234,8 @@ async def test_should_redownload_returns_true_when_etag_differs():
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client):
         result = await importer._should_redownload("https://example.com/img.jpg",
-                                                    None,
-                                                    '"old-etag"')
+                                                   None,
+                                                   '"old-etag"')
  
     assert result is True
  
@@ -215,48 +244,48 @@ async def test_should_redownload_returns_true_when_etag_differs():
 async def test_should_redownload_returns_true_when_head_request_fails():
     client = MagicMock()
     client.__aenter__ = AsyncMock(side_effect=Exception("timeout"))
-    client.__aexit__  = AsyncMock(return_value=False)
+    client.__aexit__ = AsyncMock(return_value=False)
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client):
         result = await importer._should_redownload("https://example.com/img.jpg",
-                                                    "Thu, 01 Jan 2026 00:00:00 GMT",
-                                                    None)
+                                                   "Thu, 01 Jan 2026 00:00:00 GMT",
+                                                   None)
  
     assert result is True
  
  
 @pytest.mark.asyncio
 async def test_download_and_store_returns_existing_url_when_hash_unchanged(fake_bus):
-    client   = _fake_http_client(content=IMAGE_BYTES,
-                                  headers={"content-type": "image/jpeg"})
+    client = _fake_http_client(content=IMAGE_BYTES,
+                               headers={"content-type": "image/jpeg"})
     existing = {"url": "https://cdn.example.com/old", "content_hash": IMAGE_HASH}
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client), \
          patch.object(importer, "media_storage"):
         result = await importer._download_and_store("https://example.com/img.jpg",
-                                                     existing,
-                                                     "alice@example.com")
+                                                    existing,
+                                                    "alice@example.com")
  
     assert result == ("https://cdn.example.com/old", None)
  
  
 @pytest.mark.asyncio
 async def test_download_and_store_stores_new_file_when_hash_differs(fake_bus):
-    client   = _fake_http_client(content=b"new content",
-                                 headers={"content-type": "image/jpeg"})
+    client = _fake_http_client(content=b"new content",
+                               headers={"content-type": "image/jpeg"})
     existing = {"url": "https://cdn.example.com/old", "content_hash": IMAGE_HASH}
-    stored   = StoredFile(file_id="new",
-                          url="https://cdn.example.com/new",
-                          content_type="image/jpeg",
-                          size=11)
+    stored = StoredFile(file_id="new",
+                        url="https://cdn.example.com/new",
+                        content_type="image/jpeg",
+                        size=11)
     fake_storage = MagicMock()
     fake_storage.store = AsyncMock(return_value=stored)
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client), \
          patch.object(importer, "media_storage", return_value=fake_storage):
         result = await importer._download_and_store("https://example.com/img.jpg",
-                                                     existing,
-                                                     "alice@example.com")
+                                                    existing,
+                                                    "alice@example.com")
  
     assert result[0] == "https://cdn.example.com/new"
     published = fake_bus.topic("media").published
@@ -266,13 +295,13 @@ async def test_download_and_store_stores_new_file_when_hash_differs(fake_bus):
  
 @pytest.mark.asyncio
 async def test_download_and_store_returns_existing_url_on_http_error(fake_bus):
-    client   = _fake_http_client(status_code=404)
+    client = _fake_http_client(status_code=404)
     existing = {"url": "https://cdn.example.com/old", "content_hash": IMAGE_HASH}
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client):
         result = await importer._download_and_store("https://example.com/img.jpg",
-                                                     existing,
-                                                     "alice@example.com")
+                                                    existing,
+                                                    "alice@example.com")
  
     assert result == ("https://cdn.example.com/old", None)
  
@@ -283,17 +312,17 @@ async def test_download_and_store_returns_none_when_no_existing_and_download_fai
 
     with patch.object(importer.httpx, "AsyncClient", return_value=client):
         result = await importer._download_and_store("https://example.com/img.jpg",
-                                                     None,
-                                                     "alice@example.com")
+                                                    None,
+                                                    "alice@example.com")
  
     assert result == (None, None)
  
  
 @pytest.mark.asyncio
 async def test_sync_images_downloads_when_should_redownload_is_true(monkeypatch):
-    monkeypatch.setattr(importer, "_should_redownload",
-                        AsyncMock(return_value=True))
-    monkeypatch.setattr(importer, "_download_and_store",
+    monkeypatch.setattr(importer, "_should_redownload", AsyncMock(return_value=True))
+    monkeypatch.setattr(importer,
+                        "_download_and_store",
                         AsyncMock(return_value=("https://cdn.example.com/new", "abc")))
     monkeypatch.setattr(importer, "scale_image", AsyncMock())
     profile = UserProfile(username="alice",
@@ -312,8 +341,7 @@ async def test_sync_images_reuses_url_when_not_stale(monkeypatch):
     download_mock = AsyncMock()
     monkeypatch.setattr(importer, "_download_and_store", download_mock)
     monkeypatch.setattr(importer, "scale_image", AsyncMock())
-    profile     = UserProfile(username="alice",
-                              avatar_source_url="https://example.com/photo.jpg")
+    profile = UserProfile(username="alice", avatar_source_url="https://example.com/photo.jpg")
     media_state = {"https://example.com/photo.jpg": {"url": "https://cdn.example.com/existing"}}
  
     result, tasks = await importer._sync_images("alice@example.com", profile, media_state)
@@ -395,8 +423,8 @@ async def test_run_import_publishes_created_for_new_profile(fake_bus, monkeypatc
  
  
 @pytest.mark.asyncio
-async def test_run_import_publishes_updated_when_profile_changed(fake_bus, monkeypatch):
-    old     = UserProfile(username="alice", name="Alice Old")
+async def test_run_import_publishes_profile_edited_when_profile_changed(fake_bus, monkeypatch):
+    old = UserProfile(username="alice", name="Alice Old")
     updated = UserProfile(username="alice", name="Alice New")
     monkeypatch.setattr(importer, "_fetch_remote_profile", AsyncMock(return_value=updated))
     monkeypatch.setattr(importer, "_get_current_state", AsyncMock(return_value=old))
@@ -404,9 +432,9 @@ async def test_run_import_publishes_updated_when_profile_changed(fake_bus, monke
     monkeypatch.setattr(importer, "_sync_images", AsyncMock(return_value=(updated, [])))
  
     await importer.run_import("alice", "https://example.com/alice/")
- 
-    assert fake_bus.topic("users").published[0]["event_type"] == "updated"
- 
+
+    assert fake_bus.topic("users").published[0]["event_type"] == "profile_edited" 
+
  
 @pytest.mark.asyncio
 async def test_run_import_publishes_nothing_when_profile_unchanged(fake_bus, monkeypatch):

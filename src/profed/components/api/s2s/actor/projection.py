@@ -7,28 +7,40 @@ from profed.components.api.s2s.actor.storage import storage
 
 
 async def _init() -> None:
-    store = await storage()
-    await store.ensure_schema()
+    await (await storage()).ensure_schema()
 
 
 async def _apply_snapshot_item(data: dict) -> None:
-    store = await storage()
-    await store.add(data["username"], data)
+    await (await storage()).add(data["username"], data)
 
 
 async def _created(object_id: str, payload: dict) -> None:
-    store = await storage()
-    await store.add(object_id, {**payload, "username": object_id})
+    await (await storage()).add(object_id, {**payload, "username": object_id})
 
 
-async def _updated(object_id: str, payload: dict) -> None:
-    store = await storage()
-    await store.update(object_id, {**payload, "username": object_id})
+async def _profile_edited(object_id: str, payload: dict) -> None:
+    await (await storage()).update(object_id, payload)
+
+
+async def _avatar_changed(object_id: str, payload: dict) -> None:
+    await (await storage()).update(object_id, {"avatar_url": payload.get("url")})
+
+
+async def _header_changed(object_id: str, payload: dict) -> None:
+    await (await storage()).update(object_id, {"header_url": payload.get("url")})
+
+
+async def _cv_changed(object_id: str, payload: dict) -> None:
+    await (await storage()).update(object_id, {"resume": payload.get("resume")})
+
+
+async def _keys_generated(object_id: str, payload: dict) -> None:
+    await (await storage()).update(object_id, {"public_key_pem":  payload["public_key_pem"],
+                                   "private_key_pem": payload["private_key_pem"]})
 
 
 async def _deleted(object_id: str, payload: dict) -> None:
-    store = await storage()
-    await store.delete(object_id)
+    await (await storage()).delete(object_id)
 
 
 handle_user_events, rebuild, reset_last_seen = \
@@ -37,6 +49,10 @@ handle_user_events, rebuild, reset_last_seen = \
                          init=_init,
                          on_snapshot_item=_apply_snapshot_item,
                          on_message_type={"created": _created,
-                                          "updated": _updated,
-                                          "deleted": _deleted })
+                                          "profile_edited": _profile_edited,
+                                          "avatar_changed": _avatar_changed,
+                                          "header_changed": _header_changed,
+                                          "cv_changed": _cv_changed,
+                                          "keys_generated": _keys_generated,
+                                          "deleted": _deleted})
 

@@ -153,6 +153,44 @@ async def _cancel_task_unconditionally(task):
             pass
 
 
+def _diff_events(current, new_profile):
+    if current is None:
+        public_pem, private_pem = generate_key_pair()
+
+        payload = dict(public_key_pem=public_pem,
+                       private_key_pem=private_pem,
+                       **{field: attr
+                          for field, attr in ((field, getattr(new_profile, field))
+                                              for field in ("name", "summary", "avatar_url", "header_url"))
+                          if attr is not None})
+
+        if new_profile.resume is not None:
+            payload["resume"] = new_profile.resume.model_dump(exclude_none=True)
+
+        return [("created", payload)]
+
+
+    text_diff = {field: value
+                 for field, value in ((field, getattr(new_profile, field))
+                                      for field in ("name", "summary"))
+                 if value != getattr(current, field)}
+
+    return (([("profile_edited", text_diff)] if text_diff else []) +
+
+            [(event, {"url": value})
+             for field, event, value in ((field, event, getattr(new_profile, field))
+                                         for field, event in {"avatar_url": "avatar_changed",
+                                                               "header_url": "header_changed"}.items())
+             if value != getattr(current, field)] +
+
+            ([("cv_changed",
+               {"resume": new_profile.resume.model_dump(exclude_none=True)}
+               if new_profile.resume is not None else
+               {})]
+             if new_profile.resume != current.resume else
+             []))
+
+
 async def run_import(username: str, url: str) -> None:
     current_state_task = asyncio.create_task(_get_current_state(username))
     new_profile = await _fetch_remote_profile(url, username)
@@ -160,36 +198,20 @@ async def run_import(username: str, url: str) -> None:
         await _cancel_task_unconditionally(current_state_task)
         return None
 
-    media_state = await _get_media_state(new_profile.avatar_source_url,
-                                         new_profile.header_source_url)
-    new_profile, variant_tasks = await _sync_images(acct_from_username(username),
-                                                    new_profile,
-                                                    media_state)
-    current = await current_state_task
+    (new_profile,
+     variant_tasks) = await _sync_images(acct_from_username(username),
+                                         new_profile,
+                                         await _get_media_state(new_profile.avatar_source_url,
+                                                                new_profile.header_source_url))
 
-    if current is None:
-        public_pem, private_pem = generate_key_pair()
-        new_profile.public_key_pem = public_pem
-        new_profile.private_key_pem = private_pem
-
-        event_type = "created"
+    events = _diff_events(await current_state_task, new_profile)
+    if not events:
+        logger.info("Profile for %s is unchanged", username)
     else:
-        new_profile.public_key_pem  = current.public_key_pem
-        new_profile.private_key_pem = current.private_key_pem
-
-        if new_profile == current:
-            logger.info("Profile for %s is unchanged", username)
-            return
-
-        event_type = "updated"
-
-    async with message_bus().topic("users").publish() as publish:
-        payload = new_profile.model_dump(exclude_none=True)
-        payload["private_key_pem"] = new_profile.private_key_pem
-        username = payload.pop("username")
-        await publish(event_type=event_type, object_id=username, payload=payload)
-
-    logger.info("Published users.%s for %s", event_type, username)
+        async with message_bus().topic("users").publish() as publish:
+            for event_type, payload in events:
+                await publish(event_type=event_type, object_id=username, payload=payload)
+        logger.info("Published %d users events for %s", len(events), username)
 
     if variant_tasks:
         await asyncio.gather(*variant_tasks)
