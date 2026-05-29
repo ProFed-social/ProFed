@@ -30,7 +30,8 @@ def _validate_created(payload):
         return None
 
     try:
-        return (dict(payload, resume=Resume.model_validate(payload["resume"]).model_dump())
+        return (dict(payload,
+                     resume=Resume.model_validate(payload["resume"]).model_dump())
                 if payload.get("resume") is not None else
                 dict(payload))
     except Exception as exc:
@@ -87,16 +88,14 @@ def _validate_image_changed(payload):
 def _validate_cv_changed(payload):
     if payload == {} or set(payload) == {"resume"}:
         try:
-            if payload.get("resume") is not None:
-                Resume.model_validate(payload["resume"])
-                return {"resume": payload["resume"]}
-            return {}
+            return ({"resume": Resume.model_validate(payload["resume"]).model_dump()}
+                    if payload.get("resume") is not None else
+                    {})
         except Exception as exc:
             logger.warning(_ignore_msg(f"cv_changed has invalid resume: {exc}"))
     else:
         logger.warning(_ignore_msg(f"cv_changed must be empty or contain only resume: {payload!r}"))
 
-    return None
 
 def _validate_keys_generated(payload):
     if set(payload) != {"public_key_pem", "private_key_pem"}:

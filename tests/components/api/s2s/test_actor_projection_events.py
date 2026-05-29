@@ -91,7 +91,10 @@ async def test_header_changed_updates_header_url(fake_storage, fake_bus):
               ("cv_changed", "alice", {"resume": {"experience": []}})])
 async def test_cv_changed_updates_resume(fake_storage, fake_bus):
     await projection.handle_user_events()
-    fake_storage.update.assert_awaited_once_with("alice", {"resume": {"experience": []}})
+    fake_storage.update.assert_awaited_once_with("alice", {"resume": {"experience": [],
+                                                                      'education': [],
+                                                                      'skills': [],
+                                                                      'projects': []}})
 
 
 @pytest.mark.asyncio
