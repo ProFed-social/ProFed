@@ -6,11 +6,13 @@ from .message_bus import (FakeLastSnapshot,
                           FakePublishContext,
                           FakeTopic)
 from .media_storage import FakeMediaStorage
+from .key_value_storage import FakeKeyValueStorage
 
  
 __all__ = ["FakeLastSnapshot",
            "FakeMessageBus",
            "FakePublishContext",
            "FakeTopic",
-           "FakeMediaStorage"]
+           "FakeMediaStorage",
+           "FakeKeyValueStorage"]
  

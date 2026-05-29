@@ -12,8 +12,9 @@ TS = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 class FakeStorage:
     def __init__(self):
-        self.followers:  dict[tuple, None] = {}
+        self.followers: dict[tuple, None] = {}
         self.deliveries: dict[tuple, dict] = {}
+        self.user_keys: dict[str, tuple] = {}
 
     async def ensure_schema(self):
         pass
@@ -35,6 +36,12 @@ class FakeStorage:
 
     async def get_delivery_status(self, activity_id, recipient):
         return self.deliveries.get((activity_id, recipient))
+
+    async def upsert_user_key(self, username, public_key_pem, private_key_pem):
+        self.user_keys[username] = (public_key_pem, private_key_pem)
+
+    async def get_user_key(self, username):
+        return self.user_keys.get(username)
 
 
 @pytest.fixture
@@ -108,4 +115,36 @@ async def test_delivery_failed_records_failure(fake_bus, fake_storage):
                                                    "bob@remote.example")
     assert result["success"] is False
     assert result["status_code"] == 500
+
+
+@pytest.mark.asyncio
+async def test_created_with_keys_upserts(fake_bus, fake_storage):
+    fake_bus.topic("users").messages = [
+            (1, "created", "alice", TS,
+             {"public_key_pem": "PUB", "private_key_pem": "PRIV"})]
+
+    await projections.keys_handle_events()
+
+    assert fake_storage.user_keys["alice"] == ("PUB", "PRIV")
+
+
+@pytest.mark.asyncio
+async def test_keys_generated_upserts(fake_bus, fake_storage):
+    fake_bus.topic("users").messages = [
+            (1, "keys_generated", "alice", TS,
+             {"public_key_pem": "PUB", "private_key_pem": "PRIV"})]
+
+    await projections.keys_handle_events()
+
+    assert fake_storage.user_keys["alice"] == ("PUB", "PRIV")
+
+
+@pytest.mark.asyncio
+async def test_profile_edited_does_not_touch_keys(fake_bus, fake_storage):
+    fake_bus.topic("users").messages = [
+            (1, "profile_edited", "alice", TS, {"name": "Alice"})]
+
+    await projections.keys_handle_events()
+
+    assert "alice" not in fake_storage.user_keys
 

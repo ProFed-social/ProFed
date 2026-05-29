@@ -90,8 +90,8 @@ keys_handle_events, keys_rebuild, _ = \
                      subscriber="activity_delivery_keys",
                      init=_keys_init,
                      on_snapshot_item=_upsert_key_snapshot,
-                     on_message_type={"created": _upsert_key,
-                                      "updated": _upsert_key})
+                     on_message_type={"created":        _upsert_key,
+                                      "keys_generated": _upsert_key})
 
  
 async def get_followers(following: str) -> set[str]:

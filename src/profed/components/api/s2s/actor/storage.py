@@ -23,7 +23,7 @@ class _storage(BaseStorage):
 
     async def update(self, username: str, payload: dict) -> None:
         await self.execute("""UPDATE api.s2s_actor
-                              SET payload = $2
+                              SET payload = payload || $2
                               WHERE username = $1""",
                            username,
                            payload)
