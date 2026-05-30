@@ -5,25 +5,30 @@ import asyncio
 from typing import Optional, Dict, Callable, Awaitable, Tuple, Any
 from profed.core.message_bus import message_bus, TICK
 
+
 class _EventHandlerSignature:
     def __init__(self,
                  *,
                  include_event_type: bool = False,
-                 include_emitted_at: bool = False):
+                 include_emitted_at: bool = False,
+                 include_sequence_id: bool = False):
         self._include_event_type = include_event_type
         self._include_emitted_at = include_emitted_at
+        self._include_sequence_id = include_sequence_id
 
     def __and__(self,
                 other: "_EventHandlerSignature") -> "_EventHandlerSignature":
         return _EventHandlerSignature(
             include_event_type=self._include_event_type or other._include_event_type,
-            include_emitted_at=self._include_emitted_at or other._include_emitted_at)
+            include_emitted_at=self._include_emitted_at or other._include_emitted_at,
+            include_sequence_id=self._include_sequence_id or other._include_sequence_id)
 
     async def __call__(self,
                        handler:    Callable[..., Awaitable[None]],
                        event_type: str,
                        object_id:  str,
                        emitted_at: Any,
+                       sequence_id: int,
                        payload:    Dict) -> None:
         args = []
         if self._include_event_type:
@@ -31,13 +36,16 @@ class _EventHandlerSignature:
         args.extend([object_id, payload])
         if self._include_emitted_at:
             args.append(emitted_at)
+        if self._include_sequence_id:
+            args.append(sequence_id)
 
         await handler(*args)
 
 
-standard        = _EventHandlerSignature()
+standard = _EventHandlerSignature()
 with_event_type = _EventHandlerSignature(include_event_type=True)
 with_emitted_at = _EventHandlerSignature(include_emitted_at=True)
+with_sequence_id = _EventHandlerSignature(include_sequence_id=True)
 
 
 def build_projection(topic: Dict,
@@ -60,7 +68,8 @@ def build_projection(topic: Dict,
     last_seen = 0
     topic_name = topic["name"]
 
-    async def _dispatch(event_type, object_id, emitted_at, payload):
+
+    async def _dispatch(sequence_id, event_type, object_id, emitted_at, payload):
         if event_type not in on_message_type:
             return
 
@@ -79,12 +88,13 @@ def build_projection(topic: Dict,
                                           event_type,
                                           object_id,
                                           emitted_at,
+                                          sequence_id,
                                           validated)
 
     async def handle_events():
-        async for _, event_type, object_id, emitted_at, payload \
+        async for sequence_id, event_type, object_id, emitted_at, payload \
                 in message_bus().topic(topic_name).subscribe(subscriber, last_seen):
-            await _dispatch(event_type, object_id, emitted_at, payload)
+            await _dispatch(sequence_id, event_type, object_id, emitted_at, payload)
 
     async def rebuild():
         nonlocal last_seen
@@ -103,7 +113,7 @@ def build_projection(topic: Dict,
                         in message_bus().topic(topic_name).subscribe(subscriber,
                                                                      last_seen,
                                                                      caught_up=caught_up):
-                    await _dispatch(event_type, object_id, emitted_at, payload)
+                    await _dispatch(sequence_id, event_type, object_id, emitted_at, payload)
                     last_seen = sequence_id
                     if caught_up.is_set():
                         return
