@@ -6,7 +6,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional
  
-from profed.core.message_bus import message_bus
+from profed.core.message_bus import message_bus, CatchUp
 from profed.models import UserProfile
 from profed.topics import users as users_topic
  
@@ -76,7 +76,7 @@ def _apply_event(state, username, event_type, validated):
 @asynccontextmanager
 async def reading_state(username: str):
     state: dict = {"value": None}
-    caught_up = asyncio.Event()
+    catch_up = CatchUp()
  
     start_id, snapshot = await message_bus().topic("users").last_snapshot()
     for item in snapshot:
@@ -86,7 +86,7 @@ async def reading_state(username: str):
  
     async def _update() -> None:
         async for _, event_type, object_id, _, payload \
-                in message_bus().topic("users").subscribe(_SUBSCRIBER, start_id, caught_up=caught_up):
+                in message_bus().topic("users").subscribe(_SUBSCRIBER, start_id, caught_up=catch_up.event):
             if object_id != username:
                 continue
 
@@ -107,8 +107,9 @@ async def reading_state(username: str):
             return None
  
     task = asyncio.create_task(_update())
+    catch_up.watch(task)
     try:
-        yield get_state, caught_up
+        yield get_state, catch_up
     finally:
         task.cancel()
         try:

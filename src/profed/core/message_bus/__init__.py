@@ -5,7 +5,7 @@ from importlib import import_module
 from profed.core.config import config
 from profed.core.config.database import with_database_defaults
 from .tick import start_tickers, TICK
-
+from .catch_up import CatchUp
 
 _instance = None
 

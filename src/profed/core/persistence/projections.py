@@ -3,7 +3,7 @@
 
 import asyncio
 from typing import Optional, Dict, Callable, Awaitable, Tuple, Any
-from profed.core.message_bus import message_bus, TICK
+from profed.core.message_bus import message_bus, TICK, CatchUp
 
 
 class _EventHandlerSignature:
@@ -105,24 +105,21 @@ def build_projection(topic: Dict,
             if item is not None and verify_snapshot_item(item):
                 await on_snapshot_item(item)
 
-        caught_up = asyncio.Event()
+        catch_up = CatchUp()
         async def _drain():
             nonlocal last_seen
-            try:
-                async for sequence_id, event_type, object_id, emitted_at, payload \
-                        in message_bus().topic(topic_name).subscribe(subscriber,
-                                                                     last_seen,
-                                                                     caught_up=caught_up):
-                    await _dispatch(sequence_id, event_type, object_id, emitted_at, payload)
-                    last_seen = sequence_id
-                    if caught_up.is_set():
-                        return
-            except Exception:
-                caught_up.set()
-                raise
 
-        drain_task = asyncio.create_task(_drain())
-        await caught_up.wait()
+            async for sequence_id, event_type, object_id, emitted_at, payload \
+                    in message_bus().topic(topic_name).subscribe(subscriber,
+                                                                 last_seen,
+                                                                 caught_up=catch_up.event):
+                await _dispatch(sequence_id, event_type, object_id, emitted_at, payload)
+                last_seen = sequence_id
+                if catch_up.event.is_set():
+                    return
+
+        drain_task = catch_up.watch(asyncio.create_task(_drain()))
+        await catch_up.wait()
         drain_task.cancel()
         try:
             await drain_task

@@ -4,7 +4,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from profed.core.message_bus import message_bus
+from profed.core.message_bus import message_bus, CatchUp
 from profed.topics import media as media_topic
 
 
@@ -15,7 +15,7 @@ _SUBSCRIBER = "profile_importer_media"
 @asynccontextmanager
 async def reading_media_state(source_urls: frozenset):
     state: dict = {}
-    caught_up   = asyncio.Event()
+    catch_up = CatchUp()
     start_id, snapshot = await message_bus().topic("media").last_snapshot()
 
     for item in (snapshot or []):
@@ -43,7 +43,7 @@ async def reading_media_state(source_urls: frozenset):
         async for _, event_type, object_id, _, payload in \
                 message_bus().topic("media").subscribe(_SUBSCRIBER,
                                                        start_id,
-                                                       caught_up=caught_up):
+                                                       caught_up=catch_up.event):
             validated = media_topic["validate"](event_type, payload)
             if validated is None:
                 continue
@@ -54,8 +54,9 @@ async def reading_media_state(source_urls: frozenset):
                 update_deleted(object_id)
 
     task = asyncio.create_task(_update())
+    catch_up.watch(task)
     try:
-        yield state, caught_up
+        yield state, catch_up
     finally:
         task.cancel()
         try:
