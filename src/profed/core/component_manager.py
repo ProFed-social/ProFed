@@ -42,6 +42,7 @@ def run(config, init=None):
 
         yield
 
+        print(shutdowns)
         if shutdowns:
             await asyncio.gather(*shutdowns)
 
