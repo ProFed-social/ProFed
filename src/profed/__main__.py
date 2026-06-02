@@ -2,13 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
- 
+
+from functools import partial 
+
 logging.basicConfig(level=logging.WARNING,
                     format="%(levelname)s %(name)s %(message)s")
 
 from profed.core.config import config
 from profed.core.component_manager import run
 from profed.core.message_bus import init_message_bus
+from profed.topics import names
 
 
 STANDARD_COMPONENTS = ["api",
@@ -25,5 +28,5 @@ if __name__ == "__main__":
     level = cfg.get("logging", {}).get("level", "INFO")
     logging.getLogger().setLevel(getattr(logging, level.upper()))
 
-    run(cfg, [init_message_bus])
+    run(cfg, [partial(init_message_bus, names())])
 
