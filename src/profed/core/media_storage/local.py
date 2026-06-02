@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
+import logging
 from pathlib import Path
 from uuid import uuid4
 from profed.core.media_storage import StoredFile
+
+logger = logging.getLogger(__name__)
 
 
 class LocalFileStorage:
@@ -49,9 +52,9 @@ class LocalFileStorage:
                           size=         len(data))
 
     async def retrieve(self, file_id: str) -> bytes:
-        print(f"reading file {file_id}")
+        logger.debug(f"reading file {file_id}")
         path = self._path_for(file_id)
-        print(f"at path {path}")
+        logger.debug(f"at path {path}")
 
         def _read() -> bytes:
             if not path.exists():
