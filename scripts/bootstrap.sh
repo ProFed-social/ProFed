@@ -15,3 +15,7 @@ uv venv
 source .venv/bin/activate
 pip install -U pip
 pip install -e .[dev]
+
+cd "$PROJECT_ROOT/client"
+npm ci
+
