@@ -4,9 +4,11 @@
 import asyncio
 import io
 from typing import Awaitable, Callable, Optional
-from PIL import Image
+from PIL import Image, ImageFile
 from profed.core.media_storage import media_storage
 
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 OnComplete = Callable[[str, str, int, int, str], Awaitable[None]]
 

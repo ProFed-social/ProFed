@@ -16,6 +16,17 @@ def _jpeg(width: int, height: int, mode: str = "RGB", color = "red") -> bytes:
     return buf.getvalue()
 
 
+def _broken_jpeg() -> bytes:
+    noise = bytes((i * 37 + 11) % 256 for i in range(96 * 96 * 3))
+    buf = io.BytesIO()
+    Image.frombytes("RGB", (96, 96), noise).resize((600, 600)).save(buf, format="JPEG", quality=90)
+    data = bytearray(buf.getvalue())
+    sos = data.find(b"\xff\xda")
+    for index in range(sos + 200, sos + 1700, 7):
+        data[index] ^= 0xFF
+    return bytes(data)
+
+
 def _png(width: int, height: int, mode: str = "RGBA") -> bytes:
     img = Image.new(mode, (width, height), color=(255, 0, 0, 128))
     buf = io.BytesIO()
@@ -118,3 +129,14 @@ async def test_scale_image_animated_gif_raises(fake_bus, fake_media_storage):
 
     with pytest.raises(ValueError, match="cannot scale animated"):
         await scale_image(stored.file_id, "large", width=50, height=50)
+
+
+@pytest.mark.asyncio
+async def test_scale_image_tolerates_broken_stream(fake_bus, fake_media_storage):
+    stored = await fake_media_storage.store(_broken_jpeg(), "image/jpeg")
+
+    await scale_image(stored.file_id, "small", width=80, height=80)
+
+    variant_data, _ = fake_media_storage._files[f"{stored.file_id}_small"]
+    assert Image.open(io.BytesIO(variant_data)).size == (80, 80)
+

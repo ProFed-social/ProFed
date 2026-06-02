@@ -154,5 +154,7 @@ async def run_import(username: str, url: str) -> None:
         logger.info("Published %d users events for %s", len(events), username)
 
     if variant_tasks:
-        await asyncio.gather(*variant_tasks)
+        for result in await asyncio.gather(*variant_tasks, return_exceptions=True):
+            if isinstance(result, Exception):
+                logger.warning("Variant scaling failed for %s: %s", username, result)
 
