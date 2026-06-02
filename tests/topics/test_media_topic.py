@@ -78,18 +78,19 @@ def test_snapshot_item_without_file_id_returns_none():
     assert validate_media_snapshot_item({"url": "x"}) is None
 
 
-def test_uploaded_c2s_shape_with_preview_passes():
+
+def test_uploaded_c2s_shape_with_metadata_passes():
     c2s = {**UPLOADED,
-           "preview_url": "https://example.com/media/ab/abc123_small",
-           "width": 1200,
-           "height": 800,
-           "preview_width": 400,
-           "preview_height": 267}
+           "metadata": {"kind": "image", "width": 1200, "height": 800}}
 
     result = validate_media_event("uploaded", c2s)
 
     assert result is not None
-    assert result["width"] == 1200
-    assert result["preview_url"] == "https://example.com/media/ab/abc123_small"
-    assert result["preview_height"] == 267
+    assert result["metadata"]["width"] == 1200
+    assert result["metadata"]["height"] == 800
+
+
+def test_uploaded_rejects_unknown_extra_fields():
+    bad = {**UPLOADED, "preview_url": "https://example.com/media/ab/abc123_small"}
+    assert validate_media_event("uploaded", bad) is None
 

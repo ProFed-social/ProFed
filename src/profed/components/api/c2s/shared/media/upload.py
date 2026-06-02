@@ -8,6 +8,7 @@ from profed.core.media_storage import media_storage
 from profed.media import scale_image
 from profed.core.message_bus import message_bus
 from profed.identity import acct_from_username
+from profed.models import MediaObject, ImageMeta
 from profed.models.mastodon import (MediaAttachment,
                                     MediaAttachmentMeta,
                                     MediaAttachmentMetadata)
@@ -28,7 +29,9 @@ def _preview_dimensions(orig_w: int, orig_h: int) -> tuple[int, int]:
             (round(orig_w * PREVIEW_DIM / orig_h), PREVIEW_DIM))
 
 
-async def process_upload(username: str, file: UploadFile, description: str | None) -> MediaAttachment:
+async def process_upload(username: str,
+                         file: UploadFile,
+                         description: str | None) -> MediaAttachment: 
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=422, detail="unsupported_media_type")
 
@@ -53,15 +56,12 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
     async with message_bus().topic("media").publish() as publish:
         await publish(event_type="uploaded",
                       object_id=stored.file_id,
-                      payload={"url":            stored.url,
-                               "preview_url":    preview_url,
-                               "content_type":   file.content_type,
-                               "size":           stored.size,
-                               "uploader":       uploader,
-                               "width":          orig_w,
-                               "height":         orig_h,
-                               "preview_width":  preview_w,
-                               "preview_height": preview_h})
+                      payload=MediaObject(url=stored.url,
+                                          content_type=file.content_type,
+                                          size=stored.size,
+                                          uploader=uploader,
+                                          metadata=ImageMeta(width=orig_w,
+                                                             height=orig_h)).model_dump(exclude_none=True))
 
     if not is_animated:
         scale_image(stored.file_id,
@@ -72,7 +72,7 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
     return MediaAttachment(id=stored.file_id,
                            type=_media_type(file.content_type),
                            url=stored.url,
-                           preview_url= preview_url,
+                           preview_url=preview_url,
                            description=description,
                            meta=MediaAttachmentMetadata(original=MediaAttachmentMeta(width=orig_w,
                                                                                      height=orig_h),

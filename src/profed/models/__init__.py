@@ -3,7 +3,7 @@
 
 from .resume import Resume
 from .user_profile import UserProfile, MediaReference
-from .media_object import MediaObject
+from .media_object import MediaObject, ImageMeta
 
-__all__ = ["Resume", "UserProfile", "MediaReference", "MediaObject"]
+__all__ = ["Resume", "UserProfile", "MediaReference", "MediaObject", "ImageMeta"]
 

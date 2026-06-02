@@ -10,21 +10,23 @@ async def _init() -> None:
     await (await storage()).ensure_schema()
 
 
+async def _store(file_id: str, source: dict) -> None:
+    metadata = source.get("metadata") or {}
+    await (await storage()).insert(file_id=file_id,
+                                   url=source["url"],
+                                   content_type=source["content_type"],
+                                   size=source["size"],
+                                   uploader=source["uploader"],
+                                   source_url=source.get("source_url"),
+                                   content_hash=source.get("content_hash"),
+                                   last_modified=source.get("last_modified"),
+                                   etag=source.get("etag"),
+                                   width=metadata.get("width"),
+                                   height=metadata.get("height"))
+
+
 async def _uploaded(object_id: str, payload: dict) -> None:
-    await (await storage()).insert(file_id=object_id,
-                                   url=payload["url"],
-                                   preview_url=payload.get("preview_url"),
-                                   content_type=payload["content_type"],
-                                   size=payload["size"],
-                                   uploader=payload["uploader"],
-                                   source_url=payload.get("source_url"),
-                                   content_hash=payload.get("content_hash"),
-                                   last_modified=payload.get("last_modified"),
-                                   etag=payload.get("etag"),
-                                   width=payload.get("width"),
-                                   height=payload.get("height"),
-                                   preview_width= payload.get("preview_width"),
-                                   preview_height=payload.get("preview_height"))
+    await _store(object_id, payload)
 
 
 async def _deleted(object_id: str, payload: dict) -> None:
@@ -32,21 +34,7 @@ async def _deleted(object_id: str, payload: dict) -> None:
 
 
 async def _uploaded_snapshot(item: dict) -> None:
-    await (await storage()).insert(**{k: item.get(k)
-                                      for k in ("file_id",
-                                                "url",
-                                                "preview_url",
-                                                "content_type",
-                                                "size",
-                                                "uploader",
-                                                "source_url",
-                                                "content_hash",
-                                                "last_modified",
-                                                "etag",
-                                                "width",
-                                                "height",
-                                                "preview_width",
-                                                "preview_height")})
+    await _store(item["file_id"], item)
 
 
 handle_events, rebuild, _ = build_projection(topic=media,
@@ -55,3 +43,4 @@ handle_events, rebuild, _ = build_projection(topic=media,
                                              on_snapshot_item=_uploaded_snapshot,
                                              on_message_type={"uploaded": _uploaded,
                                                               "deleted": _deleted})
+

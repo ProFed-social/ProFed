@@ -85,8 +85,12 @@ def test_upload_publishes_event(client, mocks):
     assert len(published) == 1
     assert published[0]["event_type"] == "uploaded"
     assert published[0]["object_id"]
-    assert published[0]["payload"]["content_type"] == "image/jpeg"
-    assert published[0]["payload"]["uploader"] == UPLOADER
+    payload = published[0]["payload"]
+    assert payload["content_type"] == "image/jpeg"
+    assert payload["uploader"] == UPLOADER
+    assert payload["metadata"] == {"kind": "image", "width": 100, "height": 80}
+    assert "preview_url" not in payload
+    assert "preview_width" not in payload
 
 
 def test_unsupported_type_returns_422(client):
