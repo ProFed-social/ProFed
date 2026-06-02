@@ -66,5 +66,5 @@ def start_tickers(bus, cfg, topic_names):
         ticker.start()
     async def aclose():
         await asyncio.gather(*(ticker.aclose() for ticker in tickers))
-    return aclose
+    return aclose()
 
