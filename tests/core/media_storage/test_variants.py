@@ -37,50 +37,50 @@ def _animated_gif() -> bytes:
 
 @pytest.mark.asyncio
 async def test_scale_image_with_both_dimensions(fake_bus, fake_media_storage):
-    await fake_media_storage.store("orig", _jpeg(800, 600), "image/jpeg")
+    stored = await fake_media_storage.store(_jpeg(800, 600), "image/jpeg")
 
-    await scale_image("orig", "large", width=200, height=200)
+    await scale_image(stored.file_id, "large", width=200, height=200)
 
-    variant_data, content_type = fake_media_storage._files["orig_large"]
+    variant_data, content_type = fake_media_storage._files[f"{stored.file_id}_large"]
     assert content_type == "image/jpeg"
     assert Image.open(io.BytesIO(variant_data)).size == (200, 200)
 
 
 @pytest.mark.asyncio
 async def test_scale_image_only_width_preserves_aspect(fake_bus, fake_media_storage):
-    await fake_media_storage.store("orig", _jpeg(800, 600), "image/jpeg")
+    stored = await fake_media_storage.store(_jpeg(800, 600), "image/jpeg")
 
-    await scale_image("orig", "wide", width=400)
+    await scale_image(stored.file_id, "wide", width=400)
 
-    variant_data, _ = fake_media_storage._files["orig_wide"]
+    variant_data, _ = fake_media_storage._files[f"{stored.file_id}_wide"]
     assert Image.open(io.BytesIO(variant_data)).size == (400, 300)
 
 
 @pytest.mark.asyncio
 async def test_scale_image_only_height_preserves_aspect(fake_bus, fake_media_storage):
-    await fake_media_storage.store("orig", _jpeg(800, 600), "image/jpeg")
+    stored = await fake_media_storage.store(_jpeg(800, 600), "image/jpeg")
 
-    await scale_image("orig", "tall", height=300)
+    await scale_image(stored.file_id, "tall", height=300)
 
-    variant_data, _ = fake_media_storage._files["orig_tall"]
+    variant_data, _ = fake_media_storage._files[f"{stored.file_id}_tall"]
     assert Image.open(io.BytesIO(variant_data)).size == (400, 300)
 
 
 @pytest.mark.asyncio
 async def test_scale_image_no_dimensions_raises(fake_bus, fake_media_storage):
-    await fake_media_storage.store("orig", _jpeg(100, 100), "image/jpeg")
+    stored = await fake_media_storage.store(_jpeg(100, 100), "image/jpeg")
 
     with pytest.raises(ValueError, match="at least one of width, height"):
-        await scale_image("orig", "fail")
+        await scale_image(stored.file_id, "fail")
 
 
 @pytest.mark.asyncio
 async def test_scale_image_png_with_alpha_preserves_rgba(fake_bus, fake_media_storage):
-    await fake_media_storage.store("orig", _png(400, 400, mode="RGBA"), "image/png")
+    stored = await fake_media_storage.store(_png(400, 400, mode="RGBA"), "image/png")
 
-    await scale_image("orig", "small", width=80, height=80)
+    await scale_image(stored.file_id, "small", width=80, height=80)
 
-    variant_data, content_type = fake_media_storage._files["orig_small"]
+    variant_data, content_type = fake_media_storage._files[f"{stored.file_id}_small"]
     assert content_type == "image/png"
 
     img = Image.open(io.BytesIO(variant_data))
@@ -90,13 +90,13 @@ async def test_scale_image_png_with_alpha_preserves_rgba(fake_bus, fake_media_st
 
 @pytest.mark.asyncio
 async def test_scale_image_jpeg_stays_jpeg(fake_bus, fake_media_storage):
-    await fake_media_storage.store("orig", _jpeg(400, 400), "image/jpeg")
+    stored = await fake_media_storage.store(_jpeg(400, 400), "image/jpeg")
 
-    await scale_image("orig", "small", width=80, height=80)
+    await scale_image(stored.file_id, "small", width=80, height=80)
 
-    _, content_type = fake_media_storage._files["orig_small"]
+    _, content_type = fake_media_storage._files[f"{stored.file_id}_small"]
     assert content_type == "image/jpeg"
-    assert Image.open(io.BytesIO(fake_media_storage._files["orig_small"][0])).format == "JPEG"
+    assert Image.open(io.BytesIO(fake_media_storage._files[f"{stored.file_id}_small"][0])).format == "JPEG"
 
 
 @pytest.mark.asyncio
@@ -104,18 +104,17 @@ async def test_scale_image_cmyk_jpeg_converts_to_rgb(fake_bus, fake_media_storag
     img = Image.new("CMYK", (800, 600), color=(0, 100, 100, 0))
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
-    await fake_media_storage.store("orig", buf.getvalue(), "image/jpeg")
+    stored = await fake_media_storage.store(buf.getvalue(), "image/jpeg")
 
-    await scale_image("orig", "large", width=200, height=200)
+    await scale_image(stored.file_id, "large", width=200, height=200)
 
-    variant_data, _ = fake_media_storage._files["orig_large"]
+    variant_data, _ = fake_media_storage._files[f"{stored.file_id}_large"]
     assert Image.open(io.BytesIO(variant_data)).mode == "RGB"
 
 
 @pytest.mark.asyncio
 async def test_scale_image_animated_gif_raises(fake_bus, fake_media_storage):
-    await fake_media_storage.store("orig", _animated_gif(), "image/gif")
+    stored = await fake_media_storage.store(_animated_gif(), "image/gif")
 
     with pytest.raises(ValueError, match="cannot scale animated"):
-        await scale_image("orig", "large", width=50, height=50)
-
+        await scale_image(stored.file_id, "large", width=50, height=50)

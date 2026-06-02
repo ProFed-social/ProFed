@@ -45,7 +45,7 @@ def _normalize_entry(item: Any) -> dict:
     return result
  
  
-def normalize_mf2_to_profile(mf2_data: dict, username: str) -> Optional[UserProfile]:
+def normalize_mf2_to_profile(mf2_data: dict, username: str) -> tuple[UserProfile, dict[str, str | None]] | None:
     items = mf2_data.get("items", [])
     if not items:
         return None
@@ -73,14 +73,14 @@ def normalize_mf2_to_profile(mf2_data: dict, username: str) -> Optional[UserProf
                    if contact and isinstance(contact[0], dict)
                    else {})
 
-    return UserProfile(username=username,
-                       name=name,
-                       summary=_to_text(_first(props.get("summary", []) or props.get("note", []))),
-                       resume=to_resume(h_resume),
-                       avatar_source_url=_to_url(_first(props.get("photo", []))) or
-                                         _to_url(_first(hcard_props.get("photo", []))),
-                       header_source_url=_to_url(_first(props.get("featured",  []))) or
-                                         _to_url(_first(hcard_props.get("featured",  []))) or
-                                         _to_url(_first(props.get("x-header",  []))) or
-                                         _to_url(_first(hcard_props.get("x-header",  []))))
+    return (UserProfile(username=username,
+                        name=name,
+                        summary=_to_text(_first(props.get("summary", []) or props.get("note", []))),
+                        resume=to_resume(h_resume)),
+            {"avatar": _to_url(_first(props.get("photo", []))) or
+                       _to_url(_first(hcard_props.get("photo", []))),
+             "header": _to_url(_first(props.get("featured",  []))) or
+                       _to_url(_first(hcard_props.get("featured",  []))) or
+                       _to_url(_first(props.get("x-header",  []))) or
+                       _to_url(_first(hcard_props.get("x-header",  [])))})
 

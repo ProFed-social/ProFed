@@ -23,11 +23,11 @@ async def _profile_edited(object_id: str, payload: dict) -> None:
 
 
 async def _avatar_changed(object_id: str, payload: dict) -> None:
-    await (await storage()).update(object_id, {"avatar_url": payload.get("url")})
+    await (await storage()).update(object_id, {"avatar": payload or None})
 
 
 async def _header_changed(object_id: str, payload: dict) -> None:
-    await (await storage()).update(object_id, {"header_url": payload.get("url")})
+    await (await storage()).update(object_id, {"header": payload or None})
 
 
 async def _cv_changed(object_id: str, payload: dict) -> None:

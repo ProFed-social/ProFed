@@ -38,30 +38,31 @@ def with_events(events):
 async def test_created_adds_full_payload(fake_storage, fake_bus):
     await projection.handle_user_events()
 
-    assert fake_storage.rows["alice"] == {"name":     "Alice",
-                                          "summary":  "Engineer",
+    assert fake_storage.rows["alice"] == {"name": "Alice",
+                                          "summary": "Engineer",
                                           "username": "alice"}
 
 
 @pytest.mark.asyncio
-@with_events([("created",        "alice", {"name": "Alice", "summary": "Engineer"}),
+@with_events([("created", "alice", {"name": "Alice", "summary": "Engineer"}),
               ("profile_edited", "alice", {"name": "Alice Updated"})])
 async def test_profile_edited_merges_keeps_other_fields(fake_storage, fake_bus):
     await projection.handle_user_events()
 
-    assert fake_storage.rows["alice"] == {"name":     "Alice Updated",
-                                          "summary":  "Engineer",
+    assert fake_storage.rows["alice"] == {"name": "Alice Updated",
+                                          "summary": "Engineer",
                                           "username": "alice"}
 
 
 @pytest.mark.asyncio
-@with_events([("created",        "alice", {"name": "Alice", "avatar_url": "https://x/a.png"}),
+@with_events([("created", "alice", {"name": "Alice",
+                                    "avatar": {"media_id": "m1", "variants": ["large"]}}),
               ("avatar_changed", "alice", {})])
 async def test_avatar_changed_empty_clears_only_avatar(fake_storage, fake_bus):
     await projection.handle_user_events()
 
-    assert fake_storage.rows["alice"]["avatar_url"] is None
-    assert fake_storage.rows["alice"]["name"]       == "Alice"
+    assert fake_storage.rows["alice"]["avatar"] is None
+    assert fake_storage.rows["alice"]["name"] == "Alice"
 
 
 @pytest.mark.asyncio

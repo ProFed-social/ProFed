@@ -3,7 +3,7 @@
 
 import logging
 from typing import Optional, Dict
-from profed.models import UserProfile, Resume
+from profed.models import UserProfile, Resume, MediaReference
 
 
 logger = logging.getLogger(__name__)
@@ -21,8 +21,8 @@ def _validate_created(payload):
     unknown = set(payload) - {"name",
                               "summary",
                               "resume",
-                              "avatar_url",
-                              "header_url",
+                              "avatar",
+                              "header",
                               "public_key_pem",
                               "private_key_pem"}
     if unknown:
@@ -30,12 +30,13 @@ def _validate_created(payload):
         return None
 
     try:
-        return (dict(payload,
-                     resume=Resume.model_validate(payload["resume"]).model_dump())
-                if payload.get("resume") is not None else
-                dict(payload))
+        return dict(payload, **{field: model.model_validate(payload[field]).model_dump()
+                                for field, model in (("resume", Resume),
+                                                     ("avatar", MediaReference),
+                                                     ("header", MediaReference))
+                                if field in payload})
     except Exception as exc:
-        logger.warning(_ignore_msg(f"created has invalid resume: {exc}"))
+        logger.warning(_ignore_msg(f"created has invalid payload: {exc}"))
 
 
 def _validate_deleted(payload):
@@ -73,16 +74,10 @@ def _validate_image_changed(payload):
     if payload == {}:
         return {}
 
-    if set(payload) != {"url"}:
-        logger.warning(_ignore_msg(f"image_changed must be empty or contain only url: {payload!r}"))
-        return None
-
-    url = payload["url"]
-    if not isinstance(url, str) or not url:
-        logger.warning(_ignore_msg(f"image_changed url must be a non-empty string: {url!r}"))
-        return None
-
-    return {"url": url}
+    try:
+        return MediaReference.model_validate(payload).model_dump()
+    except Exception as exc:
+        logger.warning(_ignore_msg(f"image_changed must be empty or a valid media reference: {payload!r}; {exc}"))
 
 
 def _validate_cv_changed(payload):

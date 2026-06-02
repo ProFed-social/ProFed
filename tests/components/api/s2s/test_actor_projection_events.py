@@ -55,32 +55,35 @@ async def test_profile_edited_merges_keeps_other_fields(fake_storage, fake_bus):
 
 
 @pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice", "avatar_url": "https://x/old.png"}),
-              ("avatar_changed", "alice", {"url": "https://x/new.png"})])
-async def test_avatar_changed_sets_url_keeps_name(fake_storage, fake_bus):
+@with_events([("created", "alice", {"name": "Alice",
+                                    "avatar": {"media_id": "m-old", "variants": ["large", "small"]}}),
+              ("avatar_changed", "alice", {"media_id": "m-new", "variants": ["large", "small"]})])
+async def test_avatar_changed_sets_reference_keeps_name(fake_storage, fake_bus):
     await projection.handle_user_events()
 
-    assert fake_storage.rows["alice"]["avatar_url"] == "https://x/new.png"
+    assert fake_storage.rows["alice"]["avatar"] == {"media_id": "m-new",
+                                                    "variants": {"large", "small"}}
     assert fake_storage.rows["alice"]["name"] == "Alice"
 
 
 @pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice", "avatar_url": "https://x/a.png"}),
+@with_events([("created", "alice", {"name": "Alice",
+                                    "avatar": {"media_id": "m1", "variants": ["large"]}}),
               ("avatar_changed", "alice", {})])
 async def test_avatar_changed_empty_clears_only_avatar(fake_storage, fake_bus):
     await projection.handle_user_events()
 
-    assert fake_storage.rows["alice"]["avatar_url"] is None
+    assert fake_storage.rows["alice"]["avatar"] is None
     assert fake_storage.rows["alice"]["name"] == "Alice"
 
 
 @pytest.mark.asyncio
 @with_events([("created", "alice", {"name": "Alice"}),
-              ("header_changed", "alice", {"url": "https://x/h.jpg"})])
-async def test_header_changed_sets_url(fake_storage, fake_bus):
+              ("header_changed", "alice", {"media_id": "h1", "variants": ["wide"]})])
+async def test_header_changed_sets_reference(fake_storage, fake_bus):
     await projection.handle_user_events()
 
-    assert fake_storage.rows["alice"]["header_url"] == "https://x/h.jpg"
+    assert fake_storage.rows["alice"]["header"] == {"media_id": "h1", "variants": {"wide"}}
 
 
 @pytest.mark.asyncio

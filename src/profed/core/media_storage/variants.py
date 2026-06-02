@@ -27,7 +27,7 @@ async def scale_image(media_id:    str,
                                              await storage.retrieve(media_id),
                                              width,
                                              height)
-    await storage.store(f"{media_id}_{variant}", scaled, content_type)
+    await storage.add_variant(media_id, variant, scaled, content_type)
 
     if on_complete is not None:
         await on_complete(media_id, variant, final_w, final_h, content_type)

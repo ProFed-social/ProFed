@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import io
-from uuid import uuid4
 from PIL import Image
 from fastapi import HTTPException, UploadFile
 from profed.core.media_storage import media_storage
@@ -37,24 +36,23 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
     if len(data) > MAX_SIZE_BYTES:
         raise HTTPException(status_code=422, detail="file_too_large")
 
-    file_id  = str(uuid4()).replace("-", "")
     uploader = acct_from_username(username)
 
     img = Image.open(io.BytesIO(data))
     orig_w, orig_h = img.size
     is_animated = getattr(img, "is_animated", False)
-    stored = await media_storage().store(file_id, data, file.content_type)
+    stored = await media_storage().store(data, file.content_type)
 
     if is_animated:
         preview_url = stored.url
         preview_w, preview_h = orig_w, orig_h
     else:
         preview_w, preview_h = _preview_dimensions(orig_w, orig_h)
-        preview_url = media_storage().url_for(file_id, "small")
+        preview_url = media_storage().url_for(stored.file_id, "small")
 
     async with message_bus().topic("media").publish() as publish:
         await publish(event_type="uploaded",
-                      object_id=file_id,
+                      object_id=stored.file_id,
                       payload={"url":            stored.url,
                                "preview_url":    preview_url,
                                "content_type":   file.content_type,
@@ -66,12 +64,12 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
                                "preview_height": preview_h})
 
     if not is_animated:
-        scale_image(file_id,
+        scale_image(stored.file_id,
                     "small",
                     **({"width":  PREVIEW_DIM} if orig_w >= orig_h else
                        {"height": PREVIEW_DIM}))
 
-    return MediaAttachment(id=file_id,
+    return MediaAttachment(id=stored.file_id,
                            type=_media_type(file.content_type),
                            url=stored.url,
                            preview_url= preview_url,

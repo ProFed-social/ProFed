@@ -32,11 +32,10 @@ def _apply_profile_edited(state, username, validated):
 
 
 def _apply_avatar_changed(state, username, validated):
-    url = validated.get("url")
-    if url:
-        state["value"]["avatar_url"] = url
+    if validated:
+        state["value"]["avatar"] = validated
     else:
-        state["value"].pop("avatar_url", None)
+        state["value"].pop("avatar", None)
 
 
 def _apply_header_changed(state, username, validated):
@@ -61,6 +60,9 @@ def _apply_keys_generated(state, username, validated):
 
 
 def _apply_event(state, username, event_type, validated):
+    if state["value"] is None and event_type != "created":
+        return
+
     {"created": _apply_created,
      "deleted": _apply_deleted,
      "profile_edited": _apply_profile_edited,

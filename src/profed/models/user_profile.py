@@ -4,6 +4,12 @@
 from pydantic import BaseModel, ConfigDict, Field
 from .resume import Resume
 
+class MediaReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    media_id: str
+    variants: set[str] = set()
+
 
 class UserProfile(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -12,11 +18,8 @@ class UserProfile(BaseModel):
     name: str | None = None
     summary: str | None = None
     resume: Resume | None = None
-    avatar_source_url: str | None = None
-    avatar_url: str | None = None
-    avatar_small_url:  str | None = None
-    header_source_url: str | None = None
-    header_url: str | None = None
+    avatar: MediaReference | None = None
+    header: MediaReference | None = None
     public_key_pem: str | None = None
     private_key_pem: str | None = Field(default=None, exclude=True)
 

@@ -33,11 +33,11 @@ async def _profile_edited(object_id, payload, sequence_id) -> None:
 
 
 async def _avatar_changed(object_id, payload, sequence_id) -> None:
-    await (await storage()).merge_change(object_id, {"avatar_url": payload.get("url")}, sequence_id)
+    await (await storage()).merge_change(object_id, {"avatar": payload or None}, sequence_id)
 
 
 async def _header_changed(object_id, payload, sequence_id) -> None:
-    await (await storage()).merge_change(object_id, {"header_url": payload.get("url")}, sequence_id)
+    await (await storage()).merge_change(object_id, {"header": payload or None}, sequence_id)
 
 
 async def _cv_changed(object_id, payload, sequence_id) -> None:

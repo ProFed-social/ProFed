@@ -4,12 +4,10 @@
 import logging
 from typing import Optional, Dict
 
+from profed.models import MediaObject
+
 
 logger = logging.getLogger(__name__)
-
-
-_REQUIRED_UPLOADED       = {"url", "content_type", "size", "uploader"}
-_REQUIRED_VARIANTS_ADDED = {"variants"}
 
 
 def _ignore(msg: str) -> str:
@@ -17,17 +15,11 @@ def _ignore(msg: str) -> str:
 
 
 def _validate_uploaded(payload: dict) -> Optional[Dict]:
-    missing = _REQUIRED_UPLOADED - payload.keys()
-
-    if missing:
-        logger.warning(_ignore(f"uploaded payload missing fields {missing}: {payload!r}"))
+    try:
+        return MediaObject.model_validate(payload).model_dump(exclude_none=True)
+    except Exception as exc:
+        logger.warning(_ignore(f"uploaded has invalid payload: {payload!r}; {exc}"))
         return None
-
-    if not isinstance(payload["size"], int):
-        logger.warning(_ignore(f"size is not an integer: {payload!r}"))
-        return None
-
-    return payload
 
 
 def _validate_deleted(payload: dict) -> Optional[Dict]:

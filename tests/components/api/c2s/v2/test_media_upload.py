@@ -3,10 +3,13 @@
 
 import io
 import pytest
+from uuid import uuid4
+
 from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
+
 from profed.components.api.c2s.v2.media import router as media_module
 from profed.components.api.c2s.shared.auth import current_user
 from profed.core.media_storage import StoredFile
@@ -25,9 +28,16 @@ def make_jpeg(width: int = 100, height: int = 80) -> bytes:
 
 
 class FakeStorage:
-    async def store(self, file_id, data, content_type):
+    async def store(self, data, content_type):
+        file_id = str(uuid4()).replace("-", "")
         return StoredFile(file_id=file_id,
-                          url=f"https://example.com/media/ab/{file_id}",
+                          url=self.url_for(file_id),
+                          content_type=content_type,
+                          size=len(data))
+
+    async def add_variant(self, file_id, variant, data, content_type):
+        return StoredFile(file_id=file_id,
+                          url=self.url_for(file_id, variant),
                           content_type=content_type,
                           size=len(data))
 

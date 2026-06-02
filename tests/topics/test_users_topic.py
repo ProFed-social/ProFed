@@ -9,8 +9,8 @@ def test_created_with_full_payload_passes_through():
     payload = {"name": "Alice",
                "summary": "Engineer",
                "resume": {"experience": []},
-               "avatar_url": "https://example.com/a.png",
-               "header_url": "https://example.com/h.jpg",
+               "avatar": {"media_id": "media-a", "variants": {"large", "small"}},
+               "header": {"media_id": "media-h", "variants": {"wide"}},
                "public_key_pem": "PUB",
                "private_key_pem": "PRIV"}
 
@@ -18,6 +18,7 @@ def test_created_with_full_payload_passes_through():
 
     assert result is not None
     assert result["name"] == "Alice"
+    assert result["avatar"] == {"media_id": "media-a", "variants": {"large", "small"}}
     assert result["public_key_pem"] == "PUB"
     assert result["private_key_pem"] == "PRIV"
 
@@ -63,26 +64,30 @@ def test_profile_edited_invalid_type_returns_none():
     assert validate_users_event("profile_edited", {"locked": "not a bool"}) is None
 
 
-def test_avatar_changed_with_url():
+def test_avatar_changed_with_media_id():
     assert validate_users_event("avatar_changed",
-                                {"url": "https://x/a.png"}) == {"url": "https://x/a.png"}
+                                {"media_id": "m1"}) == {"media_id": "m1", "variants": set()}
 
+def test_avatar_changed_with_variants():
+    assert validate_users_event("avatar_changed",
+                                {"media_id": "m1", "variants": {"large", "small"}}) == \
+           {"media_id": "m1", "variants": {"large", "small"}}
 
 def test_avatar_changed_empty_is_clear():
     assert validate_users_event("avatar_changed", {}) == {}
 
 
-def test_avatar_changed_invalid_url_returns_none():
-    assert validate_users_event("avatar_changed", {"url": 42}) is None
+def test_avatar_changed_invalid_media_id_returns_none():
+    assert validate_users_event("avatar_changed", {"media_id": 42}) is None
 
 
 def test_avatar_changed_extra_field_returns_none():
-    assert validate_users_event("avatar_changed", {"url": "x", "foo": "y"}) is None
+    assert validate_users_event("avatar_changed", {"media_id": "x", "foo": "y"}) is None
 
 
-def test_header_changed_with_url():
+def test_header_changed_with_media_id():
     assert validate_users_event("header_changed",
-                                {"url": "https://x/h.jpg"}) == {"url": "https://x/h.jpg"}
+                                {"media_id": "m2"}) == {"media_id": "m2", "variants": set()}
 
 
 def test_header_changed_empty_is_clear():

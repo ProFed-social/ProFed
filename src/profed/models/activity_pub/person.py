@@ -4,9 +4,21 @@
 from typing import ClassVar
 
 from profed.identity import actor_url_from_username
+from profed.core.media_storage import media_storage
 from profed.models.resume import Resume
 from profed.models.user_profile import UserProfile
+
 from .actor import Actor
+
+
+def _image_object(ref, variant):
+    return ({"type": "Image",
+             "url": media_storage().url_for(ref.media_id,
+                                            (variant
+                                             if variant in ref.variants else
+                                             None))}
+            if ref is not None else
+            None)
 
 
 class Person(Actor):
@@ -41,8 +53,6 @@ class Person(Actor):
                                "type":         "Key",
                                "owner":        actor_url,
                                "publicKeyPem": profile.public_key_pem}),
-                   icon=({"type": "Image", "url": profile.avatar_url}
-                         if getattr(profile, "avatar_url", None) else None),
-                   image=({"type": "Image", "url": profile.header_url}
-                          if getattr(profile, "header_url", None) else None))
+                   icon=_image_object(profile.avatar, "large"),
+                   image=_image_object(profile.header, "wide"))
 

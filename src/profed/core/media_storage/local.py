@@ -3,38 +3,48 @@
 
 import asyncio
 from pathlib import Path
+from uuid import uuid4
 from profed.core.media_storage import StoredFile
 
 
 class LocalFileStorage:
-    def __init__(self,
-                 base_path: str,
-                 base_url:  str):
-        self._base     = Path(base_path)
+    def __init__(self, base_path: str, base_url: str):
+        self._base = Path(base_path)
         self._base_url = base_url.rstrip("/")
 
-    def _path_for(self, file_id: str) -> Path:
-        return self._base / file_id[:2] / file_id
+    def _relative_path(self, file_id: str, variant: str | None = None):
+        return Path(file_id[:2]) / (f"{file_id}_{variant}" if variant else file_id)
 
-    def url_for(self,
-                file_id: str,
-                variant: str | None = None) -> str:
-        suffix = f"_{variant}" if variant else ""
-        return f"{self._base_url}/{file_id[:2]}/{file_id}{suffix}"
+    def _path_for(self, file_id: str, variant: str | None = None) -> Path:
+        return self._base / self._relative_path(file_id, variant)
 
-    async def store(self,
-                    file_id:      str,
-                    data:         bytes,
-                    content_type: str) -> StoredFile:
-        path = self._path_for(file_id)
+    def url_for(self, file_id: str, variant: str | None = None) -> str:
+        return f"{self._base_url}/{ str(self._relative_path(file_id, variant)) }"
 
-        def _write() -> None:
+    async def store(self, data: bytes, content_type: str) -> StoredFile:
+        return await self._write(str(uuid4()).replace("-", ""), None, data, content_type)
+
+    async def add_variant(self,
+                          file_id: str,
+                          variant: str,
+                          data: bytes,
+                          content_type: str) -> StoredFile:
+        return await self._write(file_id, variant, data, content_type)
+
+    async def _write(self,
+                     file_id: str,
+                     variant: str | None,
+                     data: bytes,
+                     content_type: str) -> StoredFile:
+        path = self._path_for(file_id, variant)
+
+        def _do_write() -> None:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
-        await asyncio.to_thread(_write)
 
+        await asyncio.to_thread(_do_write)
         return StoredFile(file_id=      file_id,
-                          url=          self.url_for(file_id),
+                          url=          self.url_for(file_id, variant),
                           content_type= content_type,
                           size=         len(data))
 

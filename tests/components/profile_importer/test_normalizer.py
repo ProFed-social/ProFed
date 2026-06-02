@@ -35,85 +35,85 @@ def test_to_url_returns_none_for_unrecognised_type():
 def test_normalize_extracts_avatar_source_url():
     mf2 = _mf2({"name": ["Alice"], "photo": ["https://example.com/photo.jpg"]})
 
-    result = normalize_mf2_to_profile(mf2, "alice")
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
 
-    assert result.avatar_source_url == "https://example.com/photo.jpg"
+    assert sources["avatar"] == "https://example.com/photo.jpg"
 
 
 def test_normalize_extracts_header_from_u_featured():
     mf2 = _mf2({"name": ["Alice"], "featured": ["https://example.com/banner.jpg"]})
 
-    result = normalize_mf2_to_profile(mf2, "alice")
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
 
-    assert result.header_source_url == "https://example.com/banner.jpg"
+    assert sources["header"] == "https://example.com/banner.jpg"
 
 
 def test_normalize_extracts_header_from_u_x_header():
     mf2 = _mf2({"name": ["Alice"], "x-header": ["https://example.com/header.jpg"]})
 
-    result = normalize_mf2_to_profile(mf2, "alice")
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
 
-    assert result.header_source_url == "https://example.com/header.jpg"
+    assert sources["header"] == "https://example.com/header.jpg"
 
 
 def test_normalize_u_featured_takes_precedence_over_u_x_header():
-    mf2 = _mf2({"name":     ["Alice"],
+    mf2 = _mf2({"name": ["Alice"],
                 "featured": ["https://example.com/featured.jpg"],
                 "x-header": ["https://example.com/header.jpg"]})
 
-    result = normalize_mf2_to_profile(mf2, "alice")
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
 
-    assert result.header_source_url == "https://example.com/featured.jpg"
+    assert sources["header"] == "https://example.com/featured.jpg"
 
 
 def test_normalize_leaves_image_fields_none_when_no_photo():
     mf2 = _mf2({"name": ["Alice"]})
 
-    result = normalize_mf2_to_profile(mf2, "alice")
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
 
-    assert result.avatar_source_url is None
-    assert result.header_source_url is None
+    assert sources["avatar"] is None
+    assert sources["header"] is None
 
- 
+
 def _mf2_with_hcard(hcard_props, resume_props=None):
     props = resume_props or {"name": ["Alice"]}
     props["contact"] = [{"type": ["h-card"], "properties": hcard_props}]
     return {"items": [{"type": ["h-resume"], "properties": props}]}
- 
- 
+
+
 def test_normalize_extracts_avatar_from_hcard_photo():
     mf2    = _mf2_with_hcard({"photo": [{"value": "https://example.com/photo.jpg",
-                                          "alt":   "Profile photo"}]})
- 
-    result = normalize_mf2_to_profile(mf2, "alice")
- 
-    assert result.avatar_source_url == "https://example.com/photo.jpg"
- 
- 
+                                         "alt": "Profile photo"}]})
+
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
+
+    assert sources["avatar"] == "https://example.com/photo.jpg"
+
+
 def test_normalize_extracts_header_from_hcard_featured():
     mf2    = _mf2_with_hcard({"featured": [{"value": "https://example.com/banner.jpg",
-                                             "alt":   "Header"}]})
- 
-    result = normalize_mf2_to_profile(mf2, "alice")
- 
-    assert result.header_source_url == "https://example.com/banner.jpg"
- 
- 
+                                            "alt": "Header"}]})
+
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
+
+    assert sources["header"] == "https://example.com/banner.jpg"
+
+
 def test_normalize_extracts_header_from_hcard_x_header():
     mf2    = _mf2_with_hcard({"x-header": [{"value": "https://example.com/header.jpg",
-                                             "alt":   "Header"}]})
- 
-    result = normalize_mf2_to_profile(mf2, "alice")
- 
-    assert result.header_source_url == "https://example.com/header.jpg"
- 
- 
+                                            "alt": "Header"}]})
+
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
+
+    assert sources["header"] == "https://example.com/header.jpg"
+
+
 def test_normalize_hresume_photo_takes_precedence_over_hcard_photo():
     mf2    = _mf2_with_hcard({"photo": [{"value": "https://example.com/hcard.jpg"}]},
-                              resume_props={"name":  ["Alice"],
+                              resume_props={"name": ["Alice"],
                                             "photo": ["https://example.com/resume.jpg"]})
- 
-    result = normalize_mf2_to_profile(mf2, "alice")
- 
-    assert result.avatar_source_url == "https://example.com/resume.jpg"
- 
+
+    _, sources = normalize_mf2_to_profile(mf2, "alice")
+
+    assert sources["avatar"] == "https://example.com/resume.jpg"
+

@@ -5,6 +5,8 @@ import asyncio
 from typing import Optional
 from profed.core.media_storage.variants import scale_image as _core_scale_image
 from .completion_handler import variant_added
+from .download import should_redownload, download, emit_uploaded
+
 
 def scale_image(media_id: str,
                 variant: str,

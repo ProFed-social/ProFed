@@ -5,9 +5,19 @@ import json
 import asyncpg
 
 
+def _json_default(obj):
+    if isinstance(obj, set):
+        return sorted(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
+def _dumps(obj) -> str:
+    return json.dumps(obj, default=_json_default)
+
+
 async def _init_connection(conn: asyncpg.Connection) -> None:
     await conn.set_type_codec("jsonb",
-                              encoder=json.dumps,
+                              encoder=_dumps,
                               decoder=json.loads,
                               schema="pg_catalog")
 
