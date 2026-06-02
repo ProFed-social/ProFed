@@ -53,3 +53,4 @@ async def storage() -> _storage:
     if _instance is None:
         raise RuntimeError("Actor storage is not initialized.")
     return _instance
+

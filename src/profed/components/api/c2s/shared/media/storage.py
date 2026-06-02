@@ -101,8 +101,7 @@ _instance: _Storage | None = None
 
 async def init(config: dict) -> None:
     global _instance
-    pool      = await init_pool(config)
-    _instance = _Storage(pool)
+    _instance = _Storage(await init_pool(config))
 
 
 async def storage() -> _Storage:

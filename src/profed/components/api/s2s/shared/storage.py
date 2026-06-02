@@ -60,3 +60,4 @@ def build_storage(table_name: str) \
         overwrite(_storage(pool))
 
     return init, storage, overwrite, reinit
+
