@@ -19,7 +19,7 @@ async def scale_image(media_id:    str,
                       on_complete: Optional[OnComplete] = None) -> tuple[int, int]:
     if width is None and height is None:
         raise ValueError("scale_image: at least one of width, height must be set")
-    storage  = media_storage()
+    storage = media_storage()
     (scaled,
      final_w,
      final_h,
@@ -36,7 +36,7 @@ async def scale_image(media_id:    str,
 
 
 def _scale_pillow(image_bytes, width, height):
-    img    = Image.open(io.BytesIO(image_bytes))
+    img = Image.open(io.BytesIO(image_bytes))
     if getattr(img, "is_animated", False):
         raise ValueError("scale_image: cannot scale animated images")
 
