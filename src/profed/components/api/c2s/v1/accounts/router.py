@@ -12,7 +12,7 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
                                                                      make_account)
 from profed.components.api.c2s.shared.actors.service import resolve_actor, local_account
 from profed.components.api.c2s.shared.actors.service import resolve_actor
-from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship
 from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
@@ -126,7 +126,7 @@ async def featured_tags(id: str):
 
 @router.get("/accounts/{id}/statuses")
 async def account_statuses(id: str,
-                           claims: Annotated[dict, Depends(current_user)] = None):
+                           claims: Annotated[dict | None, Depends(current_user_optional)] = None):
     return []
 
 
@@ -169,7 +169,7 @@ async def unfollow(id: str,
 
 @router.get("/accounts/lookup")
 async def lookup(acct: str,
-                 claims: Annotated[dict, Depends(current_user)] = None):
+                 claims: Annotated[dict | None, Depends(current_user_optional)] = None):
     raw = await _resolve_account(acct, {})
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
@@ -178,7 +178,7 @@ async def lookup(acct: str,
 
 @router.get("/accounts/{id}")
 async def get_account(id: str,
-                      claims: Annotated[dict, Depends(current_user)] = None):
+                      claims: Annotated[dict | None, Depends(current_user_optional)] = None):
     raw = await _resolve_account(id, {})
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
