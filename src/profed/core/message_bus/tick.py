@@ -51,6 +51,7 @@ class Ticker:
         if self._tasks:
             for task in self._tasks:
                 task.cancel()
+            if self._tasks
                 await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks = []
 
