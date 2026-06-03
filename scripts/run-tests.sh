@@ -11,9 +11,21 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 if [ ! -d ".venv" ]; then
-  echo "Virtualenv not found. Run: uv venv && uv pip install -e .[dev]"
+  echo "Virtualenv not found. Run: scripts/bootstrap.sh"
+  exit 1
+fi
+
+if [ ! -d "client/node_modules" ]; then
+  echo "Client dependencies not found. Run: scripts/bootstrap.sh"
   exit 1
 fi
 
 source .venv/bin/activate
-pytest "$@"
+
+status=0
+echo "== Python (pytest) =="
+pytest "$@" || status=1
+echo "== Web client (vitest) =="
+( cd client && npm test ) || status=1
+exit $status
+
