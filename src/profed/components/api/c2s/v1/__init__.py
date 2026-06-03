@@ -7,9 +7,11 @@ from fastapi import APIRouter
 from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import get_active
 
+from profed.components.api.c2s.shared.actors import storage as actors_storage
+from profed.components.api.c2s.shared.actors import projection as actors_projection
+
 from .media         import router as media
 from .accounts.following import storage as following_storage
-
 from .apps      import router as apps
 from .instance  import router as instance
 from .accounts  import router as accounts
