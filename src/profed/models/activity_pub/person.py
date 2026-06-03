@@ -49,9 +49,9 @@ class Person(Actor):
                    outbox=f"{actor_url}/outbox",
                    publicKey=(None
                               if getattr(profile, "public_key_pem", None) is None else
-                              {"id":           f"{actor_url}#main-key",
-                               "type":         "Key",
-                               "owner":        actor_url,
+                              {"id": f"{actor_url}#main-key",
+                               "type": "Key",
+                               "owner": actor_url,
                                "publicKeyPem": profile.public_key_pem}),
                    icon=_image_object(profile.avatar, "large"),
                    image=_image_object(profile.header, "wide"))

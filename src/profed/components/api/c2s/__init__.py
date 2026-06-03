@@ -4,6 +4,7 @@
 
 import asyncio
 from typing import List
+from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import narrow_deactivate_routers
 from profed.components.api.c2s.shared.known_accounts import storage as known_accounts_storage
 from profed.components.api.c2s.shared.known_accounts import projection as known_accounts_projection
@@ -23,6 +24,14 @@ def _projection_initializer(storage, projection, handle_events, name):
     return _init
 
 
+def _media_projection_initializer(storage, projection, handle_events):
+    _projection_init = _projection_initializer(storage, projection, handle_events, "c2s_media")
+    async def _init(config: dict):
+        await init_media_storage()
+        await _projection_init(config)
+    return _init
+
+
 async def init(config: dict, deactivate: List[str]) -> None:
     v1_deactivate = narrow_deactivate_routers("v1_", deactivate)
     v2_deactivate = narrow_deactivate_routers("v2_", deactivate)
@@ -32,10 +41,9 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                        known_accounts_projection.handle_events,
                                                        "c2s_known_accounts")),
                               (["v1_media", "v2_media"],
-                               _projection_initializer(media_db_storage,
-                                                       media_projection,
-                                                       media_projection.handle_events,
-                                                       "c2s_media"))]:
+                               _media_projection_initializer(media_db_storage,
+                                                             media_projection,
+                                                             media_projection.handle_events))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
     if "oauth" not in deactivate:

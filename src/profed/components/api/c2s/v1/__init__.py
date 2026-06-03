@@ -4,7 +4,12 @@
 import asyncio
 from typing import List
 from fastapi import APIRouter
+from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import get_active
+
+from .media         import router as media
+from .accounts.following import storage as following_storage
+
 from .apps      import router as apps
 from .instance  import router as instance
 from .accounts  import router as accounts
@@ -16,8 +21,6 @@ from .notifications import router as notifications
 from .lists         import router as lists
 from .markers       import router as markers
 from .media         import router as media
-from profed.components.api.c2s.shared.actors import storage as actors_storage
-from profed.components.api.c2s.shared.actors import projection as actors_projection
 from .accounts.following import storage as following_storage
 from .accounts.following import projection as following_projection 
 from .accounts.followers import storage   as followers_storage
@@ -35,6 +38,9 @@ def _projection_initializer(storage, projection, handle_events, name):
 
  
 async def init(config: dict, deactivate: List[str]) -> None:
+    if any(router not in deactivate for router in ("accounts", "statuses")):
+        await init_media_storage()
+
     for routers, init_fn in [(["accounts"],
                               _projection_initializer(actors_storage,
                                                       actors_projection,

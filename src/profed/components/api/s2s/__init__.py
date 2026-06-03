@@ -4,6 +4,7 @@
 
 import asyncio
 from typing import List
+from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import get_active
 from .webfinger import storage as webfinger_storage, projection as webfinger_projection
 from .actor     import storage as actor_storage,     projection as actor_projection
@@ -17,7 +18,11 @@ from .inbox     import router as inbox_router
 from .outbox    import router as outbox_router
 from .nodeinfo  import router as nodeinfo_router 
  
+
 async def init(config: dict, deactivate: List[str]) -> None:
+    if "actor" not in deactivate:
+        await init_media_storage()
+
     for storage, projection, task_name in get_active({"webfinger": (webfinger_storage,
                                                                     webfinger_projection,
                                                                     "s2s_webfinger"),
@@ -42,10 +47,10 @@ async def init(config: dict, deactivate: List[str]) -> None:
  
 def mount_routers(parent, deactivate: List[str]) -> None:
     for r in get_active({"webfinger": webfinger_router,
-                         "actor":     actor_router,
-                         "inbox":     inbox_router,
-                         "outbox":    outbox_router,
-                         "nodeinfo":  nodeinfo_router},
+                         "actor": actor_router,
+                         "inbox": inbox_router,
+                         "outbox": outbox_router,
+                         "nodeinfo": nodeinfo_router},
                         deactivate):
         parent.include_router(r.router)
 
