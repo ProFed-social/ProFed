@@ -17,18 +17,13 @@ async def webfinger(resource: str = Query(pattern=r"^(acct:[^@]+@[^@]+|https?://
     if acct is None:
         raise HTTPException(status_code=404)
 
-    try:
-        actor_url = await resolve_actor_url(acct)
-        if actor_url is None:
-            raise HTTPException(status_code=404)
+    actor_url = await resolve_actor_url(acct)
+    if actor_url is None:
+        raise HTTPException(status_code=404)
 
-        return ({"subject": f"acct:{acct}",
-                 "links": [{"rel": "self",
-                            "type": "application/activity+json",
-                            "href": actor_url}]}
-                if actor_url is not None else None)
-    except HTTPException:
-        raise
-    except:
-        raise HTTPException(status_code=500)
+    return ({"subject": f"acct:{acct}",
+             "links": [{"rel": "self",
+                        "type": "application/activity+json",
+                        "href": actor_url}]}
+            if actor_url is not None else None)
 

@@ -13,13 +13,8 @@ router = APIRouter()
             response_model=OrderedCollection,
             response_class=ActivityPubJSONResponse)
 async def outbox(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$")):
-    try:
-        outbox = await resolve_outbox(username)
-        if outbox is None:
-            raise HTTPException(status_code=404)
+    outbox = await resolve_outbox(username)
+    if outbox is None:
+        raise HTTPException(status_code=404)
+    return outbox
 
-        return outbox
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=500)

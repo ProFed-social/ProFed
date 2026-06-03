@@ -25,10 +25,6 @@ async def inbox(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$"), request: Req
 
         return Response(status_code=202)
 
-    except HTTPException:
-        raise
     except (ValueError, json.JSONDecodeError):
         raise HTTPException(status_code=400)
-    except Exception:
-        raise HTTPException(status_code=500)
 

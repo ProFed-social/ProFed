@@ -44,7 +44,7 @@ def client(cfg):
     app = FastAPI()
     app.include_router(actor_router)
 
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 def test_actor_success(client, fake_storage):

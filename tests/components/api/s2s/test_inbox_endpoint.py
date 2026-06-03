@@ -23,7 +23,7 @@ def fake_accept_inbox_activity(monkeypatch):
 def client():
     app = FastAPI()
     app.include_router(inbox_router)
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 def test_inbox_accepts_valid_activity(client, fake_accept_inbox_activity):

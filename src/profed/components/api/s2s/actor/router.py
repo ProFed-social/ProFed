@@ -13,14 +13,8 @@ router = APIRouter()
             response_model=Person,
             response_class=ActivityPubJSONResponse)
 async def actor(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$")):
-    try:
-        actor = await resolve_actor(username)
-        if actor is None:
-            raise HTTPException(status_code=404)
-
-        return actor
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=500)
+    actor = await resolve_actor(username)
+    if actor is None:
+        raise HTTPException(status_code=404)
+    return actor
 

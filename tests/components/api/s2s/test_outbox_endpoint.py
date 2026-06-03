@@ -29,7 +29,7 @@ def cfg():
 def client(cfg):
     app = FastAPI()
     app.include_router(outbox_router)
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 @pytest.fixture
