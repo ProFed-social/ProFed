@@ -34,6 +34,14 @@ def _media_projection_initializer(storage, projection, handle_events):
     return _init
 
 
+def _bridge_initializer(storage, projection, handle_events, name):
+    _projection_init = _projection_initializer(storage, projection, handle_events, name)
+    async def _init(config: dict):
+        await init_media_storage()
+        await _projection_init(config)
+    return _init
+
+
 async def init(config: dict, deactivate: List[str]) -> None:
     v1_deactivate = narrow_deactivate_routers("v1_", deactivate)
     v2_deactivate = narrow_deactivate_routers("v2_", deactivate)
@@ -43,10 +51,10 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                        known_accounts_projection.handle_events,
                                                        "c2s_known_accounts")),
                               (["v1_search", "v1_accounts", "v2_search"],
-                               _projection_initializer(known_local_storage,
-                                                       known_local_bridge,
-                                                       known_local_bridge.handle_events,
-                                                       "c2s_known_local")),
+                               _bridge_initializer(known_local_storage,
+                                                   known_local_bridge,
+                                                   known_local_bridge.handle_events,
+                                                   "c2s_known_local")),
                               (["v1_media", "v2_media"],
                                _media_projection_initializer(media_db_storage,
                                                              media_projection,
