@@ -19,11 +19,22 @@ def _inner_object_id(activity: dict) -> str | None:
     if isinstance(obj, dict):
         return obj.get("id")
 
-    return None
+
+def _is_actor_object(activity: dict) -> bool:
+    obj = activity.get("object")
+    return (isinstance(obj, dict) and
+            obj.get("type") in {"Person",
+                                "Service",
+                                "Group",
+                                "Organization",
+                                "Application"})
 
 
 async def _apply_item(data: dict) -> None:
     activity = data["activity"]
+    if _is_actor_object(activity):
+        return
+
     status_id = _inner_object_id(activity) or activity.get("id")
     if status_id is None:
         return
@@ -36,6 +47,9 @@ async def _apply_item(data: dict) -> None:
 
 async def _on_create(object_id: str, payload: dict, sequence_id: int) -> None:
     activity = {"id": object_id, "type": "Create", **payload["activity"]}
+    if _is_actor_object(activity):
+        return
+
     status_id = _inner_object_id(activity)
     if status_id is None:
         return
@@ -45,6 +59,9 @@ async def _on_create(object_id: str, payload: dict, sequence_id: int) -> None:
 
 async def _on_update(object_id: str, payload: dict, sequence_id: int) -> None:
     activity = {"id": object_id, "type": "Update", **payload["activity"]}
+    if _is_actor_object(activity):
+        return
+
     status_id = _inner_object_id(activity)
     if status_id is None:
         return

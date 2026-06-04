@@ -20,13 +20,19 @@ ACCT      = "alice@example.com"
 ACTOR_URL = "https://example.com/actors/alice"
 ACCOUNT_ID = 1234
  
-STORED_ROW = {"account_id":        ACCOUNT_ID,
-              "acct":              ACCT,
-              "actor_url":         ACTOR_URL,
-              "actor_data":        {"type": "Person", "name": "Alice"},
+STORED_ROW = {"account_id": ACCOUNT_ID,
+              "acct": ACCT,
+              "actor_url": ACTOR_URL,
+              "actor_data": {"type": "Person", "name": "Alice"},
               "last_webfinger_at": FRESH}
- 
- 
+
+REMOTE_ACCT = "mallory@remote.example"
+REMOTE_ACTOR_URL = "https://remote.example/actors/mallory"
+REMOTE_ROW = {**STORED_ROW,
+              "acct": REMOTE_ACCT,
+              "actor_url": REMOTE_ACTOR_URL} 
+
+
 @pytest.fixture
 def fake_storage():
     backup = storage_module._instance
@@ -56,13 +62,13 @@ async def test_lookup_by_id_returns_none_when_not_found(fake_storage):
  
 @pytest.mark.asyncio
 async def test_lookup_by_id_refreshes_stale_row(fake_storage):
-    stale_row = {**STORED_ROW, "last_webfinger_at": STALE}
+    stale_row = {**REMOTE_ROW, "last_webfinger_at": STALE}
     fake_storage.get_by_id.return_value = stale_row
     with patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
-               AsyncMock(return_value={**STORED_ROW, "last_webfinger_at": NOW})) as mock_wf:
+               AsyncMock(return_value={**REMOTE_ROW, "last_webfinger_at": NOW})) as mock_wf:
         result = await lookup_by_id(ACCOUNT_ID)
-    mock_wf.assert_awaited_once_with(ACCT)
 
+    mock_wf.assert_awaited_once_with(REMOTE_ACCT)
     assert result["last_webfinger_at"] == NOW
  
  
@@ -95,26 +101,38 @@ async def test_lookup_by_actor_url_returns_fresh_row(fake_storage):
  
 @pytest.mark.asyncio
 async def test_lookup_by_actor_url_does_webfinger_when_stale(fake_storage):
-    stale_row = {**STORED_ROW, "last_webfinger_at": STALE}
+    stale_row = {**REMOTE_ROW, "last_webfinger_at": STALE}
     fake_storage.get_by_actor_url.return_value = stale_row
     with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_acct",
-               AsyncMock(return_value=ACCT)), \
+               AsyncMock(return_value=REMOTE_ACCT)), \
          patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
-               AsyncMock(return_value=STORED_ROW)) as mock_wf:
-        result = await lookup_by_actor_url(ACTOR_URL)
+               AsyncMock(return_value=REMOTE_ROW)) as mock_wf:
+        await lookup_by_actor_url(REMOTE_ACTOR_URL)
 
-    mock_wf.assert_awaited_once_with(ACCT)
+    mock_wf.assert_awaited_once_with(REMOTE_ACCT)
  
  
 @pytest.mark.asyncio
 async def test_lookup_by_actor_url_returns_stale_row_when_webfinger_fails(fake_storage):
-    stale_row = {**STORED_ROW, "last_webfinger_at": STALE}
+    stale_row = {**REMOTE_ROW, "last_webfinger_at": STALE}
     fake_storage.get_by_actor_url.return_value = stale_row
     with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_acct",
                AsyncMock(return_value=None)):
-        result = await lookup_by_actor_url(ACTOR_URL)
+        result = await lookup_by_actor_url(REMOTE_ACTOR_URL)
 
     assert result == stale_row
+
+
+@pytest.mark.asyncio
+async def test_lookup_by_id_treats_local_account_as_fresh(fake_storage):
+    stale_local = {**STORED_ROW, "last_webfinger_at": STALE}
+    fake_storage.get_by_id.return_value = stale_local
+    with patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
+               AsyncMock()) as mock_wf:
+        result = await lookup_by_id(ACCOUNT_ID)
+
+    mock_wf.assert_not_awaited()
+    assert result == stale_local
 
 
 ROW_FULL = {"account_id": 123456,
@@ -174,4 +192,11 @@ def test_make_account_handles_missing_actor_data():
     assert result.display_name == "carol"
     assert result.avatar       is None
     assert result.header       is None
+
+
+def test_make_account_sets_created_at_when_present():
+    created = datetime(2025, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    result  = make_account({**ROW_FULL, "created_at": created})
+
+    assert result.created_at == created.isoformat()
 

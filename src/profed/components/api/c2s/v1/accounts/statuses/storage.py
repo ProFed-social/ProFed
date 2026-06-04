@@ -45,6 +45,13 @@ class _storage(BaseStorage):
                            status_id,
                            activity)
 
+    async def count(self, username: str) -> int:
+        row = await self.fetch_one("""SELECT COUNT(*) AS n
+                                      FROM api.c2s_user_statuses
+                                      WHERE username = $1""",
+                                   username)
+        return row["n"] if row else 0
+
     async def delete_status(self, username: str, status_id: str) -> None:
         await self.execute("""DELETE FROM api.c2s_user_statuses
                               WHERE username = $1 AND status_id = $2""",

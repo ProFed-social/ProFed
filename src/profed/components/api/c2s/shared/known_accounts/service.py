@@ -7,7 +7,7 @@ from typing import Optional
 from profed.core.message_bus import message_bus
 from profed.federation.webfinger import lookup_acct, lookup_actor_url
 from profed.federation.actors import fetch_actor
-from profed.identity import account_id as compute_account_id
+from profed.identity import account_id as compute_account_id, domain
 from .storage import storage
 from profed.models.mastodon import Account
 
@@ -43,6 +43,9 @@ async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
  
  
 def _is_fresh(row: dict, ttl: int) -> bool:
+    if (row.get("acct") or "").endswith("@" + domain()):
+        return True
+
     last = row["last_webfinger_at"]
     if isinstance(last, str):
         last = datetime.fromisoformat(last)
@@ -98,6 +101,7 @@ def make_account(raw: dict) -> Account:
     username = raw["acct"].split("@")[0]
     icon = actor_data.get("icon") or {}
     image = actor_data.get("image") or {}
+    created_at = raw.get("created_at")
     return Account(id=str(raw["account_id"]),
                    username=username,
                    acct=raw["acct"],
@@ -109,5 +113,8 @@ def make_account(raw: dict) -> Account:
                    header=image.get("url") if isinstance(image, dict) else None,
                    header_static=image.get("url") if isinstance(image, dict) else None,
                    locked=actor_data.get("manuallyApprovesFollowers", False),
-                   bot=actor_data.get("type") == "Service")
+                   bot=actor_data.get("type") == "Service",
+                   **({"created_at": created_at.isoformat()}
+                      if hasattr(created_at, "isoformat") else
+                      {}))
 

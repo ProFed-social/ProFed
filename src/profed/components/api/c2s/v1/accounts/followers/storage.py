@@ -40,6 +40,14 @@ class _storage(BaseStorage):
 
         return [row["follower"] for row in rows]
 
+    async def count_followers(self, following: str) -> int:
+        row = await self.fetch_one("""SELECT COUNT(*) AS n
+                                      FROM api.c2s_followers
+                                      WHERE following = $1""",
+                                   following)
+        
+        return row["n"] if row else 0
+
 
 _instance: _storage | None = None
 

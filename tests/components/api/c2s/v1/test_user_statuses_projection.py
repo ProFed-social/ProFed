@@ -92,3 +92,35 @@ async def test_announce_uses_announce_id_and_sequence(fake_status_storage):
     assert row["sequence_id"] == 7
     assert row["activity"]["type"] == "Announce"
 
+
+@pytest.mark.asyncio
+async def test_create_skips_actor_object(fake_status_storage):
+    await projection._on_create("https://example.com/actors/alice#create",
+                                {"username": "alice",
+                                 "activity": {"actor": "https://example.com/actors/alice",
+                                              "object": {"id": "https://example.com/actors/alice",
+                                                         "type": "Person",
+                                                         "name": "Alice"}}},
+                                5)
+    assert fake_status_storage.rows == {}
+
+
+@pytest.mark.asyncio
+async def test_update_skips_actor_object(fake_status_storage):
+    await projection._on_update("https://example.com/actors/alice#update",
+                                {"username": "alice",
+                                 "activity": {"object": {"id": "https://example.com/actors/alice",
+                                                         "type": "Service"}}},
+                                6)
+    assert fake_status_storage.rows == {}
+
+
+@pytest.mark.asyncio
+async def test_create_keeps_note_with_explicit_type(fake_status_storage):
+    note = "https://example.com/actors/alice/notes/2"
+    await projection._on_create("https://example.com/actors/alice#create/2",
+                                {"username": "alice",
+                                 "activity": {"object": {"id": note, "type": "Note", "content": "<p>ok</p>"}}},
+                                8)
+    assert ("alice", note) in fake_status_storage.rows
+

@@ -79,6 +79,13 @@ class _Storage(BaseStorage):
             return await self.fetch_all(sql, account_id, filter)
         return await self.fetch_all(sql, account_id)
 
+    async def count_following(self, following_user: str) -> int:
+        row = await self.fetch_one("""SELECT COUNT(*) AS n
+                                      FROM api.following
+                                      WHERE following_user = $1""",
+                                   following_user)
+        return row["n"] if row else 0
+
 
 _instance: _Storage | None = None
 

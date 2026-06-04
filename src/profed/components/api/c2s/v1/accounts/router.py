@@ -5,7 +5,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from profed.identity import actor_url_from_username
+from profed.identity import actor_url_from_username, domain as instance_domain
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
                                                                      lookup_by_actor_url,
@@ -14,7 +14,7 @@ from profed.components.api.c2s.shared.actors.service import resolve_actor, local
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
-from profed.models.mastodon import Relationship
+from profed.models.mastodon import Relationship, Account
 from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
 from profed.components.api.c2s.v1.accounts.followers.storage import storage as c2s_followers_storage
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
@@ -85,7 +85,20 @@ async def _resolve_account(query: str, config: dict) -> dict | None:
             await lookup_by_acct(f"{query}@{domain}" if "@" not in query else query, config)
             or (await lookup_by_acct(query, config) if "@" not in query else None))
 
- 
+
+async def _with_counts(account: Account) -> Account:
+    if not account.acct.endswith("@" + instance_domain()):
+        return account
+
+    username = account.acct.split("@")[0]
+    return account.model_copy(update={"statuses_count":
+                                      await (await user_statuses_storage()).count(username),
+                                      "followers_count":
+                                      await (await c2s_followers_storage()).count_followers(account.acct),
+                                      "following_count":
+                                      await (await following_storage()).count_following(username)})
+
+
 @router.post("/accounts/{id}/follow")
 async def follow(id: str,
                  claims: Annotated[dict, Depends(current_user)]):
@@ -113,7 +126,7 @@ async def follow(id: str,
                                "activity": {"actor": actor_url_from_username(username),
                                             "object": actor_url}})
  
-    return {"id":       str(row["account_id"]),
+    return {"id": str(row["account_id"]),
             "following": False,
             "requested": True}
 
@@ -137,7 +150,7 @@ async def account_statuses(id: str,
     if raw is None:
         raise HTTPException(status_code=404)
 
-    account = make_account(raw)
+    account = await _with_counts(make_account(raw))
     return [activity_to_status(str(_ACTIVITIES_SOURCE.message_id(seq)),
                                activity,
                                {actor_url_from_username(account.username): account})
@@ -188,8 +201,7 @@ async def lookup(acct: str,
     raw = await _resolve_account(acct, {})
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
-    return make_account(raw)
-
+    return await _with_counts(make_account(raw))
 
 @router.get("/accounts/{id}")
 async def get_account(id: str,
@@ -197,7 +209,7 @@ async def get_account(id: str,
     raw = await _resolve_account(id, {})
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
-    return make_account(raw)
+    return await _with_counts(make_account(raw))
 
 
 @router.get("/accounts/{id}/followers")

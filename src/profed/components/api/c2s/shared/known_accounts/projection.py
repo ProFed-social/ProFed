@@ -15,10 +15,18 @@ async def _store(account_id: int,
                  acct:       str,
                  actor_url:  str,
                  actor_data: dict | None,
-                 last:       str | datetime) -> None:
-    if isinstance(last, str):
-        last = datetime.fromisoformat(last)
-    await (await storage()).upsert(account_id, acct, actor_url, actor_data, last)
+                 last:       str | datetime,
+                 created_at: str | datetime | None = None) -> None:
+    await (await storage()).upsert(account_id,
+                                   acct,
+                                   actor_url,
+                                   actor_data,
+                                   (datetime.fromisoformat(last)
+                                    if isinstance(last, str) else
+                                    last),
+                                   (datetime.fromisoformat(created_at)
+                                    if isinstance(created_at, str) else
+                                    created_at))
 
 
 async def _discovered(object_id: str, payload: dict) -> None:
@@ -26,7 +34,8 @@ async def _discovered(object_id: str, payload: dict) -> None:
                  payload["acct"],
                  payload["actor_url"],
                  payload.get("actor_data"),
-                 payload["last_webfinger_at"])
+                 payload["last_webfinger_at"],
+                 payload.get("created_at"))
 
 
 async def _discovered_snapshot(item: dict) -> None:
@@ -34,7 +43,8 @@ async def _discovered_snapshot(item: dict) -> None:
                  item["acct"],
                  item["actor_url"],
                  item.get("actor_data"),
-                 item["last_webfinger_at"])
+                 item["last_webfinger_at"],
+                 item.get("created_at"))
 
 
 handle_events, rebuild, _ = build_projection(topic=known_accounts,

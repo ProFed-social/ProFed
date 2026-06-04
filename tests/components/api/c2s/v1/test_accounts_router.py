@@ -319,6 +319,54 @@ def test_lookup_returns_account(client):
     assert data["acct"]     == "bob@remote.example"
 
 
+LOCAL_ROW = {"account_id": 7,
+             "acct":       "alice@example.com",
+             "actor_url":  "https://example.com/actors/alice",
+             "actor_data": {"type": "Person", "name": "Alice"}}
+
+
+def _count_storage(n):
+    mock = AsyncMock()
+    mock.count = AsyncMock(return_value=n)
+    mock.count_followers = AsyncMock(return_value=n)
+    mock.count_following = AsyncMock(return_value=n)
+    return AsyncMock(return_value=mock)
+
+
+def test_lookup_local_account_includes_counts(client):
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=LOCAL_ROW)), \
+             patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
+                   _count_storage(3)), \
+             patch("profed.components.api.c2s.v1.accounts.router.c2s_followers_storage",
+                   _count_storage(5)), \
+             patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+                   _count_storage(2)):
+            response = client.get("/accounts/lookup?acct=alice@example.com")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["statuses_count"] == 3
+    assert data["followers_count"] == 5
+    assert data["following_count"] == 2
+
+
+def test_lookup_remote_account_keeps_zero_counts(client):
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW_FULL)):
+            response = client.get("/accounts/lookup?acct=bob@remote.example")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["statuses_count"] == 0
+    assert data["followers_count"] == 0
+    assert data["following_count"] == 0
+
+
 def test_lookup_returns_404_when_not_found(client):
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(return_value=None)):
