@@ -6,7 +6,7 @@ from typing import Annotated, Optional
 from profed.identity import actor_url_from_username, acct_from_username
 from profed.components.api.c2s.v1.timelines.storage import storage
 from profed.components.api.c2s.shared.known_accounts.service import lookup_multiple
-from profed.models.mastodon import Account, Status
+from profed.components.api.c2s.shared.statuses import activity_to_status
 from profed.components.api.c2s.shared.auth import current_user 
  
 
@@ -19,27 +19,6 @@ def init(config: dict) -> None:
     active = True 
  
 
-def _activity_to_status(row_id: str,
-                        activity: dict,
-                        accounts: dict[str, Account]) -> Status:
-    obj = activity.get("object", {})
-    if isinstance(obj, str):
-        obj = {}
-    actor_url      = activity.get("actor", "")
-    username = actor_url.rstrip("/").split("/")[-1]
-
-    return Status(id=          row_id,
-                  created_at=  obj.get("published", "1970-01-01T00:00:00.000Z"),
-                  uri=         activity.get("id", ""),
-                  url=         obj.get("url", activity.get("id", "")),
-                  content=     obj.get("content", ""),
-                  account=     accounts.get(actor_url, Account(id=           "0",
-                                                               username=     username,
-                                                               acct=         actor_url,
-                                                               display_name= username,
-                                                               url=          actor_url)))
- 
- 
 @router.get("/timelines/home")
 async def home_timeline(claims: Annotated[dict, Depends(current_user)],
                         limit: int = Query(default=20, ge=1, le=40),
@@ -51,7 +30,7 @@ async def home_timeline(claims: Annotated[dict, Depends(current_user)],
                                          since_id=since_id)
     accounts   = await lookup_multiple(list({activity.get("actor", "")
                                              for _, activity in rows}))
-    return [_activity_to_status(row_id, activity, accounts) for row_id, activity in rows]
+    return [activity_to_status(row_id, activity, accounts) for row_id, activity in rows]
 
 
 @router.get("/timelines/public")

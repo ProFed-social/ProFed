@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from profed.core.config import config, raw
 from profed.components.api.c2s.v1.accounts import router as accounts_module
 from profed.components.api.c2s.shared.auth import current_user 
+from profed.core.message_bus.source_key import source_key
  
 from _fakes import FakeMessageBus
 
@@ -46,7 +47,15 @@ def client():
     app.include_router(accounts_module.router)
     app.dependency_overrides[current_user] = lambda: CLAIMS
     return TestClient(app)
- 
+
+
+@pytest.fixture
+def anon_client():
+    accounts_module.init({})
+    app = FastAPI()
+    app.include_router(accounts_module.router)
+    return TestClient(app) 
+
 
 def test_verify_credentials_returns_account(client):
     with Cfg({"profed": {"run": "api"},
@@ -499,4 +508,41 @@ def test_get_followed_tags_returns_empty_list(client):
 
 def test_get_suggestions_returns_empty_list(client):
     assert client.get("/suggestions").json() == []
+
+
+def test_account_statuses_anonymous_returns_list(anon_client):
+    storage_mock = AsyncMock(fetch=AsyncMock(return_value=[]))
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW_FULL)), \
+             patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
+                   AsyncMock(return_value=storage_mock)):
+
+            response = anon_client.get("/accounts/123456/statuses")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_account_statuses_returns_rendered_statuses(anon_client):
+    activity = {"id": "https://example.com/actors/bob#create/1",
+                "actor": "https://example.com/actors/bob",
+                "object": {"id": "https://example.com/actors/bob/notes/1",
+                           "content": "<p>hello world</p>",
+                           "published": "2026-01-01T00:00:00.000Z"}}
+    storage_mock = AsyncMock(fetch=AsyncMock(return_value=[(42, activity)]))
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW_FULL)), \
+             patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
+                   AsyncMock(return_value=storage_mock)):
+
+            response = anon_client.get("/accounts/123456/statuses")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["content"] == "<p>hello world</p>"
+    assert data[0]["id"] == str(source_key("activities").message_id(42))
 

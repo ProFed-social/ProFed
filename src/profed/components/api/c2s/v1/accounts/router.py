@@ -17,7 +17,12 @@ from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship
 from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
 from profed.components.api.c2s.v1.accounts.followers.storage import storage as c2s_followers_storage
+from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
+from profed.components.api.c2s.shared.statuses import activity_to_status
+from profed.core.message_bus.source_key import source_key
 
+
+_ACTIVITIES_SOURCE = source_key("activities")
 
 router = APIRouter()
 active = False
@@ -126,8 +131,18 @@ async def featured_tags(id: str):
 
 @router.get("/accounts/{id}/statuses")
 async def account_statuses(id: str,
+                           limit: int = Query(default=20, ge=1, le=40),
                            claims: Annotated[dict | None, Depends(current_user_optional)] = None):
-    return []
+    raw = await _resolve_account(id, {})
+    if raw is None:
+        raise HTTPException(status_code=404)
+
+    account = make_account(raw)
+    return [activity_to_status(str(_ACTIVITIES_SOURCE.message_id(seq)),
+                               activity,
+                               {actor_url_from_username(account.username): account})
+            for seq, activity in await (await user_statuses_storage()).fetch(account.username,
+                                                                             limit=limit)]
 
 
 @router.post("/accounts/{id}/unfollow")

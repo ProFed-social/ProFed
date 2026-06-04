@@ -27,6 +27,8 @@ from .accounts.following import storage as following_storage
 from .accounts.following import projection as following_projection 
 from .accounts.followers import storage   as followers_storage
 from .accounts.followers import projection as followers_projection
+from .accounts.statuses import storage as user_statuses_storage
+from .accounts.statuses import projection as user_statuses_projection
 
 
 def _projection_initializer(storage, projection, handle_events, name):
@@ -62,7 +64,12 @@ async def init(config: dict, deactivate: List[str]) -> None:
                               _projection_initializer(followers_storage,
                                                       followers_projection,
                                                       followers_projection.handle_events,
-                                                      "c2s_v1_followers"))]:
+                                                      "c2s_v1_followers")),
+                             (["accounts"],
+                              _projection_initializer(user_statuses_storage,
+                                                      user_statuses_projection,
+                                                      user_statuses_projection.handle_events,
+                                                      "c2s_v1_user_statuses"))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
 
