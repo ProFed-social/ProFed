@@ -15,17 +15,7 @@ if [ ! -d ".venv" ]; then
   exit 1
 fi
 
-if [ ! -d "client/node_modules" ]; then
-  echo "Client dependencies not found. Run: scripts/bootstrap.sh"
-  exit 1
-fi
-
 source .venv/bin/activate
 
-status=0
-echo "== Python (pytest) =="
-pytest "$@" || status=1
-echo "== Web client (vitest) =="
-( cd client && npm test ) || status=1
-exit $status
+pytest "$@"
 

@@ -1,7 +1,0 @@
-<!--
-    Copyright (C) 2026 Christof Donat
-    SPDX-License-Identifier: AGPL-3.0-or-later
--->
-
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
