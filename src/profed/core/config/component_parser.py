@@ -5,6 +5,8 @@ from typing import Any, Dict, Sequence
 from copy import deepcopy
 import inspect
 
+from profed.core.util import extract_component_names
+
 class ConfigError(Exception):
     pass
 
@@ -86,9 +88,7 @@ def _apply_defaults(raw: Dict[str, Dict[str, str]],
 def components_from_raw(raw: Dict[str, Dict[str, str]],
                         defaults: Dict[str, Any] | None = None) -> Dict[str, Any]:
     parsed = deepcopy(_apply_defaults(raw, defaults))
-    run = parsed["profed"]["run"]
-    parsers = parse_list(run if isinstance(run, list) else run.split())
+    parsers = parse_list(extract_component_names(parsed["profed"]["run"]))
     parsed.update(parsers.parse_all(raw))
     return parsed
-
 
