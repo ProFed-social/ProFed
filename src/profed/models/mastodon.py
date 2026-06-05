@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from typing import Any
 
+from .resume import Resume
+
 
 class Account(BaseModel):
     id: str
@@ -26,6 +28,7 @@ class Account(BaseModel):
     emojis: list[Any] = Field(default_factory=list)
     fields: list[Any] = Field(default_factory=list)
     source: dict[str, Any] | None = None
+    resume: Resume | None = None
 
 
 class Relationship(BaseModel):

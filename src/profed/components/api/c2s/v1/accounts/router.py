@@ -15,6 +15,7 @@ from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
+from profed.models.resume import Resume
 from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
 from profed.components.api.c2s.v1.accounts.followers.storage import storage as c2s_followers_storage
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
@@ -97,6 +98,14 @@ async def _with_counts(account: Account) -> Account:
                                       await (await c2s_followers_storage()).count_followers(account.acct),
                                       "following_count":
                                       await (await following_storage()).count_following(username)})
+
+
+def _with_resume(account: Account, raw: dict) -> Account:
+    resume = (raw.get("actor_data") or {}).get("resume")
+    if not resume:
+        return account
+
+    return account.model_copy(update={"resume": Resume.model_validate(resume)})
 
 
 @router.post("/accounts/{id}/follow")
@@ -201,7 +210,8 @@ async def lookup(acct: str,
     raw = await _resolve_account(acct, {})
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
-    return await _with_counts(make_account(raw))
+    return _with_resume(await _with_counts(make_account(raw)), raw)
+
 
 @router.get("/accounts/{id}")
 async def get_account(id: str,
@@ -209,8 +219,7 @@ async def get_account(id: str,
     raw = await _resolve_account(id, {})
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
-    return await _with_counts(make_account(raw))
-
+    return _with_resume(await _with_counts(make_account(raw)), raw)
 
 @router.get("/accounts/{id}/followers")
 async def account_followers(id: str,
