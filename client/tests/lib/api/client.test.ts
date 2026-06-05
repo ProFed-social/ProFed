@@ -1,5 +1,8 @@
+// Copyright (C) 2026 Christof Donat
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, vi } from 'vitest';
-import { apiGet, ApiError } from './client';
+import { apiGet, ApiError } from '$lib/api/client';
 
 const asFetch = (mock: unknown) => mock as typeof globalThis.fetch;
 

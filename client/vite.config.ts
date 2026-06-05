@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Christof Donat
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
@@ -12,8 +15,8 @@ export default defineConfig({
                 test: {
                     name: 'server',
                     environment: 'node',
-                    include: ['src/**/*.{test,spec}.{js,ts}'],
-                    exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+                    include: ['tests/**/*.{test,spec}.{js,ts}'],
+                    exclude: ['tests/**/*.svelte.{test,spec}.{js,ts}']
                 }
             }
         ]

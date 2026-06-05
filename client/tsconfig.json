@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Christof Donat
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 {
     "extends": "./.svelte-kit/tsconfig.json",
     "compilerOptions": {
@@ -12,9 +15,4 @@
         "strict": true,
         "moduleResolution": "bundler"
     }
-    // Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
-    // except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
-    //
-    // To make changes to top-level options such as include and exclude, we recommend extending
-    // the generated config; see https://svelte.dev/docs/kit/configuration#typescript
 }

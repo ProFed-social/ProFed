@@ -1,5 +1,6 @@
-// See https://svelte.dev/docs/kit/types#app.d.ts
-// for information about these interfaces
+// Copyright (C) 2026 Christof Donat
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 declare global {
     namespace App {
         // interface Error {}
