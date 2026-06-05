@@ -95,3 +95,31 @@ def test_collect_component_hooks_raises_for_unimportable_component():
         collect_component_hooks(["does_not_exist_xyz"], "mount_endpoints")
 
 
+def test_run_executes_services_alongside_components(mock_module):
+    ran = []
+    async def service():
+        ran.append("service")
+
+    run({"example": {"foo": "bar"}, "profed": {"run": ["example"]}},
+        services=[service])
+
+    assert ran == ["service"]
+
+
+def test_run_with_empty_services(mock_module):
+    run({"example": {"foo": "bar"}, "profed": {"run": ["example"]}},
+        services=[])
+
+
+def test_run_runs_services_after_init(mock_module):
+    order = []
+    async def init_fn():
+        order.append("init")
+    async def service():
+        order.append("service")
+
+    run({"example": {"foo": "bar"}, "profed": {"run": ["example"]}},
+        init=[init_fn], services=[service])
+
+    assert order == ["init", "service"]
+

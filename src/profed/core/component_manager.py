@@ -32,7 +32,7 @@ class Component:
             await (self.entry(cfg))
     
 
-def run(config, init=None):
+def run(config, init=None, services=None):
     @asynccontextmanager
     async def _lifecycle(init):
         shutdowns = ([sd
@@ -52,7 +52,8 @@ def run(config, init=None):
                           for name in extract_component_names(config["profed"]["run"])]
 
             await asyncio.gather(*(component(config.get(component.name, {}))
-                                   for component in components))
+                                   for component in components),
+                                 *(service() for service in (services or [])))
 
     asyncio.run(main())
 
