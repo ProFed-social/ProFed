@@ -30,9 +30,13 @@ def build_users_projection(storage):
         store = await storage()
         await store.delete(object_id)
 
+    async def _rebuild_finished() -> None:
+        (await storage()).rebuild_finished()
+
     return build_projection(topic=users,
                             subscriber="api",
                             init=_init,
+                            rebuild_finished=_rebuild_finished,
                             on_snapshot_item=_apply_snapshot_item,
                             on_message_type={"created": _created,
                                              "deleted": _deleted})

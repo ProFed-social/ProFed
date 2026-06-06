@@ -24,11 +24,15 @@ async def _follower_snapshot(item: dict) -> None:
     await (await storage()).add_follower(item["following"], item["follower"])
 
 
-handle_events, rebuild, _ = build_projection(
-    topic=            followers_topic,
-    subscriber=       "api_c2s_followers",
-    init=             _init,
-    on_snapshot_item= _follower_snapshot,
-    on_message_type=  {"created": _follower_created,
-                       "deleted": _follower_deleted})
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
+handle_events, rebuild, _ = build_projection(topic=followers_topic,
+                                             subscriber="api_c2s_followers",
+                                             init=_init,
+                                             rebuild_finished=_rebuild_finished,
+                                             on_snapshot_item=_follower_snapshot,
+                                             on_message_type={"created": _follower_created,
+                                                              "deleted": _follower_deleted})
 

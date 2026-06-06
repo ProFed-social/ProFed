@@ -6,6 +6,9 @@ from typing import Optional, Dict, Callable, Awaitable, Tuple, Any
 from profed.core.message_bus import message_bus, TICK, CatchUp
 
 
+async def _no_rebuild_finished() -> None:
+    pass
+
 class _EventHandlerSignature:
     def __init__(self,
                  *,
@@ -55,7 +58,8 @@ def build_projection(topic: Dict,
                      on_snapshot_item: Callable[[Dict], Awaitable[None]],
                      verify_event: Optional[Callable[[str, Dict], bool]] = None,
                      verify_snapshot_item: Optional[Callable[[Dict], bool]] = None,
-                     event_handler_signature: _EventHandlerSignature = standard) \
+                     event_handler_signature: _EventHandlerSignature = standard,
+                     rebuild_finished: Callable[[], Awaitable[None]] = _no_rebuild_finished) \
         -> Tuple[Callable[[], Awaitable[None]],
                  Callable[[], Awaitable[None]],
                  Callable[[int], None]]:
@@ -125,6 +129,8 @@ def build_projection(topic: Dict,
             await drain_task
         except asyncio.CancelledError:
             pass
+
+        await rebuild_finished()
 
     def reset_last_seen(new_last_seen):
         nonlocal last_seen

@@ -26,3 +26,15 @@ def fake_media_storage():
 
     media_storage._instance = backup
 
+
+
+@pytest.fixture(autouse=True)
+def storages_ready_by_default(monkeypatch):
+    from profed.core.persistence import base_storage
+    original_init = base_storage.BaseStorage.__init__
+    def _init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        self._is_rebuilt = None
+    monkeypatch.setattr(base_storage.BaseStorage, "__init__", _init)
+
+

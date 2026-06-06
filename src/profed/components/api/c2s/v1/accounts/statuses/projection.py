@@ -84,10 +84,15 @@ async def _on_announce(object_id: str, payload: dict, sequence_id: int) -> None:
     await (await storage()).add(payload["username"], object_id, sequence_id, activity)
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 handle_events, rebuild, _ = \
     build_projection(topic=activities,
                      subscriber="api_user_statuses",
                      init=_init,
+                     rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_apply_item,
                      on_message_type={"Create": _on_create,
                                       "Update": _on_update,

@@ -47,9 +47,14 @@ async def _discovered_snapshot(item: dict) -> None:
                  item.get("created_at"))
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 handle_events, rebuild, _ = build_projection(topic=known_accounts,
                                              subscriber="api_c2s_known_accounts",
                                              init=_init,
+                                             rebuild_finished=_rebuild_finished,
                                              on_snapshot_item=_discovered_snapshot,
                                              on_message_type={"discovered": _discovered})
 

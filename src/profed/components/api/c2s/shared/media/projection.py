@@ -37,9 +37,14 @@ async def _uploaded_snapshot(item: dict) -> None:
     await _store(item["file_id"], item)
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 handle_events, rebuild, _ = build_projection(topic=media,
                                              subscriber="api_c2s_media",
                                              init=_init,
+                                             rebuild_finished=_rebuild_finished,
                                              on_snapshot_item=_uploaded_snapshot,
                                              on_message_type={"uploaded": _uploaded,
                                                               "deleted": _deleted})

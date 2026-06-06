@@ -28,10 +28,15 @@ async def _store_activity(event_type: str,
                                  **payload["activity"]})
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=activities,
                          subscriber="api",
                          init=_init,
+                         rebuild_finished=_rebuild_finished,
                          on_snapshot_item=_apply_item,
                          on_message_type={verb: _store_activity
                                           for verb in _ALL_AP_VERBS},

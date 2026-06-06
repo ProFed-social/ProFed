@@ -43,10 +43,15 @@ async def _deleted(object_id: str, payload: dict) -> None:
     await (await storage()).delete(object_id)
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=users,
                          subscriber="api",
                          init=_init,
+                         rebuild_finished=_rebuild_finished,
                          on_snapshot_item=_apply_snapshot_item,
                          on_message_type={"created": _created,
                                           "profile_edited": _profile_edited,

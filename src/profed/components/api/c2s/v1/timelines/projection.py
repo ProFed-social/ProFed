@@ -62,12 +62,17 @@ async def _on_announce(object_id: str, payload: dict) -> None:
     activity = {"id": object_id, "type": "Announce", **payload["activity"]}
 
     await (await storage()).add(payload["username"], object_id, activity) 
- 
+
+
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
 
 handle_events, rebuild, _ = \
     build_projection(topic=incoming_activities,
                      subscriber="api_home_timeline",
                      init=_init,
+                     rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_apply_item,
                      on_message_type={"Create": _on_create,
                                       "Update": _on_update,
