@@ -40,18 +40,13 @@ class _ProxyAuthMiddleware(BaseHTTPMiddleware):
 
 
 async def web_service():
-    logger = logging.getLogger("web_service")
-
     cfg = config()
 
-    logger.debug("collecting hooks")
     mounts = collect_component_hooks(cfg["profed"]["run"], "mount_endpoints")
-    logger.debug(f"found mount funtions: {mounts}")
     if not mounts:
         return
 
     web = cfg.get("web-server", {})
-    logger.debug(f"web server config {web}")
     if "proxy_token" not in web:
         raise RuntimeError('proxy_token is required in [web-server] config. '
                            'Set to empty string ("") to disable the token check.')
@@ -59,11 +54,9 @@ async def web_service():
     app = FastAPI()
     app.add_middleware(_ProxyAuthMiddleware, proxy_token=web["proxy_token"])
 
-    logger.debug(f"mounting endpoints")
     await asyncio.gather(*(hook(app, cfg.get(name, {}))
                            for name, hook in mounts.items()))
 
-    logger.debug(f"starting webserver")
     server = uvicorn.Server(uvicorn.Config(app,
                                            host=web.get("listen_host", "127.0.0.1"),
                                            port=int(web.get("listen_port", 8000)),
