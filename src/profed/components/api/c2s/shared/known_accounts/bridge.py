@@ -17,9 +17,9 @@ _USERS_SOURCE = source_key("users")
 
 
 async def _init() -> None:
-    storage = await storage()
-    await storage.ensure_schema()
-    await storage.rebuild_finished()
+    strg = await storage()
+    await strg.ensure_schema()
+    await strg.rebuild_finished()
 
 
 async def _apply_snapshot_item(item: dict) -> None:
