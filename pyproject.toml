@@ -29,9 +29,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-[project.scripts]
-profed = "profed:main"
-
 [project.optional-dependencies]
 profile_importer = [
     "httpx>=0.27",
