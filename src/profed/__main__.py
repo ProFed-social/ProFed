@@ -82,5 +82,5 @@ if __name__ == "__main__":
 
     run(cfg,
         init=[partial(init_message_bus, names())],
-        services=[])
+        services=[web_service])
 
