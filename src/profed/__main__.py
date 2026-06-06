@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import asyncio
 
 from functools import partial
 
@@ -53,8 +54,8 @@ async def web_service():
     app = FastAPI()
     app.add_middleware(_ProxyAuthMiddleware, proxy_token=web["proxy_token"])
 
-    for name, hook in mounts.items():
-        await hook(app, cfg.get(name, {}))
+    await asyncio.gather(*(hook(app, cfg.get(name, {}))
+                           for name, hook in mounts.items()))
 
     server = uvicorn.Server(uvicorn.Config(app,
                                            host=web.get("listen_host", "127.0.0.1"),
