@@ -40,9 +40,14 @@ async def _discovered_snapshot(item: dict) -> None:
                               datetime.now(timezone.utc).isoformat()))
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=known_accounts,
                          subscriber="s2s_inbox_public_keys",
                          init=_init,
+                         rebuild_finished=_rebuild_finished,
                          on_snapshot_item=_discovered_snapshot,
                          on_message_type={"discovered": _discovered})
