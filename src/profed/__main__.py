@@ -18,6 +18,7 @@ from profed.topics import names
 
 
 STANDARD_COMPONENTS = ["api",
+                       "client",
                        "user_activities",
                        "activity_delivery",
                        "follow_handler",
