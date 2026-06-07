@@ -80,7 +80,7 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
 
 async def _resolve_account(query: str, config: dict) -> dict | None:
     logger.debug(f"_resolve_account('query', config)")
-    logger.debug(f"starts with'https://'? {query.startswith("https://")}")
+    logger.debug(f"starts with 'https://'? {query.startswith('https://')}")
     logger.debug(f"is digit? {query.isdigit()}")
     logger.debug(f"'@' in query? {'@' in query}")
     return (await lookup_by_actor_url(query, config)
