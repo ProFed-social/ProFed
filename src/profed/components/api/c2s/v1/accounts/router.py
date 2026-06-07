@@ -211,7 +211,7 @@ async def unfollow(id: str,
 @router.get("/accounts/lookup")
 async def lookup(acct: str,
                  claims: Annotated[dict | None, Depends(current_user_optional)] = None):
-    loggger.debug(f"lookup {acct}")
+    logger.debug(f"lookup {acct}")
     raw = await _resolve_account(acct, {})
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
