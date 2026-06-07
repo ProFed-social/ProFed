@@ -72,9 +72,9 @@ async def lookup_by_id(account_id: int,
  
 async def lookup_by_acct(acct: str,
                          config: dict | None = None) -> Optional[dict]:
-    logger.debug(f"lookup('{acct}', '{config}')")
+    logger.debug(f"lookup('{acct}', {config})")
     row = await (await storage()).get_by_acct(acct)
-    logger.debug(f"row: '{row}')")
+    logger.debug(f"row: {row})")
     return (row
             if row is not None and _is_fresh(row, _ttl(config)) else
             await _do_webfinger_lookup(acct))
