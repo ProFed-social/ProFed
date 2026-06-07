@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
-import logging
 import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -14,7 +13,6 @@ from profed.models.mastodon import Account
 
  
 WEBFINGER_CACHE_TTL = 86400  # 1 day default
-logger = logging.getLogger(__name__)
  
 async def _publish_discovered(account_id: int,
                               acct: str,
@@ -72,9 +70,7 @@ async def lookup_by_id(account_id: int,
  
 async def lookup_by_acct(acct: str,
                          config: dict | None = None) -> Optional[dict]:
-    logger.debug(f"lookup('{acct}', {config})")
     row = await (await storage()).get_by_acct(acct)
-    logger.debug(f"row: {row})")
     return (row
             if row is not None and _is_fresh(row, _ttl(config)) else
             await _do_webfinger_lookup(acct))

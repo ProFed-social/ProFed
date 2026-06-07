@@ -52,9 +52,7 @@ class LocalFileStorage:
                           size=         len(data))
 
     async def retrieve(self, file_id: str) -> bytes:
-        logger.debug(f"reading file {file_id}")
         path = self._path_for(file_id)
-        logger.debug(f"at path {path}")
 
         def _read() -> bytes:
             if not path.exists():

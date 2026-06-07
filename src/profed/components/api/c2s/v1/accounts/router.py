@@ -3,7 +3,6 @@
 
 import uuid
 from typing import Annotated
-import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from profed.identity import actor_url_from_username, domain as instance_domain
@@ -28,7 +27,6 @@ _ACTIVITIES_SOURCE = source_key("activities")
 
 router = APIRouter()
 active = False
-logger = logging.getLogger(__name__)
 
 def init(config: dict) -> None:
     global active
@@ -79,10 +77,6 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
 
 
 async def _resolve_account(query: str, config: dict) -> dict | None:
-    logger.debug(f"_resolve_account('query', config)")
-    logger.debug(f"starts with 'https://'? {query.startswith('https://')}")
-    logger.debug(f"is digit? {query.isdigit()}")
-    logger.debug(f"'@' in query? {'@' in query}")
     return (await lookup_by_actor_url(query, config)
             if query.startswith("https://") else
             await lookup_by_id(int(query), config)
@@ -211,7 +205,6 @@ async def unfollow(id: str,
 @router.get("/accounts/lookup")
 async def lookup(acct: str,
                  claims: Annotated[dict | None, Depends(current_user_optional)] = None):
-    logger.debug(f"lookup {acct}")
     raw = await _resolve_account(acct, {})
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
