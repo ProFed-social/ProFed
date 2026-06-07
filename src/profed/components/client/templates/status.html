@@ -1,0 +1,20 @@
+<article class="h-entry status">
+  {% if show_author is not defined or show_author %}
+  <a class="p-author h-card author" href="{{ status.account.url }}">
+    {% if status.account.avatar %}
+    <img class="u-photo avatar" src="{{ status.account.avatar }}" alt="">
+    {% else %}
+    <span class="avatar avatar-fallback">{{ (status.account.display_name or status.account.username)[:2] | upper }}</span>
+    {% endif %}
+    <span class="p-name">{{ status.account.display_name or status.account.username }}</span>
+    <span class="acct">@{{ status.account.acct }}</span>
+  </a>
+  {% endif %}
+  <div class="e-content">{{ status.content | safe }}</div>
+  <footer class="status-meta">
+    <time class="dt-published" datetime="{{ status.created_at }}">{{ status.created_at[:10] }}</time>
+    <span class="reblogs">&#8634; {{ status.reblogs_count }}</span>
+    <span class="favourites">&#9829; {{ status.favourites_count }}</span>
+  </footer>
+</article>
+

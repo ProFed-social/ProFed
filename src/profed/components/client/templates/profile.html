@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ account.display_name or account.username }} (@{{ account.acct }}) — ProFed{% endblock %}
+{% block content %}
+<article class="h-card profile">
+  {% if account.header %}<img class="header" src="{{ account.header }}" alt="">{% endif %}
+  {% if account.avatar %}
+    <img class="u-photo avatar" src="{{ account.avatar }}" alt="">
+  {% else %}
+    <div class="avatar avatar-fallback">{{ (account.display_name or account.username)[:2] | upper }}</div>
+  {% endif %}
+
+  <h1 class="p-name">{{ account.display_name or account.username }}</h1>
+  <p class="acct"><a class="u-url" href="{{ account.url }}">@{{ account.acct }}</a></p>
+  {% if account.note %}<div class="p-note note">{{ account.note | safe }}</div>{% endif %}
+
+  <dl class="counts">
+    <div><dt>{{ account.statuses_count }}</dt><dd>Posts</dd></div>
+    <div><dt>{{ account.following_count }}</dt><dd>Following</dd></div>
+    <div><dt>{{ account.followers_count }}</dt><dd>Followers</dd></div>
+  </dl>
+  <p class="joined">Joined {{ account.created_at[:10] }}</p>
+
+  {% if account.resume %}
+  <section class="h-resume resume">
+    {% if account.resume.experience %}
+    <h2>Experience</h2>
+    {% for job in account.resume.experience %}
+    <div class="p-experience h-event">
+      <p class="p-name">{{ job.name }}{% if job.organization %} — <span class="p-location">{{ job.organization }}</span>{% endif %}</p>
+      {% if job.start or job.end %}<p class="dates">{{ job.start }}{% if job.end %}–{{ job.end }}{% endif %}</p>{% endif %}
+      {% if job.description %}<p class="p-summary">{{ job.description }}</p>{% endif %}
+      {% if job.url %}<a class="u-url" href="{{ job.url }}">{{ job.url }}</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if account.resume.education %}
+    <h2>Education</h2>
+    {% for edu in account.resume.education %}
+    <div class="p-education h-event">
+      <p class="p-name">{{ edu.name }}{% if edu.organization %} — <span class="p-location">{{ edu.organization }}</span>{% endif %}</p>
+      {% if edu.start or edu.end %}<p class="dates">{{ edu.start }}{% if edu.end %}–{{ edu.end }}{% endif %}</p>{% endif %}
+      {% if edu.description %}<p class="p-summary">{{ edu.description }}</p>{% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if account.resume.projects %}
+    <h2>Projects</h2>
+    {% for proj in account.resume.projects %}
+    <div class="p-experience h-event">
+      <p class="p-name">{{ proj.name }}</p>
+      {% if proj.description %}<p class="p-summary">{{ proj.description }}</p>{% endif %}
+      {% if proj.url %}<a class="u-url" href="{{ proj.url }}">{{ proj.url }}</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if account.resume.skills %}
+    <h2>Skills</h2>
+    <ul class="skills">
+      {% for skill in account.resume.skills %}<li class="p-skill">{{ skill.name }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="h-feed posts">
+    <h2>Latest posts</h2>
+    {% set show_author = false %}
+    {% for status in statuses %}
+    {% include "status.html" %}
+    {% else %}
+    <p class="empty">No posts yet.</p>
+    {% endfor %}
+  </section>
+</article>
+{% endblock %}
+

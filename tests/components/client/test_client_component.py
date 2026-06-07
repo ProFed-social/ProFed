@@ -9,9 +9,17 @@ async def test_entry_is_a_no_op():
     assert await Client({}) is None
 
 
-async def test_mount_endpoints_is_a_callable_no_op():
-    assert await mount_endpoints(object(), {}) is None
+async def test_mount_endpoints_binds_the_api_client_and_mounts_the_profile_route():
+    from fastapi import FastAPI
+    from profed.components.client import api_client
+    api_client._reset_api_client()
+    app = FastAPI()
 
+    await mount_endpoints(app, {})
+
+    assert api_client._app is app
+    assert "/@{handle}" in {route.path for route in app.routes}
+    api_client._reset_api_client()
 
 def test_component_resolves_the_entry_without_db_schema():
     component = Component("client")
