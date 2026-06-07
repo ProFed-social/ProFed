@@ -30,7 +30,7 @@
     {% for job in account.resume.experience %}
     <div class="p-experience h-event">
       <p class="p-name">{{ job.name }}{% if job.organization %} — <span class="p-location">{{ job.organization }}</span>{% endif %}</p>
-      {% if job.start or job.end %}<p class="dates">{{ job.start }}{% if job.end %}–{{ job.end }}{% endif %}</p>{% endif %}
+      {% if job.start or job.end %}<p class="dates">{{ job.start }}{% if job.end %} - {{ job.end }}{% endif %}</p>{% endif %}
       {% if job.description %}<p class="p-summary">{{ job.description }}</p>{% endif %}
       {% if job.url %}<a class="u-url" href="{{ job.url }}">{{ job.url }}</a>{% endif %}
     </div>
@@ -42,7 +42,7 @@
     {% for edu in account.resume.education %}
     <div class="p-education h-event">
       <p class="p-name">{{ edu.name }}{% if edu.organization %} — <span class="p-location">{{ edu.organization }}</span>{% endif %}</p>
-      {% if edu.start or edu.end %}<p class="dates">{{ edu.start }}{% if edu.end %}–{{ edu.end }}{% endif %}</p>{% endif %}
+      {% if edu.start or edu.end %}<p class="dates">{{ edu.start }}{% if edu.end %} - {{ edu.end }}{% endif %}</p>{% endif %}
       {% if edu.description %}<p class="p-summary">{{ edu.description }}</p>{% endif %}
     </div>
     {% endfor %}
