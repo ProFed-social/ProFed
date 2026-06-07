@@ -226,6 +226,7 @@ async def get_account(id: str,
         raise HTTPException(status_code=404, detail="account_not_found")
     return _with_resume(await _with_counts(make_account(raw)), raw)
 
+
 @router.get("/accounts/{id}/followers")
 async def account_followers(id: str,
                             claims: Annotated[dict, Depends(current_user)] = None):

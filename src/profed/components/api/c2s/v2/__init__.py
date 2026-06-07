@@ -29,7 +29,6 @@ def mount_routers(parent, deactivate: List[str]) -> None:
                          "filters": filters,
                          "media": media},
                         deactivate):
-        if r.active:
-            router.include_router(r.router)
+        router.include_router(r.router)
     parent.include_router(router)
 
