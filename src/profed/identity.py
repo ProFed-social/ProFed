@@ -5,7 +5,7 @@ import hashlib
 from profed.core.config import config
 
 def domain() -> str:
-    return config().get("api", {}).get("domain", "example.com")
+    return config().get("web-server", {}).get("domain", "example.com")
 
 
 def acct_from_username(username: str) -> str:
