@@ -3,12 +3,11 @@
 
 import asyncio
 import io
+import subprocess
 from typing import Awaitable, Callable, Optional
-from PIL import Image, ImageFile
+from PIL import Image
 from profed.core.media_storage import media_storage
 
-
-ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 OnComplete = Callable[[str, str, int, int, str], Awaitable[None]]
 
@@ -25,7 +24,7 @@ async def scale_image(media_id:    str,
     (scaled,
      final_w,
      final_h,
-     content_type) = await asyncio.to_thread(_scale_pillow,
+     content_type) = await asyncio.to_thread(_scale_with_fallback,
                                              await storage.retrieve(media_id),
                                              width,
                                              height)
@@ -35,6 +34,30 @@ async def scale_image(media_id:    str,
         await on_complete(media_id, variant, final_w, final_h, content_type)
 
     return final_w, final_h
+
+
+def _scale_with_fallback(image_bytes, width, height):
+    try:
+        return _scale_pillow(image_bytes, width, height)
+    except OSError:
+        return _scale_pillow(_transcode_baseline(image_bytes), width, height)
+
+
+def _transcode_baseline(image_bytes):
+    try:
+        result = subprocess.run(["jpegtran"],
+                                input=image_bytes,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+    except FileNotFoundError as exc:
+        raise OSError("scale_image: jpegtran not found; install libjpeg-progs to "
+                      "handle arithmetic or progressive JPEGs") from exc
+
+    if result.returncode != 0 or not result.stdout:
+        raise OSError("scale_image: jpegtran could not transcode the image: "
+                      + result.stderr.decode(errors="replace")[:200])
+
+    return result.stdout
 
 
 def _scale_pillow(image_bytes, width, height):
