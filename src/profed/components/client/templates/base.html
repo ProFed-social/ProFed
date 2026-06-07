@@ -4,9 +4,24 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}ProFed{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon-192x192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <link rel="mask-icon" href="/static/safari-pinned-tab.svg" color="#1a6b72">
+    <meta name="theme-color" content="#1a6b72">
     <script src="/static/vendor/htmx.min.js" defer></script>
   </head>
   <body>
+    {% block masthead %}
+    <header class="masthead">
+      <a class="masthead-brand" href="/">
+        <img class="masthead-logo" src="/static/profed-icon.svg" width="32" height="32" alt="">
+        <span class="masthead-name">ProFed</span>
+      </a>
+    </header>
+    {% endblock %}
     {% block content %}{% endblock %}
   </body>
 </html>
