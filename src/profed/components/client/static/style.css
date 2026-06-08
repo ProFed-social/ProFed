@@ -159,6 +159,10 @@ a:hover { text-decoration: underline; }
 .h-event .p-summary { margin: .15rem 0 0; }
 .h-event .u-url { font-size: .9rem; word-break: break-word; }
 
+.job-projects { list-style: none; padding: 0; margin: .3rem 0 0; font-size: .9rem; }
+.job-projects li { color: var(--muted); }
+.job-projects li::before { content: "\2013\00a0"; }
+
 /* Skills als Chips */
 .skills {
   list-style: none;

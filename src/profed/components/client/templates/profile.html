@@ -33,6 +33,7 @@
       {% if job.start or job.end %}<p class="dates">{{ job.start }}{% if job.end %} - {{ job.end }}{% endif %}</p>{% endif %}
       {% if job.description %}<p class="p-summary">{{ job.description }}</p>{% endif %}
       {% if job.url %}<a class="u-url" href="{{ job.url }}">{{ job.url }}</a>{% endif %}
+      {% if job.projects %}<ul class="job-projects">{% for project in job.projects %}<li>{{ project }}</li>{% endfor %}</ul>{% endif %}
     </div>
     {% endfor %}
     {% endif %}

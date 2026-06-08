@@ -1,14 +1,14 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from typing import Any, Optional
 from profed.models import Resume, UserProfile
- 
- 
+
+
 def _first(lst: list, default=None) -> Any:
     return lst[0] if lst else default
- 
- 
+
+
 def _to_text(value: Any) -> Optional[str]:
     if isinstance(value, str):
         return value.strip() or None
@@ -25,7 +25,7 @@ def _to_url(value: Any) -> Optional[str]:
         return value.get("value") or value.get("url")
     return None
 
- 
+
 def _normalize_entry(item: Any) -> dict:
     if isinstance(item, str):
         return {"name": item.strip()} if item.strip() else {}
@@ -49,8 +49,26 @@ def _normalize_entry(item: Any) -> dict:
         result["organization"] = organization
 
     return result
- 
- 
+
+
+def _project_lookup(project_items) -> dict:
+    return {item["id"]: name
+            for item, name in ((item, _to_text(_first(item.get("properties", {}).get("name", []))))
+                               for item in project_items
+                               if isinstance(item, dict) and item.get("id"))
+            if name}
+
+
+def _linked_project_names(item, lookup) -> list:
+    return ([name
+             for name in (lookup.get(url.rsplit("#", 1)[-1])
+                          for url in item.get("properties", {}).get("x-project", [])
+                          if isinstance(url, str) and "#" in url)
+             if name]
+            if isinstance(item, dict) else
+            [])
+
+
 def normalize_mf2_to_profile(mf2_data: dict, username: str) -> tuple[UserProfile, dict[str, str | None]] | None:
     items = mf2_data.get("items", [])
     if not items:
@@ -77,10 +95,21 @@ def normalize_mf2_to_profile(mf2_data: dict, username: str) -> tuple[UserProfile
             return None
 
         rprops = h_resume.get("properties", {})
-        return Resume(experience=[e for e in (_normalize_entry(x) for x in rprops.get("experience", [])) if e],
+        project_items = rprops.get("x-project", []) or rprops.get("project", [])
+
+        lookup = _project_lookup(project_items)
+        def experience_entry(item):
+            entry = _normalize_entry(item)
+            if entry:
+                names = _linked_project_names(item, lookup)
+                if names:
+                    entry["projects"] = names
+            return entry
+
+        return Resume(experience=[e for e in (experience_entry(x) for x in rprops.get("experience", [])) if e],
                       education=[e for e in (_normalize_entry(x) for x in rprops.get("education",  [])) if e],
                       skills=[{"name": s} for s in (t for t in (_to_text(v) for v in rprops.get("skill", [])) if t is not None)],
-                      projects=[e for e in (_normalize_entry(x) for x in (rprops.get("x-project", []) or rprops.get("project", []))) if e])
+                      projects=[e for e in (_normalize_entry(x) for x in project_items) if e])
 
     return (UserProfile(username=username,
                         name=name,

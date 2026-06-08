@@ -152,3 +152,19 @@ def test_normalize_summary_falls_back_to_hcard_note():
     profile, _ = normalize_mf2_to_profile(mf2, "alice")
     assert profile.summary == "over 30 years of experience"
 
+
+def test_normalize_links_experience_to_projects_by_id():
+    mf2 = _mf2({"name": ["Alice"],
+                "experience": [{"type": ["h-event"],
+                                "properties": {"name": ["Engineer"],
+                                               "x-project": ["https://x.test/cv/#proj-a",
+                                                             "https://x.test/cv/#proj-b"]}}],
+                "x-project": [{"type": ["h-entry"], "id": "proj-a",
+                               "properties": {"name": ["Project A"]}},
+                              {"type": ["h-entry"], "id": "proj-b",
+                               "properties": {"name": ["Project B"]}}]})
+
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+
+    assert profile.resume.experience[0]["projects"] == ["Project A", "Project B"]
+
