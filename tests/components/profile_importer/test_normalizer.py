@@ -117,3 +117,38 @@ def test_normalize_hresume_photo_takes_precedence_over_hcard_photo():
 
     assert sources["avatar"] == "https://example.com/resume.jpg"
 
+
+def test_normalize_uses_contact_name_when_resume_has_no_name():
+    mf2 = _mf2_with_hcard({"name": ["Christof Josef Donat"]},
+                          resume_props={"summary": []})
+    profile, _ = normalize_mf2_to_profile(mf2, "christof")
+    assert profile.name == "Christof Josef Donat"
+
+
+def test_normalize_experience_reads_organization_from_location():
+    mf2 = _mf2({"name": ["Alice"],
+                "experience": [{"type": ["h-event"],
+                                "properties": {"name": ["Senior Engineer"],
+                                               "location": ["Acme Corp"],
+                                               "start": ["2020-01"],
+                                               "end": ["2021-01"]}}]})
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    job = profile.resume.experience[0]
+    assert job["name"] == "Senior Engineer"
+    assert job["organization"] == "Acme Corp"
+
+
+def test_normalize_reads_projects_from_x_project():
+    mf2 = _mf2({"name": ["Alice"],
+                "x-project": [{"type": ["h-entry"],
+                               "properties": {"name": ["Project ProFed"]}}]})
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    assert profile.resume.projects[0]["name"] == "Project ProFed"
+
+
+def test_normalize_summary_falls_back_to_hcard_note():
+    mf2 = _mf2_with_hcard({"note": ["over 30 years of experience"]},
+                          resume_props={"experience": []})
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    assert profile.summary == "over 30 years of experience"
+
