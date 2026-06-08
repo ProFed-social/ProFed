@@ -36,9 +36,10 @@ class Person(Actor):
     outbox: str
     resume: Resume | None = None
     publicKey: dict | None = None
+    published: str | None = None
 
     @classmethod
-    def from_user(cls, profile: UserProfile) -> "Person":
+    def from_user(cls, profile: UserProfile, published: str | None = None) -> "Person":
         actor_url = actor_url_from_username(profile.username)
         return cls(id=actor_url,
                    preferredUsername=profile.username,
@@ -54,5 +55,6 @@ class Person(Actor):
                                "owner": actor_url,
                                "publicKeyPem": profile.public_key_pem}),
                    icon=_image_object(profile.avatar, "large"),
-                   image=_image_object(profile.header, "wide"))
+                   image=_image_object(profile.header, "wide"),
+                   published=published)
 

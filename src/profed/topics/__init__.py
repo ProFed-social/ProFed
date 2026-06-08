@@ -10,6 +10,7 @@ from profed.topics import (activities_topic,
                            oauth_apps_topic,
                            oauth_codes_topic,
                            oauth_tokens_topic,
+                           person_topic,
                            users_topic)
 
 
@@ -22,6 +23,7 @@ media = media_topic.topic
 oauth_apps = oauth_apps_topic.topic
 oauth_codes = oauth_codes_topic.topic
 oauth_tokens = oauth_tokens_topic.topic
+person = person_topic.topic
 users = users_topic.topic
 
 
@@ -36,5 +38,6 @@ def names():
             oauth_apps["name"],
             oauth_codes["name"],
             oauth_tokens["name"],
+            person["name"],
             users["name"]]
 
