@@ -6,7 +6,7 @@ from .translator import handle_user_events, rebuild
 from . import storage
 
 
-async def UsersPerson(config):
+async def UserPerson(config):
     await init_media_storage()
     await storage.init(config)
     await rebuild()
