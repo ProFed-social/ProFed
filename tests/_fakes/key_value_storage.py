@@ -11,6 +11,9 @@ class FakeKeyValueStorage:
 
     async def add(self, key, payload):
         self.rows[key] = dict(payload)
+
+    async def upsert(self, key, payload):
+        self.rows[key] = dict(payload)
         
     async def update(self, key, payload):
         self.rows[key] = {**self.rows.get(key, {}), **payload}

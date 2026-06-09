@@ -11,8 +11,7 @@ from profed.components.api.s2s.actor.service import resolve_actor
 def fake_storage():
     backup = storage._instance
     storage._instance = Mock()
-    storage._instance.add = AsyncMock()
-    storage._instance.update = AsyncMock()
+    storage._instance.upsert = AsyncMock()
     storage._instance.delete = AsyncMock()
     storage._instance.fetch = AsyncMock()
 
@@ -23,12 +22,18 @@ def fake_storage():
 
 @pytest.mark.asyncio
 async def test_resolve_actor_found(fake_storage):
-    fake_storage.fetch.return_value = {"name": "Alice", "username": "alice"}
-
+    fake_storage.fetch.return_value = {"@context": "https://www.w3.org/ns/activitystreams",
+                                       "id": "https://example.com/actors/alice",
+                                       "type": "Person",
+                                       "preferredUsername": "alice",
+                                       "name": "Alice",
+                                       "inbox": "https://example.com/actors/alice/inbox",
+                                       "outbox": "https://example.com/actors/alice/outbox"}
     act = await resolve_actor("alice")
 
     assert act is not None
     assert act.name == "Alice"
+    assert act.preferredUsername == "alice"
 
 
 @pytest.mark.asyncio

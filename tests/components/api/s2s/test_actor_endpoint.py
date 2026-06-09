@@ -15,8 +15,7 @@ from profed.components.api.s2s.actor.router import router as actor_router
 def fake_storage():
     backup = storage._instance
     storage._instance = Mock()
-    storage._instance.add = AsyncMock()
-    storage._instance.update = AsyncMock()
+    storage._instance.upsert = AsyncMock()
     storage._instance.delete = AsyncMock()
     storage._instance.fetch = AsyncMock()
 
@@ -48,10 +47,13 @@ def client(cfg):
 
 
 def test_actor_success(client, fake_storage):
-    fake_storage.fetch.return_value = {
-        "username": "alice",
-        "name": "Alice"
-    }
+    fake_storage.fetch.return_value = {"@context": "https://www.w3.org/ns/activitystreams",
+                                       "id": "https://example.com/actors/alice",
+                                       "type": "Person",
+                                       "preferredUsername": "alice",
+                                       "name": "Alice",
+                                       "inbox": "https://example.com/actors/alice/inbox",
+                                       "outbox": "https://example.com/actors/alice/outbox"}
     response = client.get("/actors/alice")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/activity+json")

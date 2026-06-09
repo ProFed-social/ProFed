@@ -15,16 +15,10 @@ class _storage(BaseStorage):
                               api.s2s_actor (username TEXT  PRIMARY KEY,
                                              payload  JSONB NOT NULL)""")
 
-    async def add(self, username: str, payload: dict) -> None:
+    async def upsert(self, username: str, payload: dict) -> None:
         await self.execute("""INSERT INTO api.s2s_actor (username, payload)
-                              VALUES ($1, $2)""",
-                           username,
-                           payload)
-
-    async def update(self, username: str, payload: dict) -> None:
-        await self.execute("""UPDATE api.s2s_actor
-                              SET payload = payload || $2
-                              WHERE username = $1""",
+                              VALUES ($1, $2)
+                              ON CONFLICT (username) DO UPDATE SET payload = $2""",
                            username,
                            payload)
 
@@ -53,4 +47,3 @@ async def storage() -> _storage:
     if _instance is None:
         raise RuntimeError("Actor storage is not initialized.")
     return _instance
-

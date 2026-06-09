@@ -13,6 +13,17 @@ from profed.components.api.s2s.actor import projection
 TS = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
+def _actor(username="alice", **extra):
+    base = f"https://example.com/actors/{username}"
+    return {"@context": "https://www.w3.org/ns/activitystreams",
+            "id": base,
+            "type": "Person",
+            "preferredUsername": username,
+            "inbox": f"{base}/inbox",
+            "outbox": f"{base}/outbox",
+            **extra}
+
+
 @pytest.fixture
 def fake_storage():
     backup = storage._instance
@@ -25,108 +36,42 @@ def with_events(events):
     def with_events_wrapper(f):
         @wraps(f)
         async def call_with_events(*args, **kwargs):
-            message_bus.message_bus().topic("users").messages = [
-                    (n+1, et, oid, TS, p)
-                    for n, (et, oid, p) in enumerate(events)]
+            message_bus.message_bus().topic("person").messages = [(n + 1, et, oid, TS, p)
+                                                                  for n, (et, oid, p) in enumerate(events)]
             return await f(*args, **kwargs)
         return call_with_events
     return with_events_wrapper
 
 
 @pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice", "summary": "Engineer"})])
-async def test_created_adds_full_payload(fake_storage, fake_bus):
+@with_events([("created", "alice", _actor(name="Alice", summary="Engineer"))])
+async def test_created_stores_full_actor(fake_storage, fake_bus):
     await projection.handle_user_events()
 
-    assert fake_storage.rows["alice"] == {"name": "Alice",
-                                          "summary": "Engineer",
-                                          "username": "alice"}
+    assert fake_storage.rows["alice"] == _actor(name="Alice", summary="Engineer")
 
 
 @pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice", "summary": "Engineer"}),
-              ("profile_edited", "alice", {"name": "Alice Updated"})])
-async def test_profile_edited_merges_keeps_other_fields(fake_storage, fake_bus):
+@with_events([("created", "alice", _actor(name="Alice", summary="Engineer")),
+              ("updated", "alice", _actor(name="Alice Updated"))])
+async def test_updated_replaces_full_actor(fake_storage, fake_bus):
     await projection.handle_user_events()
 
-    assert fake_storage.rows["alice"] == {"name": "Alice Updated",
-                                          "summary": "Engineer",
-                                          "username": "alice"}
+    assert fake_storage.rows["alice"] == _actor(name="Alice Updated")
+    assert "summary" not in fake_storage.rows["alice"]
 
 
 @pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice",
-                                    "avatar": {"media_id": "m-old", "variants": ["large", "small"]}}),
-              ("avatar_changed", "alice", {"media_id": "m-new", "variants": ["large", "small"]})])
-async def test_avatar_changed_sets_reference_keeps_name(fake_storage, fake_bus):
-    await projection.handle_user_events()
-
-    assert fake_storage.rows["alice"]["avatar"] == {"media_id": "m-new",
-                                                    "variants": {"large", "small"}}
-    assert fake_storage.rows["alice"]["name"] == "Alice"
-
-
-@pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice",
-                                    "avatar": {"media_id": "m1", "variants": ["large"]}}),
-              ("avatar_changed", "alice", {})])
-async def test_avatar_changed_empty_clears_only_avatar(fake_storage, fake_bus):
-    await projection.handle_user_events()
-
-    assert fake_storage.rows["alice"]["avatar"] is None
-    assert fake_storage.rows["alice"]["name"] == "Alice"
-
-
-@pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice"}),
-              ("header_changed", "alice", {"media_id": "h1", "variants": ["wide"]})])
-async def test_header_changed_sets_reference(fake_storage, fake_bus):
-    await projection.handle_user_events()
-
-    assert fake_storage.rows["alice"]["header"] == {"media_id": "h1", "variants": {"wide"}}
-
-
-@pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice"}),
-              ("cv_changed", "alice", {"resume": {"experience": []}})])
-async def test_cv_changed_sets_resume_keeps_name(fake_storage, fake_bus):
-    await projection.handle_user_events()
-
-    assert fake_storage.rows["alice"]["resume"]["experience"] == []
-    assert fake_storage.rows["alice"]["name"] == "Alice"
-
-
-@pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice", "public_key_pem": "OLD"}),
-              ("keys_generated", "alice", {"public_key_pem": "PUB",
-                                           "private_key_pem": "PRIV"})])
-async def test_keys_generated_merges_keys(fake_storage, fake_bus):
-    await projection.handle_user_events()
-
-    assert fake_storage.rows["alice"]["public_key_pem"] == "PUB"
-    assert fake_storage.rows["alice"]["private_key_pem"] == "PRIV"
-    assert fake_storage.rows["alice"]["name"] == "Alice"
-
-
-@pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice"}),
+@with_events([("created", "alice", _actor(name="Alice")),
               ("deleted", "alice", {})])
-async def test_deleted_removes_user(fake_storage, fake_bus):
+async def test_deleted_removes_actor(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     assert "alice" not in fake_storage.rows
 
 
 @pytest.mark.asyncio
-@with_events([("unknown", "alice", {})])
-async def test_unknown_type_is_ignored(fake_storage, fake_bus):
-    await projection.handle_user_events()
-
-    assert fake_storage.rows == {}
-
-
-@pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice"}),
+@with_events([("created", "alice", _actor(name="Alice")),
               ("deleted", "alice", {"name": "Alice"})])
 async def test_deleted_with_non_empty_payload_is_ignored(fake_storage, fake_bus):
     await projection.handle_user_events()
@@ -135,17 +80,17 @@ async def test_deleted_with_non_empty_payload_is_ignored(fake_storage, fake_bus)
 
 
 @pytest.mark.asyncio
-@with_events([("created", "alice", {"foo": "bar"})])
-async def test_malformed_payload_is_ignored(fake_storage, fake_bus):
+@with_events([("created", "alice", {"id": "x", "type": "Person"})])
+async def test_created_without_preferred_username_is_ignored(fake_storage, fake_bus):
     await projection.handle_user_events()
 
     assert fake_storage.rows == {}
 
 
 @pytest.mark.asyncio
-@with_events([("created", "old", {"name": "Old"}),
+@with_events([("created", "old", _actor("old")),
               ("unknown", "x", {}),
-              ("created", "new", {"name": "New User"})])
+              ("created", "new", _actor("new"))])
 async def test_skips_messages_before_last_seen(fake_storage, fake_bus):
     projection.reset_last_seen(2)
 

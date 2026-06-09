@@ -35,20 +35,11 @@ def fake_pool(fake_conn):
     actor._instance = backup
 
 
-
 @pytest.mark.asyncio
-async def test_add_actor(fake_pool):
+async def test_upsert_actor(fake_pool):
     store = await actor.storage()
-    await store.add("alice", {"name": "Alice"})
 
-    async with fake_pool.acquire() as conn:
-        conn.execute.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_update_actor(fake_pool):
-    store = await actor.storage()
-    await store.update("alice", {"name": "Alice Updated"})
+    await store.upsert("alice", {"name": "Alice"})
 
     async with fake_pool.acquire() as conn:
         conn.execute.assert_called_once()
@@ -66,7 +57,6 @@ async def test_delete_actor(fake_pool):
 @pytest.mark.asyncio
 async def test_fetch_actor_found(fake_pool):
     store = await actor.storage()
-    await store.delete("alice")
 
     async with fake_pool.acquire() as conn:
         conn.fetchrow.return_value = {"payload": {"name": "Alice"}}
@@ -78,9 +68,9 @@ async def test_fetch_actor_found(fake_pool):
 @pytest.mark.asyncio
 async def test_fetch_actor_not_found(fake_pool):
     store = await actor.storage()
-    await store.delete("alice")
 
     async with fake_pool.acquire() as conn:
         conn.fetchrow.return_value = None
         result = await store.fetch("alice")
         assert result is None
+
