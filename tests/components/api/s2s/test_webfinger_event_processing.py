@@ -29,7 +29,7 @@ def with_events(events):
     def wrapper(f):
         @wraps(f)
         async def call(*args, **kwargs):
-            message_bus.message_bus().topic("users").messages = [
+            message_bus.message_bus().topic("person").messages = [
                     (n+1, et, oid, TS, p)
                     for n, (et, oid, p) in enumerate(events)]
             return await f(*args, **kwargs)
@@ -38,7 +38,7 @@ def with_events(events):
 
 
 @pytest.mark.asyncio
-@with_events([("created", "bob", {})])
+@with_events([("created", "bob", {"preferredUsername":"bob"})])
 async def test_user_added_event(fake_storage, fake_bus):
     await projection.handle_user_events()
 
@@ -63,7 +63,7 @@ async def test_user_event_processing_unknown_event(fake_storage, fake_bus):
 
 
 @pytest.mark.asyncio
-@with_events([("created", "bob", {}),
+@with_events([("created", "bob", {"preferredUsername":"bob"}),
               ("updated", "bob", {}),
               ("deleted", "bob", {})])
 async def test_event_processing_multiple_messages(fake_storage, fake_bus):

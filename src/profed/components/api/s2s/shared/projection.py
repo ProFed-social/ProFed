@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.persistence.projections import build_projection
-from profed.topics import users
+from profed.topics import person
 
 
-def build_users_projection(storage):
+def build_person_projection(storage):
     async def _init() -> None:
         nonlocal storage
 
@@ -16,7 +16,7 @@ def build_users_projection(storage):
         nonlocal storage
 
         store = await storage()
-        await store.add(data["username"])
+        await store.add(data["preferredUsername"])
 
     async def _created(object_id: str, payload: dict) -> None:
         nonlocal storage
@@ -33,7 +33,7 @@ def build_users_projection(storage):
     async def _rebuild_finished() -> None:
         (await storage()).rebuild_finished()
 
-    return build_projection(topic=users,
+    return build_projection(topic=person,
                             subscriber="api",
                             init=_init,
                             rebuild_finished=_rebuild_finished,

@@ -3,7 +3,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, Mock
-from profed.components.api.s2s.webfinger import storage as webfinger_users
+from profed.components.api.s2s.webfinger import storage as webfinger_person
 
 
 @pytest.fixture
@@ -28,54 +28,54 @@ def fake_pool(fake_conn):
     pool = Mock()
     pool.acquire = Mock(return_value=AsyncContextManagerMock(fake_conn))
 
-    webfinger_users.reinit(pool)
+    webfinger_person.reinit(pool)
     return pool
 
 
 @pytest.mark.asyncio
 async def test_add_user_success(fake_pool):
-    store = await webfinger_users.storage()
+    store = await webfinger_person.storage()
     await store.add("alice")
 
     async with fake_pool.acquire() as conn:
         args = conn.execute.call_args[0]
-        assert "s2s_webfinger_users" in args[0]
+        assert "s2s_webfinger_person" in args[0]
         assert "INSERT" in args[0]
         assert args[1] == "alice"
 
 
 @pytest.mark.asyncio
 async def test_add_user_already_exists(fake_pool):
-    store = await webfinger_users.storage()
+    store = await webfinger_person.storage()
     await store.add("alice")
 
     async with fake_pool.acquire() as conn:
         args = conn.execute.call_args[0]
-        assert "s2s_webfinger_users" in args[0]
+        assert "s2s_webfinger_person" in args[0]
         assert "INSERT" in args[0]
         assert args[1] == "alice"
 
 
 @pytest.mark.asyncio
 async def test_delete_user_success(fake_pool):
-    store = await webfinger_users.storage()
+    store = await webfinger_person.storage()
     await store.delete("alice")
 
     async with fake_pool.acquire() as conn:
         args = conn.execute.call_args[0]
-        assert "s2s_webfinger_users" in args[0]
+        assert "s2s_webfinger_person" in args[0]
         assert "DELETE" in args[0]
         assert args[1] == "alice"
 
 
 @pytest.mark.asyncio
 async def test_delete_user_not_exists(fake_pool):
-    store = await webfinger_users.storage()
+    store = await webfinger_person.storage()
     await store.delete("bob")
 
     async with fake_pool.acquire() as conn:
         args = conn.execute.call_args[0]
-        assert "s2s_webfinger_users" in args[0]
+        assert "s2s_webfinger_person" in args[0]
         assert "DELETE" in args[0]
         assert args[1] == "bob"
 
@@ -84,7 +84,7 @@ async def test_delete_user_not_exists(fake_pool):
 async def test_user_exists_found(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.fetchrow.return_value = {"c": 1}
-        store = await webfinger_users.storage()
+        store = await webfinger_person.storage()
         assert await store.exists("alice@example.com")
 
 
@@ -92,13 +92,13 @@ async def test_user_exists_found(fake_pool):
 async def test_user_exists_not_found(fake_pool):
     async with fake_pool.acquire() as conn:
         conn.fetchrow.return_value = {"c": 0}
-        store = await webfinger_users.storage()
+        store = await webfinger_person.storage()
         assert not await store.exists("alice@example.com")
 
 
 @pytest.mark.asyncio
 async def test_ensure_schema_executes_create(fake_pool):
-    store = await webfinger_users.storage()
+    store = await webfinger_person.storage()
     await store.ensure_schema()
 
     async with fake_pool.acquire() as conn:
@@ -107,8 +107,8 @@ async def test_ensure_schema_executes_create(fake_pool):
 
 @pytest.mark.asyncio
 async def test_storage_not_initialized():
-    webfinger_users.overwrite(None)
+    webfinger_person.overwrite(None)
 
     with pytest.raises(RuntimeError):
-        await webfinger_users.storage()
+        await webfinger_person.storage()
 

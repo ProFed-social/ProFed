@@ -33,13 +33,13 @@ def fake_pool(fake_conn):
 
 
 @pytest.mark.asyncio
-async def test_add_user_success(fake_pool):
+async def test_add_person_success(fake_pool):
     store = await storage.storage()
     await store.add("alice")
 
     async with fake_pool.acquire() as conn:
         args = conn.execute.call_args[0]
-        assert "s2s_inbox_users" in args[0]
+        assert "s2s_inbox_person" in args[0]
         assert "INSERT" in args[0]
         assert args[1] == "alice"
 
@@ -51,7 +51,7 @@ async def test_add_user_already_exists(fake_pool):
 
     async with fake_pool.acquire() as conn:
         args = conn.execute.call_args[0]
-        assert "s2s_inbox_users" in args[0]
+        assert "s2s_inbox_person" in args[0]
         assert "INSERT" in args[0]
         assert args[1] == "alice"
 
@@ -63,7 +63,7 @@ async def test_delete_user_success(fake_pool):
 
     async with fake_pool.acquire() as conn:
         args = conn.execute.call_args[0]
-        assert "s2s_inbox_users" in args[0]
+        assert "s2s_inbox_person" in args[0]
         assert "DELETE" in args[0]
         assert args[1] == "alice"
 
@@ -75,7 +75,7 @@ async def test_delete_user_not_exists(fake_pool):
 
     async with fake_pool.acquire() as conn:
         args = conn.execute.call_args[0]
-        assert "s2s_inbox_users" in args[0]
+        assert "s2s_inbox_person" in args[0]
         assert "DELETE" in args[0]
         assert args[1] == "bob"
 

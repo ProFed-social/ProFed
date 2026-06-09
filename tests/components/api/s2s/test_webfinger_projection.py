@@ -25,15 +25,15 @@ def fake_storage():
 
 @pytest.mark.asyncio
 async def test_rebuild_success(fake_bus, fake_storage):
-    fake_bus.topic("users").snapshots = [(42,
-                                          [{"username": "alice"}])]
+    fake_bus.topic("person").snapshots = [(42,
+                                           [{"preferredUsername": "alice"}])]
     await rebuild()
     fake_storage.add.assert_awaited_once_with("alice")
 
 
 @pytest.mark.asyncio
 async def test_rebuild_no_snapshot(fake_bus, fake_storage):
-    fake_bus.topic("users").snapshots = []
+    fake_bus.topic("person").snapshots = []
 
     await rebuild()
 
@@ -42,8 +42,8 @@ async def test_rebuild_no_snapshot(fake_bus, fake_storage):
 
 @pytest.mark.asyncio
 async def test_rebuild_add_failure(fake_bus, fake_storage):
-    fake_bus.topic("users").snapshots = [(42,
-                                          [{"username": "alice"}])]
+    fake_bus.topic("person").snapshots = [(42,
+                                           [{"preferredUsername": "alice"}])]
     fake_storage.add.side_effect = RuntimeError("DB error")
 
     with pytest.raises(RuntimeError, match="DB error"):
@@ -51,29 +51,29 @@ async def test_rebuild_add_failure(fake_bus, fake_storage):
 
 
 @pytest.mark.asyncio
-async def test_projection_multiple_users(fake_bus, fake_storage):
-    fake_bus.topic("users").snapshots = [(10,
-                                          [{"username": "alice"},
-                                           {"username": "bob"}])]
+async def test_projection_multiple_person(fake_bus, fake_storage):
+    fake_bus.topic("person").snapshots = [(10,
+                                           [{"preferredUsername": "alice"},
+                                            {"preferredUsername": "bob"}])]
     await rebuild()
     assert fake_storage.add.await_count == 2
 
 
 @pytest.mark.asyncio
 async def test_projection_invalid_payload(fake_bus, fake_storage):
-    fake_bus.topic("users").snapshots = [(5,
-                                          [{"no_username": "alice"}])]
+    fake_bus.topic("person").snapshots = [(5,
+                                           [{"no_username": "alice"}])]
     await rebuild()
     assert fake_storage.add.await_count == 0
 
 
 @pytest.mark.asyncio
-async def test_projection_multiple_users_some_malformed(fake_bus, fake_storage):
-    fake_bus.topic("users").snapshots = [(10,
-                                          [{"username": "alice"},
-                                           {"username": 42},
-                                           {"no_username": "alice"},
-                                           {"username": "bob"}])]
+async def test_projection_multiple_person_some_malformed(fake_bus, fake_storage):
+    fake_bus.topic("person").snapshots = [(10,
+                                           [{"preferredUsername": "alice"},
+                                            {"preferredUsername": 42},
+                                            {"no_username": "alice"},
+                                            {"preferredUsername": "bob"}])]
     await rebuild()
     assert fake_storage.add.await_count == 2
 
