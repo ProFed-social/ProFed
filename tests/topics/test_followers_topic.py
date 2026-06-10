@@ -9,6 +9,18 @@ def test_valid_created_event_returns_empty_payload():
     assert validate_followers_event("created", {}) == {}
 
 
+def test_valid_requested_event_returns_empty_payload():
+    assert validate_followers_event("requested", {}) == {}
+
+
+def test_valid_accepted_event_returns_empty_payload():
+    assert validate_followers_event("accepted", {}) == {}
+
+
+def test_valid_rejected_event_returns_empty_payload():
+    assert validate_followers_event("rejected", {}) == {}
+
+
 def test_valid_deleted_event_returns_empty_payload():
     assert validate_followers_event("deleted", {}) == {}
 
@@ -25,6 +37,24 @@ def test_valid_snapshot_item_returns_item():
     item = {"follower": "alice@a.example", "following": "bob@b.example"}
 
     assert validate_followers_snapshot_item(item) == item
+
+
+def test_snapshot_item_with_requested_state_returns_item():
+    item = {"follower": "alice@a.example", "following": "bob@b.example", "state": "requested"}
+
+    assert validate_followers_snapshot_item(item) == item
+
+
+def test_snapshot_item_with_accepted_state_returns_item():
+    item = {"follower": "alice@a.example", "following": "bob@b.example", "state": "accepted"}
+
+    assert validate_followers_snapshot_item(item) == item
+
+
+def test_snapshot_item_with_invalid_state_returns_none():
+    bad = {"follower": "alice@a.example", "following": "bob@b.example", "state": "pending"}
+
+    assert validate_followers_snapshot_item(bad) is None
 
 
 def test_snapshot_item_missing_follower_returns_none():
