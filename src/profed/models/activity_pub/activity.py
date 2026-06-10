@@ -29,8 +29,12 @@ class DeleteActivity(Activity):
 
 class AcceptActivity(Activity):
     type: str = "Accept"
- 
- 
+
+
+class RejectActivity(Activity):
+    type: str = "Reject" 
+
+
 class FollowActivity(ActivityStreamsObject):
     type: str = "Follow"
     actor: str

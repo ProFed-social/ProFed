@@ -34,7 +34,7 @@ async def _handle_follow(username: str, activity: dict, seq: int) -> None:
     logger.info("follow_handler: WebFinger resolved %r -> %r", follow.actor, follower_acct)
 
     async with message_bus().topic("followers").publish() as publish:
-        await publish(event_type="created",
+        await publish(event_type="accepted",
                       object_id=f"{follower_acct}|{following_acct}",
                       payload={},
                       message_id=_source_key.message_id(seq))
