@@ -116,6 +116,23 @@ def test_follow_by_numeric_id_publishes_events(client):
     assert activities_events[0]["payload"]["activity"]["object"] == ROW["actor_url"]
 
 
+def test_follow_publishes_followers_requested(client):
+    fake_bus = FakeMessageBus()
+
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW)), \
+             patch.object(message_bus, "_instance", fake_bus):
+            client.post("/accounts/123456/follow")
+
+    events = fake_bus.topic("followers").published
+    assert len(events) == 1
+    assert events[0]["event_type"] == "requested"
+    assert events[0]["object_id"] == "alice@example.com|bob@remote.example"
+    assert "follow_activity_id" in events[0]["payload"]
+
+
 def test_follow_unknown_account_returns_404(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
@@ -235,6 +252,23 @@ def test_unfollow_publishes_known_accounts_event(client):
     assert events[0]["object_id"] == "123456"
     assert events[0]["payload"]["following_user"] == "alice"
 
+
+def test_unfollow_publishes_followers_deleted(client):
+    fake_bus = FakeMessageBus()
+
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=ROW)), \
+             patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+                   _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
+             patch.object(message_bus, "_instance", fake_bus):
+            client.post("/accounts/123456/unfollow")
+
+    events = fake_bus.topic("followers").published
+    assert len(events) == 1
+    assert events[0]["event_type"] == "deleted"
+    assert events[0]["object_id"] == "alice@example.com|bob@remote.example"
 
 def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
     fake_bus = FakeMessageBus()

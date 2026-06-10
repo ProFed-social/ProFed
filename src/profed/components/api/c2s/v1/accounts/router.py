@@ -5,7 +5,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from profed.identity import actor_url_from_username, domain as instance_domain
+from profed.identity import actor_url_from_username, acct_from_username, domain as instance_domain
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
                                                                      lookup_by_actor_url,
@@ -131,6 +131,11 @@ async def follow(id: str,
                       payload={"username": username,
                                "activity": {"actor": actor_url_from_username(username),
                                             "object": actor_url}})
+
+    async with message_bus().topic("followers").publish() as publish:
+        await publish(event_type="requested",
+                      object_id=f"{acct_from_username(username)}|{row['acct']}",
+                      payload={"follow_activity_id": follow_id})
  
     return {"id": str(row["account_id"]),
             "following": False,
@@ -195,6 +200,11 @@ async def unfollow(id: str,
                                                        "type": "Follow",
                                                        "actor": actor_url,
                                                        "object": account["actor_url"]}}})
+
+    async with message_bus().topic("followers").publish() as publish:
+        await publish(event_type="deleted",
+                      object_id=f"{acct_from_username(username)}|{account['acct']}",
+                      payload={})
 
     return {"id": str(account["account_id"]),
             "following": False,
