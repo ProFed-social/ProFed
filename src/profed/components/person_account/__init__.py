@@ -17,10 +17,10 @@ async def PersonAccount(config: dict) -> None:
     await store.ensure_schema()
     store.rebuild_finished()
 
-    await ayncio.gather(asyncio.create_task(handle_person_events(),
-                                            name="person_account_person"),
-                        asyncio.create_task(handle_followers_events(),
-                                            name="person_account_followers"),
-                        asyncio.create_task(handle_statuses_events(),
-                                            name="person_account_statuses"))
+    await asyncio.gather(asyncio.create_task(handle_person_events(),
+                                             name="person_account_person"),
+                         asyncio.create_task(handle_followers_events(),
+                                             name="person_account_followers"),
+                         asyncio.create_task(handle_statuses_events(),
+                                             name="person_account_statuses"))
 
