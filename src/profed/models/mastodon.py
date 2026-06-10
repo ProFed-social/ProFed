@@ -30,6 +30,33 @@ class Account(BaseModel):
     source: dict[str, Any] | None = None
     resume: Resume | None = None
 
+    @classmethod
+    def from_actor(cls,
+                   actor: dict,
+                   *,
+                   acct: str,
+                   account_id: str,
+                   url: str,
+                   created_at=None) -> "Account":
+        username = acct.split("@")[0]
+        icon  = actor.get("icon") or {}
+        image = actor.get("image") or {}
+        return cls(id=account_id,
+                   username=username,
+                   acct=acct,
+                   display_name=actor.get("name") or username,
+                   note=actor.get("summary") or "",
+                   url=url,
+                   avatar=icon.get("url") if isinstance(icon, dict) else None,
+                   avatar_static=icon.get("url") if isinstance(icon, dict) else None,
+                   header=image.get("url") if isinstance(image, dict) else None,
+                   header_static=image.get("url") if isinstance(image, dict) else None,
+                   locked=actor.get("manuallyApprovesFollowers", False),
+                   bot=actor.get("type") == "Service",
+                   **({"created_at": created_at.isoformat()}
+                      if hasattr(created_at, "isoformat") else
+                      {}))
+
 
 class Relationship(BaseModel):
     id: str

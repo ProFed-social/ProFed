@@ -12,7 +12,8 @@ from .storage import storage
 from profed.models.mastodon import Account
 
  
-WEBFINGER_CACHE_TTL = 86400  # 1 day default
+WEBFINGER_CACHE_TTL = 86400
+
  
 async def _publish_discovered(account_id: int,
                               acct: str,
@@ -96,24 +97,9 @@ async def lookup_multiple(actor_urls: list[str],
 
 
 def make_account(raw: dict) -> Account:
-    actor_data = raw.get("actor_data") or {}
-    username = raw["acct"].split("@")[0]
-    icon = actor_data.get("icon") or {}
-    image = actor_data.get("image") or {}
-    created_at = raw.get("created_at")
-    return Account(id=str(raw["account_id"]),
-                   username=username,
-                   acct=raw["acct"],
-                   display_name=actor_data.get("name") or username,
-                   note=actor_data.get("summary") or "",
-                   url=raw["actor_url"],
-                   avatar=icon.get("url") if isinstance(icon, dict) else None,
-                   avatar_static=icon.get("url") if isinstance(icon, dict) else None,
-                   header=image.get("url") if isinstance(image, dict) else None,
-                   header_static=image.get("url") if isinstance(image, dict) else None,
-                   locked=actor_data.get("manuallyApprovesFollowers", False),
-                   bot=actor_data.get("type") == "Service",
-                   **({"created_at": created_at.isoformat()}
-                      if hasattr(created_at, "isoformat") else
-                      {}))
+    return Account.from_actor(raw.get("actor_data") or {},
+                              acct=raw["acct"],
+                              account_id=str(raw["account_id"]),
+                              url=raw["actor_url"],
+                              created_at=raw.get("created_at"))
 

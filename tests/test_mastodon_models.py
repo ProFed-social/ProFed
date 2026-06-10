@@ -80,3 +80,77 @@ def test_media_attachment_with_meta():
     assert m.meta.original.width == 1280
     assert m.meta.small.height   == 225
 
+
+def test_from_actor_maps_fields():
+    acc = Account.from_actor({"type":    "Person",
+                              "name":    "Bob Example",
+                              "summary": "A test user",
+                              "icon":    {"url": "https://remote.example/avatar.png"},
+                              "image":   {"url": "https://remote.example/header.png"}},
+                             acct="bob@remote.example",
+                             account_id="123456",
+                             url="https://remote.example/actors/bob")
+ 
+    assert acc.id            == "123456"
+    assert acc.username      == "bob"
+    assert acc.acct          == "bob@remote.example"
+    assert acc.display_name  == "Bob Example"
+    assert acc.note          == "A test user"
+    assert acc.url           == "https://remote.example/actors/bob"
+    assert acc.avatar        == "https://remote.example/avatar.png"
+    assert acc.avatar_static == "https://remote.example/avatar.png"
+    assert acc.header        == "https://remote.example/header.png"
+    assert acc.locked        is False
+    assert acc.bot           is False
+ 
+ 
+def test_from_actor_falls_back_to_username():
+    acc = Account.from_actor({"type": "Person"},
+                             acct="carol@other.example",
+                             account_id="42",
+                             url="https://other.example/actors/carol")
+ 
+    assert acc.display_name == "carol"
+    assert acc.avatar       is None
+    assert acc.header       is None
+ 
+ 
+def test_from_actor_handles_missing_actor():
+    acc = Account.from_actor({},
+                             acct="carol@other.example",
+                             account_id="42",
+                             url="https://other.example/actors/carol")
+ 
+    assert acc.display_name == "carol"
+    assert acc.bot          is False
+ 
+ 
+def test_from_actor_sets_bot_for_service():
+    acc = Account.from_actor({"type": "Service"},
+                             acct="bot@example.com",
+                             account_id="99",
+                             url="https://example.com/actors/bot")
+ 
+    assert acc.bot is True
+ 
+ 
+def test_from_actor_sets_locked_from_manually_approves():
+    acc = Account.from_actor({"type": "Person", "manuallyApprovesFollowers": True},
+                             acct="x@example.com",
+                             account_id="1",
+                             url="https://example.com/actors/x")
+ 
+    assert acc.locked is True
+ 
+ 
+def test_from_actor_sets_created_at_from_datetime():
+    from datetime import datetime, timezone
+    created = datetime(2025, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    acc = Account.from_actor({"type": "Person"},
+                             acct="x@example.com",
+                             account_id="1",
+                             url="https://example.com/actors/x",
+                             created_at=created)
+ 
+    assert acc.created_at == created.isoformat()
+ 

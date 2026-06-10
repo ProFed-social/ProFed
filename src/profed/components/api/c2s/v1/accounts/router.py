@@ -11,7 +11,6 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
                                                                      lookup_by_actor_url,
                                                                      make_account)
 from profed.components.api.c2s.shared.actors.service import resolve_actor, local_account
-from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
