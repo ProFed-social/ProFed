@@ -30,16 +30,16 @@ def validate_accounts_event(event_type: str, payload: Dict) -> Optional[Dict]:
         return None
 
     for types, result in {("created", "updated"):
-                            return_payload_if(lambda: (isinstance(payload.get("id"), str) or
-                                                       not payload["id"]),
+                            return_payload_if(lambda: (isinstance(payload.get("id"), str) and 
+                                                       payload["id"]),
                                               payload,
                                               _ignore(f"missing or invalid id: {payload!r}")),
                           _COUNT_VERBS:
-                            return_payload_if(lambda: (isinstance(payload.get("count"), int) or
-                                                       isinstance(payload.get("count"), bool)),
+                            return_payload_if(lambda: (isinstance(payload.get("count"), int)  and
+                                                       not isinstance(payload.get("count"), bool)),
                                               payload,
                                               _ignore(f"missing or invalid count: {payload!r}")),
-                          "deleted": lambda: payload
+                          ("deleted", ): lambda: payload
                          }.items():
         if event_type in types:
             return result()
@@ -58,3 +58,4 @@ def validate_accounts_snapshot_item(item) -> Optional[Dict]:
 topic = {"name":              "accounts",
          "validate":          validate_accounts_event,
          "snapshot_validate": validate_accounts_snapshot_item}
+

@@ -11,6 +11,8 @@ import profed.components.person_account.storage as storage_module
 
 
 TS = datetime(2026, 1, 1, tzinfo=timezone.utc)
+ALICE_ACCT = "alice@example.com"
+ALICE_ACTOR = "https://example.com/actors/alice"
 
 
 @pytest.fixture
@@ -68,6 +70,37 @@ def _accounts(fake_bus):
     return fake_bus.topic("accounts").published
 
 
+def _follower_edge(name):
+    return f"{name}@remote.example|{ALICE_ACCT}"
+
+
+def _status_create(note_id="https://example.com/notes/1"):
+    return {"username": "alice",
+            "activity": {"actor": ALICE_ACTOR,
+                         "object": {"id": note_id, "type": "Note"}}}
+
+
+def _status_announce(boosted="https://remote.example/notes/9"):
+    return {"username": "alice",
+            "activity": {"actor": ALICE_ACTOR, "object": boosted}}
+
+
+def _status_delete(note_id="https://example.com/notes/1"):
+    return {"username": "alice",
+            "activity": {"actor": ALICE_ACTOR, "object": note_id}}
+
+
+def _actor_create():
+    return {"username": "alice",
+            "activity": {"actor": ALICE_ACTOR,
+                         "object": {"id": ALICE_ACTOR, "type": "Person"}}}
+
+
+def _actor_self_delete():
+    return {"username": "alice",
+            "activity": {"actor": ALICE_ACTOR, "object": ALICE_ACTOR}}
+
+
 @pytest.mark.asyncio
 async def test_person_created_emits_account(fake_bus, fake_counters, cfg):
     fake_bus.topic("person").messages = [_msg(1, "created", "alice", _actor())]
@@ -79,16 +112,16 @@ async def test_person_created_emits_account(fake_bus, fake_counters, cfg):
     assert published[0]["event_type"] == "created"
     assert published[0]["object_id"] == "alice"
     acc = published[0]["payload"]
-    assert acc["username"]  == "alice"
-    assert acc["acct"]  == "alice@example.com"
-    assert acc["display_name"]  == "Alice"
-    assert acc["url"]  == "https://example.com/actors/alice"
-    assert acc["followers_count"]  == 0
-    assert acc["statuses_count"]  == 0
+    assert acc["username"] == "alice"
+    assert acc["acct"] == ALICE_ACCT
+    assert acc["display_name"] == "Alice"
+    assert acc["url"] == ALICE_ACTOR
+    assert acc["followers_count"] == 0
+    assert acc["statuses_count"] == 0
 
 
 @pytest.mark.asyncio
-async def test_created_carries_existing_counter(fake_bus, fake_counters, cfg):
+async def test_created_reflects_existing_follower_counter(fake_bus, fake_counters, cfg):
     await fake_counters.bump("alice", "followers", 1)
     await fake_counters.bump("alice", "followers", 1)
     fake_bus.topic("person").messages = [_msg(5, "created", "alice", _actor())]
@@ -109,64 +142,93 @@ async def test_created_at_from_published(fake_bus, fake_counters, cfg):
 
 
 @pytest.mark.asyncio
-async def test_person_updated_and_deleted(fake_bus, fake_counters, cfg):
-    fake_bus.topic("person").messages = [_msg(1, "updated", "alice", _actor()),
-                                         _msg(2, "deleted", "alice", {})]
+async def test_person_updated_emits_updated_account(fake_bus, fake_counters, cfg):
+    fake_bus.topic("person").messages = [_msg(1, "updated", "alice", _actor())]
 
     await translator.handle_person_events()
 
     published = _accounts(fake_bus)
-    assert [p["event_type"] for p in published] == ["updated", "deleted"]
-    assert published[1]["payload"] == {}
+    assert [p["event_type"] for p in published] == ["updated"]
+    assert published[0]["payload"]["username"] == "alice"
 
 
 @pytest.mark.asyncio
-async def test_followers_changed_counts_and_clamps(fake_bus, fake_counters, cfg):
-    edge = "bob@remote.example|alice@example.com"
-    fake_bus.topic("followers").messages = [_msg(1, "created", edge, {}),
-                                            _msg(2, "created", "carol@x|alice@example.com", {}),
-                                            _msg(3, "deleted", edge, {}),
-                                            _msg(4, "deleted", "carol@x|alice@example.com", {}),
-                                            _msg(5, "deleted", "dan@x|alice@example.com", {})]
+async def test_person_deleted_emits_deleted(fake_bus, fake_counters, cfg):
+    fake_bus.topic("person").messages = [_msg(1, "deleted", "alice", {})]
+
+    await translator.handle_person_events()
+
+    published = _accounts(fake_bus)
+    assert [p["event_type"] for p in published] == ["deleted"]
+    assert published[0]["payload"] == {}
+
+
+@pytest.mark.asyncio
+async def test_followers_changed_tracks_count(fake_bus, fake_counters, cfg):
+    fake_bus.topic("followers").messages = [
+        _msg(1, "created", _follower_edge("bob"), {}),
+        _msg(2, "created", _follower_edge("carol"), {}),
+        _msg(3, "deleted", _follower_edge("bob"), {})]
 
     await translator.handle_followers_events()
 
     published = _accounts(fake_bus)
     assert all(p["event_type"] == "followers_changed" for p in published)
     assert all(p["object_id"] == "alice" for p in published)
-    assert [p["payload"]["count"] for p in published] == [1, 2, 1, 0, 0]   # last clamps at 0
-
-
-def _create(note_id="https://example.com/notes/1"):
-    return {"username": "alice",
-            "activity": {"actor":  "https://example.com/actors/alice",
-                         "object": {"id": note_id, "type": "Note"}}}
-
-
-@pytest.mark.asyncio
-async def test_statuses_changed_create_announce_delete(fake_bus, fake_counters, cfg):
-    fake_bus.topic("activities").messages = [
-        _msg(1, "Create",   "n1", _create("n1")),
-        _msg(2, "Announce", "b1", {"username": "alice", "activity": {"object": "remote-note"}}),
-        _msg(3, "Delete",   "n1", {"username": "alice",
-                                   "activity": {"actor":  "https://example.com/actors/alice",
-                                                "object": "n1"}})]
-
-    await translator.handle_statuses_events()
-
-    published = _accounts(fake_bus)
     assert [p["payload"]["count"] for p in published] == [1, 2, 1]
 
 
 @pytest.mark.asyncio
-async def test_statuses_skips_actor_create_and_self_delete(fake_bus, fake_counters, cfg):
-    actor_url = "https://example.com/actors/alice"
-    fake_bus.topic("activities").messages = [
-        _msg(1, "Create", actor_url, {"username": "alice",
-                                      "activity": {"object": {"id": actor_url, "type": "Person"}}}),
-        _msg(2, "Delete", actor_url, {"username": "alice",
-                                      "activity": {"actor": actor_url, "object": actor_url}})]
+async def test_followers_count_clamps_at_zero(fake_bus, fake_counters, cfg):
+    fake_bus.topic("followers").messages = [_msg(1, "deleted", _follower_edge("dan"), {})]
+
+    await translator.handle_followers_events()
+
+    assert _accounts(fake_bus)[0]["payload"]["count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_status_create_increments(fake_bus, fake_counters, cfg):
+    fake_bus.topic("activities").messages = [_msg(1, "Create", "n1", _status_create("n1"))]
+
+    await translator.handle_statuses_events()
+
+    assert _accounts(fake_bus)[0]["payload"]["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_status_announce_increments(fake_bus, fake_counters, cfg):
+    fake_bus.topic("activities").messages = [_msg(1, "Announce", "b1", _status_announce())]
+
+    await translator.handle_statuses_events()
+
+    assert _accounts(fake_bus)[0]["payload"]["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_status_delete_decrements(fake_bus, fake_counters, cfg):
+    await fake_counters.bump("alice", "statuses", 2)
+    fake_bus.topic("activities").messages = [_msg(1, "Delete", "n1", _status_delete("n1"))]
+
+    await translator.handle_statuses_events()
+
+    assert _accounts(fake_bus)[0]["payload"]["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_statuses_skips_actor_create(fake_bus, fake_counters, cfg):
+    fake_bus.topic("activities").messages = [_msg(1, "Create", ALICE_ACTOR, _actor_create())]
 
     await translator.handle_statuses_events()
 
     assert _accounts(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_statuses_skips_actor_self_delete(fake_bus, fake_counters, cfg):
+    fake_bus.topic("activities").messages = [_msg(1, "Delete", ALICE_ACTOR, _actor_self_delete())]
+
+    await translator.handle_statuses_events()
+
+    assert _accounts(fake_bus) == []
+
