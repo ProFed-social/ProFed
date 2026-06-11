@@ -51,12 +51,8 @@ class _Storage(BaseStorage):
 
     async def count_follows(self, acct: str) -> tuple[int, int]:
         row = await self.fetch_one("""SELECT
-                                          SUM(CASE WHEN follower = $1
-                                                   THEN 1
-                                                   ELSE 0) AS follower_count,
-                                          SUM(CASE WHEN following = $1
-                                                   THEN 1
-                                                   ELSE 0) AS following_count
+                                          COUNT(*) FILTER (WHERE following = $1) AS follower_count,
+                                          COUNT(*) FILTER (WHERE follower = $1) AS following_count,
                                       FROM person_account.edges
                                       WHERE follower = $1 OR following = $1""",
                                    acct)
