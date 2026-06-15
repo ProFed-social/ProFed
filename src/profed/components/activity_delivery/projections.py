@@ -10,7 +10,7 @@ async def _followers_init() -> None:
     pass
  
  
-async def _follower_created(object_id: str, payload: dict) -> None:
+async def _follower_accepted(object_id: str, payload: dict) -> None:
     follower, following = object_id.split("|", 1)
     await (await storage()).add_follower(following, follower)
 
@@ -21,7 +21,8 @@ async def _follower_deleted(object_id: str, payload: dict) -> None:
 
 
 async def _follower_snapshot(item: dict) -> None:
-    await (await storage()).add_follower(item["following"], item["follower"])
+    if item.get("state") != "requested":
+       await (await storage()).add_follower(item["following"], item["follower"])
  
  
 followers_handle_events, followers_rebuild, _ = \
@@ -29,7 +30,7 @@ followers_handle_events, followers_rebuild, _ = \
                      subscriber="activity_delivery",
                      init=_followers_init,
                      on_snapshot_item=_follower_snapshot,
-                     on_message_type={"created": _follower_created,
+                     on_message_type={"accepted": _follower_accepted,
                                       "deleted": _follower_deleted})
  
  
@@ -90,7 +91,7 @@ keys_handle_events, keys_rebuild, _ = \
                      subscriber="activity_delivery_keys",
                      init=_keys_init,
                      on_snapshot_item=_upsert_key_snapshot,
-                     on_message_type={"created":        _upsert_key,
+                     on_message_type={"created": _upsert_key,
                                       "keys_generated": _upsert_key})
 
  

@@ -55,9 +55,9 @@ def fake_storage():
 
 
 @pytest.mark.asyncio
-async def test_follower_created_adds_to_storage(fake_bus, fake_storage):
+async def test_follower_accepted_adds_to_storage(fake_bus, fake_storage):
     fake_bus.topic("followers").messages = [
-            (1, "created", "bob@remote.example|alice@example.com", TS, {})]
+            (1, "accepted", "bob@remote.example|alice@example.com", TS, {})]
 
     await projections.followers_rebuild()
 
@@ -67,12 +67,37 @@ async def test_follower_created_adds_to_storage(fake_bus, fake_storage):
 @pytest.mark.asyncio
 async def test_follower_deleted_removes_from_storage(fake_bus, fake_storage):
     fake_bus.topic("followers").messages = [
-            (1, "created", "bob@remote.example|alice@example.com", TS, {}),
+            (1, "accepted", "bob@remote.example|alice@example.com", TS, {}),
             (2, "deleted", "bob@remote.example|alice@example.com", TS, {})]
 
     await projections.followers_rebuild()
 
     assert ("alice@example.com", "bob@remote.example") not in fake_storage.followers
+
+
+@pytest.mark.asyncio
+async def test_requested_follower_is_ignored(fake_bus, fake_storage):
+    fake_bus.topic("followers").messages = [
+            (1, "requested", "bob@remote.example|alice@example.com", TS, {})]
+
+    await projections.followers_rebuild()
+
+    assert fake_storage.followers == {}
+
+
+@pytest.mark.asyncio
+async def test_snapshot_skips_pending_edge(fake_bus, fake_storage):
+    fake_bus.topic("followers").snapshots = [
+            (0, [{"follower": "bob@remote.example",
+                  "following": "alice@example.com",
+                  "state": "accepted"},
+                 {"follower": "carol@remote.example",
+                  "following": "alice@example.com",
+                  "state": "requested"}])]
+
+    await projections.followers_rebuild()
+
+    assert await projections.get_followers("alice@example.com") == {"bob@remote.example"}
 
 
 @pytest.mark.asyncio
