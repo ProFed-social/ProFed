@@ -12,7 +12,6 @@ from .storage import storage
 
 
 logger = logging.getLogger(__name__)
-
 _PERSON_SOURCE = source_key("person")
 _FOLLOWERS_SOURCE = source_key("followers")
 _FOLLOWING_SOURCE = source_key("followers:following")
@@ -109,10 +108,12 @@ async def _follower_accepted(object_id, payload, sequence_id) -> None:
     if await (await storage()).add_edge(follower, following):
         await _emit_edge_change(follower, following, sequence_id)
 
+
 async def _follower_deleted(object_id, payload, sequence_id) -> None:
     follower, following = object_id.split("|", 1)
     if await (await storage()).remove_edge(follower, following):
         await _emit_edge_change(follower, following, sequence_id)
+
 
 handle_followers_events, _, _ = \
     build_projection(topic=followers,
@@ -134,11 +135,8 @@ def _is_actor_self_delete(activity: dict) -> bool:
 
 
 async def _bump_statuses(username: str, delta: int, sequence_id: int) -> None:
-    await _emit_count("statuses_changed",
-                      username,
-                      await (await storage()).bump_statuses(username, delta),
-                      _ACTIVITIES_SOURCE,
-                      sequence_id)
+    count = await (await storage()).bump_statuses(username, delta)
+    await _emit_count("statuses_changed", username, count, _ACTIVITIES_SOURCE, sequence_id)
 
 
 async def _status_created(object_id, payload, sequence_id) -> None:

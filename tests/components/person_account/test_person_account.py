@@ -53,7 +53,7 @@ class _FakeStore:
         return sum(1 for follower, following in self.edges if follower == acct)
 
     async def count_follows(self, acct):
-        return (await self.count_followers(acct)), (await self.count_following(acct))
+        return (await self.count_followers(acct), await self.count_following(acct))
 
     async def bump_statuses(self, username, delta):
         self.statuses[username] = max(self.statuses.get(username, 0) + delta, 0)
@@ -261,9 +261,8 @@ async def test_rejected_is_ignored(fake_bus, fake_store, cfg):
 
 @pytest.mark.asyncio
 async def test_duplicate_accept_emits_once(fake_bus, fake_store, cfg):
-    fake_bus.topic("followers").messages = [
-        _msg(1, "accepted", _follower_edge("bob"), {}),
-        _msg(2, "accepted", _follower_edge("bob"), {})]
+    fake_bus.topic("followers").messages = [_msg(1, "accepted", _follower_edge("bob"), {}),
+                                            _msg(2, "accepted", _follower_edge("bob"), {})]
 
     await translator.handle_followers_events()
 

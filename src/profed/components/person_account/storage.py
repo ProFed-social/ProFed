@@ -11,12 +11,12 @@ class _Storage(BaseStorage):
     async def ensure_schema(self) -> None:
         await super().ensure_schema()
         await self.execute("""CREATE TABLE IF NOT EXISTS
-                              person_account.edges (follower  TEXT NOT NULL,
+                              person_account.edges (follower TEXT NOT NULL,
                                                     following TEXT NOT NULL,
                                                     PRIMARY KEY (follower, following))""")
         await self.execute("""CREATE TABLE IF NOT EXISTS
-                              person_account.statuses (username TEXT   PRIMARY KEY,
-                                                       count    BIGINT NOT NULL DEFAULT 0)""")
+                              person_account.statuses (username TEXT PRIMARY KEY,
+                                                       count BIGINT NOT NULL DEFAULT 0)""")
 
     async def add_edge(self, follower: str, following: str) -> bool:
         row = await self.fetch_one("""INSERT INTO person_account.edges (follower, following)
@@ -40,30 +40,29 @@ class _Storage(BaseStorage):
                                       FROM person_account.edges
                                       WHERE following = $1""",
                                    acct)
-        return row["count"] if row else 0
+        return row["count"]
 
     async def count_following(self, acct: str) -> int:
         row = await self.fetch_one("""SELECT COUNT(*) AS count
                                       FROM person_account.edges
                                       WHERE follower = $1""",
                                    acct)
-        return row["count"] if row else 0
+        return row["count"]
 
     async def count_follows(self, acct: str) -> tuple[int, int]:
-        row = await self.fetch_one("""SELECT
-                                          COUNT(*) FILTER (WHERE following = $1) AS follower_count,
-                                          COUNT(*) FILTER (WHERE follower = $1) AS following_count,
+        row = await self.fetch_one("""SELECT COUNT(*) FILTER (WHERE following = $1) AS followers,
+                                             COUNT(*) FILTER (WHERE follower = $1) AS following
                                       FROM person_account.edges
                                       WHERE follower = $1 OR following = $1""",
                                    acct)
-        return (row["follower_count"], row["following_count"]) if row else (0, 0)
+        return (row["followers"], row["following"]) if row else (0, 0)
 
     async def bump_statuses(self, username: str, delta: int) -> int:
         row = await self.fetch_one("""INSERT INTO person_account.statuses (username, count)
                                       VALUES ($1, GREATEST($2, 0))
                                       ON CONFLICT (username) DO UPDATE
-                                          SET count = GREATEST(
-                                                  person_account.statuses.count + $2, 0)
+                                          SET count = GREATEST(person_account.statuses.count + $2,
+                                                               0)
                                       RETURNING count""",
                                    username,
                                    delta)
@@ -72,7 +71,7 @@ class _Storage(BaseStorage):
     async def get_statuses(self, username: str) -> int:
         row = await self.fetch_one("""SELECT count
                                       FROM person_account.statuses
-                                     WHERE username = $1""",
+                                      WHERE username = $1""",
                                    username)
         return row["count"] if row else 0
 
