@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get("/.well-known/nodeinfo")
 async def well_known_nodeinfo():
     d = domain()
-    return {"links": [{"rel":  "http://nodeinfo.diaspora.software/ns/schema/2.0",
+    return {"links": [{"rel": "http://nodeinfo.diaspora.software/ns/schema/2.0",
                         "href": f"https://{d}/nodeinfo/2.0"}]}
  
  
