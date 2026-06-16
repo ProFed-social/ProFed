@@ -14,9 +14,10 @@ from profed.components.api.c2s.shared.actors.service import resolve_actor, local
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
+from profed.models.activity_pub import AcceptActivity, RejectActivity
 from profed.models.resume import Resume
 from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
-from profed.components.api.c2s.v1.accounts.followers.storage import storage as c2s_followers_storage
+from profed.components.api.c2s.v1.accounts.follows.storage import storage as follows_storage
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
 from profed.components.api.c2s.shared.statuses import activity_to_status
 from profed.core.message_bus.source_key import source_key
@@ -66,12 +67,12 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
                                           for q in id)
                 if account_id is not None}
 
-    rows = await (await following_storage()).get_following(username, filter=list(resolved.values()))
-    following_map = {row["account_id"]: row for row in rows}
+    flags = await (await follows_storage()).relationships(acct_from_username(username),
+                                                          list(resolved.values()))
     return [Relationship(id=str(resolved[query]),
-                         following=following_map.get(resolved[query], {}).get("accepted", False),
-                         requested=(resolved[query] in following_map and
-                                    not following_map[resolved[query]]["accepted"]))
+                         following=flags[resolved[query]]["following"],
+                         requested=flags[resolved[query]]["requested"],
+                         followed_by=flags[resolved[query]]["followed_by"])
             for query in id if query in resolved]
 
 
@@ -92,9 +93,9 @@ async def _with_counts(account: Account) -> Account:
     return account.model_copy(update={"statuses_count":
                                       await (await user_statuses_storage()).count(username),
                                       "followers_count":
-                                      await (await c2s_followers_storage()).count_followers(account.acct),
+                                      await (await follows_storage()).count_followers(account.acct),
                                       "following_count":
-                                      await (await following_storage()).count_following(username)})
+                                      await (await follows_storage()).count_following(account.acct)})
 
 
 def _with_resume(account: Account, raw: dict) -> Account:
@@ -238,7 +239,7 @@ async def account_followers(id: str,
 
     return [make_account(a)
             async for a in (await lookup_by_acct(acct)
-                            for acct in await (await c2s_followers_storage()).get_followers(raw["acct"]))
+                            for acct in await (await follows_storage()).get_followers(raw["acct"]))
             if a is not None]
 
 
@@ -249,9 +250,9 @@ async def account_following(id: str,
     if raw is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    following = await (await following_storage()).get_following(raw["acct"].split("@")[0])
     return [make_account(a)
-            async for a in (await lookup_by_id(r["account_id"], {}) for r in following)
+            async for a in (await lookup_by_acct(acct)
+                            for acct in await (await follows_storage()).get_following(raw["acct"]))
             if a is not None]
 
 
@@ -294,19 +295,72 @@ async def get_mutes(claims: Annotated[dict, Depends(current_user)],
 @router.get("/follow_requests")
 async def get_follow_requests(claims: Annotated[dict, Depends(current_user)],
                               limit: int = Query(default=40, ge=1, le=80)):
-    return []
+    username = claims.get("preferred_username") or claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="invalid_token")
+
+    requests = await (await follows_storage()).follow_requests(acct_from_username(username))
+    return [make_account(a)
+            async for a in (await lookup_by_acct(row["follower"]) for row in requests[:limit])
+            if a is not None]
+
+
+async def _federate_follow_response(username: str,
+                                    requester: dict,
+                                    edge: dict | None,
+                                    decision: str) -> None:
+    if requester["acct"].endswith("@" + instance_domain()):
+        return
+
+    follow_id = (edge or {}).get("follow_activity_id") or f"{requester['actor_url']}#follows/unknown"
+    follow = {"id": follow_id,
+              "type": "Follow",
+              "actor": requester["actor_url"],
+              "object": actor_url_from_username(username)}
+    activity = AcceptActivity if decision == "accepted" else RejectActivity
+    response = activity(id=f"{follow_id}#{decision}/",
+                        actor=actor_url_from_username(username),
+                        object=follow)
+
+    async with message_bus().topic("activities").publish() as publish:
+        await publish(event_type=response.type,
+                      object_id=response.id,
+                      payload={"username": username,
+                               "activity": response.as_event_payload()})
+
+
+async def _resolve_follow_request(id: str, claims: dict, decision: str) -> Relationship:
+    username = claims.get("preferred_username") or claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="invalid_token")
+
+    requester = await lookup_by_id(int(id), {})
+    if requester is None:
+        raise HTTPException(status_code=404, detail="account_not_found")
+
+    me_acct = acct_from_username(username)
+    edge = await (await follows_storage()).get(requester["acct"], me_acct)
+
+    async with message_bus().topic("followers").publish() as publish:
+        await publish(event_type=decision,
+                      object_id=f"{requester['acct']}|{me_acct}",
+                      payload={})
+
+    await _federate_follow_response(username, requester, edge, decision)
+
+    return Relationship(id=id, followed_by=decision == "accepted")
 
 
 @router.post("/follow_requests/{id}/authorize")
 async def authorize_follow_request(id: str,
                                    claims: Annotated[dict, Depends(current_user)]):
-    return Relationship(id=id)
+    return await _resolve_follow_request(id, claims, "accepted")
 
 
 @router.post("/follow_requests/{id}/reject")
 async def reject_follow_request(id: str,
                                 claims: Annotated[dict, Depends(current_user)]):
-    return Relationship(id=id)
+    return await _resolve_follow_request(id, claims, "rejected")
 
 
 @router.get("/preferences")

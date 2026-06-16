@@ -143,41 +143,43 @@ def test_follow_unknown_account_returns_404(client):
     assert response.status_code == 404
 
 
-FOLLOWING_ROW_PENDING  = {"account_id": 42, "following_user": "alice", "accepted": False}
-FOLLOWING_ROW_ACCEPTED = {"account_id": 42, "following_user": "alice", "accepted": True}
+FLAGS_NONE = {42: {"following": False, "requested": False, "followed_by": False}}
+FLAGS_REQUESTED = {42: {"following": False, "requested": True, "followed_by": False}}
+FLAGS_FOLLOWING = {42: {"following": True, "requested": False, "followed_by": False}}
+FLAGS_FOLLOWED_BY = {42: {"following": False, "requested": False, "followed_by": True}}
 
 
-def _mock_storage(rows):
+def _relationships_storage(flags):
     mock = AsyncMock()
-    mock.get_following = AsyncMock(return_value=rows)
+    mock.relationships = AsyncMock(return_value=flags)
     return AsyncMock(return_value=mock)
 
 
 def test_relationships_not_following(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.api.c2s.v1.accounts.router.following_storage",
-                   _mock_storage([])):
+        with patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
+                   _relationships_storage(FLAGS_NONE)):
             response = client.get("/accounts/relationships?id[]=42")
 
     assert response.status_code == 200
     data = response.json()
-    assert data == [{"id":              "42",
-                     "following":       False,
-                     "requested":       False,
-                     "followed_by":     False,
-                     "blocking":        False,
-                     "muting":          False,
+    assert data == [{"id": "42",
+                     "following": False,
+                     "requested": False,
+                     "followed_by": False,
+                     "blocking": False,
+                     "muting": False,
                      "domain_blocking": False,
-                     "endorsed":        False,
-                     "note":            ""}]
+                     "endorsed": False,
+                     "note": ""}]
 
 
 def test_relationships_follow_requested(client):
     with Cfg({"profed": {"run": "api"},
-              "api":    {"domain": "example.com"}}):
-        with patch("profed.components.api.c2s.v1.accounts.router.following_storage",
-                   _mock_storage([FOLLOWING_ROW_PENDING])):
+              "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
+                   _relationships_storage(FLAGS_REQUESTED)):
             response = client.get("/accounts/relationships?id[]=42")
 
     assert response.status_code == 200
@@ -188,15 +190,90 @@ def test_relationships_follow_requested(client):
 
 def test_relationships_following(client):
     with Cfg({"profed": {"run": "api"},
-              "api":    {"domain": "example.com"}}):
-        with patch("profed.components.api.c2s.v1.accounts.router.following_storage",
-                   _mock_storage([FOLLOWING_ROW_ACCEPTED])):
+              "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
+                   _relationships_storage(FLAGS_FOLLOWING)):
             response = client.get("/accounts/relationships?id[]=42")
 
     assert response.status_code == 200
     data = response.json()
     assert data[0]["following"] is True
     assert data[0]["requested"] is False
+
+
+def test_relationships_followed_by(client):
+    with Cfg({"profed": {"run": "api"},
+              "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
+                   _relationships_storage(FLAGS_FOLLOWED_BY)):
+            response = client.get("/accounts/relationships?id[]=42")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["followed_by"] is True
+    assert data[0]["following"] is False
+
+
+def test_follow_requests_returns_pending_accounts(client):
+    follows = AsyncMock()
+    follows.follow_requests = AsyncMock(return_value=[{"follower": "bob@remote.example",
+                                                       "follower_id": 123456,
+                                                       "follow_activity_id": None}])
+
+    with Cfg({"profed": {"run": "api"},
+              "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
+                   AsyncMock(return_value=follows)), \
+             patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
+                   AsyncMock(return_value=ROW)):
+            response = client.get("/follow_requests")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == "123456"
+
+
+def test_authorize_publishes_accepted_and_federates(client):
+    fake_bus = FakeMessageBus()
+    follows = AsyncMock()
+    follows.get = AsyncMock(return_value={"follow_activity_id": "https://remote.example/follows/1"})
+
+    with Cfg({"profed": {"run": "api"},
+              "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
+                   AsyncMock(return_value=ROW)), \
+             patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
+                   AsyncMock(return_value=follows)), \
+             patch.object(message_bus, "_instance", fake_bus):
+            response = client.post("/follow_requests/123456/authorize")
+
+    assert response.status_code == 200
+    assert response.json()["followed_by"] is True
+    followers = fake_bus.topic("followers").published
+    assert followers[0]["event_type"] == "accepted"
+    assert followers[0]["object_id"] == "bob@remote.example|alice@example.com"
+    assert fake_bus.topic("activities").published[0]["event_type"] == "Accept"
+
+
+def test_reject_publishes_rejected_and_federates(client):
+    fake_bus = FakeMessageBus()
+    follows = AsyncMock()
+    follows.get = AsyncMock(return_value={"follow_activity_id": "https://remote.example/follows/1"})
+
+    with Cfg({"profed": {"run": "api"},
+              "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
+                   AsyncMock(return_value=ROW)), \
+             patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
+                   AsyncMock(return_value=follows)), \
+             patch.object(message_bus, "_instance", fake_bus):
+            response = client.post("/follow_requests/123456/reject")
+
+    assert response.status_code == 200
+    assert response.json()["followed_by"] is False
+    assert fake_bus.topic("followers").published[0]["event_type"] == "rejected"
+    assert fake_bus.topic("activities").published[0]["event_type"] == "Reject"
 
 
 def test_follow_publishes_follow_activity_id_in_known_accounts_event(client):
@@ -367,6 +444,13 @@ def _count_storage(n):
     return AsyncMock(return_value=mock)
 
 
+def _follows_count_storage(followers, following):
+    mock = AsyncMock()
+    mock.count_followers = AsyncMock(return_value=followers)
+    mock.count_following = AsyncMock(return_value=following)
+    return AsyncMock(return_value=mock)
+
+
 def test_lookup_local_account_includes_counts(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
@@ -374,10 +458,8 @@ def test_lookup_local_account_includes_counts(client):
                    AsyncMock(return_value=LOCAL_ROW)), \
              patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
                    _count_storage(3)), \
-             patch("profed.components.api.c2s.v1.accounts.router.c2s_followers_storage",
-                   _count_storage(5)), \
-             patch("profed.components.api.c2s.v1.accounts.router.following_storage",
-                   _count_storage(2)):
+             patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
+                   _follows_count_storage(5, 2)):
             response = client.get("/accounts/lookup?acct=alice@example.com")
 
     assert response.status_code == 200
@@ -432,7 +514,7 @@ def test_account_followers_returns_accounts(client):
 
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(return_value=ROW_FULL)), \
-         patch("profed.components.api.c2s.v1.accounts.router.c2s_followers_storage",
+         patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                AsyncMock(return_value=mock_followers)), \
          patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
                AsyncMock(return_value=ROW_FOLLOWING)):
@@ -450,7 +532,7 @@ def test_account_followers_skips_unknown_followers(client):
 
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(return_value=ROW_FULL)), \
-         patch("profed.components.api.c2s.v1.accounts.router.c2s_followers_storage",
+         patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                AsyncMock(return_value=mock_followers)), \
          patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
                AsyncMock(return_value=None)):
@@ -470,16 +552,13 @@ def test_account_followers_returns_404_when_account_not_found(client):
 
 def test_account_following_returns_accounts_for_known_user(client):
     mock_storage = AsyncMock()
-    mock_storage.get_following = AsyncMock(
-        return_value=[{"account_id":        789,
-                       "accepted":           True,
-                       "follow_activity_id": None}])
+    mock_storage.get_following = AsyncMock(return_value=["alice@other.example"])
 
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(return_value=ROW_FULL)), \
-         patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+         patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
+         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
                AsyncMock(return_value=ROW_FOLLOWING)):
         response = client.get("/accounts/123456/following")
 
@@ -492,16 +571,13 @@ def test_account_following_returns_accounts_for_known_user(client):
 
 def test_account_following_skips_unresolvable_accounts(client):
     mock_storage = AsyncMock()
-    mock_storage.get_following = AsyncMock(
-        return_value=[{"account_id":        789,
-                       "accepted":           True,
-                       "follow_activity_id": None}])
+    mock_storage.get_following = AsyncMock(return_value=["alice@other.example"])
 
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(return_value=ROW_FULL)), \
-         patch("profed.components.api.c2s.v1.accounts.router.following_storage",
+         patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
+         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
                AsyncMock(return_value=None)):
         response = client.get("/accounts/123456/following")
 
@@ -551,18 +627,6 @@ def test_get_blocks_returns_empty_list(client):
 
 def test_get_mutes_returns_empty_list(client):
     assert client.get("/mutes").json() == []
-
-
-def test_get_follow_requests_returns_empty_list(client):
-    assert client.get("/follow_requests").json() == []
-
-
-def test_authorize_follow_request_returns_relationship(client):
-    assert client.post("/follow_requests/123/authorize").status_code == 200
-
-
-def test_reject_follow_request_returns_relationship(client):
-    assert client.post("/follow_requests/123/reject").status_code == 200
 
 
 def test_get_preferences_returns_defaults(client):
