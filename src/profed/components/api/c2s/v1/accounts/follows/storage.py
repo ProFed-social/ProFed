@@ -84,6 +84,14 @@ class _Storage(BaseStorage):
                                        WHERE following = $1 AND state = 'requested'""",
                                     following)
 
+    async def get(self, follower: str, following: str) -> dict | None:
+        return await self.fetch_one("""SELECT follower, follower_id, following, following_id,
+                                              state, follow_activity_id
+                                       FROM api.follows
+                                       WHERE follower = $1 AND following = $2""",
+                                    follower,
+                                    following)
+
     async def relationships(self, acct: str, ids: list[int]) -> dict[int, dict]:
         rows = await self.fetch_all("""SELECT follower, follower_id, following, following_id, state
                                        FROM api.follows

@@ -55,3 +55,35 @@ async def test_get_followers_returns_accts():
     assert await store.get_followers("alice@example.com") == ["bob@remote.example",
                                                               "carol@remote.example"]
 
+
+@pytest.mark.asyncio
+async def test_get_returns_the_single_edge():
+    store = _Storage(None)
+    edge = {"follower": "alice@example.com",
+            "follower_id": 1,
+            "following": "bob@remote.example",
+            "following_id": 11,
+            "state": "accepted",
+            "follow_activity_id": "https://example.com/actors/alice#follows/x"}
+    store.fetch_one = AsyncMock(return_value=edge)
+
+    assert await store.get("alice@example.com", "bob@remote.example") == edge
+
+
+@pytest.mark.asyncio
+async def test_get_returns_none_when_edge_missing():
+    store = _Storage(None)
+    store.fetch_one = AsyncMock(return_value=None)
+
+    assert await store.get("alice@example.com", "bob@remote.example") is None
+
+
+@pytest.mark.asyncio
+async def test_get_queries_by_follower_then_following():
+    store = _Storage(None)
+    store.fetch_one = AsyncMock(return_value=None)
+
+    await store.get("alice@example.com", "bob@remote.example")
+
+    assert store.fetch_one.await_args.args[1:] == ("alice@example.com", "bob@remote.example")
+
