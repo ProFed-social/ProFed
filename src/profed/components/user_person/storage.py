@@ -6,7 +6,7 @@ from profed.core.persistence.base_storage import BaseStorage, init_pool
 
 class _Storage(BaseStorage):
     def __init__(self, pool):
-        super().__init__(pool, "user_person")
+        super().__init__(pool, None)
 
     async def ensure_schema(self) -> None:
         await super().ensure_schema()

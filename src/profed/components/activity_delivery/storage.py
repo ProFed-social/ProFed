@@ -10,7 +10,7 @@ from profed.core.persistence.base_storage import BaseStorage, init_pool
 class _Storage(BaseStorage):
     def __init__(self, pool):
         super().__init__(pool,
-                         "activity_delivery",
+                         None,
                          subscriber_schemas=["activity_delivery_keys"])
 
     async def ensure_schema(self) -> None:
