@@ -75,7 +75,10 @@ async def _tick(object_id, payload, emitted_at, sequence_id) -> None:
     store = await storage()
     last_tick = await store.last_tick_seq()
 
-    for row in await store.pending_since(last_tick):
+    pending = await store.pending_since(last_tick)
+    logger.warning("user_person _tick: seq=%s last_tick=%s pending=%d", sequence_id, last_tick, len(pending))
+
+    for row in pending:
         event = _person_event_for(row, last_tick)
         if event is not None:
             event_type, body = event
@@ -84,10 +87,12 @@ async def _tick(object_id, payload, emitted_at, sequence_id) -> None:
                               object_id=row["username"],
                               payload=body,
                               message_id=_USERS_SOURCE.message_id(row["last_changed_seq"]))
+            logger.warning("user_person _tick: published %s for %s", event_type, row["username"])
         if row["deleted_seq"] is not None:
             await store.remove(row["username"])
 
     await store.set_last_tick_seq(sequence_id)
+    logger.warning("user_person _tick: done seq=%s", sequence_id)
 
 
 handle_user_events, rebuild, reset_last_seen = \
