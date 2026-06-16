@@ -72,6 +72,7 @@ def _person_event_for(row, last_tick):
 
 
 async def _tick(object_id, payload, emitted_at, sequence_id) -> None:
+    logger.warning("user_person _tick")
     store = await storage()
     last_tick = await store.last_tick_seq()
 
