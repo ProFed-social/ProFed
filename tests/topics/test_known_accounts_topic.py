@@ -16,9 +16,8 @@ def test_valid_discovered_event_returns_payload():
     assert payload["acct"] == "bob@remote.example"
 
 
-def test_valid_follow_accepted_event_returns_payload():
-    assert validate_known_accounts_event("follow_accepted", PAYLOAD) is not None
-
+def test_follow_accepted_event_is_rejected():
+    assert validate_known_accounts_event("follow_accepted", PAYLOAD) is None
 
 def test_unknown_event_type_returns_none():
     assert validate_known_accounts_event("renamed", PAYLOAD) is None

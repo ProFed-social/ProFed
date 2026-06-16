@@ -13,7 +13,7 @@ def _ignore(msg):
 
 
 def validate_known_accounts_event(event_type: str, payload: Dict) -> Optional[Dict]:
-    if event_type not in ("discovered", "follow_accepted"):
+    if event_type != "discovered":
         logger.warning(_ignore(f"unknown event type {event_type!r}"))
         return None
 
