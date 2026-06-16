@@ -8,7 +8,7 @@ from typing import Optional, Dict
 logger = logging.getLogger(__name__)
 
 
-_EVENT_VERBS = ("created", "requested", "accepted", "rejected", "deleted")
+_EVENT_VERBS = ("requested", "accepted", "rejected", "deleted")
 _EDGE_STATES = ("requested", "accepted")
 
 

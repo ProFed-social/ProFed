@@ -5,9 +5,8 @@ from profed.topics.followers_topic import (validate_followers_event,
                                            validate_followers_snapshot_item)
 
 
-def test_valid_created_event_returns_empty_payload():
-    assert validate_followers_event("created", {}) == {}
-
+def test_created_event_is_rejected():
+    assert validate_followers_event("created", {}) is None
 
 def test_valid_requested_event_returns_empty_payload():
     assert validate_followers_event("requested", {}) == {}

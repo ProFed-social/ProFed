@@ -16,7 +16,6 @@ from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
 from profed.models.activity_pub import AcceptActivity, RejectActivity
 from profed.models.resume import Resume
-from profed.components.api.c2s.v1.accounts.following.storage import storage as following_storage
 from profed.components.api.c2s.v1.accounts.follows.storage import storage as follows_storage
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
 from profed.components.api.c2s.shared.statuses import activity_to_status
@@ -120,12 +119,6 @@ async def follow(id: str,
     actor_url = row["actor_url"]
     follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
 
-    async with message_bus().topic("known_accounts").publish() as publish:
-        await publish(event_type="follow_requested",
-                      object_id=str(row["account_id"]),
-                      payload={"following_user": username,
-                               "follow_activity_id": follow_id})
-
     async with message_bus().topic("activities").publish() as publish:
         await publish(event_type="Follow",
                       object_id=follow_id,
@@ -181,16 +174,11 @@ async def unfollow(id: str,
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    following = await (await following_storage()).get(account["account_id"], username)
-    follow_id = ((following or {}).get("follow_activity_id")
+    edge = await (await follows_storage()).get(acct_from_username(username), account["acct"])
+    follow_id = ((edge or {}).get("follow_activity_id")
                  or f"{actor_url_from_username(username)}#follows/{account['account_id']}")
     actor_url  = actor_url_from_username(username)
     undo_id    = f"{actor_url}#unfollows/{uuid.uuid4()}"
-
-    async with message_bus().topic("known_accounts").publish() as publish:
-        await publish(event_type="unfollow",
-                      object_id=str(account["account_id"]),
-                      payload={"following_user": username})
 
     async with message_bus().topic("activities").publish() as publish:
         await publish(event_type="Undo",

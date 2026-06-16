@@ -31,12 +31,6 @@ async def _handle_accept(username: str, activity: dict, seq: int) -> None:
         logger.warning("accept_handler: unknown actor %r", accept.actor)
         return
 
-    async with message_bus().topic("known_accounts").publish() as publish:
-        await publish(event_type="follow_accepted",
-                      object_id=str(account_id),
-                      payload={"following_user": username},
-                      message_id=_source_key.message_id(seq))
-
     following_acct = await lookup_acct(accept.actor)
     if following_acct is not None:
         async with message_bus().topic("followers").publish() as publish:

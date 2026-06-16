@@ -43,23 +43,6 @@ def fake_storage():
 
 
 @pytest.mark.asyncio
-async def test_accept_publishes_follow_accepted(fake_bus, fake_storage):
-    _enqueue(fake_bus)
-
-    with patch("profed.components.accept_handler.handler.actor_url_from_username",
-               return_value="https://example.com/actors/alice"), \
-         patch("profed.components.accept_handler.handler.lookup_acct",
-               AsyncMock(return_value="bob@remote.example")):
-        await handler.handle_incoming_activities()
-
-    published = fake_bus.topic("known_accounts").published
-    assert len(published) == 1
-    assert published[0]["event_type"] == "follow_accepted"
-    assert published[0]["object_id"]  == "123456"
-    assert published[0]["payload"]["following_user"] == "alice"
-
-
-@pytest.mark.asyncio
 async def test_accept_publishes_followers_accepted(fake_bus, fake_storage):
     _enqueue(fake_bus)
 
