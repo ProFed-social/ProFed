@@ -142,15 +142,16 @@ ProFed's approach is inspired by the `rel="me"` link verification used across th
 
 #### The Mechanism
 
-When someone writes a reference for a ProFed user, the following occurs on the referrer's side: the referrer publishes a hash of the reference text at a stable URL on a website they control. This URL is the verification anchor.
+When someone writes a reference for a ProFed user, the following occurs on the referrer's side: the referrer publishes a hash of the reference text together with the recipient's identity at a stable URL on a website they control. Binding the recipient into the hash prevents a reference written for one person from being re-used by someone else. This URL is the verification anchor.
 
 On the recipient's side: the reference entry in their profile stores both the reference text and a link to that hash URL.
 
-Any client rendering the profile can then verify the reference independently: it computes the hash of the displayed reference text using the agreed algorithm, fetches the hash from the referrer's URL, and compares the two. If they match, the reference is marked as verified. If they do not match — or if the URL is unreachable — the reference is marked as unverified. The verification result is a local conclusion drawn by the client; no server needs to pre-compute or cache it.
+Any client rendering the profile can then verify the reference independently: it computes the hash of the displayed reference text and the recipient's identity using the agreed algorithm, fetches the hash from the referrer's URL, and compares the two. If they match, the reference is marked as verified. If they do not match — or if the URL is unreachable — the reference is marked as unverified. The verification result is a local conclusion drawn by the client; no server needs to pre-compute or cache it.
+
 
 #### Properties
 
-This mechanism provides meaningful guarantees without a central authority. A reference cannot be fabricated by the recipient, because they cannot publish content on the referrer's domain. A reference cannot be silently altered after the fact, because the hash would no longer match. A referrer can revoke a reference by removing or changing the hash at their URL, at which point clients will display it as unverified.
+This mechanism provides meaningful guarantees without a central authority. A reference cannot be fabricated by the recipient, because they cannot publish content on the referrer's domain. A reference cannot be re-attributed to a different person, because the recipient's identity is part of the hashed input — a statement written for one person does not verify for another. A reference cannot be silently altered after the fact, because the hash would no longer match. A referrer can revoke a reference by removing or changing the hash at their URL, at which point clients will display it as unverified.
 
 The mechanism is also lightweight by design. It does not require ActivityPub support, a shared PKI, or any coordination between instances. It works across systems as long as both parties have a URL they control — a personal website, a company page, or any other web presence.
 
@@ -339,13 +340,14 @@ This table documents the correspondence between mf2 property names (as used on p
 
 ### h-card → Person actor
 
-| mf2 property  | AP field     | Notes                              |
-|:--------------|:-------------|:-----------------------------------|
-| `p-name`      | `name`       |                                    |
-| `p-note`      | `summary`    |                                    |
-| `p-job-title` | —            | Display field; not in AP actor     |
-| `u-photo`     | `icon.url`   |                                    |
-| `u-url`       | `url`        |                                    |
+| mf2 property  | AP field     | Notes                                                                          |
+|:--------------|:-------------|:----------------------------------————————————————————————————————————————————-|
+| `p-name`      | `name`       |                                                                                |
+| `p-note`      | `summary`    |                                                                                |
+| `p-job-title` | —            | Display field; not in AP actor                                                 |
+| `p-location`  | `org`        | Current profile organisation; importer reads `location`, falls back to `p-org` |
+| `u-photo`     | `icon.url`   |                                                                                |
+| `u-url`       | `url`        |                                                                                |
 
 ### h-resume → resume object
 
