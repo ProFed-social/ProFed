@@ -17,8 +17,9 @@ _USERS_SOURCE = source_key("users")
 
 
 async def _init() -> None:
-    await (await storage()).ensure_schema()
-
+    store = await storage()
+    await store.ensure_schema()
+    store.rebuild_finished()
 
 async def _apply_snapshot_item(item: dict) -> None:
     pass
@@ -72,16 +73,10 @@ def _person_event_for(row, last_tick):
 
 
 async def _tick(object_id, payload, emitted_at, sequence_id) -> None:
-    logger.warning("user_person _tick")
     store = await storage()
-    logger.warning("user_person _tick: storage instantiated")
     last_tick = await store.last_tick_seq()
-    logger.warning("user_person _tick: last_tick: %s", last_tick)
 
-    pending = await store.pending_since(last_tick)
-    logger.warning("user_person _tick: seq=%s last_tick=%s pending=%d", sequence_id, last_tick, len(pending))
-
-    for row in pending:
+    for row in await store.pending_since(last_tick):
         event = _person_event_for(row, last_tick)
         if event is not None:
             event_type, body = event
@@ -90,12 +85,10 @@ async def _tick(object_id, payload, emitted_at, sequence_id) -> None:
                               object_id=row["username"],
                               payload=body,
                               message_id=_USERS_SOURCE.message_id(row["last_changed_seq"]))
-            logger.warning("user_person _tick: published %s for %s", event_type, row["username"])
         if row["deleted_seq"] is not None:
             await store.remove(row["username"])
 
     await store.set_last_tick_seq(sequence_id)
-    logger.warning("user_person _tick: done seq=%s", sequence_id)
 
 
 handle_user_events, rebuild, reset_last_seen = \
