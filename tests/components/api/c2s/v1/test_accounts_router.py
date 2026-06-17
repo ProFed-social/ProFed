@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core.config import config, raw
 from profed.identity import account_id
+from profed.models.mastodon import Account
 from profed.components.api.c2s.v1.accounts import router as accounts_module
 from profed.components.api.c2s.shared.auth import current_user 
 from profed.core.message_bus.source_key import source_key
@@ -36,10 +37,13 @@ class Cfg:
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
  
  
-class FakePerson:
-    name = "Alice Example"
-    summary = "Software engineer"
- 
+LOCAL_ACCOUNT = Account(id="1",
+                        username="alice",
+                        acct="alice@example.com",
+                        display_name="Alice Example",
+                        note="Software engineer",
+                        url="https://example.com/actors/alice")
+   
  
 @pytest.fixture
 def client():
@@ -62,7 +66,7 @@ def test_verify_credentials_returns_account(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router.resolve_actor",
-                   new=AsyncMock(return_value=FakePerson())):
+                   new=AsyncMock(return_value=LOCAL_ACCOUNT)):
             response = client.get("/accounts/verify_credentials")
 
     assert response.status_code == 200
@@ -625,7 +629,7 @@ def test_get_preferences_returns_defaults(client):
 
 def test_update_credentials_returns_account(client):
     with patch("profed.components.api.c2s.v1.accounts.router.resolve_actor",
-               AsyncMock(return_value=FakePerson())):
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
         response = client.patch("/accounts/update_credentials")
 
     assert response.status_code == 200

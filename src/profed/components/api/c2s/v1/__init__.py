@@ -44,7 +44,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
     for routers, init_fn in [(["accounts"],
                               _projection_initializer(actors_storage,
                                                       actors_projection,
-                                                      actors_projection.handle_user_events,
+                                                      actors_projection.handle_account_events,
                                                       "c2s_actor")),
                              (["timelines"],
                               _projection_initializer(timelines_storage,

@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.auth import current_user
+from profed.models.mastodon import Account
 
  
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
@@ -22,14 +23,15 @@ def client(fake_bus):
     return TestClient(app)
  
  
-class FakePerson:
-    name    = "Alice"
-    summary = ""
-
+LOCAL_ACCOUNT = Account(id="1",
+                        username="alice",
+                        acct="alice@example.com",
+                        display_name="Alice",
+                        url="https://example.com/actors/alice")
 
 def test_create_status_publishes_activity(client, fake_bus):
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
-               AsyncMock(return_value=FakePerson())):
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
         response = client.post("/statuses", json={"status": "Hello Fediverse!"})
 
     assert response.status_code == 200
@@ -43,7 +45,7 @@ def test_create_status_publishes_activity(client, fake_bus):
  
 def test_create_status_returns_status_object(client, fake_bus):
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
-               AsyncMock(return_value=FakePerson())):
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
         response = client.post("/statuses", json={"status": "Hello Fediverse!"})
     data = response.json()
 
@@ -67,7 +69,7 @@ def test_statuses_active_flag_set_after_init():
 
 def test_create_status_activity_has_context_and_to(client, fake_bus):
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
-               AsyncMock(return_value=FakePerson())):
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
         client.post("/statuses", json={"status": "Hello Fediverse!"})
 
     activity = fake_bus.topic("activities").published[0]["payload"]["activity"]

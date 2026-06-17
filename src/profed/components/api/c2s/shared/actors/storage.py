@@ -17,7 +17,9 @@ class _storage(BaseStorage):
 
     async def add(self, username: str, payload: dict) -> None:
         await self.execute("""INSERT INTO api.c2s_actor (username, payload)
-                              VALUES ($1, $2)""",
+                              VALUES ($1, $2)
+                              ON CONFLICT (username) DO UPDATE
+                                SET payload = EXCLUDED.payload""",
                            username,
                            payload)
 

@@ -10,7 +10,7 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
                                                                      lookup_by_acct,
                                                                      lookup_by_actor_url,
                                                                      make_account)
-from profed.components.api.c2s.shared.actors.service import resolve_actor, local_account
+from profed.components.api.c2s.shared.actors.service import resolve_actor, with_source
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
@@ -39,11 +39,11 @@ async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
 
-    person = await resolve_actor(username)
-    if person is None:
+    account = await resolve_actor(username)
+    if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    return local_account(username, person)
+    return with_source(account)
  
  
 @router.get("/accounts/relationships")
@@ -362,8 +362,11 @@ async def get_preferences(claims: Annotated[dict, Depends(current_user)]):
 
 @router.patch("/accounts/update_credentials")
 async def update_credentials(claims: Annotated[dict, Depends(current_user)]):
-    username = claims.get("preferred_username") or claims.get("sub")
-    return local_account(username, await resolve_actor(username))
+    account = await resolve_actor(claims.get("preferred_username") or
+                                  claims.get("sub"))
+    if account is None:
+        raise HTTPException(status_code=404, detail="account_not_found")
+    return with_source(account)
 
 
 @router.get("/featured_tags")

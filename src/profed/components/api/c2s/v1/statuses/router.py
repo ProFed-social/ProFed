@@ -11,7 +11,7 @@ from profed.identity import actor_url_from_username, acct_from_username
 from profed.models.activity_pub import CreateActivity, DeleteActivity, Note
 from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
-from profed.components.api.c2s.shared.actors.service import resolve_actor, local_account
+from profed.components.api.c2s.shared.actors.service import resolve_actor
  
  
 router = APIRouter()
@@ -78,7 +78,7 @@ async def create_status(body: StatusCreate,
                   uri=note_id,
                   url=note_id,
                   content=body.status,
-                  account=local_account(username, await resolve_actor(username)))
+                  account=await resolve_actor(username))
 
 
 @router.get("/statuses/{id}")

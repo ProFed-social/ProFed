@@ -11,6 +11,13 @@ from profed.components.api.c2s.shared.actors import projection
 
 
 TS = datetime(2026, 1, 1, tzinfo=timezone.utc)
+ACCOUNT = {"id": "1",
+           "username": "alice",
+           "acct": "alice@example.com",
+           "display_name": "Alice",
+           "followers_count": 2,
+           "following_count": 3,
+           "statuses_count":  5}
 
 
 @pytest.fixture
@@ -25,7 +32,7 @@ def with_events(events):
     def with_events_wrapper(f):
         @wraps(f)
         async def call_with_events(*args, **kwargs):
-            message_bus.message_bus().topic("users").messages = [
+            message_bus.message_bus().topic("accounts").messages = [
                     (n+1, et, oid, TS, p)
                     for n, (et, oid, p) in enumerate(events)]
             return await f(*args, **kwargs)
@@ -33,43 +40,44 @@ def with_events(events):
     return with_events_wrapper
 
 
-@pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice", "summary": "Engineer"})])
-async def test_created_adds_full_payload(fake_storage, fake_bus):
-    await projection.handle_user_events()
+@with_events([("created", "alice", ACCOUNT)])
+async def test_created_stores_account(fake_storage, fake_bus):
+    await projection.handle_account_events()
 
-    assert fake_storage.rows["alice"] == {"name": "Alice",
-                                          "summary": "Engineer",
-                                          "username": "alice"}
+    assert fake_storage.rows["alice"] == ACCOUNT
 
 
 @pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice", "summary": "Engineer"}),
-              ("profile_edited", "alice", {"name": "Alice Updated"})])
-async def test_profile_edited_merges_keeps_other_fields(fake_storage, fake_bus):
-    await projection.handle_user_events()
+@with_events([("created", "alice", ACCOUNT),
+              ("updated", "alice", {**ACCOUNT, "display_name": "Alice Updated"})])
+async def test_updated_replaces_account(fake_storage, fake_bus):
+    await projection.handle_account_events()
 
-    assert fake_storage.rows["alice"] == {"name": "Alice Updated",
-                                          "summary": "Engineer",
-                                          "username": "alice"}
+    assert fake_storage.rows["alice"]["display_name"] == "Alice Updated"
+
+
+@with_events([("created", "alice", ACCOUNT),
+              ("followers_changed", "alice", {"count": 9})])
+async def test_followers_changed_updates_only_followers(fake_storage, fake_bus):
+    await projection.handle_account_events()
+
+    assert fake_storage.rows["alice"]["followers_count"] == 9
+    assert fake_storage.rows["alice"]["following_count"] == 3
+
+
+@with_events([("created", "alice", ACCOUNT),
+              ("statuses_changed", "alice", {"count": 7})])
+async def test_statuses_changed_updates_count(fake_storage, fake_bus):
+    await projection.handle_account_events()
+
+    assert fake_storage.rows["alice"]["statuses_count"] == 7
 
 
 @pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice",
-                                    "avatar": {"media_id": "m1", "variants": ["large"]}}),
-              ("avatar_changed", "alice", {})])
-async def test_avatar_changed_empty_clears_only_avatar(fake_storage, fake_bus):
-    await projection.handle_user_events()
-
-    assert fake_storage.rows["alice"]["avatar"] is None
-    assert fake_storage.rows["alice"]["name"] == "Alice"
-
-
-@pytest.mark.asyncio
-@with_events([("created", "alice", {"name": "Alice"}),
+@with_events([("created", "alice", ACCOUNT),
               ("deleted", "alice", {})])
-async def test_deleted_removes_user(fake_storage, fake_bus):
-    await projection.handle_user_events()
+async def test_deleted_removes_account(fake_storage, fake_bus):
+    await projection.handle_account_events()
 
     assert "alice" not in fake_storage.rows
 
