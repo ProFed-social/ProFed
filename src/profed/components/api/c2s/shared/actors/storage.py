@@ -13,14 +13,20 @@ class _storage(BaseStorage):
         await super().ensure_schema()
         await self.execute("""CREATE TABLE IF NOT EXISTS api.c2s_actor (
                               username TEXT  PRIMARY KEY,
-                              payload  JSONB NOT NULL)""")
+                              actor_id TEXT  NOT NULL UNIQUE,
+                              actor_url TEXT  NOT NULL UNIQUE,
+                              payload JSONB NOT NULL)""")
 
     async def add(self, username: str, payload: dict) -> None:
-        await self.execute("""INSERT INTO api.c2s_actor (username, payload)
-                              VALUES ($1, $2)
+        await self.execute("""INSERT INTO api.c2s_actor (username, actor_id, actor_url, payload)
+                              VALUES ($1, $2, $3, $4)
                               ON CONFLICT (username) DO UPDATE
-                                SET payload = EXCLUDED.payload""",
+                                SET actor_id = EXCLUDED.actor_id,
+                                    actor_url = EXCLUDED.actor_url,
+                                    payload = EXCLUDED.payload""",
                            username,
+                           payload["id"],
+                           payload["url"],
                            payload)
 
     async def update(self, username: str, payload: dict) -> None:
@@ -42,6 +48,19 @@ class _storage(BaseStorage):
                                    username)
         return row["payload"] if row is not None else None
 
+    async def fetch_by_id(self, account_id: str) -> Optional[Dict]:
+        row = await self.fetch_one("""SELECT payload
+                                      FROM api.c2s_actor
+                                      WHERE actor_id = $1""",
+                                   account_id)
+        return row["payload"] if row is not None else None
+
+    async def fetch_by_url(self, url: str) -> Optional[Dict]:
+        row = await self.fetch_one("""SELECT payload
+                                      FROM api.c2s_actor
+                                      WHERE actor_url = $1""",
+                                   url)
+        return row["payload"] if row is not None else None
 
 _instance: _storage | None = None
 

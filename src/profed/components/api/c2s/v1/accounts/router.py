@@ -10,7 +10,10 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
                                                                      lookup_by_acct,
                                                                      lookup_by_actor_url,
                                                                      make_account)
-from profed.components.api.c2s.shared.actors.service import resolve_actor, with_source
+from profed.components.api.c2s.shared.actors.service import (resolve_actor,
+                                                             resolve_actor_by_id,
+                                                             resolve_actor_by_url,
+                                                             with_source)
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
@@ -53,9 +56,9 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
         raise HTTPException(status_code=401, detail="invalid_token")
 
     async def _resolve_account_id(query):
-        row = await _resolve_account(query, {})
-        if row is not None:
-            return row["account_id"]
+        account = await _resolve_account(query, {})
+        if account is not None:
+            return int(account.id)
         return None
 
     resolved = {query: account_id
@@ -74,13 +77,28 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
             for query in id if query in resolved]
 
 
-async def _resolve_account(query: str, config: dict) -> dict | None:
-    return (await lookup_by_actor_url(query, config)
-            if query.startswith("https://") else
-            await lookup_by_id(int(query), config)
-            if query.isdigit() else
-            await lookup_by_acct(f"{query}@{instance_domain()}" if "@" not in query else query, config)
-            or (await lookup_by_acct(query, config) if "@" not in query else None))
+async def _resolve_local(query: str) -> Account | None:
+    if query.startswith("https://"):
+        return await resolve_actor_by_url(query)
+    if query.isdigit():
+        return await resolve_actor_by_id(query)
+    if "@" not in query or query.endswith("@" + instance_domain()):
+        return await resolve_actor(query.split("@")[0])
+    return None
+
+
+async def _resolve_account(query: str, config: dict) -> Account | None:
+    local = await _resolve_local(query)
+    if local is not None:
+        return local
+
+    raw = (await lookup_by_actor_url(query, config)
+           if query.startswith("https://") else
+           await lookup_by_id(int(query), config)
+           if query.isdigit() else
+           await lookup_by_acct(f"{query}@{instance_domain()}" if "@" not in query else query, config)
+           or (await lookup_by_acct(query, config) if "@" not in query else None))
+    return make_account(raw) if raw is not None else None
 
 
 async def _with_counts(account: Account) -> Account:
@@ -103,11 +121,11 @@ async def follow(id: str,
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
  
-    row = await _resolve_account(id, {})
-    if row is None:
+    account = await _resolve_account(id, {})
+    if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
  
-    actor_url = row["actor_url"]
+    actor_url = account.url
     follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
 
     async with message_bus().topic("activities").publish() as publish:
@@ -119,10 +137,10 @@ async def follow(id: str,
 
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type="requested",
-                      object_id=f"{acct_from_username(username)}|{row['acct']}",
+                      object_id=f"{acct_from_username(username)}|{account.acct}",
                       payload={"follow_activity_id": follow_id})
  
-    return {"id": str(row["account_id"]),
+    return {"id": account.id,
             "following": False,
             "requested": True}
 
@@ -142,11 +160,11 @@ async def featured_tags(id: str):
 async def account_statuses(id: str,
                            limit: int = Query(default=20, ge=1, le=40),
                            claims: Annotated[dict | None, Depends(current_user_optional)] = None):
-    raw = await _resolve_account(id, {})
-    if raw is None:
+    account = await _resolve_account(id, {})
+    if account is None:
         raise HTTPException(status_code=404)
 
-    account = await _with_counts(make_account(raw))
+    account = await _with_counts(account)
     return [activity_to_status(str(_ACTIVITIES_SOURCE.message_id(seq)),
                                activity,
                                {actor_url_from_username(account.username): account})
@@ -165,9 +183,9 @@ async def unfollow(id: str,
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    edge = await (await follows_storage()).get(acct_from_username(username), account["acct"])
+    edge = await (await follows_storage()).get(acct_from_username(username), account.acct)
     follow_id = ((edge or {}).get("follow_activity_id")
-                 or f"{actor_url_from_username(username)}#follows/{account['account_id']}")
+                 or f"{actor_url_from_username(username)}#follows/{account.id}")
     actor_url  = actor_url_from_username(username)
     undo_id    = f"{actor_url}#unfollows/{uuid.uuid4()}"
 
@@ -179,14 +197,14 @@ async def unfollow(id: str,
                                             "object": {"id": follow_id,
                                                        "type": "Follow",
                                                        "actor": actor_url,
-                                                       "object": account["actor_url"]}}})
+                                                       "object": account.url}}})
 
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type="deleted",
-                      object_id=f"{acct_from_username(username)}|{account['acct']}",
+                      object_id=f"{acct_from_username(username)}|{account.acct}",
                       payload={})
 
-    return {"id": str(account["account_id"]),
+    return {"id": account.id,
             "following": False,
             "requested": False}
 
@@ -194,45 +212,43 @@ async def unfollow(id: str,
 @router.get("/accounts/lookup")
 async def lookup(acct: str,
                  claims: Annotated[dict | None, Depends(current_user_optional)] = None):
-    raw = await _resolve_account(acct, {})
-    if raw is None:
+    account = await _resolve_account(acct, {})
+    if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
-    return await _with_counts(make_account(raw))
+    return await _with_counts(account)
 
 
 @router.get("/accounts/{id}")
 async def get_account(id: str,
                       claims: Annotated[dict | None, Depends(current_user_optional)] = None):
-    raw = await _resolve_account(id, {})
-    if raw is None:
+    account = await _resolve_account(id, {})
+    if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
-    return await _with_counts(make_account(raw))
+    return await _with_counts(account)
 
 
 @router.get("/accounts/{id}/followers")
 async def account_followers(id: str,
                             claims: Annotated[dict, Depends(current_user)] = None):
-    raw = await _resolve_account(id, {})
-    if raw is None:
+    account = await _resolve_account(id, {})
+    if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    return [make_account(a)
-            async for a in (await lookup_by_acct(acct)
-                            for acct in await (await follows_storage()).get_followers(raw["acct"]))
-            if a is not None]
+    return [a for a in [await _resolve_account(acct, {})
+                        for acct in await (await follows_storage()).get_followers(account.acct)]
+              if a is not None]
 
 
 @router.get("/accounts/{id}/following")
 async def account_following(id: str,
                             claims: Annotated[dict, Depends(current_user)] = None):
-    raw = await _resolve_account(id, {})
-    if raw is None:
+    account = await _resolve_account(id, {})
+    if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    return [make_account(a)
-            async for a in (await lookup_by_acct(acct)
-                            for acct in await (await follows_storage()).get_following(raw["acct"]))
-            if a is not None]
+    return [a for a in [await _resolve_account(acct, {})
+                        for acct in await (await follows_storage()).get_following(account.acct)]
+              if a is not None]
 
 
 @router.post("/accounts/{id}/block")

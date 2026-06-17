@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from profed.core.config import config, raw
 from profed.identity import account_id
 from profed.models.mastodon import Account
+from profed.components.api.c2s.shared.known_accounts.service import make_account
 from profed.components.api.c2s.v1.accounts import router as accounts_module
 from profed.components.api.c2s.shared.auth import current_user 
 from profed.core.message_bus.source_key import source_key
@@ -43,7 +44,7 @@ LOCAL_ACCOUNT = Account(id="1",
                         display_name="Alice Example",
                         note="Software engineer",
                         url="https://example.com/actors/alice")
-   
+ 
  
 @pytest.fixture
 def client():
@@ -103,7 +104,7 @@ def test_follow_by_numeric_id_publishes_events(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch.object(message_bus, "_instance", fake_bus):
             response = client.post("/accounts/123456/follow")
 
@@ -122,7 +123,7 @@ def test_follow_publishes_followers_requested(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch.object(message_bus, "_instance", fake_bus):
             client.post("/accounts/123456/follow")
 
@@ -282,7 +283,7 @@ def test_follow_publishes_follow_activity_id_consistently(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch.object(message_bus, "_instance", fake_bus):
             response = client.post("/accounts/123456/follow")
 
@@ -311,14 +312,14 @@ def test_unfollow_returns_relationship(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
              patch.object(message_bus, "_instance", fake_bus):
             response = client.post("/accounts/123456/unfollow")
 
     assert response.status_code == 200
-    assert response.json() == {"id": "123456", "following": False, "requested": False}
+    assert response.json() == {"id": account_id(ROW["acct"]), "following": False, "requested": False}
     assert fake_bus.topic("known_accounts").published == []
 
 
@@ -328,7 +329,7 @@ def test_unfollow_publishes_followers_deleted(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
              patch.object(message_bus, "_instance", fake_bus):
@@ -345,7 +346,7 @@ def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
              patch.object(message_bus, "_instance", fake_bus):
@@ -371,7 +372,7 @@ def test_unfollow_without_follow_activity_id_uses_fallback_id(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    _mock_storage_with(following_no_id)), \
              patch.object(message_bus, "_instance", fake_bus):
@@ -380,7 +381,7 @@ def test_unfollow_without_follow_activity_id_uses_fallback_id(client):
     assert response.status_code == 200
     events = fake_bus.topic("activities").published
     assert len(events) == 1
-    assert events[0]["payload"]["activity"]["object"]["id"].endswith("#follows/123456")
+    assert events[0]["payload"]["activity"]["object"]["id"].endswith(f"#follows/{account_id(ROW['acct'])}")
 
 
 def test_unfollow_unknown_account_returns_404(client):
@@ -412,7 +413,7 @@ ROW_FOLLOWING = {"account_id": 789,
 
 def test_lookup_returns_account(client):
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-               AsyncMock(return_value=ROW_FULL)):
+               AsyncMock(return_value=make_account(ROW_FULL))):
         response = client.get("/accounts/lookup?acct=bob@remote.example")
 
     assert response.status_code == 200
@@ -447,7 +448,7 @@ def test_lookup_local_account_includes_counts(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=LOCAL_ROW)), \
+                   AsyncMock(return_value=make_account(LOCAL_ROW))), \
              patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
                    _count_storage(3)), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
@@ -465,7 +466,7 @@ def test_lookup_remote_account_keeps_zero_counts(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW_FULL)):
+                   AsyncMock(return_value=make_account(ROW_FULL))):
             response = client.get("/accounts/lookup?acct=bob@remote.example")
 
     assert response.status_code == 200
@@ -485,7 +486,7 @@ def test_lookup_returns_404_when_not_found(client):
 
 def test_get_account_returns_account(client):
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-               AsyncMock(return_value=ROW_FULL)):
+               AsyncMock(return_value=make_account(ROW_FULL))):
         response = client.get("/accounts/123456")
 
     assert response.status_code == 200
@@ -504,12 +505,12 @@ def test_account_followers_returns_accounts(client):
     mock_followers = AsyncMock()
     mock_followers.get_followers = AsyncMock(return_value=["alice@other.example"])
 
+    resolved = {"123456": make_account(ROW_FULL),
+                "alice@other.example": make_account(ROW_FOLLOWING)}
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-               AsyncMock(return_value=ROW_FULL)), \
+               AsyncMock(side_effect=lambda query, _config: resolved.get(query))), \
          patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
-               AsyncMock(return_value=mock_followers)), \
-         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
-               AsyncMock(return_value=ROW_FOLLOWING)):
+               AsyncMock(return_value=mock_followers)):
         response = client.get("/accounts/123456/followers")
 
     assert response.status_code == 200
@@ -522,12 +523,11 @@ def test_account_followers_skips_unknown_followers(client):
     mock_followers = AsyncMock()
     mock_followers.get_followers = AsyncMock(return_value=["unknown@gone.example"])
 
+    resolved = {"123456": make_account(ROW_FULL)}
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-               AsyncMock(return_value=ROW_FULL)), \
+               AsyncMock(side_effect=lambda query, _config: resolved.get(query))), \
          patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
-               AsyncMock(return_value=mock_followers)), \
-         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
-               AsyncMock(return_value=None)):
+               AsyncMock(return_value=mock_followers)):
         response = client.get("/accounts/123456/followers")
 
     assert response.status_code == 200
@@ -546,12 +546,12 @@ def test_account_following_returns_accounts_for_known_user(client):
     mock_storage = AsyncMock()
     mock_storage.get_following = AsyncMock(return_value=["alice@other.example"])
 
+    resolved = {"123456": make_account(ROW_FULL),
+                "alice@other.example": make_account(ROW_FOLLOWING)}
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-               AsyncMock(return_value=ROW_FULL)), \
+               AsyncMock(side_effect=lambda query, _config: resolved.get(query))), \
          patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
-               AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
-               AsyncMock(return_value=ROW_FOLLOWING)):
+               AsyncMock(return_value=mock_storage)):
         response = client.get("/accounts/123456/following")
 
     assert response.status_code == 200
@@ -565,12 +565,11 @@ def test_account_following_skips_unresolvable_accounts(client):
     mock_storage = AsyncMock()
     mock_storage.get_following = AsyncMock(return_value=["alice@other.example"])
 
+    resolved = {"123456": make_account(ROW_FULL)}
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-               AsyncMock(return_value=ROW_FULL)), \
+               AsyncMock(side_effect=lambda query, _config: resolved.get(query))), \
          patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
-               AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
-               AsyncMock(return_value=None)):
+               AsyncMock(return_value=mock_storage)):
         response = client.get("/accounts/123456/following")
 
     assert response.status_code == 200
@@ -653,7 +652,7 @@ def test_account_statuses_anonymous_returns_list(anon_client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW_FULL)), \
+                   AsyncMock(return_value=make_account(ROW_FULL))), \
              patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
                    AsyncMock(return_value=storage_mock)):
 
@@ -672,7 +671,7 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
     storage_mock = AsyncMock(fetch=AsyncMock(return_value=[(42, activity)]))
     with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=ROW_FULL)), \
+                   AsyncMock(return_value=make_account(ROW_FULL))), \
              patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
                    AsyncMock(return_value=storage_mock)):
 

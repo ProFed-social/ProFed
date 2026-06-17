@@ -11,6 +11,19 @@ async def resolve_actor(username: str) -> Account | None:
             if payload is not None else
             None)
 
+async def resolve_actor_by_id(account_id: str) -> Account | None:
+    payload = await (await storage()).fetch_by_id(account_id)
+    if payload is None:
+        return None
+    return Account.model_validate(payload)
+
+
+async def resolve_actor_by_url(url: str) -> Account | None:
+    payload = await (await storage()).fetch_by_url(url)
+    if payload is None:
+        return None
+    return Account.model_validate(payload)
+
 
 def with_source(account: Account) -> Account:
     return account.model_copy(update={"source": {"privacy": "public",
