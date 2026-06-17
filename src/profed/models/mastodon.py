@@ -42,6 +42,7 @@ class Account(BaseModel):
 
         icon  = actor.get("icon", {}).get("url") if isinstance(actor.get("icon"), dict) else None
         image = actor.get("image", {}).get("url") if isinstance(actor.get("image"), dict) else None
+        resume = actor.get("resume")
 
         raw_created = created_at if created_at is not None else actor.get("published")
         created = (raw_created.isoformat()
@@ -60,6 +61,7 @@ class Account(BaseModel):
                    header_static=image,
                    locked=actor.get("manuallyApprovesFollowers", False),
                    bot=actor.get("type") == "Service",
+                   resume=Resume.model_validate(resume) if resume else None,
                    **({"created_at": created} if created is not None else {}))
 
 

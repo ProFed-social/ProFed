@@ -167,3 +167,20 @@ def test_from_actor_created_at_overrides_published():
  
     assert acc.created_at == "2021-06-06T00:00:00+00:00"
 
+
+def test_from_actor_maps_resume():
+    acc = Account.from_actor({"type": "Person", "resume": {"skills": [{"name": "Python"}]}},
+                             acct="bob@remote.example",
+                             url="https://remote.example/actors/bob")
+
+    assert acc.resume is not None
+    assert acc.resume.skills == [{"name": "Python"}]
+
+
+def test_from_actor_without_resume_is_none():
+    acc = Account.from_actor({"type": "Person"},
+                             acct="bob@remote.example",
+                             url="https://remote.example/actors/bob")
+
+    assert acc.resume is None
+
