@@ -10,7 +10,8 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
                                                                      lookup_by_actor_url,
                                                                      make_account,
                                                                      WEBFINGER_CACHE_TTL)
- 
+from profed.identity import account_id
+
  
 NOW   = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
 FRESH = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -161,7 +162,7 @@ ROW_BOT = {"account_id": 99,
 def test_make_account_returns_correct_fields():
     result = make_account(ROW_FULL)
 
-    assert result.id           == "123456"
+    assert result.id           == account_id(ROW_FULL["acct"])
     assert result.username     == "bob"
     assert result.acct         == "bob@remote.example"
     assert result.display_name == "Bob Example"

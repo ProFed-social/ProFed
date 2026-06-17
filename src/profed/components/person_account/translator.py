@@ -6,7 +6,7 @@ from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.core.persistence.projections import build_projection, with_sequence_id
 from profed.topics import person, followers, activities
-from profed.identity import acct_from_username, account_id, username_from_acct, domain
+from profed.identity import acct_from_username, username_from_acct, domain
 from profed.models.mastodon import Account
 from .storage import storage
 
@@ -38,14 +38,7 @@ async def _publish(event_type: str, object_id: str, payload: dict, message_id) -
 
 async def _emit_account(event_type: str, username: str, person_actor: dict, sequence_id: int) -> None:
     acct = acct_from_username(person_actor["preferredUsername"])
-    account = Account.from_actor(person_actor,
-                                 acct=acct,
-                                 account_id=account_id(acct),
-                                 url=person_actor["id"])
-
-    published = person_actor.get("published")
-    if published:
-        account.created_at = published
+    account = Account.from_actor(person_actor, acct=acct, url=person_actor["id"])
 
     store = await storage()
     account.followers_count, account.following_count = await store.count_follows(acct)

@@ -8,6 +8,7 @@ from profed.core import message_bus
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core.config import config, raw
+from profed.identity import account_id
 from profed.components.api.c2s.v1.accounts import router as accounts_module
 from profed.components.api.c2s.shared.auth import current_user 
 from profed.core.message_bus.source_key import source_key
@@ -226,7 +227,7 @@ def test_follow_requests_returns_pending_accounts(client):
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["id"] == "123456"
+    assert data[0]["id"] == account_id(ROW["acct"])
 
 
 def test_authorize_publishes_accepted_and_federates(client):
@@ -412,7 +413,7 @@ def test_lookup_returns_account(client):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["id"]       == "123456"
+    assert data["id"]       == account_id(ROW_FULL["acct"])
     assert data["username"] == "bob"
     assert data["acct"]     == "bob@remote.example"
 
@@ -484,7 +485,7 @@ def test_get_account_returns_account(client):
         response = client.get("/accounts/123456")
 
     assert response.status_code == 200
-    assert response.json()["id"] == "123456"
+    assert response.json()["id"] == account_id(ROW_FULL["acct"])
 
 
 def test_get_account_returns_404_when_not_found(client):
@@ -552,7 +553,7 @@ def test_account_following_returns_accounts_for_known_user(client):
     assert response.status_code == 200
     data = response.json()
     assert len(data)           == 1
-    assert data[0]["id"]       == "789"
+    assert data[0]["id"]       == account_id(ROW_FOLLOWING["acct"])
     assert data[0]["username"] == "alice"
 
 

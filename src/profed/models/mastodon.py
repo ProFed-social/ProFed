@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Any
 
 from .resume import Resume
+from profed.identity import account_id
 
 
 class Account(BaseModel):
@@ -35,27 +36,31 @@ class Account(BaseModel):
                    actor: dict,
                    *,
                    acct: str,
-                   account_id: str,
                    url: str,
                    created_at=None) -> "Account":
         username = acct.split("@")[0]
-        icon  = actor.get("icon") or {}
-        image = actor.get("image") or {}
-        return cls(id=account_id,
+
+        icon  = actor.get("icon", {}).get("url")
+        image = actor.get("image", {}).get("url")
+
+        raw_created = created_at if created_at is not None else actor.get("published")
+        created = (raw_created.isoformat()
+                   if hasattr(raw_created, "isoformat") else
+                   raw_created)
+
+        return cls(id=account_id(acct),
                    username=username,
                    acct=acct,
                    display_name=actor.get("name") or username,
                    note=actor.get("summary") or "",
                    url=url,
-                   avatar=icon.get("url") if isinstance(icon, dict) else None,
-                   avatar_static=icon.get("url") if isinstance(icon, dict) else None,
-                   header=image.get("url") if isinstance(image, dict) else None,
-                   header_static=image.get("url") if isinstance(image, dict) else None,
+                   avatar=icon,
+                   avatar_static=icon,
+                   header=image,
+                   header_static=image,
                    locked=actor.get("manuallyApprovesFollowers", False),
                    bot=actor.get("type") == "Service",
-                   **({"created_at": created_at.isoformat()}
-                      if hasattr(created_at, "isoformat") else
-                      {}))
+                   **({"created_at": created} if created is not None else {}))
 
 
 class Relationship(BaseModel):

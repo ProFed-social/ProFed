@@ -1,6 +1,9 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from datetime import datetime, timezone
+
+from profed.identity import account_id
 from profed.models.mastodon import (Account,
                                     Relationship,
                                     MediaAttachment,
@@ -88,10 +91,9 @@ def test_from_actor_maps_fields():
                               "icon":    {"url": "https://remote.example/avatar.png"},
                               "image":   {"url": "https://remote.example/header.png"}},
                              acct="bob@remote.example",
-                             account_id="123456",
                              url="https://remote.example/actors/bob")
  
-    assert acc.id            == "123456"
+    assert acc.id            == account_id("bob@remote.example")
     assert acc.username      == "bob"
     assert acc.acct          == "bob@remote.example"
     assert acc.display_name  == "Bob Example"
@@ -107,7 +109,6 @@ def test_from_actor_maps_fields():
 def test_from_actor_falls_back_to_username():
     acc = Account.from_actor({"type": "Person"},
                              acct="carol@other.example",
-                             account_id="42",
                              url="https://other.example/actors/carol")
  
     assert acc.display_name == "carol"
@@ -118,7 +119,6 @@ def test_from_actor_falls_back_to_username():
 def test_from_actor_handles_missing_actor():
     acc = Account.from_actor({},
                              acct="carol@other.example",
-                             account_id="42",
                              url="https://other.example/actors/carol")
  
     assert acc.display_name == "carol"
@@ -128,7 +128,6 @@ def test_from_actor_handles_missing_actor():
 def test_from_actor_sets_bot_for_service():
     acc = Account.from_actor({"type": "Service"},
                              acct="bot@example.com",
-                             account_id="99",
                              url="https://example.com/actors/bot")
  
     assert acc.bot is True
@@ -137,20 +136,34 @@ def test_from_actor_sets_bot_for_service():
 def test_from_actor_sets_locked_from_manually_approves():
     acc = Account.from_actor({"type": "Person", "manuallyApprovesFollowers": True},
                              acct="x@example.com",
-                             account_id="1",
                              url="https://example.com/actors/x")
  
     assert acc.locked is True
  
  
 def test_from_actor_sets_created_at_from_datetime():
-    from datetime import datetime, timezone
     created = datetime(2025, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
     acc = Account.from_actor({"type": "Person"},
                              acct="x@example.com",
-                             account_id="1",
                              url="https://example.com/actors/x",
                              created_at=created)
  
     assert acc.created_at == created.isoformat()
+
+
+def test_from_actor_uses_published_when_no_created_at():
+    acc = Account.from_actor({"type": "Person", "published": "2020-05-05T00:00:00+00:00"},
+                             acct="x@example.com",
+                             url="https://example.com/actors/x")
  
+    assert acc.created_at == "2020-05-05T00:00:00+00:00"
+ 
+
+def test_from_actor_created_at_overrides_published():
+    acc = Account.from_actor({"type": "Person", "published": "2020-05-05T00:00:00+00:00"},
+                             acct="x@example.com",
+                             url="https://example.com/actors/x",
+                             created_at="2021-06-06T00:00:00+00:00")
+ 
+    assert acc.created_at == "2021-06-06T00:00:00+00:00"
+

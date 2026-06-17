@@ -99,7 +99,6 @@ async def lookup_multiple(actor_urls: list[str],
 def make_account(raw: dict) -> Account:
     return Account.from_actor(raw.get("actor_data") or {},
                               acct=raw["acct"],
-                              account_id=str(raw["account_id"]),
                               url=raw["actor_url"],
                               created_at=raw.get("created_at"))
 

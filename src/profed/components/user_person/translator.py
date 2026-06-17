@@ -65,7 +65,7 @@ def _person_event_for(row, last_tick):
             return None
         return ("deleted", {})
 
-    verb   = "created" if row["created_seq"] > last_tick else "updated"
+    verb = "created" if row["created_seq"] > last_tick else "updated"
     person = Person.from_user(UserProfile.model_validate(row["profile"]),
                               published=row["published"])
 
