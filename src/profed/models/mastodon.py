@@ -40,8 +40,8 @@ class Account(BaseModel):
                    created_at=None) -> "Account":
         username = acct.split("@")[0]
 
-        icon  = actor.get("icon", {}).get("url")
-        image = actor.get("image", {}).get("url")
+        icon  = actor.get("icon", {}).get("url") if isinstance(actor.get("icon"), dict) else None
+        image = actor.get("image", {}).get("url") if isinstance(actor.get("image"), dict) else None
 
         raw_created = created_at if created_at is not None else actor.get("published")
         created = (raw_created.isoformat()
