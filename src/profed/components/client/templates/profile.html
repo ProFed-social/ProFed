@@ -29,7 +29,7 @@
     <h2>Experience</h2>
     {% for job in account.resume.experience %}
     <div class="p-experience h-event">
-      <p><span class="p-name">{{ job.name }}<span>{% if job.organization %} at <span class="p-location">{{ job.organization }}</span>{% endif %}</p>
+      <p><span class="p-name">{{ job.name }}</span>{% if job.organization %} at <span class="p-location">{{ job.organization }}</span>{% endif %}</p>
       {% if job.start or job.end %}<p class="dates">{{ job.start }}{% if job.end %} - {{ job.end }}{% endif %}</p>{% endif %}
       {% if job.description %}<p class="p-summary">{{ job.description }}</p>{% endif %}
       {% if job.url %}<a class="u-url" href="{{ job.url }}">{{ job.url }}</a>{% endif %}
