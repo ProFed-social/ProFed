@@ -154,7 +154,7 @@ a:hover { text-decoration: underline; }
 }
 .h-event > :not(.dates) { grid-column: 2; }
 .h-event .dates { grid-column: 1; grid-row: 1; margin: 0; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.h-event:has(.p-name)  { margin: 0 }
+.h-event p:has(.p-name)  { margin: 0 }
 .h-event .p-name { margin: 0; font-weight: 600; }
 .h-event .p-location { font-weight: 400; color: var(--muted); }
 .h-event .p-summary { margin: .15rem 0 0; }
