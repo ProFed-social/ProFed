@@ -159,7 +159,7 @@ a:hover { text-decoration: underline; }
 .h-event .p-summary { margin: .15rem 0 0; }
 .h-event .u-url { font-size: .9rem; word-break: break-word; }
 
-.job-projects { list-style-type: disc; padding: 0; margin: .3rem 0 0; font-size: .9rem; }
+.job-projects { list-style-type: disc; padding: 0; margin: .3rem 2rem 0; font-size: .9rem; }
 .job-projects li { color: var(--muted); }
 
 /* Skills als Chips */
