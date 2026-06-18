@@ -152,7 +152,7 @@ a:hover { text-decoration: underline; }
   align-items: start;
   margin-top: 1.1rem;
 }
-.h-event > :not(.dates) { grid-column: 2; }
+.h-event > :not(.dates) { grid-column: 2; border: 1px solid white}
 .h-event .dates { grid-column: 1; grid-row: 1; margin: 0; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .h-event p:has(.p-name)  { margin: 0 }
 .h-event .p-name { margin: 0; font-weight: 600; }
