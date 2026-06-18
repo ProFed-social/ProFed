@@ -124,7 +124,7 @@ async def test_verify_inbox_request_fetches_key_when_not_in_projection():
     mock_storage.get_by_actor_url = AsyncMock(return_value=None)
 
     with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.s2s.inbox.service.fetch_and_register_actor", AsyncMock(return_value=public_pem)):
+         patch("profed.components.api.s2s.inbox.service.fetch_and_register_actor", AsyncMock(return_value={"publicKey": {"publicKeyPem": public_pem}})):
         from profed.components.api.s2s.inbox.service import verify_inbox_request
         result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
 
@@ -142,7 +142,7 @@ async def test_verify_inbox_request_retries_with_fresh_key_on_stale_projection()
     mock_storage.get_by_actor_url = AsyncMock(return_value={"public_key_pem": old_public_pem})
 
     with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.s2s.inbox.service.fetch_and_register_actor", AsyncMock(return_value=public_pem)):
+         patch("profed.components.api.s2s.inbox.service.fetch_and_register_actor", AsyncMock(return_value={"publicKey": {"publicKeyPem": public_pem}})):
         from profed.components.api.s2s.inbox.service import verify_inbox_request
         result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
 

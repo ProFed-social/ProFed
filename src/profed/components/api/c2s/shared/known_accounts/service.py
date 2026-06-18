@@ -4,9 +4,8 @@
 import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from profed.core.message_bus import message_bus
 from profed.federation.webfinger import lookup_acct, lookup_actor_url
-from profed.federation.actors import fetch_actor
+from profed.federation.actors import fetch_and_register_actor
 from profed.identity import account_id as compute_account_id, domain
 from .storage import storage
 from profed.models.mastodon import Account
@@ -15,30 +14,15 @@ from profed.models.mastodon import Account
 WEBFINGER_CACHE_TTL = 86400
 
  
-async def _publish_discovered(account_id: int,
-                              acct: str,
-                              actor_url: str,
-                              actor_data: dict) -> None:
-    async with message_bus().topic("known_accounts").publish() as publish:
-        await publish(event_type="discovered",
-                      object_id=str(account_id),
-                      payload={"acct": acct,
-                               "actor_url": actor_url,
-                               "actor_data":  actor_data,
-                               "last_webfinger_at": datetime.now(timezone.utc).isoformat()}) 
-
- 
 async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
     actor_url = await lookup_actor_url(acct)
-    actor_data = await fetch_actor(actor_url) if actor_url is not None else None
+    actor_data = await fetch_and_register_actor(actor_url) if actor_url is not None else None
     if actor_data is None:
         return None
 
-    aid = int(compute_account_id(acct))
-    await _publish_discovered(aid, acct, actor_url, actor_data)
-    return {"account_id": aid,
-            "acct":       acct,
-            "actor_url":  actor_url,
+    return {"account_id": int(compute_account_id(acct)),
+            "acct": acct,
+            "actor_url": actor_url,
             "actor_data": actor_data}
  
  

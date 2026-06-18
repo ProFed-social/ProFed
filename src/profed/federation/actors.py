@@ -18,7 +18,7 @@ async def fetch_actor(actor_url: str) -> Optional[dict]:
         return None
 
 
-async def fetch_and_register_actor(actor_url: str) -> Optional[str]:
+async def fetch_and_register_actor(actor_url: str) -> Optional[dict]:
     actor_data = await fetch_actor(actor_url)
     if actor_data is None:
         return None
@@ -26,13 +26,15 @@ async def fetch_and_register_actor(actor_url: str) -> Optional[str]:
     acct = await lookup_acct(actor_url)
     if acct is not None:
         aid = int(compute_account_id(acct))
-        async with message_bus().topic("known_accounts").publish() as publish:
-            await publish(event_type="discovered",
-                          object_id=str(aid),
-                          payload={"acct": acct,
-                                   "actor_url": actor_url,
-                                   "actor_data": actor_data,
-                                   "last_webfinger_at": datetime.now(timezone.utc).isoformat()})
+        payload = {"acct": acct,
+                   "actor_url": actor_url,
+                   "actor_data": actor_data,
+                   "last_webfinger_at": datetime.now(timezone.utc).isoformat()}
+        async with message_bus().topic("remote_actors").publish() as publish:
+            await publish(event_type="discovered", object_id=str(aid), payload=payload)
 
-    return (actor_data.get("publicKey") or {}).get("publicKeyPem")
+        async with message_bus().topic("known_accounts").publish() as publish:
+            await publish(event_type="discovered", object_id=str(aid), payload=payload)
+
+    return actor_data
 

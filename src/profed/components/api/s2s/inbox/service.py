@@ -13,13 +13,16 @@ def _valid_activity(activity) -> bool:
             isinstance(activity.get("type"), str) and
             activity["type"] != "")
 
+def _pem_from_actor(actor: dict | None) -> str | None:
+    return (actor.get("publicKey") or {}).get("publicKeyPem") if actor else None
+
 
 async def _get_public_key_pem(actor_url: str) -> tuple[str | None, bool]:
     row = await (await public_keys_storage()).get_by_actor_url(actor_url)
 
     return ((row["public_key_pem"], True)
             if row is not None else
-            (await fetch_and_register_actor(actor_url), False))
+            (_pem_from_actor(await fetch_and_register_actor(actor_url)), False))
 
 
 async def verify_inbox_request(method:  str,
@@ -39,7 +42,7 @@ async def verify_inbox_request(method:  str,
     if not from_projection:
         return False
 
-    public_key_pem = await fetch_and_register_actor(actor_url)
+    public_key_pem = _pem_from_actor(await fetch_and_register_actor(actor_url))
     if public_key_pem is None:
         return False
 

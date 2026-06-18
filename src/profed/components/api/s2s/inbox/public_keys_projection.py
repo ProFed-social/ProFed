@@ -3,7 +3,7 @@
 
 from datetime import datetime, timezone
 from profed.core.persistence.projections import build_projection
-from profed.topics import known_accounts
+from profed.topics import remote_actors
 from .public_keys_storage import storage
 
 
@@ -45,7 +45,7 @@ async def _rebuild_finished() -> None:
 
 
 handle_user_events, rebuild, reset_last_seen = \
-        build_projection(topic=known_accounts,
+        build_projection(topic=remote_actors,
                          subscriber="s2s_inbox_public_keys",
                          init=_init,
                          rebuild_finished=_rebuild_finished,
