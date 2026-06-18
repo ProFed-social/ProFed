@@ -146,7 +146,7 @@ a:hover { text-decoration: underline; }
 }
 .h-event {
   display: grid;
-  grid-template-columns: 8rem 1fr;
+  grid-template-columns: 9rem 1fr;
   column-gap: 1.5rem;
   row-gap: .15rem;
   align-items: start;
