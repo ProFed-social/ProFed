@@ -25,7 +25,8 @@ STORED_ROW = {"account_id": ACCOUNT_ID,
               "acct": ACCT,
               "actor_url": ACTOR_URL,
               "actor_data": {"type": "Person", "name": "Alice"},
-              "last_webfinger_at": FRESH}
+              "last_webfinger_at": FRESH,
+              "created_at": "2026-01-01T00:00:00+00:00"}
 
 REMOTE_ACCT = "mallory@remote.example"
 REMOTE_ACTOR_URL = "https://remote.example/actors/mallory"
@@ -50,7 +51,7 @@ async def test_lookup_by_id_returns_fresh_row(fake_storage):
     fake_storage.get_by_id.return_value = STORED_ROW
     result = await lookup_by_id(ACCOUNT_ID)
 
-    assert result == STORED_ROW
+    assert result == make_account(STORED_ROW)
  
  
 @pytest.mark.asyncio
@@ -70,7 +71,7 @@ async def test_lookup_by_id_refreshes_stale_row(fake_storage):
         result = await lookup_by_id(ACCOUNT_ID)
 
     mock_wf.assert_awaited_once_with(REMOTE_ACCT)
-    assert result["last_webfinger_at"] == NOW
+    assert result == make_account(REMOTE_ROW)
  
  
 @pytest.mark.asyncio
@@ -78,7 +79,7 @@ async def test_lookup_by_acct_returns_fresh_row(fake_storage):
     fake_storage.get_by_acct.return_value = STORED_ROW
     result = await lookup_by_acct(ACCT)
 
-    assert result == STORED_ROW
+    assert result == make_account(STORED_ROW)
  
  
 @pytest.mark.asyncio
@@ -89,7 +90,7 @@ async def test_lookup_by_acct_does_webfinger_when_not_found(fake_storage):
         result = await lookup_by_acct(ACCT)
     mock_wf.assert_awaited_once_with(ACCT)
 
-    assert result == STORED_ROW
+    assert result == make_account(STORED_ROW)
  
  
 @pytest.mark.asyncio
@@ -97,7 +98,7 @@ async def test_lookup_by_actor_url_returns_fresh_row(fake_storage):
     fake_storage.get_by_actor_url.return_value = STORED_ROW
     result = await lookup_by_actor_url(ACTOR_URL)
 
-    assert result == STORED_ROW
+    assert result == make_account(STORED_ROW)
  
  
 @pytest.mark.asyncio
@@ -121,7 +122,7 @@ async def test_lookup_by_actor_url_returns_stale_row_when_webfinger_fails(fake_s
                AsyncMock(return_value=None)):
         result = await lookup_by_actor_url(REMOTE_ACTOR_URL)
 
-    assert result == stale_row
+    assert result == make_account(stale_row)
 
 
 @pytest.mark.asyncio
@@ -133,7 +134,7 @@ async def test_lookup_by_id_treats_local_account_as_fresh(fake_storage):
         result = await lookup_by_id(ACCOUNT_ID)
 
     mock_wf.assert_not_awaited()
-    assert result == stale_local
+    assert result == make_account(stale_local)
 
 
 ROW_FULL = {"account_id": 123456,

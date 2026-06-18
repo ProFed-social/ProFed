@@ -8,8 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from profed.identity import actor_url_from_username, acct_from_username, domain as instance_domain
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
-                                                                     lookup_by_actor_url,
-                                                                     make_account)
+                                                                     lookup_by_actor_url)
 from profed.components.api.c2s.shared.actors.service import (resolve_actor,
                                                              resolve_actor_by_id,
                                                              resolve_actor_by_url,
@@ -92,13 +91,12 @@ async def _resolve_account(query: str, config: dict) -> Account | None:
     if local is not None:
         return local
 
-    raw = (await lookup_by_actor_url(query, config)
-           if query.startswith("https://") else
-           await lookup_by_id(int(query), config)
-           if query.isdigit() else
-           await lookup_by_acct(f"{query}@{instance_domain()}" if "@" not in query else query, config)
-           or (await lookup_by_acct(query, config) if "@" not in query else None))
-    return make_account(raw) if raw is not None else None
+    return (await lookup_by_actor_url(query, config)
+            if query.startswith("https://") else
+            await lookup_by_id(int(query), config)
+            if query.isdigit() else
+            await lookup_by_acct(f"{query}@{instance_domain()}" if "@" not in query else query, config)
+            or (await lookup_by_acct(query, config) if "@" not in query else None))
 
 
 async def _with_counts(account: Account) -> Account:
@@ -295,22 +293,23 @@ async def get_follow_requests(claims: Annotated[dict, Depends(current_user)],
         raise HTTPException(status_code=401, detail="invalid_token")
 
     requests = await (await follows_storage()).follow_requests(acct_from_username(username))
-    return [make_account(a)
-            async for a in (await lookup_by_acct(row["follower"]) for row in requests[:limit])
-            if a is not None]
+    return [account
+            for account in [await lookup_by_acct(row["follower"])
+                            for row in requests[:limit]]
+            if account is not None]
 
 
 async def _federate_follow_response(username: str,
-                                    requester: dict,
+                                    requester: Account,
                                     edge: dict | None,
                                     decision: str) -> None:
-    if requester["acct"].endswith("@" + instance_domain()):
+    if requester.acct.endswith("@" + instance_domain()):
         return
 
-    follow_id = (edge or {}).get("follow_activity_id") or f"{requester['actor_url']}#follows/unknown"
+    follow_id = (edge or {}).get("follow_activity_id") or f"{requester.url}#follows/unknown"
     follow = {"id": follow_id,
               "type": "Follow",
-              "actor": requester["actor_url"],
+              "actor": requester.url,
               "object": actor_url_from_username(username)}
     activity = AcceptActivity if decision == "accepted" else RejectActivity
     response = activity(id=f"{follow_id}#{decision}/",
@@ -334,11 +333,11 @@ async def _resolve_follow_request(id: str, claims: dict, decision: str) -> Relat
         raise HTTPException(status_code=404, detail="account_not_found")
 
     me_acct = acct_from_username(username)
-    edge = await (await follows_storage()).get(requester["acct"], me_acct)
+    edge = await (await follows_storage()).get(requester.acct, me_acct)
 
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type=decision,
-                      object_id=f"{requester['acct']}|{me_acct}",
+                      object_id=f"{requester.acct}|{me_acct}",
                       payload={})
 
     await _federate_follow_response(username, requester, edge, decision)

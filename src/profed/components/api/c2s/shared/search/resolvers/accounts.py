@@ -3,7 +3,6 @@
  
 import logging
 from profed.components.api.c2s.shared.known_accounts.service import lookup_by_acct
-from profed.components.api.c2s.shared.known_accounts.service import lookup_by_acct, make_account
 from profed.models.mastodon import Account
 
 
@@ -15,8 +14,8 @@ async def resolve(q: str, resolve: bool = False, limit: int = 20) -> dict[str, A
         return {}
 
     acct = q.lstrip("@")
-    row = await lookup_by_acct(acct)
-    if row is None:
+    account = await lookup_by_acct(acct)
+    if account is None:
         return {}
-    return {"accounts": [make_account(row)]}
+    return {"accounts": [account]}
 

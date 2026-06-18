@@ -226,7 +226,7 @@ def test_follow_requests_returns_pending_accounts(client):
         with patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    AsyncMock(return_value=follows)), \
              patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
-                   AsyncMock(return_value=ROW)):
+                   AsyncMock(return_value=make_account(ROW))):
             response = client.get("/follow_requests")
 
     assert response.status_code == 200
@@ -243,7 +243,7 @@ def test_authorize_publishes_accepted_and_federates(client):
     with Cfg({"profed": {"run": "api"},
               "api": {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    AsyncMock(return_value=follows)), \
              patch.object(message_bus, "_instance", fake_bus):
@@ -265,7 +265,7 @@ def test_reject_publishes_rejected_and_federates(client):
     with Cfg({"profed": {"run": "api"},
               "api": {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
-                   AsyncMock(return_value=ROW)), \
+                   AsyncMock(return_value=make_account(ROW))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    AsyncMock(return_value=follows)), \
              patch.object(message_bus, "_instance", fake_bus):

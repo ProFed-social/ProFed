@@ -60,40 +60,42 @@ def _ttl(config):
 
  
 async def lookup_by_id(account_id: int,
-                       config: dict | None = None) -> Optional[dict]:
+                       config: dict | None = None) -> Optional[Account]:
     row = await (await storage()).get_by_id(account_id)
-    if row is not None:
-        return (row
-                if _is_fresh(row, _ttl(config)) else
-                await _do_webfinger_lookup(row["acct"]) or row)
-    return None
+    return (make_account(row
+                         if _is_fresh(row, _ttl(config)) else
+                         await _do_webfinger_lookup(row["acct"]) or row)
+            if row is not None else
+            None)
  
  
 async def lookup_by_acct(acct: str,
-                         config: dict | None = None) -> Optional[dict]:
+                         config: dict | None = None) -> Optional[Account]:
     row = await (await storage()).get_by_acct(acct)
-    return (row
-            if row is not None and _is_fresh(row, _ttl(config)) else
-            await _do_webfinger_lookup(acct))
- 
+    raw = (row
+           if row is not None and _is_fresh(row, _ttl(config)) else
+           await _do_webfinger_lookup(acct))
+    return make_account(raw) if raw is not None else None 
+
  
 async def lookup_by_actor_url(actor_url: str,
-                              config: dict | None = None) -> Optional[dict]:
+                              config: dict | None = None) -> Optional[Account]:
     row = await (await storage()).get_by_actor_url(actor_url)
     if row is not None and _is_fresh(row, _ttl(config)):
-        return row
+        return make_account(row)
 
     acct = await lookup_acct(actor_url)
-    return row if acct is None else await _do_webfinger_lookup(acct)
-
+    raw = row if acct is None else await _do_webfinger_lookup(acct)
+    return make_account(raw) if raw is not None else None
 
 
 async def lookup_multiple(actor_urls: list[str],
                           config: dict | None = None) -> dict[str, Account]:
-    raws = await asyncio.gather(*(lookup_by_actor_url(url, config) for url in actor_urls))
-    return {url: make_account(raw)
-            for url, raw in zip(actor_urls, raws)
-            if raw is not None}
+    return {u: a
+            for u, a in zip(actor_urls,
+                            await asyncio.gather(*(lookup_by_actor_url(u, config)
+                                                   for u in actor_urls)))
+            if a is not None}
 
 
 def make_account(raw: dict) -> Account:
