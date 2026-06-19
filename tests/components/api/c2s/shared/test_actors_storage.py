@@ -72,39 +72,3 @@ async def test_fetch_returns_none_when_not_found(fake_pool):
         result = await store.fetch("alice")
     assert result is None
 
-
-@pytest.mark.asyncio
-async def test_fetch_by_id_returns_payload(fake_pool):
-    store = await actors.storage()
-    async with fake_pool.acquire() as conn:
-        conn.fetchrow.return_value = {"payload": {"id": "1"}}
-        result = await store.fetch_by_id("1")
-    assert result == {"id": "1"}
-
-
-@pytest.mark.asyncio
-async def test_fetch_by_id_returns_none_when_not_found(fake_pool):
-    store = await actors.storage()
-    async with fake_pool.acquire() as conn:
-        conn.fetchrow.return_value = None
-        result = await store.fetch_by_id("1")
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_fetch_by_url_returns_payload(fake_pool):
-    store = await actors.storage()
-    async with fake_pool.acquire() as conn:
-        conn.fetchrow.return_value = {"payload": {"url": "https://example.com/actors/alice"}}
-        result = await store.fetch_by_url("https://example.com/actors/alice")
-    assert result == {"url": "https://example.com/actors/alice"}
-
-
-@pytest.mark.asyncio
-async def test_fetch_by_url_returns_none_when_not_found(fake_pool):
-    store = await actors.storage()
-    async with fake_pool.acquire() as conn:
-        conn.fetchrow.return_value = None
-        result = await store.fetch_by_url("https://example.com/actors/alice")
-    assert result is None
-

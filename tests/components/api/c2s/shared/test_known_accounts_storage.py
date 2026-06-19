@@ -100,6 +100,28 @@ async def test_get_by_actor_url_returns_row(fake_pool):
  
  
 @pytest.mark.asyncio
+async def test_update_merges_account(fake_pool):
+    store = await module.storage()
+    await store.update(1234, {"followers_count": 5})
+
+    async with fake_pool.acquire() as conn:
+        conn.execute.assert_called_once()
+        sql = conn.execute.call_args[0][0]
+        assert "UPDATE" in sql
+        assert "||" in sql
+
+
+@pytest.mark.asyncio
+async def test_delete_removes_row(fake_pool):
+    store = await module.storage()
+    await store.delete(1234)
+
+    async with fake_pool.acquire() as conn:
+        sql = conn.execute.call_args[0][0]
+        assert "DELETE" in sql
+
+
+@pytest.mark.asyncio
 async def test_storage_raises_when_not_initialized():
     backup = module._instance
     module._instance = None

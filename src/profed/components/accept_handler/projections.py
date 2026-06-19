@@ -10,18 +10,27 @@ async def _init() -> None:
     await (await storage()).ensure_schema()
  
  
-async def _discovered(object_id: str, payload: dict) -> None:
-    await (await storage()).upsert(payload["actor_url"], int(object_id))
+async def _store(payload: dict) -> None:
+    await (await storage()).upsert(payload["url"], int(payload["id"]))
 
 
-async def _discovered_snapshot(item: dict) -> None:
-    await (await storage()).upsert(item["actor_url"], item["account_id"])
- 
+async def _created(object_id: str, payload: dict) -> None:
+    await _store(payload)
+
+
+async def _updated(object_id: str, payload: dict) -> None:
+    await _store(payload)
+
+
+async def _snapshot(item: dict) -> None:
+    await _store(item)
+
  
 handle_events, rebuild, _ = \
     build_projection(topic=known_accounts,
                      subscriber="accept_handler",
                      init=_init,
-                     on_snapshot_item=_discovered_snapshot,
-                     on_message_type={"discovered": _discovered})
+                     on_snapshot_item=_snapshot,
+                     on_message_type={"created": _created,
+                                      "updated": _updated})
 

@@ -8,8 +8,8 @@ from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import narrow_deactivate_routers
 from profed.components.api.c2s.shared.known_accounts import storage as known_accounts_storage
 from profed.components.api.c2s.shared.known_accounts import projection as known_accounts_projection
-from profed.components.api.c2s.shared.known_accounts import bridge_storage as known_local_storage
-from profed.components.api.c2s.shared.known_accounts import bridge as known_local_bridge
+from profed.components.api.c2s.shared.known_accounts import local_translator as known_accounts_local
+from profed.components.api.c2s.shared.known_accounts import remote_translator as known_accounts_remote
 from profed.components.api.c2s.shared.media import storage as media_db_storage
 from profed.components.api.c2s.shared.media import projection as media_projection
 from . import oauth
@@ -34,11 +34,9 @@ def _media_projection_initializer(storage, projection, handle_events):
     return _init
 
 
-def _bridge_initializer(storage, projection, handle_events, name):
-    _projection_init = _projection_initializer(storage, projection, handle_events, name)
+def _translator_initializer(handle_events, name):
     async def _init(config: dict):
-        await init_media_storage()
-        await _projection_init(config)
+        asyncio.create_task(handle_events(), name=name)
     return _init
 
 
@@ -51,10 +49,12 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                        known_accounts_projection.handle_events,
                                                        "c2s_known_accounts")),
                               (["v1_search", "v1_accounts", "v2_search"],
-                               _bridge_initializer(known_local_storage,
-                                                   known_local_bridge,
-                                                   known_local_bridge.handle_events,
-                                                   "c2s_known_local")),
+
+                               _translator_initializer(known_accounts_local.handle_events,
+                                                       "c2s_known_accounts_local")),
+                              (["v1_search", "v1_accounts", "v2_search"],
+                               _translator_initializer(known_accounts_remote.handle_events,
+                                                       "c2s_known_accounts_remote")),
                               (["v1_media", "v2_media"],
                                _media_projection_initializer(media_db_storage,
                                                              media_projection,

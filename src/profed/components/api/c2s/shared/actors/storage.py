@@ -48,20 +48,6 @@ class _storage(BaseStorage):
                                    username)
         return row["payload"] if row is not None else None
 
-    async def fetch_by_id(self, account_id: str) -> Optional[Dict]:
-        row = await self.fetch_one("""SELECT payload
-                                      FROM api.c2s_actor
-                                      WHERE actor_id = $1""",
-                                   account_id)
-        return row["payload"] if row is not None else None
-
-    async def fetch_by_url(self, url: str) -> Optional[Dict]:
-        row = await self.fetch_one("""SELECT payload
-                                      FROM api.c2s_actor
-                                      WHERE actor_url = $1""",
-                                   url)
-        return row["payload"] if row is not None else None
-
 _instance: _storage | None = None
 
 

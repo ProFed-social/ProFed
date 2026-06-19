@@ -9,10 +9,7 @@ from profed.identity import actor_url_from_username, acct_from_username, domain 
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
                                                                      lookup_by_actor_url)
-from profed.components.api.c2s.shared.actors.service import (resolve_actor,
-                                                             resolve_actor_by_id,
-                                                             resolve_actor_by_url,
-                                                             with_source)
+from profed.components.api.c2s.shared.actors.service import resolve_actor, with_source
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
@@ -76,21 +73,7 @@ async def relationships(id: list[str] = Query(default=[], alias="id[]"),
             for query in id if query in resolved]
 
 
-async def _resolve_local(query: str) -> Account | None:
-    if query.startswith("https://"):
-        return await resolve_actor_by_url(query)
-    if query.isdigit():
-        return await resolve_actor_by_id(query)
-    if "@" not in query or query.endswith("@" + instance_domain()):
-        return await resolve_actor(query.split("@")[0])
-    return None
-
-
 async def _resolve_account(query: str, config: dict) -> Account | None:
-    local = await _resolve_local(query)
-    if local is not None:
-        return local
-
     return (await lookup_by_actor_url(query, config)
             if query.startswith("https://") else
             await lookup_by_id(int(query), config)

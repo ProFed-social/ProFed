@@ -49,6 +49,18 @@ class _Storage(BaseStorage):
                            account,
                            last_webfinger_at)
 
+    async def update(self, account_id: int, patch: dict) -> None:
+        await self.execute("""UPDATE api.known_accounts
+                              SET account = account || $2
+                              WHERE account_id = $1""",
+                           account_id,
+                           patch)
+
+    async def delete(self, account_id: int) -> None:
+        await self.execute("""DELETE FROM api.known_accounts
+                              WHERE account_id = $1""",
+                           account_id)
+
     async def get_by_id(self, account_id: int) -> Optional[dict]:
         return await self.fetch_one("""SELECT account_id,
                                               acct,

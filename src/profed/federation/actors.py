@@ -33,8 +33,5 @@ async def fetch_and_register_actor(actor_url: str) -> Optional[dict]:
         async with message_bus().topic("remote_actors").publish() as publish:
             await publish(event_type="discovered", object_id=str(aid), payload=payload)
 
-        async with message_bus().topic("known_accounts").publish() as publish:
-            await publish(event_type="discovered", object_id=str(aid), payload=payload)
-
     return actor_data
 
