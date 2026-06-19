@@ -3,7 +3,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-import profed.components.api.c2s.shared.known_accounts.local_translator as mod
+import profed.components.local_accounts.translator as mod
 
 
 def _fake_bus():

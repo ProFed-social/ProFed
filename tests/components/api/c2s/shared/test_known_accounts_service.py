@@ -3,14 +3,12 @@
  
 import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 import profed.components.api.c2s.shared.known_accounts.storage as storage_module
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
-                                                                     lookup_by_actor_url,
-                                                                     make_account,
-                                                                     WEBFINGER_CACHE_TTL)
-from profed.identity import account_id
+                                                                     lookup_by_actor_url)
+from profed.models.mastodon import Account
 
  
 NOW   = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -21,7 +19,7 @@ ACCT      = "alice@example.com"
 ACTOR_URL = "https://example.com/actors/alice"
 ACCOUNT_ID = 1234
 ACTOR_DATA = {"type": "Person", "name": "Alice", "published": "2026-01-01T00:00:00+00:00"}
-ACCOUNT = make_account({"acct": ACCT, "actor_url": ACTOR_URL, "actor_data": ACTOR_DATA})
+ACCOUNT = Account.from_actor(ACTOR_DATA, acct=ACCT, url=ACTOR_URL)
  
 STORED_ROW = {"account_id": ACCOUNT_ID,
               "acct": ACCT,
@@ -31,9 +29,8 @@ STORED_ROW = {"account_id": ACCOUNT_ID,
 
 REMOTE_ACCT = "mallory@remote.example"
 REMOTE_ACTOR_URL = "https://remote.example/actors/mallory"
-REMOTE_ACCOUNT = make_account({"acct": REMOTE_ACCT,
-                               "actor_url": REMOTE_ACTOR_URL,
-                               "actor_data": ACTOR_DATA})
+REMOTE_ACCOUNT = Account.from_actor(ACTOR_DATA, acct=REMOTE_ACCT, url=REMOTE_ACTOR_URL)
+
 REMOTE_ROW = {"account_id": ACCOUNT_ID,
               "acct": REMOTE_ACCT,
               "actor_url": REMOTE_ACTOR_URL,
@@ -141,70 +138,4 @@ async def test_lookup_by_id_treats_local_account_as_fresh(fake_storage):
 
     mock_wf.assert_not_awaited()
     assert result == ACCOUNT
-
-
-ROW_FULL = {"account_id": 123456,
-            "acct":       "bob@remote.example",
-            "actor_url":  "https://remote.example/actors/bob",
-            "actor_data": {"type":                     "Person",
-                           "name":                     "Bob Example",
-                           "summary":                  "A test user",
-                           "icon":                     {"url": "https://remote.example/avatar.png"},
-                           "image":                    {"url": "https://remote.example/header.png"},
-                           "manuallyApprovesFollowers": False}}
-
-
-ROW_MINIMAL = {"account_id": 42,
-               "acct":       "carol@other.example",
-               "actor_url":  "https://other.example/actors/carol",
-               "actor_data": {"type": "Person"}}
-
-
-ROW_BOT = {"account_id": 99,
-           "acct":       "bot@example.com",
-           "actor_url":  "https://example.com/actors/bot",
-           "actor_data": {"type": "Service"}}
-
-
-def test_make_account_returns_correct_fields():
-    result = make_account(ROW_FULL)
-
-    assert result.id           == account_id(ROW_FULL["acct"])
-    assert result.username     == "bob"
-    assert result.acct         == "bob@remote.example"
-    assert result.display_name == "Bob Example"
-    assert result.note         == "A test user"
-    assert result.url          == "https://remote.example/actors/bob"
-    assert result.avatar       == "https://remote.example/avatar.png"
-    assert result.header       == "https://remote.example/header.png"
-    assert result.locked       is False
-    assert result.bot          is False
-
-
-def test_make_account_falls_back_to_username_for_display_name():
-    result = make_account(ROW_MINIMAL)
-
-    assert result.display_name == "carol"
-
-
-def test_make_account_sets_bot_flag_for_service_type():
-    result = make_account(ROW_BOT)
-
-    assert result.bot is True
-
-
-def test_make_account_handles_missing_actor_data():
-    row    = {**ROW_MINIMAL, "actor_data": None}
-    result = make_account(row)
-
-    assert result.display_name == "carol"
-    assert result.avatar       is None
-    assert result.header       is None
-
-
-def test_make_account_sets_created_at_when_present():
-    created = datetime(2025, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
-    result  = make_account({**ROW_FULL, "created_at": created})
-
-    assert result.created_at == created.isoformat()
 

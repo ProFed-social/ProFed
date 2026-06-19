@@ -40,7 +40,7 @@ def _forwarder(event_type: str):
 
 
 handle_events, rebuild, _ = build_projection(topic=accounts,
-                                             subscriber="c2s_known_accounts_local",
+                                             subscriber="local_accounts",
                                              init=_noop,
                                              on_snapshot_item=_noop_item,
                                              on_message_type={verb: _forwarder(verb)

@@ -20,7 +20,7 @@ async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
     if actor_data is None:
         return None
 
-    return make_account({"acct": acct, "actor_url": actor_url, "actor_data": actor_data})
+    return Account.from_actor(actor_data, acct=acct, url=actor_url)
  
  
 def _is_fresh(row: dict, ttl: int) -> bool:
@@ -86,11 +86,4 @@ async def lookup_multiple(actor_urls: list[str],
                             await asyncio.gather(*(lookup_by_actor_url(u, config)
                                                    for u in actor_urls)))
             if a is not None}
-
-
-def make_account(raw: dict) -> Account:
-    return Account.from_actor(raw.get("actor_data") or {},
-                              acct=raw["acct"],
-                              url=raw["actor_url"],
-                              created_at=raw.get("created_at"))
 

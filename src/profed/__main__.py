@@ -22,6 +22,8 @@ STANDARD_COMPONENTS = ["api",
                        "user_person",
                        "person_activities",
                        "person_account",
+                       "local_accounts",
+                       "remote_accounts",
                        "activity_delivery",
                        "follow_handler",
                        "accept_handler"]

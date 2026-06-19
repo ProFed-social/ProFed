@@ -6,7 +6,7 @@ from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.core.persistence.projections import build_projection, with_sequence_id
 from profed.topics import remote_actors
-from .service import make_account
+from profed.models.mastodon import Account
 
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,11 @@ async def _noop_item(item: dict) -> None:
 
 
 async def _discovered(object_id, payload, sequence_id) -> None:
-    account = make_account(payload)
+    account = Account.from_actor(payload.get("actor_data") or {},
+                                 acct=payload["acct"],
+                                 url=payload["actor_url"],
+                                 created_at=payload.get("created_at"))
+
     async with message_bus().topic("known_accounts").publish() as publish:
         await publish(event_type="updated",
                       object_id=object_id,
@@ -31,7 +35,7 @@ async def _discovered(object_id, payload, sequence_id) -> None:
 
 
 handle_events, rebuild, _ = build_projection(topic=remote_actors,
-                                             subscriber="c2s_known_accounts_remote",
+                                             subscriber="remote_accounts",
                                              init=_noop,
                                              on_snapshot_item=_noop_item,
                                              on_message_type={"discovered": _discovered},
