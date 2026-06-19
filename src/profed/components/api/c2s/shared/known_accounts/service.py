@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from profed.federation.webfinger import lookup_acct, lookup_actor_url
 from profed.federation.actors import fetch_and_register_actor
-from profed.identity import account_id as compute_account_id, domain
+from profed.identity import domain
 from .storage import storage
 from profed.models.mastodon import Account
 
@@ -20,10 +20,7 @@ async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
     if actor_data is None:
         return None
 
-    return {"account_id": int(compute_account_id(acct)),
-            "acct": acct,
-            "actor_url": actor_url,
-            "actor_data": actor_data}
+    return make_account({"acct": acct, "actor_url": actor_url, "actor_data": actor_data})
  
  
 def _is_fresh(row: dict, ttl: int) -> bool:
@@ -39,38 +36,47 @@ def _is_fresh(row: dict, ttl: int) -> bool:
     return datetime.now(timezone.utc) - last < timedelta(seconds=ttl)
 
 
-def _ttl(config):
-    return int((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL))
+def _ttl(config: dict | None) -> int:
+    return int(((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL)
+                if config is not None else
+                WEBFINGER_CACHE_TTL)) 
 
- 
+
+def _account_from_row(row: dict) -> Account:
+    return Account.model_validate(row["account"]) 
+
+
 async def lookup_by_id(account_id: int,
                        config: dict | None = None) -> Optional[Account]:
     row = await (await storage()).get_by_id(account_id)
-    return (make_account(row
-                         if _is_fresh(row, _ttl(config)) else
-                         await _do_webfinger_lookup(row["acct"]) or row)
-            if row is not None else
-            None)
+
+    return (None
+            if row is None else
+            _account_from_row(row)
+            if _is_fresh(row, _ttl(config)) else
+            await _do_webfinger_lookup(row["acct"]) or _account_from_row(row))
  
  
 async def lookup_by_acct(acct: str,
                          config: dict | None = None) -> Optional[Account]:
     row = await (await storage()).get_by_acct(acct)
-    raw = (row
-           if row is not None and _is_fresh(row, _ttl(config)) else
-           await _do_webfinger_lookup(acct))
-    return make_account(raw) if raw is not None else None 
-
+    return (_account_from_row(row)
+            if row is not None and _is_fresh(row, _ttl(config)) else 
+            await _do_webfinger_lookup(acct))
  
+
 async def lookup_by_actor_url(actor_url: str,
                               config: dict | None = None) -> Optional[Account]:
     row = await (await storage()).get_by_actor_url(actor_url)
     if row is not None and _is_fresh(row, _ttl(config)):
-        return make_account(row)
+       return _account_from_row(row)
 
     acct = await lookup_acct(actor_url)
-    raw = row if acct is None else await _do_webfinger_lookup(acct)
-    return make_account(raw) if raw is not None else None
+    return (await _do_webfinger_lookup(acct)
+            if acct is not None else
+            _account_from_row(row)
+            if row is not None else
+            None)
 
 
 async def lookup_multiple(actor_urls: list[str],

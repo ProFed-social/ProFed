@@ -7,9 +7,10 @@ from unittest.mock import AsyncMock, Mock
 import profed.components.api.c2s.shared.known_accounts.storage as module 
  
 NOW = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
-ACTOR_DATA = {"type": "Person", "name": "Alice"}
+ACCOUNT = {"id": "1234", "acct": "alice@example.com", "username": "alice",
+           "created_at": "2026-01-01T00:00:00+00:00"} 
  
- 
+
 @pytest.fixture
 def fake_pool():
     conn = Mock()
@@ -34,13 +35,13 @@ async def test_upsert_calls_execute(fake_pool):
     store = await module.storage()
     await store.upsert(1234, "alice@example.com",
                        "https://example.com/actors/alice",
-                       ACTOR_DATA, NOW)
+                       ACCOUNT, NOW)
 
     async with fake_pool.acquire() as conn:
         conn.execute.assert_called_once()
         sql = conn.execute.call_args[0][0]
 
-        assert "known_accounts" in sql
+        assert "jsonb_set" in sql
  
  
 @pytest.mark.asyncio
@@ -50,7 +51,7 @@ async def test_get_by_id_returns_row(fake_pool):
         conn.fetchrow.return_value = {"account_id": 1234,
                                       "acct": "alice@example.com",
                                       "actor_url": "https://example.com/actors/alice",
-                                      "actor_data": ACTOR_DATA,
+                                      "actor_data": ACCOUNT,
                                       "last_webfinger_at": NOW}
         result = await store.get_by_id(1234)
 
@@ -75,7 +76,7 @@ async def test_get_by_acct_returns_row(fake_pool):
         conn.fetchrow.return_value = {"account_id": 1234,
                                       "acct": "alice@example.com",
                                       "actor_url": "https://example.com/actors/alice",
-                                      "actor_data": ACTOR_DATA,
+                                      "actor_data": ACCOUNT,
                                       "last_webfinger_at": NOW}
         result = await store.get_by_acct("alice@example.com")
 
@@ -90,7 +91,7 @@ async def test_get_by_actor_url_returns_row(fake_pool):
         conn.fetchrow.return_value = {"account_id": 1234,
                                       "acct": "alice@example.com",
                                       "actor_url": "https://example.com/actors/alice",
-                                      "actor_data": ACTOR_DATA,
+                                      "actor_data": ACCOUNT,
                                       "last_webfinger_at": NOW}
         result = await store.get_by_actor_url("https://example.com/actors/alice")
 

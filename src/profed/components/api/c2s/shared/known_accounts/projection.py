@@ -1,50 +1,35 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
  
-from datetime import datetime, timezone
+from datetime import datetime
 from profed.core.persistence.projections import build_projection
 from profed.topics import known_accounts
 from .storage import storage
+from .service import make_account
  
  
 async def _init() -> None:
     await (await storage()).ensure_schema()
 
 
-async def _store(account_id: int,
-                 acct:       str,
-                 actor_url:  str,
-                 actor_data: dict | None,
-                 last:       str | datetime,
-                 created_at: str | datetime | None = None) -> None:
+async def _store(account_id: int, payload: dict) -> None:
+    account = make_account(payload)
+    last = payload["last_webfinger_at"]
     await (await storage()).upsert(account_id,
-                                   acct,
-                                   actor_url,
-                                   actor_data,
+                                   account.acct,
+                                   account.url,
+                                   account.model_dump(),
                                    (datetime.fromisoformat(last)
                                     if isinstance(last, str) else
-                                    last),
-                                   (datetime.fromisoformat(created_at)
-                                    if isinstance(created_at, str) else
-                                    created_at))
+                                    last))
 
 
 async def _discovered(object_id: str, payload: dict) -> None:
-    await _store(int(object_id),
-                 payload["acct"],
-                 payload["actor_url"],
-                 payload.get("actor_data"),
-                 payload["last_webfinger_at"],
-                 payload.get("created_at"))
+    await _store(int(object_id), payload)
 
 
 async def _discovered_snapshot(item: dict) -> None:
-    await _store(item["account_id"],
-                 item["acct"],
-                 item["actor_url"],
-                 item.get("actor_data"),
-                 item["last_webfinger_at"],
-                 item.get("created_at"))
+    await _store(item["account_id"], item)
 
 
 async def _rebuild_finished() -> None:

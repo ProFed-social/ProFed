@@ -17,50 +17,44 @@ class _Storage(BaseStorage):
                                                   acct              TEXT        UNIQUE NOT NULL,
                                                   acct_local        TEXT        NOT NULL,
                                                   actor_url         TEXT        UNIQUE NOT NULL,
-                                                  actor_data        JSONB,
-                                                  last_webfinger_at TIMESTAMPTZ NOT NULL,
-                                                  created_at        TIMESTAMPTZ)""")
-        await self.execute("""ALTER TABLE api.known_accounts
-                              ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ""")
+                                                  account           JSONB       NOT NULL,
+                                                  last_webfinger_at TIMESTAMPTZ NOT NULL)""")
 
     async def upsert(self,
                      account_id: int,
                      acct: str,
                      actor_url: str,
-                     actor_data: dict | None,
-                     last_webfinger_at: datetime,
-                     created_at: datetime | None = None) -> None:
+                     account: dict,
+                     last_webfinger_at: datetime) -> None:
         await self.execute("""INSERT INTO
                               api.known_accounts (account_id,
                                                   acct,
                                                   acct_local,
                                                   actor_url,
-                                                  actor_data,
-                                                  last_webfinger_at,
-                                                  created_at)
-                              VALUES ($1, $2, split_part($2, '@', 1), $3, $4, $5, $6)
+                                                  account,
+                                                  last_webfinger_at)
+                              VALUES ($1, $2, split_part($2, '@', 1), $3, $4, $5)
                               ON CONFLICT (account_id) DO UPDATE
                                   SET acct              = EXCLUDED.acct,
                                       acct_local        = EXCLUDED.acct_local,
                                       actor_url         = EXCLUDED.actor_url,
-                                      actor_data        = EXCLUDED.actor_data,
-                                      last_webfinger_at = EXCLUDED.last_webfinger_at,
-                                      created_at        = COALESCE(known_accounts.created_at,
-                                                                   EXCLUDED.created_at)""",
+                                      account           = jsonb_set(EXCLUDED.account,
+                                                                    '{created_at}',
+                                                                    COALESCE(known_accounts.account -> 'created_at',
+                                                                             EXCLUDED.account -> 'created_at')),
+                                      last_webfinger_at = EXCLUDED.last_webfinger_at""",
                            account_id,
                            acct,
                            actor_url,
-                           actor_data,
-                           last_webfinger_at,
-                           created_at)
+                           account,
+                           last_webfinger_at)
 
     async def get_by_id(self, account_id: int) -> Optional[dict]:
         return await self.fetch_one("""SELECT account_id,
                                               acct,
                                               actor_url,
-                                              actor_data,
-                                              last_webfinger_at,
-                                              created_at
+                                              account,
+                                              last_webfinger_at
                                         FROM api.known_accounts
                                         WHERE account_id = $1""",
                                     account_id)
@@ -69,9 +63,8 @@ class _Storage(BaseStorage):
         return await self.fetch_one("""SELECT account_id,
                                               acct,
                                               actor_url,
-                                              actor_data,
-                                              last_webfinger_at,
-                                              created_at
+                                              account,
+                                              last_webfinger_at
                                        FROM api.known_accounts
                                        WHERE acct = $1 OR acct_local = $1""",
                                     acct)
@@ -80,9 +73,8 @@ class _Storage(BaseStorage):
         return await self.fetch_one("""SELECT account_id,
                                               acct,
                                               actor_url,
-                                              actor_data,
-                                              last_webfinger_at,
-                                              created_at
+                                              account,
+                                              last_webfinger_at
                                        FROM api.known_accounts
                                        WHERE actor_url = $1""",
                                     actor_url)
