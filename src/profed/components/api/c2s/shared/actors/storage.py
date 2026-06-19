@@ -13,20 +13,14 @@ class _storage(BaseStorage):
         await super().ensure_schema()
         await self.execute("""CREATE TABLE IF NOT EXISTS api.c2s_actor (
                               username TEXT  PRIMARY KEY,
-                              actor_id TEXT  NOT NULL UNIQUE,
-                              actor_url TEXT  NOT NULL UNIQUE,
                               payload JSONB NOT NULL)""")
 
     async def add(self, username: str, payload: dict) -> None:
-        await self.execute("""INSERT INTO api.c2s_actor (username, actor_id, actor_url, payload)
-                              VALUES ($1, $2, $3, $4)
+        await self.execute("""INSERT INTO api.c2s_actor (username, payload)
+                              VALUES ($1, $2)
                               ON CONFLICT (username) DO UPDATE
-                                SET actor_id = EXCLUDED.actor_id,
-                                    actor_url = EXCLUDED.actor_url,
-                                    payload = EXCLUDED.payload""",
+                                SET payload = EXCLUDED.payload""",
                            username,
-                           payload["id"],
-                           payload["url"],
                            payload)
 
     async def update(self, username: str, payload: dict) -> None:

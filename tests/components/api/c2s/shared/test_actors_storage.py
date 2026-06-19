@@ -35,9 +35,10 @@ async def test_add_inserts_row(fake_pool):
         conn.execute.assert_called_once()
         args = conn.execute.call_args[0]
         assert "c2s_actor" in args[0]
-        assert args[2] == "1"
-        assert args[3] == "https://example.com/actors/alice"
- 
+        assert args[1] == "alice"
+        assert args[2] == {"id":  "1",
+                           "url": "https://example.com/actors/alice",
+                           "name": "Alice"} 
  
 @pytest.mark.asyncio
 async def test_update_updates_row(fake_pool):
