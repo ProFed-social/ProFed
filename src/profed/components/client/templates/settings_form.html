@@ -1,0 +1,22 @@
+<form id="settings-form" class="settings-form" hx-post="/settings" hx-swap="outerHTML">
+  {% if saved %}<p class="form-status saved" role="status">Settings saved.</p>{% endif %}
+  {% if error %}<p class="form-status error" role="alert">{{ error }}</p>{% endif %}
+  <label class="field">
+    <span class="field-label">Default post visibility</span>
+    <select name="visibility">
+      {% for option in visibilities %}
+      <option value="{{ option }}"{% if values.visibility == option %} selected{% endif %}>{{ option }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="field checkbox">
+    <input type="checkbox" name="sensitive"{% if values.sensitive %} checked{% endif %}>
+    <span class="field-label">Mark media as sensitive by default</span>
+  </label>
+  <label class="field">
+    <span class="field-label">Default posting language</span>
+    <input type="text" name="language" value="{{ values.language }}" maxlength="10" placeholder="e.g. en">
+  </label>
+  <button type="submit">Save</button>
+</form>
+
