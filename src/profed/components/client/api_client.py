@@ -36,11 +36,21 @@ class ApiClient:
                 if self._force_external or not self._is_local(method, path) else
                 self._local)
 
-    async def request(self, method, path, **kwargs):
+
+    async def request(self, method, path, token=None, **kwargs):
+        if token is not None:
+            kwargs["headers"] = {**kwargs.get("headers", {}),
+                                 "Authorization": f"Bearer {token}"}
         return await self._select(method, path).request(method, path, **kwargs)
 
     async def get(self, path, **kwargs):
         return await self.request("GET", path, **kwargs)
+
+    async def post(self, path, **kwargs):
+        return await self.request("POST", path, **kwargs)
+
+    async def patch(self, path, **kwargs):
+        return await self.request("PATCH", path, **kwargs)
 
 
 def bind(app):

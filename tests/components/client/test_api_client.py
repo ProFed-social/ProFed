@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pytest import raises
 
 from profed.__main__ import _ProxyAuthMiddleware
@@ -81,4 +81,47 @@ def test_api_client_is_built_after_bind_and_resettable(monkeypatch):
     mod._reset_api_client()
     with raises(RuntimeError):
         mod.api_client()
+
+
+async def test_post_and_patch_reach_their_methods():
+    app = FastAPI()
+
+    @app.post("/x")
+    async def post_x():
+        return {"method": "post"}
+
+    @app.patch("/x")
+    async def patch_x():
+        return {"method": "patch"}
+
+    client = ApiClient(app, "https://example.test", "", False)
+
+    assert (await client.post("/x")).json()["method"] == "post"
+    assert (await client.patch("/x")).json()["method"] == "patch"
+
+
+async def test_token_adds_bearer_authorization_header():
+    app = FastAPI()
+
+    @app.get("/echo")
+    async def echo(request: Request):
+        return {"authorization": request.headers.get("authorization")}
+
+    client = ApiClient(app, "https://example.test", "", False)
+    response = await client.get("/echo", token="tok-123")
+
+    assert response.json()["authorization"] == "Bearer tok-123"
+
+
+async def test_request_without_token_sends_no_authorization():
+    app = FastAPI()
+
+    @app.get("/echo")
+    async def echo(request: Request):
+        return {"authorization": request.headers.get("authorization")}
+
+    client = ApiClient(app, "https://example.test", "", False)
+    response = await client.get("/echo")
+
+    assert response.json()["authorization"] is None
 
