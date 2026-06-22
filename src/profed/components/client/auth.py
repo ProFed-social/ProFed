@@ -82,7 +82,7 @@ async def _access_token(code: str, client_id: str, client_secret: str):
     if token_response.status_code != 200:
         logger.warning("token exchange failed: %s %s", token_response.status_code, token_response.text)
         raise HTTPException(status_code=502, detail="token_exchange_failed")
-    return  token_response.json()["access_token"]
+    return token_response.json()["access_token"]
 
 
 async def _username(access_token: str):
