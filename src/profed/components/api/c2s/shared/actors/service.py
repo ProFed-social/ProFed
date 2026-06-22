@@ -11,11 +11,3 @@ async def resolve_actor(username: str) -> Account | None:
             if payload is not None else
             None)
 
-
-def with_source(account: Account) -> Account:
-    return account.model_copy(update={"source": {"privacy": "public",
-                                                 "sensitive": False,
-                                                 "language": None,
-                                                 "note": account.note or "",
-                                                 "fields": []}})
-

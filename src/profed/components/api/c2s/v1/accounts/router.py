@@ -4,20 +4,23 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from profed.identity import actor_url_from_username, acct_from_username, domain as instance_domain
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
                                                                      lookup_by_actor_url)
-from profed.components.api.c2s.shared.actors.service import resolve_actor, with_source
+from profed.components.api.c2s.v1.accounts.credentials.service import credential_account
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
 from profed.models.activity_pub import AcceptActivity, RejectActivity
 from profed.components.api.c2s.v1.accounts.follows.storage import storage as follows_storage
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
+from profed.components.api.c2s.v1.accounts.preferences.storage import storage as preferences_storage
 from profed.components.api.c2s.shared.statuses import activity_to_status
 from profed.core.message_bus.source_key import source_key
+from profed.languages import is_supported
+from profed.topics.preferences_topic import PRIVACY_VALUES
 
 
 _ACTIVITIES_SOURCE = source_key("activities")
@@ -37,12 +40,11 @@ async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
 
-    account = await resolve_actor(username)
+    account = await credential_account(username)
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    return with_source(account)
- 
+    return account
  
 @router.get("/accounts/relationships")
 async def relationships(id: list[str] = Query(default=[], alias="id[]"),
@@ -342,20 +344,52 @@ async def reject_follow_request(id: str,
 
 @router.get("/preferences")
 async def get_preferences(claims: Annotated[dict, Depends(current_user)]):
-    return {"posting:default:visibility": "public",
-            "posting:default:sensitive":   False,
-            "posting:default:language":    None,
-            "reading:expand:media":        "default",
-            "reading:expand:spoilers":     False}
+    username = claims.get("preferred_username") or claims.get("sub")
+    prefs = await (await preferences_storage()).get(username)
+    return {"posting:default:visibility": prefs["privacy"],
+            "posting:default:sensitive": prefs["sensitive"],
+            "posting:default:language": prefs["language"],
+            "reading:expand:media": "default",
+            "reading:expand:spoilers": False}
+
+
+def _preferences_delta(form) -> dict:
+    delta = {}
+
+    privacy = form.get("source[privacy]")
+    if privacy is not None:
+        if privacy not in PRIVACY_VALUES:
+            raise HTTPException(status_code=422, detail="invalid_privacy")
+        delta["privacy"] = privacy
+
+    sensitive = form.get("source[sensitive]")
+    if sensitive is not None:
+        delta["sensitive"] = str(sensitive).lower() in ("true", "1", "on", "yes")
+
+    language = form.get("source[language]")
+    if language:
+        if not is_supported(language):
+            raise HTTPException(status_code=422, detail="invalid_language")
+        delta["language"] = language
+
+    return delta
 
 
 @router.patch("/accounts/update_credentials")
-async def update_credentials(claims: Annotated[dict, Depends(current_user)]):
-    account = await resolve_actor(claims.get("preferred_username") or
-                                  claims.get("sub"))
+async def update_credentials(request: Request,
+                             claims: Annotated[dict, Depends(current_user)]):
+    username = claims.get("preferred_username") or claims.get("sub")
+    account = await credential_account(username)
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
-    return with_source(account)
+
+    delta = _preferences_delta(await request.form())
+    if delta:
+        async with message_bus().topic("preferences").publish() as publish:
+            await publish(event_type="updated", object_id=username, payload=delta)
+        account = account.model_copy(update={"source": {**(account.source or {}), **delta}})
+
+    return account
 
 
 @router.get("/featured_tags")

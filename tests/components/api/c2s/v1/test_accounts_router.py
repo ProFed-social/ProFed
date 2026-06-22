@@ -43,6 +43,13 @@ LOCAL_ACCOUNT = Account(id="1",
                         display_name="Alice Example",
                         note="Software engineer",
                         url="https://example.com/actors/alice")
+
+CRED_ACCOUNT = LOCAL_ACCOUNT.model_copy(update={"source": {"privacy": "public",
+                                                           "sensitive": False,
+                                                           "language": "en",
+                                                           "note": "Software engineer",
+                                                           "fields": [],
+                                                           "follow_requests_count": 0}})
  
  
 @pytest.fixture
@@ -65,7 +72,7 @@ def anon_client():
 def test_verify_credentials_returns_account(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.api.c2s.v1.accounts.router.resolve_actor",
+        with patch("profed.components.api.c2s.v1.accounts.router.credential_account",
                    new=AsyncMock(return_value=LOCAL_ACCOUNT)):
             response = client.get("/accounts/verify_credentials")
 
@@ -80,7 +87,7 @@ def test_verify_credentials_returns_account(client):
 def test_verify_credentials_unknown_actor_returns_404(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
-        with patch("profed.components.api.c2s.v1.accounts.router.resolve_actor",
+        with patch("profed.components.api.c2s.v1.accounts.router.credential_account",
                    new=AsyncMock(return_value=None)):
             response = client.get("/accounts/verify_credentials")
     assert response.status_code == 404
@@ -660,18 +667,58 @@ def test_get_mutes_returns_empty_list(client):
 
 
 def test_get_preferences_returns_defaults(client):
-    response = client.get("/preferences")
+    with patch("profed.components.api.c2s.v1.accounts.router.preferences_storage",
+               _mock_storage_with({"privacy": "public",
+                                   "sensitive": False,
+                                   "language": "en"})):
+        response = client.get("/preferences") 
+
     assert response.status_code == 200
     assert response.json()["posting:default:visibility"] == "public"
+    assert response.json()["posting:default:language"] == "en"
 
 
 def test_update_credentials_returns_account(client):
-    with patch("profed.components.api.c2s.v1.accounts.router.resolve_actor",
+    with patch("profed.components.api.c2s.v1.accounts.router.credential_account",
                AsyncMock(return_value=LOCAL_ACCOUNT)):
         response = client.patch("/accounts/update_credentials")
 
     assert response.status_code == 200
     assert response.json()["username"] == "alice"
+
+
+def test_update_credentials_publishes_preferences(client):
+    fake_bus = FakeMessageBus()
+
+    with patch("profed.components.api.c2s.v1.accounts.router.credential_account",
+               AsyncMock(return_value=CRED_ACCOUNT)), \
+         patch.object(message_bus, "_instance", fake_bus):
+        response = client.patch("/accounts/update_credentials",
+                                data={"source[privacy]": "private",
+                                      "source[sensitive]": "true",
+                                      "source[language]": "de"})
+
+    assert response.status_code == 200
+    events = fake_bus.topic("preferences").published
+    assert len(events) == 1
+    assert events[0]["event_type"] == "updated"
+    assert events[0]["object_id"] == "alice"
+    assert events[0]["payload"] == {"privacy": "private",
+                                    "sensitive": True,
+                                    "language": "de"}
+    source = response.json()["source"]
+    assert source["privacy"] == "private"
+    assert source["sensitive"] is True
+    assert source["language"] == "de"
+
+
+def test_update_credentials_rejects_invalid_privacy(client):
+    with patch("profed.components.api.c2s.v1.accounts.router.credential_account",
+               AsyncMock(return_value=CRED_ACCOUNT)):
+        response = client.patch("/accounts/update_credentials",
+                                data={"source[privacy]": "loud"})
+
+    assert response.status_code == 422
 
 
 def test_get_featured_tags_returns_empty_list(client):

@@ -23,6 +23,8 @@ from .lists         import router as lists
 from .markers       import router as markers
 from .accounts.follows import storage as follows_storage
 from .accounts.follows import projection as follows_projection
+from .accounts.preferences import storage as preferences_storage
+from .accounts.preferences import projection as preferences_projection
 from .accounts.statuses import storage as user_statuses_storage
 from .accounts.statuses import projection as user_statuses_projection
 
@@ -56,6 +58,11 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       follows_projection,
                                                       follows_projection.handle_events,
                                                       "c2s_v1_follows")),
+                             (["accounts"],
+                              _projection_initializer(preferences_storage,
+                                                      preferences_projection,
+                                                      preferences_projection.handle_events,
+                                                      "c2s_v1_preferences")),
                              (["accounts"],
                                _projection_initializer(user_statuses_storage,
                                                       user_statuses_projection,
