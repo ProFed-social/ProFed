@@ -4,6 +4,7 @@
 import os
 from profed.core.config import config, raw
 from profed.components.api.c2s.shared.instance import build_common_response
+from profed.languages import supported
  
  
 class Cfg:
@@ -39,3 +40,11 @@ def test_build_common_response_default_title_is_domain():
     with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
         result = build_common_response({}, "example.com", 5000)
     assert result["title"] == "example.com"
+
+
+def test_build_common_response_languages_is_the_supported_set():
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        result = build_common_response({}, "example.com", 5000)
+    assert result["languages"] == sorted(supported())
+    assert "en" in result["languages"]
+

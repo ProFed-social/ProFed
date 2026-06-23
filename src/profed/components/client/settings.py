@@ -71,11 +71,17 @@ async def update_settings(request: Request, session):
     response = await api_client().patch("/api/v1/accounts/update_credentials",
                                         token=session["token"],
                                         data=_credentials_payload(submitted))
+
+    languages = await _languages()
     if response.status_code == 200:
         return HTMLResponse(_render("settings_form.html",
                                     _values_from_source(response.json()["source"]),
+                                    languages,
                                     saved=True))
 
-    return HTMLResponse(_render("settings_form.html", submitted, error="Could not save settings."),
+    return HTMLResponse(_render("settings_form.html",
+                                submitted,
+                                languages,
+                                error="Could not save settings."),
                         status_code=response.status_code)
 

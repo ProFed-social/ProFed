@@ -82,12 +82,12 @@ def requires_login(f):
 async def login(request: Request):
     cfg = config().get("client", {})
     state = secrets.token_urlsafe(16)
-    response = RedirectResponse(f"/oauth/authorize?{urlencode({'response_type': 'code',
-                                                               'client_id': cfg['client_id'],
-                                                               'redirect_uri': f'https://{domain()}/auth/callback',
-                                                               'scope': cfg['scope'],
-                                                               'state': state})}",
-                                status_code=302)
+    params = urlencode({'response_type': 'code',
+                        'client_id': cfg['client_id'],
+                        'redirect_uri': f'https://{domain()}/auth/callback',
+                        'scope': cfg['scope'],
+                        'state': state})
+    response = RedirectResponse(f"/oauth/authorize?{params}", status_code=302)
     response.set_cookie(STATE_COOKIE,
                         state,
                         max_age=STATE_TTL,
