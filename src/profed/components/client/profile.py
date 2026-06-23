@@ -3,10 +3,11 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .api_client import api_client
+from .auth import page_context
 from .templating import environment
 
 logger = logging.getLogger(__name__)
@@ -33,10 +34,12 @@ async def _account_statuses(account_id):
 
 
 @router.get("/@{handle}", response_class=HTMLResponse)
-async def profile(handle: str):
+async def profile(request: Request, handle: str):
     account = await _account_from_handle(handle)
     statuses = await _account_statuses(account["id"]) 
     template = environment().get_template("profile.html")
 
-    return HTMLResponse(template.render(account=account, statuses=statuses))
+    return HTMLResponse(template.render(account=account,
+                                        statuses=statuses,
+                                        **(await page_context(request))))
 

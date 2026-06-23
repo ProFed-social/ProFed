@@ -141,3 +141,17 @@ def test_status_fragment_author_block_is_optional():
     assert "@bob@remote.tld" in shown and "https://remote.tld/@bob" in shown
     assert "Bob" not in template.render(status=status, show_author=False)
 
+
+def test_masthead_nav_reflects_login_state():
+    template = _ENV.get_template("base.html")
+
+    out = template.render(current_username="alice")
+
+    assert "/@alice" in out and "/settings" in out and "/logout" in out
+    assert "/login" not in out
+
+    anon = template.render()
+
+    assert "/login" in anon
+    assert "/settings" not in anon and "/logout" not in anon
+

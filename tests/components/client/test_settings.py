@@ -99,6 +99,7 @@ async def test_settings_renders_form_with_current_preferences(monkeypatch):
     assert '<option value="unlisted" selected' in body
     assert 'name="language"' in body and '<option value="de" selected' in body
     assert client.calls[0][1]["token"] == "tok"
+    assert "/logout" in body             
 
 
 async def test_update_settings_patches_credentials_and_marks_saved(monkeypatch):

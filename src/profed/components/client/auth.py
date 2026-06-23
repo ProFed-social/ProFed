@@ -53,6 +53,10 @@ async def current_user(request: Request):
     return session
 
 
+async def page_context(request):
+    return {"current_username": (await current_user_optional(request) or {}).get("username")}
+
+
 def _login_response(request):
     target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
     url = "/login?" + urlencode({"next": _safe_next(target)})

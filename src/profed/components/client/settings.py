@@ -46,12 +46,13 @@ async def _languages():
     return response.json().get("languages", []) if response.status_code == 200 else []
 
 
-def _render(name, values, languages, saved=False, error=None):
+def _render(name, values, languages, saved=False, error=None, current_username=None):
     return environment().get_template(name).render(values=values,
                                                    visibilities=VISIBILITIES,
                                                    languages=languages,
                                                    saved=saved,
-                                                   error=error)
+                                                   error=error,
+                                                   current_username=current_username)
 
 
 @router.get("/settings")
@@ -61,7 +62,8 @@ async def settings(request: Request, session):
     preferences.raise_for_status()
     return HTMLResponse(_render("settings.html",
                                 _values_from_preferences(preferences.json()),
-                                await _languages()))
+                                await _languages(),
+                                current_username=session.get("username")))
 
 
 @router.post("/settings")

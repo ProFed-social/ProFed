@@ -51,6 +51,10 @@ a:hover { text-decoration: underline; }
 
 /* Kopfzeile mit Logo */
 .masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   max-width: var(--col);
   margin-inline: auto;
   padding: 1rem 1.25rem;
@@ -64,12 +68,21 @@ a:hover { text-decoration: underline; }
 .masthead-brand:hover { text-decoration: none; }
 .masthead-logo { width: 28px; height: 28px; }
 .masthead-name { font-weight: 700; letter-spacing: -.01em; }
+.masthead-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
 
-/* Profil-Spalte */
-.profile {
+/* Zentrierte Inhaltsspalte */
+.column {
   max-width: var(--col);
   margin-inline: auto;
-  padding: 0 1.25rem 4rem;
+  padding-inline: 1.25rem;
+}
+/* Profil-Spalte */
+.profile {
+  padding-bottom: 4rem;
   container-type: inline-size;
 }
 .header {
