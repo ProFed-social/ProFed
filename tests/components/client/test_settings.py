@@ -67,6 +67,10 @@ def _credential_account(privacy="private", sensitive=True, language="en"):
     return {"source": {"privacy": privacy, "sensitive": sensitive, "language": language}}
 
 
+def _instance():
+    return _resp(200, json={"languages": ["de", "en", "fr"]})
+
+
 async def _fetch(app, method, path, **kwargs):
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="https://test.local") as client:
@@ -83,7 +87,8 @@ async def test_settings_redirects_to_login_without_session(monkeypatch):
 
 async def test_settings_renders_form_with_current_preferences(monkeypatch):
     app, client = _app(monkeypatch,
-                       {"preferences": _resp(200, json=_preferences())},
+                       {"preferences": _resp(200, json=_preferences()),
+                        "instance": _instance()},
                        {"username": "alice", "token": "tok"})
 
     response = await _fetch(app, "GET", "/settings")
@@ -92,7 +97,7 @@ async def test_settings_renders_form_with_current_preferences(monkeypatch):
     body = response.text
     assert 'name="visibility"' in body
     assert '<option value="unlisted" selected' in body
-    assert 'name="language"' in body and 'value="de"' in body
+    assert 'name="language"' in body and '<option value="de" selected' in body
     assert client.calls[0][1]["token"] == "tok"
 
 
@@ -100,7 +105,8 @@ async def test_update_settings_patches_credentials_and_marks_saved(monkeypatch):
     app, client = _app(monkeypatch,
                        {"update_credentials": _resp(200, json=_credential_account(privacy="public",
                                                                                   sensitive=False,
-                                                                                  language="fr"))},
+                                                                                  language="fr")),
+                        "instance": _instance()},
                        {"username": "alice", "token": "tok"})
 
     response = await _fetch(app, "POST", "/settings",
@@ -110,7 +116,8 @@ async def test_update_settings_patches_credentials_and_marks_saved(monkeypatch):
     body = response.text
     assert "Settings saved." in body
     assert '<option value="public" selected' in body
-    assert 'value="fr"' in body
+    assert '<option value="fr" selected' in body
+
     payload = client.calls[0][1]["data"]
     assert payload["source[privacy]"] == "public"
     assert payload["source[sensitive]"] == "false"
@@ -119,7 +126,8 @@ async def test_update_settings_patches_credentials_and_marks_saved(monkeypatch):
 
 async def test_update_settings_sends_sensitive_true_when_checked(monkeypatch):
     app, client = _app(monkeypatch,
-                       {"update_credentials": _resp(200, json=_credential_account())},
+                       {"update_credentials": _resp(200, json=_credential_account()),
+                        "instance": _instance()},
                        {"username": "alice", "token": "tok"})
 
     await _fetch(app, "POST", "/settings",
@@ -130,16 +138,18 @@ async def test_update_settings_sends_sensitive_true_when_checked(monkeypatch):
 
 async def test_update_settings_reports_validation_error(monkeypatch):
     app, _ = _app(monkeypatch,
-                  {"update_credentials": _resp(422, json={"error": "bad language"})},
+                  {"update_credentials": _resp(422, json={"error": "bad language"}),
+                   "instance": _instance()},
                   {"username": "alice", "token": "tok"})
 
     response = await _fetch(app, "POST", "/settings",
-                            data={"visibility": "public", "language": "xx"})
+                            data={"visibility": "public", "language": "de"})
 
     assert response.status_code == 422
     body = response.text
     assert "Could not save settings." in body
-    assert 'value="xx"' in body
+    assert '<option value="public" selected' in body
+    assert '<option value="de" selected' in body
 
 
 async def test_update_settings_redirects_via_htmx_without_session(monkeypatch):

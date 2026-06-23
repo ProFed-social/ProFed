@@ -15,7 +15,11 @@
   </label>
   <label class="field">
     <span class="field-label">Default posting language</span>
-    <input type="text" name="language" value="{{ values.language }}" maxlength="10" placeholder="e.g. en">
+    <select name="language">
+      {% for code in languages %}
+      <option value="{{ code }}"{% if values.language == code %} selected{% endif %}>{{ code }}</option>
+      {% endfor %}
+    </select>
   </label>
   <button type="submit">Save</button>
 </form>

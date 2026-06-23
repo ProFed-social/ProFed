@@ -41,9 +41,15 @@ def _credentials_payload(values):
             "source[language]": values["language"]}
 
 
-def _render(name, values, saved=False, error=None):
+async def _languages():
+    response = await api_client().get("/api/v2/instance")
+    return response.json().get("languages", []) if response.status_code == 200 else []
+
+
+def _render(name, values, languages, saved=False, error=None):
     return environment().get_template(name).render(values=values,
                                                    visibilities=VISIBILITIES,
+                                                   languages=languages,
                                                    saved=saved,
                                                    error=error)
 
@@ -53,7 +59,9 @@ def _render(name, values, saved=False, error=None):
 async def settings(request: Request, session):
     preferences = await api_client().get("/api/v1/preferences", token=session["token"])
     preferences.raise_for_status()
-    return HTMLResponse(_render("settings.html", _values_from_preferences(preferences.json())))
+    return HTMLResponse(_render("settings.html",
+                                _values_from_preferences(preferences.json()),
+                                await _languages()))
 
 
 @router.post("/settings")
