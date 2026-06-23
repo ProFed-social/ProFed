@@ -52,7 +52,7 @@ class _Storage(BaseStorage):
         await self.execute("""INSERT INTO api.preferences (username, privacy, sensitive, language)
                               VALUES ($1,
                                       COALESCE($2::api.privacy_values, $5::api.privacy_values),
-                                      COALESCE($3, $6),
+                                      COALESCE($3::boolean, $6::boolean),
                                       COALESCE($4, $7))
                               ON CONFLICT (username) DO UPDATE
                                   SET privacy = COALESCE($2::api.privacy_values,
