@@ -41,6 +41,14 @@ def _safe_next(target):
             "/")
 
 
+def _full_path(request):
+    return request.url.path + (f"?{request.url.query}" if request.url.query else "")
+
+
+def _login_url(request):
+    return "/login?" + urlencode({"next": _safe_next(_full_path(request))})
+
+
 async def current_user_optional(request: Request):
     sid = request.cookies.get(SESSION_COOKIE)
     return None if sid is None else await key_value_store().get(_session_key(sid))
@@ -54,15 +62,13 @@ async def current_user(request: Request):
 
 
 async def page_context(request):
-    return {"current_username": (await current_user_optional(request) or {}).get("username")}
-
+    return {"current_username": (await current_user_optional(request) or {}).get("username"),
+            "login_url": _login_url(request)}
 
 def _login_response(request):
-    target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
-    url = "/login?" + urlencode({"next": _safe_next(target)})
-    if request.method == "GET":
-        return RedirectResponse(url, status_code=303)
-    return Response(status_code=401, headers={"HX-Redirect": url})
+    return (RedirectResponse(_login_url(request), status_code=303)
+            if request.method == "GET" else
+            Response(status_code=401, headers={"HX-Redirect": _login_url(request)}))
 
 
 def requires_login(f):

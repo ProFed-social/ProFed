@@ -143,15 +143,16 @@ def test_status_fragment_author_block_is_optional():
 
 
 def test_masthead_nav_when_logged_in():
-    out = _ENV.get_template("base.html").render(current_username="alice")
-
-    assert "/@alice" in out and "/settings" in out and "/logout" in out
-    assert "/login" not in out
-
+    out = _ENV.get_template("base.html").render(current_username="alice",
+                                                login_url="/login?next=%2F%40alice")
+    assert '<a href="/@alice">My profile</a>' in out
+    assert "/settings" in out and "/logout" in out
+    assert ">Login</a>" not in out and "/login?next=" not in out
 
 def test_masthead_nav_when_logged_out():
-    out = _ENV.get_template("base.html").render()
-
-    assert "/login" in out
+    out = _ENV.get_template("base.html").render(current_username=None,
+                                                login_url="/login?next=%2F%40bob")
+    assert '<a href="/login?next=%2F%40bob">Login</a>' in out
+    assert "My profile" not in out
     assert "/settings" not in out and "/logout" not in out
 

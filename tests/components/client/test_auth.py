@@ -245,3 +245,29 @@ def test_requires_login_passes_session_to_handler():
     assert response.status_code == 200
     assert response.json() == "alice"
 
+
+async def test_page_context_anonymous_carries_login_url_with_current_path():
+    request = MagicMock()
+    request.cookies = {}
+    request.url.path = "/@christof"
+    request.url.query = ""
+
+    ctx = await auth.page_context(request)
+
+    assert ctx["current_username"] is None
+    assert ctx["login_url"] == "/login?next=%2F%40christof"
+
+
+async def test_page_context_reports_logged_in_username():
+    request = MagicMock()
+    request.cookies = {"session": "sid1"}
+    request.url.path = "/@christof"
+    request.url.query = ""
+    kv = MagicMock()
+    kv.get = AsyncMock(return_value={"username": "christof", "token": "t"})
+
+    with patch("profed.components.client.auth.key_value_store", return_value=kv):
+        ctx = await auth.page_context(request)
+
+    assert ctx["current_username"] == "christof"
+
