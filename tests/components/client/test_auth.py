@@ -9,8 +9,11 @@ from starlette.testclient import TestClient
 from profed.components.client import auth
 
 
-CLIENT_CFG = {"client": {"client_id": "cid", "client_secret": "csecret"}}
-
+CLIENT_CFG = {"client": {"client_id": "cid",
+                         "client_secret": "csecret",
+                         "scope": "read write",
+                         "session_ttl": 86400,
+                         "cookie_secure": True}}
 
 def _app():
     app = FastAPI()

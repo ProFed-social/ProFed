@@ -25,21 +25,8 @@ DEFAULT_SESSION_TTL = 86400
 STATE_TTL = 600
 
 
-def _as_bool(value):
-    return str(value).strip().lower() in ("1", "true", "yes", "on")
-
-
 def _session_key(sid):
     return f"client:session:{sid}"
-
-
-def _oauth_config():
-    cfg = config().get("client", {})
-    return {"client_id": cfg.get("client_id", ""),
-            "client_secret": cfg.get("client_secret", ""),
-            "scope": cfg.get("scope", DEFAULT_SCOPE),
-            "session_ttl": int(cfg.get("session_ttl", DEFAULT_SESSION_TTL)),
-            "cookie_secure": _as_bool(cfg.get("cookie_secure", True))}
 
 
 async def current_user_optional(request: Request):
@@ -56,7 +43,7 @@ async def current_user(request: Request):
 
 @router.get("/login")
 async def login():
-    cfg = _oauth_config()
+    cfg = config().get("client", {})
     state = secrets.token_urlsafe(16)
     params = {"response_type": "code",
               "client_id": cfg["client_id"],
@@ -103,7 +90,7 @@ async def _start_session(access_token: str, session_ttl):
 
 @router.get("/auth/callback")
 async def callback(request: Request, code: str, state: str):
-    cfg = _oauth_config()
+    cfg = config().get("client", {})
     if request.cookies.get(STATE_COOKIE) != state:
         raise HTTPException(status_code=400, detail="invalid_state")
 
