@@ -1,12 +1,14 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from functools import wraps
+import inspect
 import logging
 import secrets
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 from profed.core.config import config
 from profed.core.key_value_store import key_value_store
@@ -20,6 +22,7 @@ router = APIRouter()
 
 SESSION_COOKIE = "session"
 STATE_COOKIE = "oauth_state"
+RETURN_COOKIE = "oauth_return"
 DEFAULT_SCOPE = "read write"
 DEFAULT_SESSION_TTL = 86400
 STATE_TTL = 600
@@ -27,6 +30,15 @@ STATE_TTL = 600
 
 def _session_key(sid):
     return f"client:session:{sid}"
+
+
+def _safe_next(target):
+    target = target or ""
+    return (target
+            if target.startswith("/") and
+               not target.startswith(("//", "/\\")) and
+               target.split("?", 1)[0] != "/login" else
+            "/")
 
 
 async def current_user_optional(request: Request):
@@ -41,22 +53,55 @@ async def current_user(request: Request):
     return session
 
 
+def _login_response(request):
+    target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+    url = "/login?" + urlencode({"next": _safe_next(target)})
+    if request.method == "GET":
+        return RedirectResponse(url, status_code=303)
+    return Response(status_code=401, headers={"HX-Redirect": url})
+
+
+def requires_login(f):
+    @wraps(f)
+    async def w(*args, **kwargs):
+        request = kwargs["request"]
+        session = await current_user_optional(request)
+        
+        return (_login_response(request)
+                if session is None else
+                await f(*args, **{**kwargs, "session": session}))
+
+    sig = inspect.signature(f)
+    w.__signature__ = sig.replace(parameters=[p
+                                              for name, p in sig.parameters.items()
+                                              if name != "session"])
+    return w
+
+
 @router.get("/login")
-async def login():
+async def login(request: Request):
     cfg = config().get("client", {})
     state = secrets.token_urlsafe(16)
-    params = {"response_type": "code",
-              "client_id": cfg["client_id"],
-              "redirect_uri": f"https://{domain()}/auth/callback",
-              "scope": cfg["scope"],
-              "state": state}
-    response = RedirectResponse(f"/oauth/authorize?{urlencode(params)}", status_code=302)
+    response = RedirectResponse(f"/oauth/authorize?{urlencode({'response_type': 'code',
+                                                               'client_id': cfg['client_id'],
+                                                               'redirect_uri': f'https://{domain()}/auth/callback',
+                                                               'scope': cfg['scope'],
+                                                               'state': state})}",
+                                status_code=302)
     response.set_cookie(STATE_COOKIE,
                         state,
                         max_age=STATE_TTL,
                         httponly=True,
                         secure=cfg["cookie_secure"],
                         samesite="lax")
+    target = _safe_next(request.query_params.get("next"))
+    if target != "/":
+        response.set_cookie(RETURN_COOKIE,
+                            target,
+                            max_age=STATE_TTL,
+                            httponly=True,
+                            secure=cfg["cookie_secure"],
+                            samesite="lax")
     return response
 
 
@@ -94,7 +139,7 @@ async def callback(request: Request, code: str, state: str):
     if request.cookies.get(STATE_COOKIE) != state:
         raise HTTPException(status_code=400, detail="invalid_state")
 
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse(_safe_next(request.cookies.get(RETURN_COOKIE)), status_code=303)
     response.set_cookie(SESSION_COOKIE,
                         await _start_session(await _access_token(code,
                                                                  cfg["client_id"],
@@ -105,6 +150,7 @@ async def callback(request: Request, code: str, state: str):
                         secure=cfg["cookie_secure"],
                         samesite="lax")
     response.delete_cookie(STATE_COOKIE)
+    response.delete_cookie(RETURN_COOKIE)
     return response
 
 

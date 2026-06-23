@@ -5,9 +5,9 @@ import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from profed.components.client.auth import requires_login
 
 from .api_client import api_client
-from .auth import current_user_optional
 from .templating import environment
 
 
@@ -49,22 +49,16 @@ def _render(name, values, saved=False, error=None):
 
 
 @router.get("/settings")
-async def settings(request: Request):
-    session = await current_user_optional(request)
-    if session is None:
-        return RedirectResponse("/login", status_code=303)
-
+@requires_login
+async def settings(request: Request, session):
     preferences = await api_client().get("/api/v1/preferences", token=session["token"])
     preferences.raise_for_status()
     return HTMLResponse(_render("settings.html", _values_from_preferences(preferences.json())))
 
 
 @router.post("/settings")
-async def update_settings(request: Request):
-    session = await current_user_optional(request)
-    if session is None:
-        return Response(status_code=401, headers={"HX-Redirect": "/login"})
-
+@requires_login
+async def update_settings(request: Request, session):
     submitted = _submitted(await request.form())
     response = await api_client().patch("/api/v1/accounts/update_credentials",
                                         token=session["token"],

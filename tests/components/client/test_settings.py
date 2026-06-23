@@ -5,7 +5,7 @@ import httpx
 from fastapi import FastAPI
 from jinja2 import Environment, select_autoescape
 
-from profed.components.client import settings, templating
+from profed.components.client import settings, templating, auth
 
 
 _ENV = Environment(loader=templating.build_loader(templating.STANDARD_TEMPLATES, None),
@@ -49,7 +49,7 @@ def _app(monkeypatch, responses, session):
     client = _FakeClient(responses)
     monkeypatch.setattr(settings, "api_client", lambda: client)
     monkeypatch.setattr(settings, "environment", lambda: _ENV)
-    monkeypatch.setattr(settings, "current_user_optional", _session(session))
+    monkeypatch.setattr(auth, "current_user_optional", _session(session))
 
     app = FastAPI()
     app.include_router(settings.router)
@@ -79,8 +79,7 @@ async def test_settings_redirects_to_login_without_session(monkeypatch):
     response = await _fetch(app, "GET", "/settings")
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
-
+    assert response.headers["location"] == "/login?next=%2Fsettings"
 
 async def test_settings_renders_form_with_current_preferences(monkeypatch):
     app, client = _app(monkeypatch,
@@ -149,5 +148,6 @@ async def test_update_settings_redirects_via_htmx_without_session(monkeypatch):
     response = await _fetch(app, "POST", "/settings", data={"visibility": "public"})
 
     assert response.status_code == 401
-    assert response.headers["HX-Redirect"] == "/login"
+    assert response.headers["HX-Redirect"] == "/login?next=%2Fsettings"
+
 
