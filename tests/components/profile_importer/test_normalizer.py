@@ -168,3 +168,9 @@ def test_normalize_links_experience_to_projects_by_id():
 
     assert profile.resume.experience[0]["projects"] == ["Project A", "Project B"]
 
+def test_normalize_escapes_summary_to_html():
+    mf2 = _mf2({"name": ["Alice"],
+                "summary": ["Reliable & <Trustworthy>"]})
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    assert profile.summary == "Reliable &amp; &lt;Trustworthy&gt;"
+

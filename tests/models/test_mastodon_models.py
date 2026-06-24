@@ -184,3 +184,12 @@ def test_from_actor_without_resume_is_none():
 
     assert acc.resume is None
 
+
+def test_from_actor_sanitizes_note_from_summary():
+    acc = Account.from_actor({"type":    "Person",
+                              "summary": "<p>hi</p><script>alert(1)</script>"},
+                             acct="mallory@remote.example",
+                             url="https://remote.example/actors/mallory")
+
+    assert acc.note == "<p>hi</p>"
+

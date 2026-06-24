@@ -149,10 +149,23 @@ def test_masthead_nav_when_logged_in():
     assert "/settings" in out and "/logout" in out
     assert ">Login</a>" not in out and "/login?next=" not in out
 
+
 def test_masthead_nav_when_logged_out():
     out = _ENV.get_template("base.html").render(current_username=None,
                                                 login_url="/login?next=%2F%40bob")
     assert '<a href="/login?next=%2F%40bob">Login</a>' in out
     assert "My profile" not in out
     assert "/settings" not in out and "/logout" not in out
+
+
+_ENV.filters["sanitize"] = templating.sanitize_html
+
+async def test_profile_render_sanitizes_malicious_note(monkeypatch):
+    account = _account()
+    account["note"] = "<p>ok</p><script>alert(1)</script>"
+    app = _app(monkeypatch, {"lookup": _resp(200, json=account),
+                             "statuses": _resp(200, json=[])})
+    response = await _fetch(app, "/@alice")
+    assert "<p>ok</p>" in response.text
+    assert "<script>" not in response.text
 

@@ -7,6 +7,7 @@ from typing import Any
 
 from .resume import Resume
 from profed.identity import account_id
+from profed.sanitize import sanitize_html
 
 
 class Account(BaseModel):
@@ -53,7 +54,7 @@ class Account(BaseModel):
                    username=username,
                    acct=acct,
                    display_name=actor.get("name") or username,
-                   note=actor.get("summary") or "",
+                   note=sanitize_html(actor.get("summary")) or "",
                    url=url,
                    avatar=icon,
                    avatar_static=icon,

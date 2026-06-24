@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from html import escape
 from typing import Any, Optional
 from profed.models import Resume, UserProfile
 
@@ -16,6 +17,11 @@ def _to_text(value: Any) -> Optional[str]:
         raw = value.get("value") or value.get("html", "")
         return raw.strip() or None
     return None
+
+
+def _to_html(value: Any) -> Optional[str]:
+    text = _to_text(value)
+    return escape(text) if text is not None else None
 
 
 def _to_url(value: Any) -> Optional[str]:
@@ -86,7 +92,7 @@ def normalize_mf2_to_profile(mf2_data: dict, username: str) -> tuple[UserProfile
                    else {})
     name = (_to_text(_first(props.get("name", [])))
             or _to_text(_first(hcard_props.get("name", []))))
-    summary = _to_text(_first(props.get("summary", [])
+    summary = _to_html(_first(props.get("summary", [])
                               or props.get("note", [])
                               or hcard_props.get("summary", [])
                               or hcard_props.get("note", [])))

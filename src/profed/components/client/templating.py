@@ -5,6 +5,7 @@ from pathlib import Path
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, select_autoescape
 
 from profed.core.config import config
+from profed.sanitize import sanitize_html
 
 
 STANDARD_TEMPLATES = Path(__file__).parent / "templates"
@@ -26,6 +27,7 @@ def environment():
         theme_dir = config().get("client", {}).get("theme_dir")
         _instance = Environment(loader=build_loader(STANDARD_TEMPLATES, theme_dir),
                                 autoescape=select_autoescape(["html", "xml"]))
+        _instance.filters["sanitize"] = sanitize_html
 
     return _instance
 

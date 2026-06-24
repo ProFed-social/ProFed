@@ -21,7 +21,8 @@
       </dl>
     </div>
   </header>
-  {% if account.note %}<div class="p-note note">{{ account.note | safe }}</div>{% endif %}
+  {% if account.note %}<div class="p-note note">{{ account.note | sanitize | safe }}</div>{% endif %}
+
 
   {% if account.resume %}
   <section class="h-resume resume">
