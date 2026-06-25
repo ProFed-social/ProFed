@@ -1,9 +1,15 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from html import escape
 from typing import Any, Optional
 from profed.models import Resume, UserProfile
+from profed.sanitize import sanitize_html
+from .composition import apply_template
+ 
+ 
+DEFAULT_USERNAME = "{given-name}_{family-name}"
+DEFAULT_NAME     = "{name|{given-name} {additional-name} {family-name}}"
+DEFAULT_SUMMARY  = "{summary|{note}}"
 
 
 def _first(lst: list, default=None) -> Any:
@@ -19,9 +25,17 @@ def _to_text(value: Any) -> Optional[str]:
     return None
 
 
-def _to_html(value: Any) -> Optional[str]:
-    text = _to_text(value)
-    return escape(text) if text is not None else None
+def _raw(value: Any) -> str:
+    if isinstance(value, dict):
+        return (value.get("html") or value.get("value") or "").strip()
+    return value.strip() if isinstance(value, str) else ""
+ 
+ 
+def _values(props: dict, hcard_props: dict) -> dict[str, str]:
+    merged = {**hcard_props, **props}
+    return {key: raw
+            for key, raw in ((key, _raw(_first(vals))) for key, vals in merged.items())
+            if raw}
 
 
 def _to_url(value: Any) -> Optional[str]:
@@ -75,7 +89,11 @@ def _linked_project_names(item, lookup) -> list:
             [])
 
 
-def normalize_mf2_to_profile(mf2_data: dict, username: str) -> tuple[UserProfile, dict[str, str | None]] | None:
+
+def normalize_mf2_to_profile(mf2_data: dict,
+                             username_template: str = DEFAULT_USERNAME,
+                             name_template: str = DEFAULT_NAME,
+                             summary_template: str = DEFAULT_SUMMARY) -> tuple[UserProfile, dict[str, str | None]] | None:
     items = mf2_data.get("items", [])
     if not items:
         return None
@@ -90,12 +108,13 @@ def normalize_mf2_to_profile(mf2_data: dict, username: str) -> tuple[UserProfile
     hcard_props = (contact[0].get("properties", {})
                    if contact and isinstance(contact[0], dict)
                    else {})
-    name = (_to_text(_first(props.get("name", [])))
-            or _to_text(_first(hcard_props.get("name", []))))
-    summary = _to_html(_first(props.get("summary", [])
-                              or props.get("note", [])
-                              or hcard_props.get("summary", [])
-                              or hcard_props.get("note", [])))
+    values = _values(props, hcard_props)
+    username = " ".join(apply_template(username_template, values).split())
+    if not username:
+        return None
+
+    name = " ".join(apply_template(name_template, values).split()) or None
+    summary = sanitize_html(apply_template(summary_template, values)) or None
     def to_resume(h_resume):
         if h_resume is None:
             return None

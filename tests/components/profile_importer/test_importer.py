@@ -102,18 +102,33 @@ async def test_no_mf2_content_publishes_nothing(fake_bus):
 
 
 @pytest.mark.asyncio
-async def test_profile_importer_component_calls_run_import(fake_bus):
+async def test_profile_importer_calls_run_import_with_default_templates(fake_bus):
     from profed.components import profile_importer as component
     with patch.object(component, "run_import", new=AsyncMock()) as mock_run:
         await component.ProfileImporter({"username": "alice", "url": "https://example.com/alice"})
-        mock_run.assert_awaited_once_with("alice", "https://example.com/alice")
+        mock_run.assert_awaited_once_with("alice", "https://example.com/alice",
+                                          component.DEFAULT_NAME, component.DEFAULT_SUMMARY)
 
 
 @pytest.mark.asyncio
-async def test_profile_importer_raises_without_username(fake_bus):
+async def test_profile_importer_passes_config_templates(fake_bus):
     from profed.components import profile_importer as component
-    with pytest.raises(ValueError, match="username"):
+    with patch.object(component, "run_import", new=AsyncMock()) as mock_run:
+        await component.ProfileImporter({"username": "alice",
+                                         "url":      "https://example.com/alice",
+                                         "name":     "{given-name}",
+                                         "summary":  "{x-summary}"})
+        mock_run.assert_awaited_once_with("alice", "https://example.com/alice",
+                                          "{given-name}", "{x-summary}")
+
+
+@pytest.mark.asyncio
+async def test_profile_importer_defaults_username_template(fake_bus):
+    from profed.components import profile_importer as component
+    with patch.object(component, "run_import", new=AsyncMock()) as mock_run:
         await component.ProfileImporter({"url": "https://example.com/alice"})
+        mock_run.assert_awaited_once_with(component.DEFAULT_USERNAME, "https://example.com/alice",
+                                          component.DEFAULT_NAME, component.DEFAULT_SUMMARY)
 
 
 @pytest.mark.asyncio

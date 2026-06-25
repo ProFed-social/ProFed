@@ -16,6 +16,7 @@ def test_to_url_returns_string_directly():
 def test_to_url_strips_whitespace():
     assert _to_url("  https://example.com/photo.jpg  ") == "https://example.com/photo.jpg"
 
+
 def test_to_url_returns_none_for_empty_string():
     assert _to_url("") is None
 
@@ -168,9 +169,46 @@ def test_normalize_links_experience_to_projects_by_id():
 
     assert profile.resume.experience[0]["projects"] == ["Project A", "Project B"]
 
-def test_normalize_escapes_summary_to_html():
-    mf2 = _mf2({"name": ["Alice"],
-                "summary": ["Reliable & <Trustworthy>"]})
+def test_normalize_sanitizes_summary():
+    mf2 = _mf2({"name":    ["Alice"],
+                "summary": ["<p>hi</p><script>x()</script>"]})
     profile, _ = normalize_mf2_to_profile(mf2, "alice")
-    assert profile.summary == "Reliable &amp; &lt;Trustworthy&gt;"
+    assert profile.summary == "<p>hi</p>"
+
+
+def test_normalize_name_defaults_to_name_property():
+    profile, _ = normalize_mf2_to_profile(_mf2({"name": ["Alice Smith"]}), "alice")
+    assert profile.name == "Alice Smith"
+
+
+def test_normalize_name_composes_from_parts_and_collapses_whitespace():
+    mf2 = _mf2_with_hcard({"given-name": ["Christof"], "family-name": ["Donat"]},
+                          resume_props={"experience": []})
+    profile, _ = normalize_mf2_to_profile(mf2, "christof")
+    assert profile.name == "Christof Donat"
+
+
+def test_normalize_username_from_literal_template():
+    profile, _ = normalize_mf2_to_profile(_mf2({"name": ["Alice"]}), "alice")
+    assert profile.username == "alice"
+
+
+def test_normalize_username_composes_from_parts():
+    mf2 = _mf2_with_hcard({"given-name": ["Christof"], "family-name": ["Donat"]},
+                          resume_props={"experience": []})
+    profile, _ = normalize_mf2_to_profile(mf2, "{given-name}_{family-name}")
+    assert profile.username == "Christof_Donat"
+
+
+def test_normalize_returns_none_when_username_empty():
+    mf2 = _mf2_with_hcard({"given-name": ["Christof"]}, resume_props={"experience": []})
+    assert normalize_mf2_to_profile(mf2, "{missing}") is None
+
+
+def test_normalize_summary_template_override_composes_html():
+    mf2 = _mf2({"x-summary": [{"value": "q",  "html": "<strong>q</strong>"}],
+                "x-note":    [{"value": "ab", "html": "<li>a</li><li>b</li>"}]})
+    profile, _ = normalize_mf2_to_profile(mf2, "alice",
+                                          summary_template="{x-summary} <ul>{x-note}</ul>")
+    assert profile.summary == "<strong>q</strong> <ul><li>a</li><li>b</li></ul>"
 

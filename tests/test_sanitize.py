@@ -41,6 +41,10 @@ def test_keeps_allowed_formatting():
         assert fragment in out
 
 
+def test_keeps_small_tag():
+    assert sanitize_html("<p>x <small>y</small></p>") == "<p>x <small>y</small></p>"
+
+
 def test_keeps_allowed_link_and_adds_rel():
     out = sanitize_html('<a href="https://example.test/x">l</a>')
     assert 'href="https://example.test/x"' in out

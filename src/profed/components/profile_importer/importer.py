@@ -11,7 +11,7 @@ from profed.models import UserProfile, MediaReference
 from profed.media import scale_image, should_redownload, download
 
 from .fetcher import fetch_mf2
-from .normalizer import normalize_mf2_to_profile
+from .normalizer import normalize_mf2_to_profile, DEFAULT_USERNAME, DEFAULT_NAME, DEFAULT_SUMMARY
 from .state_reader import reading_state
 from .media_reader import reading_media_state
  
@@ -23,15 +23,22 @@ _VARIANTS_FOR = {"avatar": [("large", {"width": 400, "height": 400}),
                  "header": [("wide",  {"width": 1500})]}
 
 
-async def _fetch_remote_profile(url: str, username: str) -> tuple[UserProfile, dict[str, str | None]] | None:
+
+async def _fetch_remote_profile(url: str,
+                                username_template: str = DEFAULT_USERNAME,
+                                name_template: str = DEFAULT_NAME,
+                                summary_template: str = DEFAULT_SUMMARY) \
+        -> tuple[UserProfile, dict[str, str | None]] | None:
     try:
         mf2_data = await fetch_mf2(url)
     except Exception as exc:
         logger.error("Failed to fetch profile from %s: %s", url, exc)
         return None
-    profile = normalize_mf2_to_profile(mf2_data, username)
+
+    profile = normalize_mf2_to_profile(mf2_data, username_template, name_template, summary_template)
     if profile is None:
-        logger.warning("No h-resume or h-card found at %s", url)
+        logger.warning("No importable profile at %s (no h-resume/h-card or empty username)", url)
+
     return profile
 
 
@@ -80,14 +87,6 @@ async def _sync_images(uploader, new_profile, sources, media_state):
     return new_profile, avatar_tasks + header_tasks
 
 
-async def _cancel_task_unconditionally(task):
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-
-
 def _diff_events(current, new_profile):
     if current is None:
         public_pem, private_pem = generate_key_pair()
@@ -129,13 +128,17 @@ def _diff_events(current, new_profile):
              []))
 
 
-async def run_import(username: str, url: str) -> None:
-    current_state_task = asyncio.create_task(_get_current_state(username))
-    nps = await _fetch_remote_profile(url, username)
+
+async def run_import(username_template: str,
+                     url: str,
+                     name_template: str = DEFAULT_NAME,
+                     summary_template: str = DEFAULT_SUMMARY) -> None:
+    nps = await _fetch_remote_profile(url, username_template, name_template, summary_template)
     if nps is None:
-        await _cancel_task_unconditionally(current_state_task)
         return None
     new_profile, sources = nps
+    username = new_profile.username
+    current = await _get_current_state(username)
 
     (new_profile,
      variant_tasks) = await _sync_images(acct_from_username(username),
@@ -144,7 +147,7 @@ async def run_import(username: str, url: str) -> None:
                                          await _get_media_state(sources.get("avatar"),
                                                                 sources.get("header")))
 
-    events = _diff_events(await current_state_task, new_profile)
+    events = _diff_events(current, new_profile)
     if not events:
         logger.info("Profile for %s is unchanged", username)
     else:

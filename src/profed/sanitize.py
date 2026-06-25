@@ -7,7 +7,7 @@ import nh3
 
 _TAGS = {
     "p", "br", "span", "a", "abbr", "del", "pre", "blockquote", "code",
-    "b", "strong", "u", "sub", "sup", "i", "em",
+    "b", "strong", "u", "sub", "sup", "i", "em", "small",
     "h1", "h2", "h3", "h4", "h5", "ul", "ol", "li",
 }
 _ATTRIBUTES = {
