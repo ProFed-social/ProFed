@@ -35,7 +35,7 @@ def _media_projection_initializer(storage, projection, handle_events):
 async def init(config: dict, deactivate: List[str]) -> None:
     v1_deactivate = narrow_deactivate_routers("v1_", deactivate)
     v2_deactivate = narrow_deactivate_routers("v2_", deactivate)
-    for routers, init_fn in [(["v1_search", "v1_accounts", "v2_search"],
+    for routers, init_fn in [(["v1_search", "v1_accounts", "v1_timelines", "v2_search"],
                                _projection_initializer(known_accounts_storage,
                                                        known_accounts_projection,
                                                        known_accounts_projection.handle_events,

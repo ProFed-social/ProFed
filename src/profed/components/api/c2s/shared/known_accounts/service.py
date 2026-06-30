@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from profed.federation.webfinger import lookup_acct, lookup_actor_url
 from profed.federation.actors import fetch_and_register_actor
-from profed.identity import domain
+from profed.identity import is_local
 from .storage import storage
 from profed.models.mastodon import Account
 
@@ -15,6 +15,8 @@ WEBFINGER_CACHE_TTL = 86400
 
  
 async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
+    if is_local(acct):
+        return None
     actor_url = await lookup_actor_url(acct)
     actor_data = await fetch_and_register_actor(actor_url) if actor_url is not None else None
     if actor_data is None:
@@ -24,7 +26,7 @@ async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
  
  
 def _is_fresh(row: dict, ttl: int) -> bool:
-    if (row.get("acct") or "").endswith("@" + domain()):
+    if is_local(row.get("acct") or ""):
         return True
 
     last = row["last_webfinger_at"]

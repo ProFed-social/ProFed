@@ -8,6 +8,10 @@ def domain() -> str:
     return config().get("web-server", {}).get("domain", "example.com")
 
 
+def is_local(acct: str) -> bool:
+    return acct.endswith("@" + domain())
+
+
 def acct_from_username(username: str) -> str:
     return f"{username}@{domain()}"
 

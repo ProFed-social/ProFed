@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, Mock, patch
 import profed.components.api.c2s.shared.known_accounts.storage as storage_module
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
-                                                                     lookup_by_actor_url)
+                                                                     lookup_by_actor_url,
+                                                                     _do_webfinger_lookup)
 from profed.models.mastodon import Account
 
  
@@ -15,7 +16,7 @@ NOW   = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
 FRESH = datetime.now(timezone.utc) - timedelta(hours=1)
 STALE = datetime.now(timezone.utc) - timedelta(days=30)
 
-ACCT      = "alice@example.com"
+ACCT = "alice@example.com"
 ACTOR_URL = "https://example.com/actors/alice"
 ACCOUNT_ID = 1234
 ACTOR_DATA = {"type": "Person", "name": "Alice", "published": "2026-01-01T00:00:00+00:00"}
@@ -138,4 +139,37 @@ async def test_lookup_by_id_treats_local_account_as_fresh(fake_storage):
 
     mock_wf.assert_not_awaited()
     assert result == ACCOUNT
+
+
+@pytest.mark.asyncio
+async def test_webfinger_lookup_returns_none_for_local_acct():
+    with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_actor_url",
+               AsyncMock(return_value=ACTOR_URL)), \
+         patch("profed.components.api.c2s.shared.known_accounts.service.fetch_and_register_actor",
+               AsyncMock(return_value=ACTOR_DATA)):
+        result = await _do_webfinger_lookup(ACCT)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_webfinger_lookup_does_not_register_local_acct():
+    with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_actor_url",
+               AsyncMock(return_value=ACTOR_URL)), \
+         patch("profed.components.api.c2s.shared.known_accounts.service.fetch_and_register_actor",
+               AsyncMock()) as mock_register:
+        await _do_webfinger_lookup(ACCT)
+
+    mock_register.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_webfinger_lookup_resolves_remote_acct():
+    with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_actor_url",
+               AsyncMock(return_value=REMOTE_ACTOR_URL)), \
+         patch("profed.components.api.c2s.shared.known_accounts.service.fetch_and_register_actor",
+               AsyncMock(return_value=ACTOR_DATA)):
+        result = await _do_webfinger_lookup(REMOTE_ACCT)
+
+    assert result == REMOTE_ACCOUNT
 

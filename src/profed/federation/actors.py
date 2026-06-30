@@ -6,7 +6,7 @@ from typing import Optional
 from profed.core.message_bus import message_bus
 from profed.federation.webfinger import lookup_acct
 from profed.http.client import http
-from profed.identity import account_id as compute_account_id
+from profed.identity import account_id as compute_account_id, is_local
 
 
 async def fetch_actor(actor_url: str) -> Optional[dict]:
@@ -24,7 +24,7 @@ async def fetch_and_register_actor(actor_url: str) -> Optional[dict]:
         return None
 
     acct = await lookup_acct(actor_url)
-    if acct is not None:
+    if acct is not None and not is_local(acct):
         aid = int(compute_account_id(acct))
         payload = {"acct": acct,
                    "actor_url": actor_url,
