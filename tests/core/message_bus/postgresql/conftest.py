@@ -8,6 +8,7 @@ from unittest.mock import patch
 import asyncio
 
 from .fake_asyncpg import InMemoryDatabase, FakePool
+from profed.core.message_bus.postgresql import subscriber
 
 
 CONFIG = {"backend": "postgresql",
@@ -24,6 +25,19 @@ CONFIG = {"backend": "postgresql",
 @fixture
 def db():
     return InMemoryDatabase()
+
+
+@fixture(autouse=True)
+def no_process_exit():
+    def _raise(*args):
+        raise RuntimeError("corruption")
+
+    original = subscriber._fatal_corruption
+    subscriber._fatal_corruption = _raise
+
+    yield
+
+    subscriber._fatal_corruption = original
 
 
 @async_fixture

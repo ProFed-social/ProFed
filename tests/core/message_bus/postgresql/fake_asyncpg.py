@@ -72,6 +72,13 @@ class FakeConnection:
             rows = self._fetch_single_table(self._extract_table(query), *args)
             min_id = min((r["id"] for r in rows), default=None)
             return [{"min_id": min_id}]
+        if "MAX(ID)" in query.upper():
+            rows = self._db.messages[self._extract_table(query)]
+            return [{"max_id": max((r["id"] for r in rows), default=None)}]
+        if "COUNT(*)" in query.upper():
+            lo, hi = args[0], args[1]
+            rows = self._db.messages[self._extract_table(query)]
+            return [{"n": sum(1 for r in rows if lo <= r["id"] <= hi)}]
         if "FROM" in query:
             tables = re.findall(r"FROM\s+([^\s]+)\s+([^\s]+)\s+JOIN\s+([^\s]+)\s+([^\s]+)\s+ON\s+([^\s]+)\.([^\s]+)\s*=\s*([^\s]+)\.([^\s]+)",
                                 query.upper(),

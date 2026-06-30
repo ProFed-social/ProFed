@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-import asyncio
 from tests.core.message_bus.postgresql import fake_asyncpg
 
 
@@ -48,7 +47,28 @@ async def test_listeners_registered_only_after_backlog_drained(topic, db, drain)
         messages = await drain()
 
         assert messages[0][4]["v"] == "a"
-        assert len(add_listener_calls) == 2  # topic + snapshot channel
+        assert len(add_listener_calls) == 1
     finally:
         fake_asyncpg.FakeConnection.add_listener = original_add_listener
+
+
+
+@pytest.mark.asyncio
+async def test_reconnects_after_a_dropped_connection(topic, db, monkeypatch):
+    db.insert_message("public.test", {"v": "a"})
+    dropped = []
+    real_fetch = fake_asyncpg.FakeConnection.fetch
+
+    async def flaky_fetch(self, query, *args):
+        if "ORDER BY id" in query and not dropped:
+            dropped.append(True)
+            raise OSError("connection dropped")
+        return await real_fetch(self, query, *args)
+
+    monkeypatch.setattr(fake_asyncpg.FakeConnection, "fetch", flaky_fetch)
+
+    subscriber = topic.subscribe("test")
+    message = await subscriber.__anext__()
+    assert message[4]["v"] == "a"
+
 

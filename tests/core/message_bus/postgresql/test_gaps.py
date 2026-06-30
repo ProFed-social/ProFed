@@ -2,7 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+
+def _settled_row(rid, value):
+    return {"id": rid,
+            "event_type": "created",
+            "object_id": f"o{rid}",
+            "payload": {"v": value},
+            "message_id": None,
+            "emitted_at": datetime.now(timezone.utc) - timedelta(seconds=10)}
 
 
 @pytest.mark.asyncio
@@ -29,4 +38,10 @@ async def test_gap_detected_and_late_message_processed(topic, db):
     third = await subscriber.__anext__()
 
     assert [m[4]["v"] for m in [first, second, third]] == ["a", "b", "c"]
+
+
+@pytest.mark.asyncio
+async def test_settled_gap_is_skipped(topic, db, drain):
+    db.messages["public.test"] = [_settled_row(1, "a"), _settled_row(3, "c")]
+    assert [m[0] for m in await drain()] == [1, 3]
 
