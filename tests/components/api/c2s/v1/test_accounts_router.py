@@ -773,3 +773,20 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
     assert data[0]["content"] == "<p>hello world</p>"
     assert data[0]["id"] == str(source_key("activities").message_id(42))
 
+
+def test_lookup_returns_resume(anon_client):
+    account = Account(id="2",
+                      username="bob",
+                      acct="bob@remote.example",
+                      display_name="Bob",
+                      url="https://remote.example/actors/bob",
+                      resume={"skills": [{"name": "Python"}]})
+
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
+                   new=AsyncMock(return_value=account)):
+            response = anon_client.get("/accounts/lookup?acct=bob@remote.example")
+
+    assert response.json()["resume"]["skills"] == [{"name": "Python"}]
+

@@ -193,3 +193,12 @@ def test_from_actor_sanitizes_note_from_summary():
 
     assert acc.note == "<p>hi</p>"
 
+
+def test_from_actor_preserves_resume():
+    acc = Account.from_actor({"type": "Person",
+                              "resume": {"skills": [{"name": "Python"}]}},
+                             acct="bob@remote.example",
+                             url="https://remote.example/actors/bob")
+
+    assert acc.resume.skills == [{"name": "Python"}]
+
