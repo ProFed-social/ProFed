@@ -46,6 +46,42 @@ def _to_url(value: Any) -> Optional[str]:
     return None
 
 
+def _html_field(props: dict, name: str) -> Optional[str]:
+    for key in (name, "x-" + name):
+        first = _first(props.get(key, []))
+        if isinstance(first, dict) and first.get("html"):
+            return sanitize_html(first["html"]) or None
+    for key in (name, "x-" + name):
+        text = _to_text(_first(props.get(key, [])))
+        if text is not None:
+            return text
+    return None
+
+
+def _reference(item: Any) -> dict:
+    if not isinstance(item, dict):
+        return {}
+    props = item.get("properties", {})
+    author = _first(props.get("author", []))
+    aprops = author.get("properties", {}) if isinstance(author, dict) else {}
+    giver = {key: value
+             for key, value in (("name", _to_text(_first(aprops.get("name", [])))),
+                                ("role", _to_text(_first(aprops.get("job-title", [])))),
+                                ("organization", _to_text(_first(aprops.get("org", [])))))
+             if value is not None}
+    content = {(value.get("lang") or "und"): sanitize_html(value["html"])
+               for value in props.get("content", [])
+               if isinstance(value, dict) and value.get("html")}
+    url = _to_url(_first(props.get("url", [])))
+    verification = _to_text(_first(props.get("x-verification", [])))
+    return {key: value
+            for key, value in (("author", giver),
+                               ("content", content),
+                               ("url", url),
+                               ("verification", verification))
+            if value}
+
+
 def _normalize_entry(item: Any) -> dict:
     if isinstance(item, str):
         return {"name": item.strip()} if item.strip() else {}
@@ -57,11 +93,18 @@ def _normalize_entry(item: Any) -> dict:
     for mf2_key, model_key in [("name", "name"),
                                ("start", "start"),
                                ("end", "end"),
-                               ("description", "description"),
                                ("url", "url")]:
         val = _to_text(_first(props.get(mf2_key, [])))
         if val is not None:
             result[model_key] = val
+
+    description = _html_field(props, "description")
+    if description is not None:
+        result["description"] = description
+
+    technologies = [t for t in (_to_text(v) for v in props.get("technology", [])) if t is not None]
+    if technologies:
+        result["technologies"] = technologies
 
     organization = (_to_text(_first(props.get("org", [])))
                     or _to_text(_first(props.get("location", []))))
@@ -134,7 +177,11 @@ def normalize_mf2_to_profile(mf2_data: dict,
         return Resume(experience=[e for e in (experience_entry(x) for x in rprops.get("experience", [])) if e],
                       education=[e for e in (_normalize_entry(x) for x in rprops.get("education",  [])) if e],
                       skills=[{"name": s} for s in (t for t in (_to_text(v) for v in rprops.get("skill", [])) if t is not None)],
-                      projects=[e for e in (_normalize_entry(x) for x in project_items) if e])
+                      projects=[e for e in (_normalize_entry(x) for x in project_items) if e],
+                      references=[r for r in (_reference(c)
+                                              for c in h_resume.get("children", [])
+                                              if isinstance(c, dict) and "h-cite" in c.get("type", []))
+                                  if r])
 
     return (UserProfile(username=username,
                         name=name,

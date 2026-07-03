@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from profed.components.profile_importer.normalizer import _to_url, normalize_mf2_to_profile
-
+from profed.components.profile_importer.normalizer import (_to_url,
+                                                           _html_field,
+                                                           _reference,
+                                                           normalize_mf2_to_profile)
 
 def _mf2(props):
     return {"items": [{"type": ["h-resume"], "properties": props}]}
@@ -211,4 +213,91 @@ def test_normalize_summary_template_override_composes_html():
     profile, _ = normalize_mf2_to_profile(mf2, "alice",
                                           summary_template="{x-summary} <ul>{x-note}</ul>")
     assert profile.summary == "<strong>q</strong> <ul><li>a</li><li>b</li></ul>"
+
+
+def test_html_field_prefers_html_over_text():
+    props = {"x-description": [{"html": "<p>x</p><script>y</script>", "value": "x"}]}
+    assert _html_field(props, "description") == "<p>x</p>"
+
+
+def test_html_field_falls_back_to_text():
+    assert _html_field({"description": ["plain text"]}, "description") == "plain text"
+
+
+def test_html_field_returns_none_when_absent():
+    assert _html_field({}, "description") is None
+
+
+def test_normalize_project_description_is_html():
+    mf2 = _mf2({"name": ["Alice"],
+                "x-project": [{"type": ["h-entry"],
+                               "properties": {"name": ["ProFed"],
+                                              "description": [{"value": "a b",
+                                                               "html": "<p>a</p><p>b</p>"}]}}]})
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    assert profile.resume.projects[0]["description"] == "<p>a</p><p>b</p>"
+
+
+def test_normalize_experience_description_from_e_x_variant():
+    mf2 = _mf2({"name": ["Alice"],
+                "experience": [{"type": ["h-event"],
+                                "properties": {"name": ["Engineer"],
+                                               "description": ["plain"],
+                                               "x-description": [{"value": "rich",
+                                                                  "html": "<p>rich</p>"}]}}]})
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    assert profile.resume.experience[0]["description"] == "<p>rich</p>"
+
+
+def test_normalize_reads_project_technologies():
+    mf2 = _mf2({"name": ["Alice"],
+                "x-project": [{"type": ["h-entry"],
+                               "properties": {"name": ["ProFed"],
+                                              "technology": ["Python", "FastAPI"]}}]})
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    assert profile.resume.projects[0]["technologies"] == ["Python", "FastAPI"]
+
+
+def _h_cite(content, author=None):
+    return {"type": ["h-cite"],
+            "properties": {"author": [{"type": ["h-card"],
+                                       "properties": author or {"name": ["John Doe"],
+                                                                "job-title": ["Janitor"],
+                                                                "org": ["ACME"]}}],
+                           "content": content,
+                           "url": ["https://x.example/ref"],
+                           "x-verification": ["source"]}}
+
+
+def _mf2_children(children):
+    return {"items": [{"type": ["h-resume"],
+                       "properties": {"name": ["Alice"]},
+                       "children": children}]}
+
+
+def test_normalize_reads_reference_from_h_cite_child():
+    mf2 = _mf2_children([_h_cite([{"value": "t", "lang": "en", "html": "<p>t</p>"}])])
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    ref = profile.resume.references[0]
+    assert ref["author"] == {"name": "John Doe", "role": "Janitor", "organization": "ACME"}
+    assert ref["url"] == "https://x.example/ref"
+    assert ref["verification"] == "source"
+
+
+def test_normalize_reference_content_is_language_mapped():
+    mf2 = _mf2_children([_h_cite([{"value": "d", "lang": "de", "html": "<p>d</p>"},
+                                  {"value": "e", "lang": "en", "html": "<p>e</p>"}])])
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    assert profile.resume.references[0]["content"] == {"de": "<p>d</p>", "en": "<p>e</p>"}
+
+
+def test_normalize_reference_content_is_sanitised():
+    mf2 = _mf2_children([_h_cite([{"value": "x", "lang": "en",
+                                   "html": "<p>ok</p><script>bad</script>"}])])
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+    assert profile.resume.references[0]["content"]["en"] == "<p>ok</p>"
+
+
+def test_reference_ignores_non_dict():
+    assert _reference("not a dict") == {}
 
