@@ -158,3 +158,31 @@ def test_create_status_returns_sanitised_content(client, fake_bus):
 
     assert response.json()["content"] == "<p>hi</p>"
 
+
+def test_create_status_federates_sanitised_spoiler_as_summary(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
+        client.post("/statuses", json={"status": "hi",
+                                       "spoiler_text": "CW <script>x</script>spoiler"})
+
+    obj = fake_bus.topic("activities").published[0]["payload"]["activity"]["object"]
+    assert obj["summary"] == "CW spoiler"
+
+
+def test_create_status_without_spoiler_has_no_summary(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
+        client.post("/statuses", json={"status": "hi"})
+
+    obj = fake_bus.topic("activities").published[0]["payload"]["activity"]["object"]
+    assert "summary" not in obj
+
+
+def test_create_status_returns_sanitised_spoiler_text(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
+        response = client.post("/statuses", json={"status": "hi",
+                                                  "spoiler_text": "CW <script>x</script>!"})
+
+    assert response.json()["spoiler_text"] == "CW !"
+

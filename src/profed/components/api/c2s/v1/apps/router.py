@@ -5,6 +5,7 @@ import secrets
 from fastapi import APIRouter
 from pydantic import BaseModel
 from profed.core.message_bus import message_bus
+from profed.sanitize import strip_tags
  
  
 router = APIRouter()
@@ -29,19 +30,20 @@ class AppRegistration(BaseModel):
 async def register_app(body: AppRegistration):
     client_id     = secrets.token_urlsafe(16)
     client_secret = secrets.token_urlsafe(32)
+    client_name   = strip_tags(body.client_name)
  
     async with message_bus().topic("oauth_apps").publish() as publish:
         await publish(event_type="created",
                       object_id=client_id,
                       payload={"client_secret": client_secret,
-                               "client_name": body.client_name,
+                               "client_name": client_name,
                                "redirect_uris": body.redirect_uris,
                                "scopes": body.scopes})
 
     return {"id": client_id,
             "client_id": client_id,
             "client_secret": client_secret,
-            "name": body.client_name,
+            "name": client_name,
             "redirect_uri": body.redirect_uris,
             "scopes": body.scopes,
             "website": body.website}

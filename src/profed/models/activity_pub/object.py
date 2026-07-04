@@ -8,6 +8,7 @@ class Note(ActivityStreamsObject):
     type: str = "Note"
     attributedTo: str
     content: str
+    summary: str | None = None
     published: str
     to: list[str] = ["https://www.w3.org/ns/activitystreams#Public"]
 

@@ -61,3 +61,12 @@ def test_verify_app_credentials_returns_app_info(client):
     assert response.json()["name"] == "ProFed"
 
 
+def test_register_app_sanitises_client_name(client, fake_bus):
+    response = client.post("/apps",
+                           json={"client_name":   "<b>Evil</b><script>x</script>App",
+                                 "redirect_uris": "app://cb",
+                                 "scopes":        "read"})
+
+    assert fake_bus.topic("oauth_apps").published[0]["payload"]["client_name"] == "EvilApp"
+    assert response.json()["name"] == "EvilApp"
+
