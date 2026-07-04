@@ -138,3 +138,54 @@ async def test_lookup_acct_caches_result():
         await lookup_acct(ACTOR_URL.format("cache_test"))
 
     assert request_mock.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_lookup_actor_url_accepts_https_href():
+    with patch("profed.http.client.httpx.AsyncClient") as mock:
+        mock.return_value.__aenter__.return_value.request = AsyncMock(
+            return_value=_mock_response(json_data={
+                "links": [{"rel": "self",
+                           "type": "application/activity+json",
+                           "href": "https://remote.example/actors/bob"}]}))
+        result = await lookup_actor_url(ACCT.format("accepts_https"))
+
+    assert result == "https://remote.example/actors/bob"
+
+
+@pytest.mark.asyncio
+async def test_lookup_actor_url_rejects_non_https_href():
+    with patch("profed.http.client.httpx.AsyncClient") as mock:
+        mock.return_value.__aenter__.return_value.request = AsyncMock(
+            return_value=_mock_response(json_data={
+                "links": [{"rel": "self",
+                           "type": "application/activity+json",
+                           "href": "http://remote.example/actors/bob"}]}))
+        result = await lookup_actor_url(ACCT.format("rejects_http"))
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_lookup_actor_url_rejects_javascript_href():
+    with patch("profed.http.client.httpx.AsyncClient") as mock:
+        mock.return_value.__aenter__.return_value.request = AsyncMock(
+            return_value=_mock_response(json_data={
+                "links": [{"rel": "self",
+                           "type": "application/activity+json",
+                           "href": "javascript:alert(1)"}]}))
+        result = await lookup_actor_url(ACCT.format("rejects_js"))
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_lookup_acct_sanitises_subject():
+    with patch("profed.http.client.httpx.AsyncClient") as mock:
+        mock.return_value.__aenter__.return_value.request = AsyncMock(
+            return_value=_mock_response(json_data={
+                "subject": "acct:<b>bob</b>@example.com"}))
+        result = await lookup_acct(ACTOR_URL.format("sanitises_subject"))
+
+    assert result == "bob@example.com"
+

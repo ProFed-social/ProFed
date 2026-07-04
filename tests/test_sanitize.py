@@ -137,3 +137,53 @@ def test_sanitize_document_passes_through_non_strings():
 
     assert out == {"n": 42, "b": True, "x": None}
 
+
+def test_strip_tags_drops_javascript_scheme():
+    assert strip_tags("javascript:alert(1)") == ""
+
+
+def test_strip_tags_drops_data_scheme():
+    assert strip_tags("data:text/html,<b>x</b>") == ""
+
+
+def test_strip_tags_drops_obfuscated_script_scheme():
+    assert strip_tags("java\tscript:alert(1)") == ""
+
+
+def test_strip_tags_drops_typescript_like_scheme():
+    assert strip_tags("typescript:whatever") == ""
+
+
+def test_strip_tags_drops_scheme_revealed_after_tag_strip():
+    assert strip_tags("<b>javascript:alert(1)</b>") == ""
+
+
+def test_strip_tags_keeps_https_url():
+    assert strip_tags("https://example.com/a") == "https://example.com/a"
+
+
+def test_strip_tags_keeps_acct_scheme():
+    assert strip_tags("acct:bob@example.com") == "acct:bob@example.com"
+
+
+def test_strip_tags_keeps_text_with_colon():
+    assert strip_tags("Re:Zero is great") == "Re:Zero is great"
+
+
+def test_strip_tags_keeps_scheme_not_at_start():
+    assert strip_tags("see javascript:alert(1)") == "see javascript:alert(1)"
+
+
+def test_strip_tags_logs_on_dangerous_scheme(caplog):
+    with caplog.at_level("WARNING"):
+        strip_tags("javascript:alert(1)")
+
+    assert "disallowed URL scheme" in caplog.text
+
+
+def test_sanitize_document_drops_dangerous_url_in_field():
+    out = sanitize_document({"icon": {"url": "data:text/html,x"}, "inbox": "https://x/in"})
+
+    assert out["icon"]["url"] == ""
+    assert out["inbox"] == "https://x/in"
+

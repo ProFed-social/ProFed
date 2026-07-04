@@ -7,6 +7,7 @@ from functools import wraps
 from typing import Optional
 from urllib.parse import urlparse, urlunparse, urlencode
 from profed.http.client import http
+from profed.sanitize import sanitize_document
 
 
 logger = logging.getLogger(__name__)
@@ -51,9 +52,10 @@ async def _fetch_webfinger(resource: str) -> dict | None:
                       urlencode({"resource": _normalize_resource(resource)}),
                       ""))
     try:
-        return await http("GET").json(url,
-                                      headers={"Accept": "application/jrd+json"},
-                                      timeout=30.0)
+        return sanitize_document(await http("GET").json(url,
+                                                        headers={"Accept": "application/jrd+json"},
+                                                        timeout=30.0),
+                                 html_fields=frozenset())
     except Exception:
         return None 
 
@@ -71,5 +73,6 @@ async def lookup_actor_url(acct: str) -> Optional[str]:
     if data is not None:
         for link in data.get("links", []):
             if link.get("rel") == "self" and link.get("type") == "application/activity+json":
-                return link.get("href")
+                href = (link.get("href") or "").strip()
+                return href if href.startswith("https://") else None
 

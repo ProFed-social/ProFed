@@ -1,10 +1,13 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import re
 from html import unescape
 import nh3
 
+
+logger = logging.getLogger(__name__)
 
 _TAGS = {
     "p", "br", "span", "a", "abbr", "del", "pre", "blockquote", "code",
@@ -27,7 +30,7 @@ _LINK_REL = "nofollow noopener noreferrer"
 _ALLOWED_CLASS = re.compile(r"^(?:h|p|u|dt|e)-|^(?:mention|hashtag)$")
 _AS2_HTML_FIELDS = frozenset({"content", "summary"})
 _HTML_SUBTREES = {"resume": frozenset({"description"})}
-
+_DANGEROUS_SCHEME = re.compile(r".*script.*|data|blob|file", re.IGNORECASE)
 
 def _filter_attribute(tag, attribute, value):
     if attribute == "class":
@@ -47,6 +50,15 @@ def sanitize_html(html):
             html)
 
 
+def _dangerous_scheme(text):
+    match = re.match(r"([a-zA-Z][a-zA-Z0-9+.-]*):",
+                     re.sub(r"^[\x00-\x20]+", "", re.sub(r"[\t\r\n]", "", text)))
+    if match is not None and _DANGEROUS_SCHEME.fullmatch(match.group(1)):
+        logger.warning("strip_tags: dropped value with disallowed URL scheme %r", match.group(1))
+        return True
+    return False
+
+
 def strip_tags(text):
     if not text:
         return text
@@ -55,7 +67,7 @@ def strip_tags(text):
     while result != previous:
         previous = result
         result = unescape(nh3.clean(result, tags=set(), clean_content_tags={"script", "style"}))
-    return result
+    return "" if _dangerous_scheme(result) else result
 
 
 def _html_value(value):
