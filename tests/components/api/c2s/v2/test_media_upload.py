@@ -116,3 +116,19 @@ def test_thumbnail_is_smaller_than_original(client):
     assert meta["small"]["width"]  <= 400
     assert meta["small"]["height"] <= 400
 
+
+def test_upload_description_is_sanitised(client):
+    response = client.post("/media",
+                           files={"file": ("photo.jpg", make_jpeg(), "image/jpeg")},
+                           data={"description": "<script>evil()</script><b>Alt</b>"})
+
+    assert response.json()["description"] == "Alt"
+
+
+def test_upload_description_drops_dangerous_url(client):
+    response = client.post("/media",
+                           files={"file": ("photo.jpg", make_jpeg(), "image/jpeg")},
+                           data={"description": "javascript:alert(1)"})
+
+    assert response.json()["description"] == ""
+

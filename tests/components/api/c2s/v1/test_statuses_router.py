@@ -140,3 +140,21 @@ def test_unbookmark_returns_404(client, fake_bus):
 
     assert response.status_code == 404
 
+
+def test_create_status_sanitises_published_content(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
+        client.post("/statuses", json={"status": "<p>hi</p><script>steal()</script>"})
+
+    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    assert activity["object"]["content"] == "<p>hi</p>"
+
+
+def test_create_status_returns_sanitised_content(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
+        response = client.post("/statuses", json={"status": "<p>hi</p><script>steal()</script>"})
+
+
+    assert response.json()["content"] == "<p>hi</p>"
+

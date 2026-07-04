@@ -9,6 +9,7 @@ from profed.media import scale_image
 from profed.core.message_bus import message_bus
 from profed.identity import acct_from_username
 from profed.models import MediaObject, ImageMeta
+from profed.sanitize import strip_tags
 from profed.models.mastodon import (MediaAttachment,
                                     MediaAttachmentMeta,
                                     MediaAttachmentMetadata)
@@ -39,19 +40,20 @@ async def process_upload(username: str,
     if len(data) > MAX_SIZE_BYTES:
         raise HTTPException(status_code=422, detail="file_too_large")
 
-    uploader = acct_from_username(username)
-
     img = Image.open(io.BytesIO(data))
     orig_w, orig_h = img.size
-    is_animated = getattr(img, "is_animated", False)
     stored = await media_storage().store(data, file.content_type)
 
-    if is_animated:
+    if getattr(img, "is_animated", False):
         preview_url = stored.url
         preview_w, preview_h = orig_w, orig_h
     else:
         preview_w, preview_h = _preview_dimensions(orig_w, orig_h)
         preview_url = media_storage().url_for(stored.file_id, "small")
+        scale_image(stored.file_id,
+                    "small",
+                    **({"width": PREVIEW_DIM} if orig_w >= orig_h else
+                       {"height": PREVIEW_DIM}))
 
     async with message_bus().topic("media").publish() as publish:
         await publish(event_type="uploaded",
@@ -59,21 +61,15 @@ async def process_upload(username: str,
                       payload=MediaObject(url=stored.url,
                                           content_type=file.content_type,
                                           size=stored.size,
-                                          uploader=uploader,
+                                          uploader=acct_from_username(username),
                                           metadata=ImageMeta(width=orig_w,
                                                              height=orig_h)).model_dump(exclude_none=True))
-
-    if not is_animated:
-        scale_image(stored.file_id,
-                    "small",
-                    **({"width":  PREVIEW_DIM} if orig_w >= orig_h else
-                       {"height": PREVIEW_DIM}))
 
     return MediaAttachment(id=stored.file_id,
                            type=_media_type(file.content_type),
                            url=stored.url,
                            preview_url=preview_url,
-                           description=description,
+                           description=strip_tags(description),
                            meta=MediaAttachmentMetadata(original=MediaAttachmentMeta(width=orig_w,
                                                                                      height=orig_h),
                                                         small=MediaAttachmentMeta(width=preview_w,

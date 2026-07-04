@@ -54,7 +54,7 @@ def _dangerous_scheme(text):
     match = re.match(r"([a-zA-Z][a-zA-Z0-9+.-]*):",
                      re.sub(r"^[\x00-\x20]+", "", re.sub(r"[\t\r\n]", "", text)))
     if match is not None and _DANGEROUS_SCHEME.fullmatch(match.group(1)):
-        logger.warning("strip_tags: dropped value with disallowed URL scheme %r", match.group(1))
+        logger.warning("dropped value with disallowed URL scheme %r", match.group(1))
         return True
     return False
 

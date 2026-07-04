@@ -12,6 +12,7 @@ from profed.models.activity_pub import CreateActivity, DeleteActivity, Note
 from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
+from profed.sanitize import sanitize_html
  
  
 router = APIRouter()
@@ -35,26 +36,20 @@ class StatusCreate(BaseModel):
  
 @router.post("/statuses")
 async def create_status(body: StatusCreate,
-                         claims: Annotated[dict, Depends(current_user)]):
+                        claims: Annotated[dict, Depends(current_user)]):
     username = claims.get("preferred_username") or claims.get("sub")
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
  
-    max_chars = int(_config.get("status_max_characters", 5000))
-    if len(body.status) > max_chars:
+    if len(body.status) > int(_config.get("status_max_characters", 5000)):
         raise HTTPException(status_code=422, detail="status too long")
  
     actor_url  = actor_url_from_username(username)
-    note_id    = f"{actor_url}/notes/{uuid.uuid4()}"
-    created_at = datetime.now(timezone.utc).isoformat()
- 
-    note = Note(id=note_id,
+    note = Note(id=f"{actor_url}/notes/{uuid.uuid4()}",
                 attributedTo=actor_url,
-                content=body.status,
-                published=created_at)
- 
-    activity_id = f"{actor_url}#create/{uuid.uuid4()}"
-    activity = CreateActivity(id=activity_id,
+                content=sanitize_html(body.status),
+                published=datetime.now(timezone.utc).isoformat())
+    activity = CreateActivity(id=f"{actor_url}#create/{uuid.uuid4()}",
                               actor=actor_url,
                               to=note.to,
                               object=note.model_dump(by_alias=True,
@@ -62,22 +57,22 @@ async def create_status(body: StatusCreate,
 
     async with message_bus().topic("activities").publish() as publish:
         await publish(event_type="Create",
-                      object_id=activity_id,
+                      object_id=activity.id,
                       payload={"username": username,
                                "activity": {k: v
                                             for k, v in activity.model_dump(by_alias=True,
                                                                             exclude_none=True).items()
                                             if k not in ("id", "type")}})
 
-    return Status(id=note_id,
-                  created_at=created_at,
+    return Status(id=note.id,
+                  created_at=note.published,
                   visibility=body.visibility,
                   sensitive=body.sensitive,
                   spoiler_text=body.spoiler_text,
                   language=body.language,
-                  uri=note_id,
-                  url=note_id,
-                  content=body.status,
+                  uri=note.id,
+                  url=note.id,
+                  content=note.content,
                   account=await resolve_actor(username))
 
 
