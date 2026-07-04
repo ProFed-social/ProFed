@@ -44,13 +44,14 @@ def _patches():
     return (patch("profed.federation.actors.fetch_actor",
                   AsyncMock(return_value=dict(REMOTE_ACTOR))),
             patch("profed.federation.actors.lookup_acct",
-                  AsyncMock(return_value="bob@remote.example")))
+                  AsyncMock(return_value="bob@remote.example")),
+            patch("profed.federation.actors.is_local", lambda acct: False))
 
 
 @pytest.mark.asyncio
 async def test_publishes_sanitised_actor(fake_bus):
-    fetch, lookup = _patches()
-    with fetch, lookup:
+    fetch, lookup, local = _patches()
+    with fetch, lookup, local:
         await fetch_and_register_actor("https://remote.example/users/bob")
 
     actor = fake_bus.topic("remote_actors").published[0]["payload"]["actor_data"]
@@ -60,8 +61,8 @@ async def test_publishes_sanitised_actor(fake_bus):
 
 @pytest.mark.asyncio
 async def test_preserves_public_key_pem(fake_bus):
-    fetch, lookup = _patches()
-    with fetch, lookup:
+    fetch, lookup, local = _patches()
+    with fetch, lookup, local:
         await fetch_and_register_actor("https://remote.example/users/bob")
 
     actor = fake_bus.topic("remote_actors").published[0]["payload"]["actor_data"]
@@ -70,8 +71,8 @@ async def test_preserves_public_key_pem(fake_bus):
 
 @pytest.mark.asyncio
 async def test_returns_sanitised_actor_with_intact_pem(fake_bus):
-    fetch, lookup = _patches()
-    with fetch, lookup:
+    fetch, lookup, local = _patches()
+    with fetch, lookup, local:
         result = await fetch_and_register_actor("https://remote.example/users/bob")
 
     assert result["summary"] == "<p>hi</p>"
