@@ -47,3 +47,28 @@ async def test_returns_false_for_unknown_user(fake_bus, fake_storage):
     assert result is False
     assert fake_bus.topic("incoming_activities").published == []
 
+
+CREATE_ACTIVITY = {"id": "https://mastodon.social/alice/statuses/1",
+                   "type": "Create",
+                   "actor": "https://mastodon.social/users/alice",
+                   "object": {"type": "Note",
+                              "content": "<p>hi</p><script>steal()</script>",
+                              "attributedTo": "https://mastodon.social/users/alice"}}
+
+
+@pytest.mark.asyncio
+async def test_publishes_sanitized_activity_content(fake_bus, fake_storage):
+    await accept_inbox_activity("cdonat", CREATE_ACTIVITY)
+
+    published = fake_bus.topic("incoming_activities").published
+    assert published[0]["payload"]["activity"]["object"]["content"] == "<p>hi</p>"
+
+
+@pytest.mark.asyncio
+async def test_preserves_actor_and_ids_through_sanitisation(fake_bus, fake_storage):
+    await accept_inbox_activity("cdonat", CREATE_ACTIVITY)
+
+    published = fake_bus.topic("incoming_activities").published
+    assert published[0]["object_id"] == CREATE_ACTIVITY["id"]
+    assert published[0]["payload"]["activity"]["actor"] == CREATE_ACTIVITY["actor"]
+

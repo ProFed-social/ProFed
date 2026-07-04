@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.sanitize import sanitize_html
+from profed.sanitize import sanitize_html, strip_tags, sanitize_document
 
 
 def test_strips_script_tag_and_content():
@@ -67,4 +67,73 @@ def test_is_idempotent():
 def test_passes_through_empty_and_none():
     assert sanitize_html("") == ""
     assert sanitize_html(None) is None
+
+
+def test_strip_tags_removes_all_tags():
+    assert strip_tags("<p>Hello <b>world</b></p>") == "Hello world"
+
+
+def test_strip_tags_unescapes_and_strips_nested_encoding():
+    assert strip_tags("a &lt;script&gt;alert(1)&lt;/script&gt; b") == "a  b"
+
+
+def test_strip_tags_preserves_pem():
+    pem = '-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0B==\n-----END PUBLIC KEY-----\n'
+    assert strip_tags(pem) == pem
+
+
+def test_strip_tags_passes_through_empty_and_none():
+    assert strip_tags("") == ""
+    assert strip_tags(None) is None
+
+
+def test_sanitize_document_sanitizes_html_field():
+    out = sanitize_document({"summary": "<p>hi</p><script>x</script>"})
+
+    assert out["summary"] == "<p>hi</p>"
+
+
+def test_sanitize_document_strips_text_field():
+    out = sanitize_document({"name": "Bob <b>Evil</b>"})
+
+    assert out["name"] == "Bob Evil"
+
+
+def test_sanitize_document_handles_language_map():
+    out = sanitize_document({"summaryMap": {"en": "<p>hi</p><script>x</script>",
+                                            "de": "<p>hallo</p>"}})
+
+    assert out["summaryMap"] == {"en": "<p>hi</p>", "de": "<p>hallo</p>"}
+
+
+def test_sanitize_document_html_field_as_dict_is_language_mapped():
+    out = sanitize_document({"content": {"en": "<p>ok</p><script>y</script>"}})
+
+    assert out["content"] == {"en": "<p>ok</p>"}
+
+
+def test_sanitize_document_scopes_description_to_resume_subtree():
+    out = sanitize_document({"resume": {"experience": [{"description":
+                                                        "<p>ok</p><script>b</script>"}]}})
+
+    assert out["resume"]["experience"][0]["description"] == "<p>ok</p>"
+
+
+def test_sanitize_document_description_outside_resume_is_stripped():
+    out = sanitize_document({"description": "<p>ok</p><script>b</script>"})
+
+    assert out["description"] == "ok"
+
+
+def test_sanitize_document_preserves_pem():
+    pem = '-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0B==\n-----END PUBLIC KEY-----\n'
+    out = sanitize_document({"publicKey": {"publicKeyPem": pem}})
+
+    assert out["publicKey"]["publicKeyPem"] == pem
+
+
+def test_sanitize_document_passes_through_non_strings():
+    out = sanitize_document({"n": 42, "b": True, "x": None})
+
+    assert out == {"n": 42, "b": True, "x": None}
 

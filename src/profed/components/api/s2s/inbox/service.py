@@ -4,6 +4,7 @@
 from profed.core.message_bus import message_bus
 from profed.http.signatures import key_id_from_signature_header, verify_request
 from profed.federation.actors import fetch_and_register_actor
+from profed.sanitize import sanitize_document
 from profed.components.api.s2s.inbox.storage import storage
 from profed.components.api.s2s.inbox.public_keys_storage import storage as public_keys_storage
 
@@ -63,9 +64,9 @@ async def accept_inbox_activity(username: str, activity: dict) -> bool:
         await publish(event_type=activity["type"],
                       object_id=activity["id"],
                       payload={"username": username,
-                               "activity": {k: v
-                                            for k, v in activity.items()
-                                            if k not in ("id", "type")}})
+                               "activity": sanitize_document({k: v
+                                                              for k, v in activity.items()
+                                                              if k not in ("id", "type")})})
 
     return True
 

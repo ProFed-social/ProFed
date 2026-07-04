@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import re
+from html import unescape
 import nh3
 
 
@@ -24,6 +25,8 @@ _URL_SCHEMES = {
 }
 _LINK_REL = "nofollow noopener noreferrer"
 _ALLOWED_CLASS = re.compile(r"^(?:h|p|u|dt|e)-|^(?:mention|hashtag)$")
+_AS2_HTML_FIELDS = frozenset({"content", "summary"})
+_HTML_SUBTREES = {"resume": frozenset({"description"})}
 
 
 def _filter_attribute(tag, attribute, value):
@@ -42,4 +45,40 @@ def sanitize_html(html):
                       clean_content_tags={"script", "style"})
             if html else
             html)
+
+
+def strip_tags(text):
+    if not text:
+        return text
+    previous = None
+    result = text
+    while result != previous:
+        previous = result
+        result = unescape(nh3.clean(result, tags=set(), clean_content_tags={"script", "style"}))
+    return result
+
+
+def _html_value(value):
+    return (sanitize_html(value)
+            if isinstance(value, str) else
+            {key: _html_value(v) for key, v in value.items()}
+            if isinstance(value, dict) else
+            [_html_value(v) for v in value]
+            if isinstance(value, list) else
+            value)
+
+
+def sanitize_document(value, html_fields=_AS2_HTML_FIELDS):
+    return ({key: (_html_value(v)
+                   if (key[:-3] if key.endswith("Map") else key) in html_fields else
+                   sanitize_document(v, html_fields | _HTML_SUBTREES[key])
+                   if key in _HTML_SUBTREES else
+                   sanitize_document(v, html_fields))
+             for key, v in value.items()}
+            if isinstance(value, dict) else
+            [sanitize_document(v, html_fields) for v in value]
+            if isinstance(value, list) else
+            strip_tags(value)
+            if isinstance(value, str) else
+            value)
 
