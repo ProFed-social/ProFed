@@ -15,9 +15,10 @@ class _Storage(BaseStorage):
                                                     following TEXT NOT NULL,
                                                     PRIMARY KEY (follower, following))""")
         await self.execute("""CREATE TABLE IF NOT EXISTS
-                              person_account.statuses (username TEXT PRIMARY KEY,
-                                                       count BIGINT NOT NULL DEFAULT 0)""")
-
+                              person_account.statuses (username TEXT NOT NULL,
+                                                       status_id TEXT NOT NULL,
+                                                       PRIMARY KEY (username, status_id))""")
+ 
     async def add_edge(self, follower: str, following: str) -> bool:
         row = await self.fetch_one("""INSERT INTO person_account.edges (follower, following)
                                       VALUES ($1, $2)
@@ -57,23 +58,29 @@ class _Storage(BaseStorage):
                                    acct)
         return (row["followers"], row["following"]) if row else (0, 0)
 
-    async def bump_statuses(self, username: str, delta: int) -> int:
-        row = await self.fetch_one("""INSERT INTO person_account.statuses (username, count)
-                                      VALUES ($1, GREATEST($2, 0))
-                                      ON CONFLICT (username) DO UPDATE
-                                          SET count = GREATEST(person_account.statuses.count + $2,
-                                                               0)
-                                      RETURNING count""",
+    async def add_status(self, username: str, status_id: str) -> bool:
+        row = await self.fetch_one("""INSERT INTO person_account.statuses (username, status_id)
+                                      VALUES ($1, $2)
+                                      ON CONFLICT DO NOTHING
+                                      RETURNING username""",
                                    username,
-                                   delta)
-        return row["count"] if row else 0
+                                   status_id)
+        return row is not None
 
-    async def get_statuses(self, username: str) -> int:
-        row = await self.fetch_one("""SELECT count
+    async def remove_status(self, username: str, status_id: str) -> bool:
+        row = await self.fetch_one("""DELETE FROM person_account.statuses
+                                      WHERE username = $1 AND status_id = $2
+                                      RETURNING username""",
+                                   username,
+                                   status_id)
+        return row is not None
+
+    async def count_statuses(self, username: str) -> int:
+        row = await self.fetch_one("""SELECT COUNT(*) AS count
                                       FROM person_account.statuses
                                       WHERE username = $1""",
                                    username)
-        return row["count"] if row else 0
+        return row["count"]
 
 
 _instance: _Storage | None = None

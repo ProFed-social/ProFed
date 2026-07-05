@@ -29,7 +29,7 @@ def cfg():
 class _FakeStore:
     def __init__(self):
         self.edges = set()
-        self.statuses = {}
+        self.statuses = set()
 
     def rebuild_finished(self):
         pass
@@ -55,13 +55,20 @@ class _FakeStore:
     async def count_follows(self, acct):
         return (await self.count_followers(acct), await self.count_following(acct))
 
-    async def bump_statuses(self, username, delta):
-        self.statuses[username] = max(self.statuses.get(username, 0) + delta, 0)
-        return self.statuses[username]
+    async def add_status(self, username, status_id):
+        if (username, status_id) in self.statuses:
+            return False
+        self.statuses.add((username, status_id))
+        return True
 
-    async def get_statuses(self, username):
-        return self.statuses.get(username, 0)
+    async def remove_status(self, username, status_id):
+        if (username, status_id) not in self.statuses:
+            return False
+        self.statuses.discard((username, status_id))
+        return True
 
+    async def count_statuses(self, username):
+        return sum(1 for u, _ in self.statuses if u == username)
 
 @pytest.fixture
 def fake_store():
@@ -315,7 +322,8 @@ async def test_status_announce_increments(fake_bus, fake_store, cfg):
 
 @pytest.mark.asyncio
 async def test_status_delete_decrements(fake_bus, fake_store, cfg):
-    await fake_store.bump_statuses("alice", 2)
+    await fake_store.add_status("alice", "n1")
+    await fake_store.add_status("alice", "n2")
     fake_bus.topic("activities").messages = [_msg(1, "Delete", "n1", _status_delete("n1"))]
 
     await translator.handle_statuses_events()
@@ -338,5 +346,24 @@ async def test_statuses_skips_actor_self_delete(fake_bus, fake_store, cfg):
 
     await translator.handle_statuses_events()
 
+    assert _accounts(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_duplicate_status_create_counts_once(fake_bus, fake_store, cfg):
+    fake_bus.topic("activities").messages = [_msg(1, "Create", "n1", _status_create("n1")),
+                                             _msg(2, "Create", "n1", _status_create("n1"))]
+
+    await translator.handle_statuses_events()
+    
+    assert [a["payload"]["count"] for a in _accounts(fake_bus)] == [1]
+
+
+@pytest.mark.asyncio
+async def test_deleting_unknown_status_emits_nothing(fake_bus, fake_store, cfg):
+    fake_bus.topic("activities").messages = [_msg(1, "Delete", "n1", _status_delete("n1"))]
+
+    await translator.handle_statuses_events()
+    
     assert _accounts(fake_bus) == []
 

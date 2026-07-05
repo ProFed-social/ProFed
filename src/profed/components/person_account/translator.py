@@ -42,7 +42,7 @@ async def _emit_account(event_type: str, username: str, person_actor: dict, sequ
 
     store = await storage()
     account.followers_count, account.following_count = await store.count_follows(acct)
-    account.statuses_count = await store.get_statuses(username)
+    account.statuses_count = await store.count_statuses(username)
 
     await _publish(event_type,
                    username,
@@ -127,25 +127,36 @@ def _is_actor_self_delete(activity: dict) -> bool:
     return activity.get("actor") is not None and activity.get("actor") == activity.get("object")
 
 
-async def _bump_statuses(username: str, delta: int, sequence_id: int) -> None:
-    count = await (await storage()).bump_statuses(username, delta)
-    await _emit_count("statuses_changed", username, count, _ACTIVITIES_SOURCE, sequence_id)
+def _status_id(activity: dict):
+    obj = activity.get("object")
+    return obj.get("id") if isinstance(obj, dict) else obj
 
+
+async def _apply_status(username: str, status_id, present: bool, sequence_id: int) -> None:
+    if status_id is None:
+        return
+
+    store = await storage()
+    changed = await (store.add_status if present else store.remove_status)(username, status_id)
+    if changed:
+        await _emit_count("statuses_changed", username,
+                          await store.count_statuses(username), _ACTIVITIES_SOURCE, sequence_id)
+ 
 
 async def _status_created(object_id, payload, sequence_id) -> None:
     if _is_actor_object(payload["activity"]):
         return
-    await _bump_statuses(payload["username"], 1, sequence_id)
+    await _apply_status(payload["username"], _status_id(payload["activity"]), True, sequence_id)
 
 
 async def _status_announced(object_id, payload, sequence_id) -> None:
-    await _bump_statuses(payload["username"], 1, sequence_id)
+    await _apply_status(payload["username"], object_id, True, sequence_id)
 
 
 async def _status_deleted(object_id, payload, sequence_id) -> None:
     if _is_actor_self_delete(payload["activity"]):
         return
-    await _bump_statuses(payload["username"], -1, sequence_id)
+    await _apply_status(payload["username"], _status_id(payload["activity"]), False, sequence_id)
 
 
 handle_statuses_events, _, _ = \
