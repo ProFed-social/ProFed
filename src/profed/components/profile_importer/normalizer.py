@@ -1,9 +1,9 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 from profed.models import Resume, UserProfile
-from profed.sanitize import sanitize_html
+from profed.sanitize import sanitize_html, strip_tags
 from .composition import apply_template
  
  
@@ -16,13 +16,20 @@ def _first(lst: list, default=None) -> Any:
     return lst[0] if lst else default
 
 
+def _from_val(value: any, get: Callable):
+    return strip_tags(value
+                      if isinstance(value, str) else
+                      get(value)
+                      if isinstance(value, dict) else
+                      "").strip() or None
+
+
 def _to_text(value: Any) -> Optional[str]:
-    if isinstance(value, str):
-        return value.strip() or None
-    if isinstance(value, dict):
-        raw = value.get("value") or value.get("html", "")
-        return raw.strip() or None
-    return None
+    return _from_val(value, lambda v: (v.get("value") or v.get("html", "")).strip())
+
+
+def _to_url(value: Any) -> Optional[str]:
+    return _from_val(value, lambda v: v.get("value") or v.get("url"))
 
 
 def _raw(value: Any) -> str:
@@ -36,14 +43,6 @@ def _values(props: dict, hcard_props: dict) -> dict[str, str]:
     return {key: raw
             for key, raw in ((key, _raw(_first(vals))) for key, vals in merged.items())
             if raw}
-
-
-def _to_url(value: Any) -> Optional[str]:
-    if isinstance(value, str):
-        return value.strip() or None
-    if isinstance(value, dict):
-        return value.get("value") or value.get("url")
-    return None
 
 
 def _html_field(props: dict, name: str) -> Optional[str]:

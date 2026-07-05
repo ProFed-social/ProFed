@@ -301,3 +301,34 @@ def test_normalize_reference_content_is_sanitised():
 def test_reference_ignores_non_dict():
     assert _reference("not a dict") == {}
 
+
+def test_to_url_drops_dangerous_scheme():
+    assert _to_url("javascript:alert(1)") is None
+
+
+def test_to_url_keeps_https():
+    assert _to_url("https://example.com/x") == "https://example.com/x"
+
+
+def test_normalize_drops_dangerous_project_url():
+    mf2 = _mf2({"name": ["Alice"],
+                "x-project": [{"type": ["h-entry"],
+                               "properties": {"name": ["ProFed"],
+                                              "url": ["javascript:alert(1)"]}}]})
+
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+
+    assert "url" not in profile.resume.projects[0]
+
+
+def test_normalize_keeps_https_experience_url():
+    mf2 = _mf2({"name": ["Alice"],
+                "experience": [{"type": ["h-event"],
+                                "properties": {"name": ["Dev"],
+                                               "url": ["https://ok.example/e"]}}]})
+
+    profile, _ = normalize_mf2_to_profile(mf2, "alice")
+
+    assert profile.resume.experience[0]["url"] == "https://ok.example/e"
+
+
