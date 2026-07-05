@@ -36,6 +36,10 @@ async def _created(object_id, payload, emitted_at, sequence_id) -> None:
 async def _profile_edited(object_id, payload, emitted_at, sequence_id) -> None:
     await (await storage()).merge_change(object_id, payload, sequence_id)
 
+async def _updated(object_id, payload, emitted_at, sequence_id) -> None:
+    await (await storage()).merge_change(object_id,
+                                         {k: v for k, v in payload.items() if k != "private_key_pem"},
+                                         sequence_id)
 
 async def _avatar_changed(object_id, payload, emitted_at, sequence_id) -> None:
     await (await storage()).merge_change(object_id, {"avatar": payload or None}, sequence_id)
@@ -97,6 +101,7 @@ handle_user_events, rebuild, reset_last_seen = \
                          init=_init,
                          on_snapshot_item=_apply_snapshot_item,
                          on_message_type={"created": _created,
+                                          "updated": _updated,
                                           "profile_edited": _profile_edited,
                                           "avatar_changed": _avatar_changed,
                                           "header_changed": _header_changed,

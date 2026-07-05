@@ -117,6 +117,7 @@ def validate_users_event(event_type: str, payload) -> Optional[Dict]:
         logger.warning(_ignore_msg(f"unknown event type {event_type!r}"))
 
     return ({"created": _validate_created,
+             "updated": _validate_created,
              "deleted": _validate_deleted,
              "profile_edited": _validate_profile_edited,
              "avatar_changed": _validate_image_changed,

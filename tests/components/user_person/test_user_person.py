@@ -242,3 +242,21 @@ async def test_resume_reaches_person_after_cv_changed(fake_bus, fake_store):
     assert published[1]["event_type"] == "updated"
     assert published[1]["payload"]["resume"]["projects"] == [{"name": "Demo"}]
 
+
+@pytest.mark.asyncio
+async def test_updated_merges_sanitised_profile_without_private_key(fake_bus, fake_store):
+    fake_bus.topic("users").messages = [_msg(1, "created", "alice", {"name": "Alice",
+                                                                     "summary": "<p>x</p>"}),
+                                        _msg(2, "Tick", "", {}),
+                                        _msg(3, "updated", "alice", {"name": "Alice",
+                                                                     "summary": "clean",
+                                                                     "private_key_pem": "PRIV"}),
+                                        _msg(4, "Tick", "", {})]
+
+    await translator.handle_user_events()
+
+    published = _person(fake_bus)
+    assert published[-1]["event_type"] == "updated"
+    assert published[-1]["payload"]["summary"] == "clean"
+    assert "private_key_pem" not in fake_store.rows["alice"]["profile"]
+

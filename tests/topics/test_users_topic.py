@@ -150,3 +150,12 @@ def test_snapshot_item_missing_username_returns_none():
 
 def test_non_dict_snapshot_item_returns_none():
     assert validate_users_snapshot_item("not a dict") is None
+
+
+def test_updated_validates_like_created():
+    payload = {"name": "Alice",
+               "summary": "Engineer",
+               "public_key_pem": "PUB",
+               "private_key_pem": "PRIV"}
+    assert validate_users_event("updated", payload) == validate_users_event("created", payload)
+
