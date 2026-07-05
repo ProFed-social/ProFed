@@ -7,7 +7,7 @@ from functools import wraps
 from typing import Optional
 from urllib.parse import urlparse, urlunparse, urlencode
 from profed.http.client import http
-from profed.sanitize import sanitize_document
+from profed.sanitize import sanitize_document, no_html_fields
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ async def _fetch_webfinger(resource: str) -> dict | None:
         return sanitize_document(await http("GET").json(url,
                                                         headers={"Accept": "application/jrd+json"},
                                                         timeout=30.0),
-                                 html_fields=frozenset())
+                                 html_fields=no_html_fields)
     except Exception:
         return None 
 

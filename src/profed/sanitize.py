@@ -5,6 +5,7 @@ import logging
 import re
 from html import unescape
 import nh3
+from pydantic import BaseModel
 
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,6 @@ _URL_SCHEMES = {
 }
 _LINK_REL = "nofollow noopener noreferrer"
 _ALLOWED_CLASS = re.compile(r"^(?:h|p|u|dt|e)-|^(?:mention|hashtag)$")
-_AS2_HTML_FIELDS = frozenset({"content", "summary"})
-_HTML_SUBTREES = {"resume": frozenset({"description"})}
 _DANGEROUS_SCHEME = re.compile(r".*script.*|data|blob|file", re.IGNORECASE)
 
 def _filter_attribute(tag, attribute, value):
@@ -70,6 +69,22 @@ def strip_tags(text):
     return "" if _dangerous_scheme(result) else result
 
 
+def resume_html_fields():
+    return {"content", "description"}, {}
+
+
+def as2_html_fields():
+    return {"content", "summary"}, {"resume": resume_html_fields}
+
+
+def no_html_fields():
+    return set(), {}
+
+
+def skip_nothing():
+    return set(), {}
+
+
 def _html_value(value):
     return (sanitize_html(value)
             if isinstance(value, str) else
@@ -80,15 +95,25 @@ def _html_value(value):
             value)
 
 
-def sanitize_document(value, html_fields=_AS2_HTML_FIELDS):
-    return ({key: (_html_value(v)
-                   if (key[:-3] if key.endswith("Map") else key) in html_fields else
-                   sanitize_document(v, html_fields | _HTML_SUBTREES[key])
-                   if key in _HTML_SUBTREES else
-                   sanitize_document(v, html_fields))
-             for key, v in value.items()}
+def _sanitize_dict(value, html_fields, skip):
+    html_flat, html_sub = html_fields()
+    skip_flat, skip_sub = skip()
+    return {key: (v
+                  if key in skip_flat else
+                  sanitize_document(v, html_sub.get(key, html_fields), skip_sub.get(key, skip))
+                  if key in html_sub or key in skip_sub else
+                  _html_value(v)
+                  if (key[:-3] if key.endswith("Map") else key) in html_flat else
+                  sanitize_document(v, html_fields, skip))
+            for key, v in value.items()}
+
+
+def sanitize_document(value, html_fields=as2_html_fields, skip=skip_nothing):
+    return (type(value).model_validate(sanitize_document(value.model_dump(by_alias=True), html_fields, skip))
+            if isinstance(value, BaseModel) else
+            _sanitize_dict(value, html_fields, skip)
             if isinstance(value, dict) else
-            [sanitize_document(v, html_fields) for v in value]
+            [sanitize_document(v, html_fields, skip) for v in value]
             if isinstance(value, list) else
             strip_tags(value)
             if isinstance(value, str) else

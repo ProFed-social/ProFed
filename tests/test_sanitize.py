@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.sanitize import sanitize_html, strip_tags, sanitize_document
+from profed.models.activity_pub import Note
 
 
 def test_strips_script_tag_and_content():
@@ -187,3 +188,49 @@ def test_sanitize_document_drops_dangerous_url_in_field():
     assert out["icon"]["url"] == ""
     assert out["inbox"] == "https://x/in"
 
+
+def test_sanitize_document_skips_flat_field():
+    out = sanitize_document({"note": "<b>raw</b>", "x": "<b>y</b>"},
+                            html_fields=lambda: ({"note"}, {}), skip=lambda: ({"note"}, {}))
+
+    assert out == {"note": "<b>raw</b>", "x": "y"}
+
+
+def test_sanitize_document_skips_field_within_subtree():
+    out = sanitize_document({"note": "<b>rendered</b>",
+                             "source": {"note": "<b>raw</b>", "privacy": "public"}},
+                            html_fields=lambda: ({"note"}, {}),
+                            skip=lambda: (set(), {"source": lambda: ({"note"}, {})}))
+
+    assert out["note"] == "<b>rendered</b>"
+    assert out["source"]["note"] == "<b>raw</b>"
+    assert out["source"]["privacy"] == "public"
+
+
+def test_sanitize_document_empty_fields_strips_everything():
+    out = sanitize_document({"summary": "<p>hi</p>"}, html_fields=lambda: (set(), {}))
+
+    assert out == {"summary": "hi"}
+
+
+def test_sanitize_document_subtree_replaces_html_fields():
+    out = sanitize_document({"summary": "<p>bio</p>",
+                             "resume": {"summary": "<b>x</b>",
+                                        "description": "<p>d</p><script>s</script>"}})
+
+    assert out["summary"] == "<p>bio</p>"
+    assert out["resume"]["summary"] == "x"
+    assert out["resume"]["description"] == "<p>d</p>"
+
+
+def test_sanitize_document_roundtrips_pydantic_model():
+    note = Note(id="https://x/n", attributedTo="https://x/bob",
+                content="<p>hi</p><script>s</script>", summary="<b>CW</b>",
+                published="2026-01-01")
+
+    result = sanitize_document(note)
+
+    assert isinstance(result, Note)
+    assert result.content == "<p>hi</p>"
+    assert result.summary == "<b>CW</b>"
+    assert result.id == "https://x/n"
