@@ -3,6 +3,7 @@
 
 import pytest
 import os
+import json
 import asyncio
 from typing import Dict
 from datetime import datetime, timezone
@@ -189,4 +190,29 @@ async def test_deliver_sends_signed_request_when_key_available(fake_bus, fake_st
             assert "Signature" in headers
             assert "Digest"    in headers
             assert "Date"      in headers
+
+
+@pytest.mark.asyncio
+async def test_deliver_sanitises_body_before_signing(fake_bus, fake_storage):
+    activity = {"id":     "https://example.com/act/2",
+                "type":   "Create",
+                "actor":  "https://example.com/actors/alice",
+                "object": {"id":      "https://example.com/n/2",
+                           "type":    "Note",
+                           "content": "<p>ok</p><script>evil</script>"}}
+    with Cfg({"profed": {"run": "activity_delivery"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.activity_delivery.delivery._fetch_inbox_url",
+                   AsyncMock(return_value=INBOX_URL)), \
+             patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_post:
+            post = AsyncMock(return_value=_mock_post_response(status=202))
+            mock_post.return_value.__aenter__.return_value.post = post
+
+            await delivery.deliver({"initial_retry": 0},
+                                   "https://example.com/act/2",
+                                   activity,
+                                   "bob@remote.example")
+
+            body = json.loads(post.call_args.kwargs["content"])
+            assert body["object"]["content"] == "<p>ok</p>"
 

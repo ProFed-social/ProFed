@@ -131,3 +131,10 @@ def sanitize_as_object(payload):
 def sanitize_c2s_object(payload):
     return sanitize_document(payload, html_fields=mastodon_html_fields)
 
+
+def sanitize_egress(content, sanitize, kind):
+    result = sanitize(content)
+    if result != content:
+        logger.warning("third line sanitised unsanitised content at egress: %s", kind)
+    return result
+

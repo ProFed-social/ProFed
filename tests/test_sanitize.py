@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.sanitize import sanitize_html, strip_tags, sanitize_document
+from profed.sanitize import sanitize_html, strip_tags, sanitize_document, sanitize_egress, sanitize_as_object
 from profed.models.activity_pub import Note
 
 
@@ -234,3 +234,20 @@ def test_sanitize_document_roundtrips_pydantic_model():
     assert result.content == "<p>hi</p>"
     assert result.summary == "<b>CW</b>"
     assert result.id == "https://x/n"
+
+
+def test_sanitize_egress_returns_sanitised_and_logs(caplog):
+    with caplog.at_level("WARNING"):
+        out = sanitize_egress({"summary": "<p>x</p><script>s</script>"}, sanitize_as_object, "k")
+
+    assert out == {"summary": "<p>x</p>"}
+    assert "third line" in caplog.text
+
+
+def test_sanitize_egress_silent_when_clean(caplog):
+    with caplog.at_level("WARNING"):
+        out = sanitize_egress({"summary": "<p>ok</p>"}, sanitize_as_object, "k")
+
+    assert out == {"summary": "<p>ok</p>"}
+    assert caplog.text == ""
+

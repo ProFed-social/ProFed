@@ -15,6 +15,7 @@ from typing import Optional
  
 from profed.http.client import http 
 from profed.http.signatures import sign_request
+from profed.sanitize import sanitize_egress, sanitize_as_object
 from profed.core.message_bus import message_bus
 from .projections import get_delivery_status
 from .storage import storage
@@ -135,18 +136,15 @@ async def _build_signed_headers(activity: dict,
 async def _post_to_inbox(inbox_url: str,
                          activity: dict,
                          client: httpx.AsyncClient) -> httpx.Response:
-    ap_activity = {k: v for k, v in activity.items()
-                   if k not in _INTERNAL_FIELDS}
+    ap_activity = {k: v for k, v in activity.items() if k not in _INTERNAL_FIELDS}
     if "@context" not in ap_activity:
         ap_activity["@context"] = "https://www.w3.org/ns/activitystreams"
-    body    = json.dumps(ap_activity).encode()
 
-    headers = await _build_signed_headers(activity, inbox_url, body)
-    logger.debug("POST %s headers: %r", inbox_url, headers)
+    body = json.dumps(sanitize_egress(ap_activity, sanitize_as_object, "delivery")).encode()
 
     return await client.post(inbox_url,
                              content=body,
-                             headers=headers,
+                             headers=await _build_signed_headers(activity, inbox_url, body),
                              timeout=REQUEST_TIMEOUT)
 
  
