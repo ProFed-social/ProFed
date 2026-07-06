@@ -77,6 +77,10 @@ def as2_html_fields():
     return {"content", "summary"}, {"resume": resume_html_fields}
 
 
+def mastodon_html_fields():
+    return {"content", "note"}, {"resume": resume_html_fields}
+
+
 def no_html_fields():
     return set(), {}
 
@@ -118,4 +122,12 @@ def sanitize_document(value, html_fields=as2_html_fields, skip=skip_nothing):
             strip_tags(value)
             if isinstance(value, str) else
             value)
+
+
+def sanitize_as_object(payload):
+    return sanitize_document(payload, html_fields=as2_html_fields)
+
+
+def sanitize_c2s_object(payload):
+    return sanitize_document(payload, html_fields=mastodon_html_fields)
 

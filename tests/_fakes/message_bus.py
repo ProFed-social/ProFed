@@ -24,9 +24,9 @@ class FakePublishContext:
                            message_id=None):
             if message_id is not None:
                 if message_id in self._topic._published_ids:
-                    return
+                    return None
                 self._topic._published_ids.add(message_id)
-            seq     = len(self._topic.messages) + 1
+            seq = len(self._topic.messages) + 1
             payload = payload if payload is not None else {}
             self._topic.messages.append((seq,
                                          event_type,
@@ -34,8 +34,9 @@ class FakePublishContext:
                                          datetime.now(timezone.utc),
                                          payload))
             self._topic.published.append({"event_type": event_type,
-                                          "object_id":  object_id,
-                                          "payload":    payload})
+                                          "object_id": object_id,
+                                          "payload": payload})
+            return seq
         return _publish
 
     async def __aexit__(self, *_):
@@ -44,9 +45,9 @@ class FakePublishContext:
 
 class FakeTopic:
     def __init__(self):
-        self.messages  = []   # [(seq, event_type, object_id, emitted_at, payload), ...]
-        self.published = []   # [{"event_type", "object_id", "payload"}, ...]
-        self.snapshots = []   # [(last_event_id, items), ...]
+        self.messages  = [] 
+        self.published = [] 
+        self.snapshots = [] 
         self.last_seen = 0
         self._published_ids = set()
 

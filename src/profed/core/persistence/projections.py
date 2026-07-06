@@ -2,9 +2,30 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
+import logging
 from typing import Optional, Dict, Callable, Awaitable, Tuple, Any
 from profed.core.message_bus import message_bus, TICK, CatchUp
+from profed.core.message_bus.source_key import source_key
 
+
+logger = logging.getLogger(__name__)
+
+
+def _identity(payload):
+    return payload
+
+
+_default_sanitize = _identity
+_default_correction_verb_map = {}
+
+
+def configure_defaults(sanitize=None, correction_verb_map=None):
+    global _default_sanitize, _default_correction_verb_map
+    if sanitize is not None:
+        _default_sanitize = sanitize
+    if correction_verb_map is not None:
+        _default_correction_verb_map = correction_verb_map
+ 
 
 async def _no_rebuild_finished() -> None:
     pass
@@ -71,29 +92,48 @@ def build_projection(topic: Dict,
                             lambda i: True)
     last_seen = 0
     topic_name = topic["name"]
+ 
+    async def _heal(sequence_id, event_type, object_id, payload):
+        verb = topic.get("correction_verb_map",
+                         _default_correction_verb_map).get(event_type,
+                                                           event_type)
+        if verb is None:
+            return
 
+        async with message_bus().topic(topic_name).publish() as publish:
+            written = await publish(event_type=verb,
+                                    object_id=object_id,
+                                    payload=payload,
+                                    message_id=source_key(topic_name).message_id(sequence_id))
+
+        if written is not None:
+            logger.warning("second line healed unsanitised content: topic=%s type=%s id=%s",
+                           topic_name, event_type, object_id)
 
     async def _dispatch(sequence_id, event_type, object_id, emitted_at, payload):
         if event_type not in on_message_type:
             return
 
-        def _get_validated():
+        async def _get_validated_and_sanitized():
             validated = topic["validate"](event_type, payload)
-            return (validated
-                    if validated is not None and
-                       verify_event(event_type, validated) else
-                    None)
+            if validated is None or not verify_event(event_type, validated):
+                return None 
 
-        validated = (payload
-                     if event_type == TICK else
-                     _get_validated())
-        if validated is not None:
+            sanitized = topic.get("sanitize", _identity)(validated)
+            if sanitized != validated:
+                await _heal(sequence_id, event_type, object_id, sanitized)
+            return sanitized
+
+        payload = (payload
+                   if event_type == TICK else
+                   await _get_validated_and_sanitized())
+        if payload is not None:
             await event_handler_signature(on_message_type[event_type],
                                           event_type,
                                           object_id,
                                           emitted_at,
                                           sequence_id,
-                                          validated)
+                                          payload)
 
     async def handle_events():
         async for sequence_id, event_type, object_id, emitted_at, payload \

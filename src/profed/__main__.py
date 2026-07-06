@@ -14,6 +14,8 @@ from starlette.responses import Response as StarletteResponse
 from profed.core.config import config
 from profed.core.component_manager import run, collect_component_hooks
 from profed.core.message_bus import init_message_bus
+from profed.core.persistence import projections
+from profed.sanitize import sanitize_as_object
 from profed.topics import names
 
 
@@ -73,12 +75,12 @@ if __name__ == "__main__":
     config.set_defaults({"profed": {"run": STANDARD_COMPONENTS}})
     cfg = config()
 
-    logging.basicConfig(level=logging.WARNING,
-                        format="%(levelname)s %(name)s %(message)s")
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
     level = cfg.get("logging", {}).get("level", "INFO")
     logging.getLogger().setLevel(getattr(logging, level.upper()))
 
-    run(cfg,
-        init=[partial(init_message_bus, names())],
-        services=[web_service])
+    projections.configure_defaults(sanitize=sanitize_as_object,
+                                   correction_verb_map={"Create": "Update", "created": "updated"})
+
+    run(cfg, init=[partial(init_message_bus, names())], services=[web_service])
 

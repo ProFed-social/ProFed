@@ -3,6 +3,7 @@
 
 import logging
 from typing import Optional, Dict
+from profed.sanitize import sanitize_c2s_object
 
 
 logger = logging.getLogger(__name__)
@@ -57,5 +58,6 @@ def validate_known_accounts_snapshot_item(item) -> Optional[Dict]:
 
 topic = {"name":              "known_accounts",
          "validate":          validate_known_accounts_event,
-         "snapshot_validate": validate_known_accounts_snapshot_item}
+         "snapshot_validate": validate_known_accounts_snapshot_item,
+         "sanitize":          sanitize_c2s_object}
 
