@@ -89,6 +89,10 @@ def skip_nothing():
     return set(), {}
 
 
+def skip_source():
+    return {"source"}, {}
+
+
 def _html_value(value):
     return (sanitize_html(value)
             if isinstance(value, str) else
@@ -128,8 +132,8 @@ def sanitize_as_object(payload):
     return sanitize_document(payload, html_fields=as2_html_fields)
 
 
-def sanitize_c2s_object(payload):
-    return sanitize_document(payload, html_fields=mastodon_html_fields)
+def sanitize_c2s_object(payload, skip=skip_nothing):
+    return sanitize_document(payload, html_fields=mastodon_html_fields, skip=skip)
 
 
 def sanitize_egress(content, sanitize, kind):

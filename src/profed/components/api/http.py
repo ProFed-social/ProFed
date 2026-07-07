@@ -1,8 +1,9 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from functools import partial
 from fastapi.responses import JSONResponse
-from profed.sanitize import sanitize_egress, sanitize_as_object
+from profed.sanitize import sanitize_egress, sanitize_as_object, sanitize_c2s_object, skip_nothing
 
 
 class ActivityPubJSONResponse(JSONResponse):
@@ -14,4 +15,14 @@ class ActivityPubJSONResponse(JSONResponse):
 
     def render(self, content):
         return super().render(sanitize_egress(content, sanitize_as_object, "activitypub response"))
+
+
+class MastodonJSONResponse(JSONResponse):
+    def __init__(self, *args, skip=skip_nothing, **kwargs):
+        self._skip = skip
+        super().__init__(*args, **kwargs)
+
+    def render(self, content):
+        sanitise = partial(sanitize_c2s_object, skip=self._skip)
+        return super().render(sanitize_egress(content, sanitise, "mastodon response"))
 

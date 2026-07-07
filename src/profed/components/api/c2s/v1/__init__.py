@@ -4,23 +4,24 @@
 import asyncio
 from typing import List
 from fastapi import APIRouter
+from profed.components.api.http import MastodonJSONResponse
 from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import get_active
 
 from profed.components.api.c2s.shared.actors import storage as actors_storage
 from profed.components.api.c2s.shared.actors import projection as actors_projection
 
-from .media         import router as media
-from .apps      import router as apps
-from .instance  import router as instance
-from .accounts  import router as accounts
-from .statuses  import router as statuses
+from .media import router as media
+from .apps import router as apps
+from .instance import router as instance
+from .accounts import router as accounts
+from .statuses import router as statuses
 from .timelines import storage as timelines_storage
 from .timelines import projection as timelines_projection
 from .timelines import router as timelines
 from .notifications import router as notifications
-from .lists         import router as lists
-from .markers       import router as markers
+from .lists import router as lists
+from .markers import router as markers
 from .accounts.follows import storage as follows_storage
 from .accounts.follows import projection as follows_projection
 from .accounts.preferences import storage as preferences_storage
@@ -85,7 +86,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
 
 
 def mount_routers(parent, deactivate: List[str]) -> None:
-    router = APIRouter(prefix="/v1")
+    router = APIRouter(prefix="/v1", default_response_class=MastodonJSONResponse)
     for r in get_active({"apps": apps,
                          "instance": instance,
                          "accounts": accounts,

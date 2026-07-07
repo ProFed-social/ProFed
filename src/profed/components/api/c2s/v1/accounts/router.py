@@ -5,6 +5,9 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.encoders import jsonable_encoder
+from profed.components.api.http import MastodonJSONResponse
+from profed.sanitize import skip_source
 from profed.identity import actor_url_from_username, acct_from_username, domain as instance_domain
 from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
                                                                      lookup_by_acct,
@@ -44,8 +47,8 @@ async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    return account
- 
+    return MastodonJSONResponse(jsonable_encoder(account), skip=skip_source) 
+
 @router.get("/accounts/relationships")
 async def relationships(id: list[str] = Query(default=[], alias="id[]"),
                         claims: Annotated[dict, Depends(current_user)] = None):

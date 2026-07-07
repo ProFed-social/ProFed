@@ -3,6 +3,7 @@
  
 from typing import List
 from fastapi import APIRouter
+from profed.components.api.http import MastodonJSONResponse
 from profed.components.api.active_routers import get_active
 from .instance import router as instance
 from .search import router as search
@@ -22,7 +23,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
 
 
 def mount_routers(parent, deactivate: List[str]) -> None:
-    router = APIRouter(prefix="/v2")
+    router = APIRouter(prefix="/v2", default_response_class=MastodonJSONResponse)
     for r in get_active({"instance": instance,
                          "search": search,
                          "suggestions": suggestions,

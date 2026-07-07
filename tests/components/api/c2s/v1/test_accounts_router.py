@@ -790,3 +790,19 @@ def test_lookup_returns_resume(anon_client):
 
     assert response.json()["resume"]["skills"] == [{"name": "Python"}]
 
+
+def test_verify_credentials_sanitises_note_but_keeps_source_raw(client):
+    account = LOCAL_ACCOUNT.model_copy(update={
+        "note":   "<p>rendered</p><script>evil</script>",
+        "source": {"note": "raw <b>markup</b> the user typed", "privacy": "public"}})
+
+    with Cfg({"profed": {"run": "api"},
+              "api":    {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router.credential_account",
+                   new=AsyncMock(return_value=account)):
+            response = client.get("/accounts/verify_credentials")
+
+    data = response.json()
+    assert data["note"] == "<p>rendered</p>"
+    assert data["source"]["note"] == "raw <b>markup</b> the user typed"
+
