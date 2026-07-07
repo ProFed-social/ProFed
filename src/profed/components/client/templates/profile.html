@@ -32,7 +32,7 @@
     <div class="p-experience h-event">
       <p><span class="p-name">{{ job.name }}</span>{% if job.organization %} at <span class="p-location">{{ job.organization }}</span>{% endif %}</p>
       {% if job.start or job.end %}<p class="dates">{{ job.start }}{% if job.end %} - {{ job.end }}{% endif %}</p>{% endif %}
-      {% if job.description %}<p class="p-summary">{{ job.description }}</p>{% endif %}
+      {% if job.description %}<p class="p-summary">{{ job.description | sanitize | safe }}</p>{% endif %}
       {% if job.url %}<a class="u-url" href="{{ job.url }}">{{ job.url }}</a>{% endif %}
       {% if job.projects %}<ul class="job-projects">{% for project in job.projects %}<li>{{ project }}</li>{% endfor %}</ul>{% endif %}
     </div>
@@ -45,7 +45,7 @@
     <div class="p-education h-event">
       <p><span class="p-name">{{ edu.name }}</span>{% if edu.organization %} at <span class="p-location">{{ edu.organization }}</span>{% endif %}</p>
       {% if edu.start or edu.end %}<p class="dates">{{ edu.start }}{% if edu.end %} - {{ edu.end }}{% endif %}</p>{% endif %}
-      {% if edu.description %}<p class="p-summary">{{ edu.description }}</p>{% endif %}
+      {% if edu.description %}<p class="p-summary">{{ edu.description | sanitize | safe }}</p>{% endif %}
     </div>
     {% endfor %}
     {% endif %}
@@ -55,7 +55,7 @@
     {% for proj in account.resume.projects %}
     <div class="p-experience h-event">
       <p class="p-name">{{ proj.name }}</p>
-      {% if proj.description %}<p class="p-summary">{{ proj.description }}</p>{% endif %}
+      {% if proj.description %}<p class="p-summary">{{ proj.description | sanitize | safe }}</p>{% endif %}
       {% if proj.url %}<a class="u-url" href="{{ proj.url }}">{{ proj.url }}</a>{% endif %}
     </div>
     {% endfor %}

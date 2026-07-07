@@ -61,7 +61,9 @@ def _account():
                                        "end": "2024",
                                        "description": "Built things"}],
                        "education": [],
-                       "projects": [],
+                       "projects": [{"name": "Demo",
+                                     "description": "<p>A <b>cool</b> project</p>"
+                                                    "<script>steal()</script>"}],
                        "skills": [{"name": "Python"}]}}
 
 
@@ -94,10 +96,12 @@ async def test_profile_renders_header_cv_and_posts(monkeypatch):
     body = response.text
     assert "Alice" in body
     assert "@alice@example.test" in body
-    assert "<p>hi</p>" in body                                  # bio rendered raw
-    assert "Engineer" in body and "Acme" in body                # CV experience
-    assert "Python" in body                                     # CV skill
-    assert "<p>first post</p>" in body                          # post content rendered raw
+    assert "<p>hi</p>" in body
+    assert "Engineer" in body and "Acme" in body
+    assert "Python" in body
+    assert "<p>first post</p>" in body
+    assert "<p>A <b>cool</b> project</p>" in body
+    assert "steal()" not in body
     assert "Followers" in body
 
 
