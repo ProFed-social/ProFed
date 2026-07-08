@@ -5,16 +5,16 @@ from datetime import datetime, timezone
 from typing import Optional
 from profed.core.message_bus import message_bus
 from profed.federation.webfinger import lookup_acct
-from profed.http.client import http
+from profed.http.client import HttpClient
 from profed.identity import account_id as compute_account_id, is_local
 from profed.sanitize import sanitize_document
 
 
 async def fetch_actor(actor_url: str) -> Optional[dict]:
     try:
-        return await http("GET").json(actor_url,
-                                      headers={"Accept": "application/activity+json"},
-                                      timeout=10.0)
+        return (await HttpClient().get(actor_url,
+                                       headers={"Accept": "application/activity+json"},
+                                       timeout=10.0)).json()
     except Exception:
         return None
 

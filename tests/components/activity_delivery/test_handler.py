@@ -133,8 +133,8 @@ async def test_deliver_publishes_delivery_succeeded(fake_bus, fake_storage):
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.activity_delivery.delivery._fetch_inbox_url",
                    AsyncMock(return_value=INBOX_URL)), \
-             patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_post:
-            mock_post.return_value.__aenter__.return_value.post = \
+             patch("profed.http.client.httpx.AsyncClient") as mock_post:
+            mock_post.return_value.__aenter__.return_value.request = \
                     AsyncMock(return_value=_mock_post_response(status=202))
             await delivery.deliver({"initial_retry": 0},
                                    "https://example.com/act/1",
@@ -153,8 +153,8 @@ async def test_deliver_publishes_delivery_failed(fake_bus, fake_storage):
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.activity_delivery.delivery._fetch_inbox_url",
                    AsyncMock(return_value=INBOX_URL)), \
-             patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_post:
-            mock_post.return_value.__aenter__.return_value.post = \
+             patch("profed.http.client.httpx.AsyncClient") as mock_post:
+            mock_post.return_value.__aenter__.return_value.request = \
                     AsyncMock(return_value=_mock_post_response(status=500))
             await delivery.deliver({"initial_retry": 0},
                                    "https://example.com/act/1",
@@ -177,15 +177,15 @@ async def test_deliver_sends_signed_request_when_key_available(fake_bus, fake_st
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.activity_delivery.delivery._fetch_inbox_url",
                    AsyncMock(return_value=INBOX_URL)), \
-             patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_post:
-            mock_post.return_value.__aenter__.return_value.post = \
+             patch("profed.http.client.httpx.AsyncClient") as mock_post:
+            mock_post.return_value.__aenter__.return_value.request = \
                     AsyncMock(return_value=_mock_post_response(status=202))
             await delivery.deliver({"initial_retry": 0},
                                    "https://example.com/act/1",
                                    ACTIVITY,
                                    "bob@remote.example")
 
-            call_kwargs = mock_post.return_value.__aenter__.return_value.post.call_args
+            call_kwargs = mock_post.return_value.__aenter__.return_value.request.call_args
             headers     = call_kwargs.kwargs["headers"]
             assert "Signature" in headers
             assert "Digest"    in headers
@@ -204,9 +204,9 @@ async def test_deliver_sanitises_body_before_signing(fake_bus, fake_storage):
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.activity_delivery.delivery._fetch_inbox_url",
                    AsyncMock(return_value=INBOX_URL)), \
-             patch("profed.components.activity_delivery.delivery.httpx.AsyncClient") as mock_post:
+             patch("profed.http.client.httpx.AsyncClient") as mock_post:
             post = AsyncMock(return_value=_mock_post_response(status=202))
-            mock_post.return_value.__aenter__.return_value.post = post
+            mock_post.return_value.__aenter__.return_value.request = post
 
             await delivery.deliver({"initial_retry": 0},
                                    "https://example.com/act/2",

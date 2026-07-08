@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 from email.utils import parsedate_to_datetime
 from typing import Optional
  
-from profed.http.client import http 
+from profed.http.client import HttpClient 
 from profed.http.signatures import sign_request
 from profed.sanitize import sanitize_egress, sanitize_as_object
 from profed.core.message_bus import message_bus
@@ -45,9 +45,9 @@ async def _fetch_inbox_url(actor_url: str, config: dict) -> Optional[str]:
     if cached is not None and now < cached[2]:
         return cached[0]
     try:
-        data  = await http("GET").json(actor_url,
-                                        headers={"Accept": "application/activity+json"},
-                                        timeout=REQUEST_TIMEOUT)
+        data = (await HttpClient().get(actor_url,
+                                       headers={"Accept": "application/activity+json"},
+                                       timeout=REQUEST_TIMEOUT)).json()
         inbox = data.get("inbox")
         if isinstance(inbox, str):
             mean   = float(config.get("inbox_cache_ttl", INBOX_CACHE_TTL_MEAN))
@@ -133,19 +133,18 @@ async def _build_signed_headers(activity: dict,
     return headers
 
 
-async def _post_to_inbox(inbox_url: str,
-                         activity: dict,
-                         client: httpx.AsyncClient) -> httpx.Response:
+async def _post_to_inbox(inbox_url: str, activity: dict) -> httpx.Response:
     ap_activity = {k: v for k, v in activity.items() if k not in _INTERNAL_FIELDS}
     if "@context" not in ap_activity:
         ap_activity["@context"] = "https://www.w3.org/ns/activitystreams"
 
     body = json.dumps(sanitize_egress(ap_activity, sanitize_as_object, "delivery")).encode()
 
-    return await client.post(inbox_url,
-                             content=body,
-                             headers=await _build_signed_headers(activity, inbox_url, body),
-                             timeout=REQUEST_TIMEOUT)
+    return await HttpClient().post(inbox_url,
+                                   content=body,
+                                   headers=await _build_signed_headers(activity, inbox_url, body),
+                                   timeout=REQUEST_TIMEOUT,
+                                   raise_for_status=False)
 
  
 def _actor_url_from_acct(acct: str) -> str:
@@ -165,8 +164,7 @@ async def _attempt_delivery(config: dict,
         await _publish_attempt(activity_id, recipient_acct, attempt, "delivery_failed", None, None, first_at)
         return
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await _post_to_inbox(inbox_url, activity, client)
+        response = await _post_to_inbox(inbox_url, activity)
 
         success = 200 <= response.status_code < 300
         await _publish_attempt(activity_id,

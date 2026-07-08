@@ -3,10 +3,10 @@
 
 import hashlib
 import logging
-import httpx
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
+from profed.http.client import HttpClient
 from profed.core.message_bus import message_bus
 from profed.core.media_storage import media_storage
 from profed.models import MediaObject
@@ -19,8 +19,7 @@ async def should_redownload(source_url, last_modified, etag) -> bool:
     if last_modified is None and etag is None:
         return True
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.head(source_url, timeout=5.0)
+        response = await HttpClient().head(source_url, timeout=5.0, raise_for_status=False)
 
         if last_modified is not None:
             server_lm = response.headers.get("last-modified")
@@ -60,9 +59,7 @@ async def emit_uploaded(stored,
 
 async def download(source_url, existing, uploader) -> tuple:
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(source_url, timeout=10.0)
-            response.raise_for_status()
+        response = await HttpClient().get(source_url, timeout=10.0)
     except Exception as exc:
         logger.warning("Failed to download image from %s: %s", source_url, exc)
         return (existing["url"] if existing else None, None)

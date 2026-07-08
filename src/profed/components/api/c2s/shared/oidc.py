@@ -4,7 +4,7 @@
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 from authlib.jose import JsonWebKey, jwt
-from profed.http.client import http
+from profed.http.client import HttpClient
 
 _oidc_issuer: str            = ""
 _oidc_config: Optional[dict] = None
@@ -34,8 +34,7 @@ async def _fetch_oidc_config(issuer: str) -> dict:
                       "",
                       "",
                       ""))
-    _oidc_config = await http("GET").json(url)
-    return _oidc_config
+    return (await HttpClient().get(url)).json()
 
  
 async def _fetch_jwks(issuer: str) -> dict:
@@ -44,13 +43,11 @@ async def _fetch_jwks(issuer: str) -> dict:
         return _jwks
 
     oidc_config = await _fetch_oidc_config(issuer)
-    _jwks = await http("GET").json(oidc_config["jwks_uri"])
-    return _jwks 
+    return (await HttpClient().get(oidc_config["jwks_uri"])).json() 
  
 async def validate_token(issuer: str, token: str) -> Optional[dict]:
     try:
-        claims = jwt.decode(token,
-                            JsonWebKey.import_key_set(await _fetch_jwks(issuer)))
+        claims = jwt.decode(token, JsonWebKey.import_key_set(await _fetch_jwks(issuer)))
         claims.validate()
         return dict(claims)
     except Exception:

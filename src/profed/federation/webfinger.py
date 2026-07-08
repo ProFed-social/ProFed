@@ -6,7 +6,7 @@ from datetime import datetime
 from functools import wraps
 from typing import Optional
 from urllib.parse import urlparse, urlunparse, urlencode
-from profed.http.client import http
+from profed.http.client import HttpClient
 from profed.sanitize import sanitize_document, no_html_fields
 
 
@@ -52,9 +52,9 @@ async def _fetch_webfinger(resource: str) -> dict | None:
                       urlencode({"resource": _normalize_resource(resource)}),
                       ""))
     try:
-        return sanitize_document(await http("GET").json(url,
-                                                        headers={"Accept": "application/jrd+json"},
-                                                        timeout=30.0),
+        return sanitize_document((await HttpClient().get(url,
+                                                         headers={"Accept": "application/jrd+json"},
+                                                         timeout=30.0)).json(),
                                  html_fields=no_html_fields)
     except Exception:
         return None 
