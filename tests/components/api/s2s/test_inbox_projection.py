@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from profed.core import message_bus
 
@@ -17,6 +17,7 @@ def fake_storage():
     instance.delete = AsyncMock()
     instance.exists = AsyncMock()
     instance.ensure_schema = AsyncMock()
+    instance.rebuild_finished = MagicMock()
 
     storage.overwrite(instance)
 

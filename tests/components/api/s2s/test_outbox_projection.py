@@ -4,7 +4,7 @@
 import pytest
 from datetime import datetime, timezone
 from functools import wraps
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from profed.core import message_bus
 from profed.components.api.s2s.outbox import storage
 from profed.components.api.s2s.outbox import projection
@@ -25,6 +25,7 @@ def fake_storage():
     storage._instance = AsyncMock()
     storage._instance.add = AsyncMock()
     storage._instance.ensure_schema = AsyncMock()
+    storage._instance.rebuild_finished = MagicMock()
 
     yield storage._instance
 

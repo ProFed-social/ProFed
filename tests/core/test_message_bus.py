@@ -43,7 +43,7 @@ def mock_module():
 async def test_message_bus_instantiation(mock_module):
     with Cfg({"message_bus": {"type": "example"}, "profed": {"run":""}}):
         message_bus._instance = None
-        await message_bus.init_message_bus([])
+        await (await message_bus.init_message_bus([]))
 
         bus = message_bus.message_bus()
 
@@ -74,7 +74,7 @@ async def test_database_section_is_passed_to_message_bus(mock_module):
                               "password": "p"},
               "profed":      {"run": ""}}):
         message_bus._instance = None
-        await message_bus.init_message_bus([])
+        await (await message_bus.init_message_bus([]))
         bus = message_bus.message_bus()
         assert bus["host"] == "db.example.com"
         assert bus["database"] == "mydb"
@@ -92,7 +92,7 @@ async def test_message_bus_section_overrides_database_section(mock_module):
                               "password": "p"},
               "profed":      {"run": ""}}):
         message_bus._instance = None
-        await message_bus.init_message_bus([])
+        await (await message_bus.init_message_bus([]))
         bus = message_bus.message_bus()
         assert bus["host"] == "bus-specific-host"
         assert bus["database"] == "mydb"
@@ -103,7 +103,7 @@ async def test_no_database_section_leaves_message_bus_config_unchanged(mock_modu
     with Cfg({"message_bus": {"type": "example", "host": "myhost"},
               "profed":      {"run": ""}}):
         message_bus._instance = None
-        await message_bus.init_message_bus([])
+        await (await message_bus.init_message_bus([]))
         bus = message_bus.message_bus()
         assert bus["host"] == "myhost"
         assert bus["password"] is None
