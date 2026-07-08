@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import httpx
+from profed.http.guard import GuardTransport
  
  
 class HttpClient:
-    async def request(self, method, url, *, raise_for_status=True, **kwargs) -> httpx.Response:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+    async def request(self, method, url, *, raise_for_status=True, follow_redirects=True, **kwargs) \
+            -> httpx.Response:
+        async with httpx.AsyncClient(transport=GuardTransport(), follow_redirects=follow_redirects) as client:
             response = await client.request(method, url, **kwargs)
             if raise_for_status:
                 response.raise_for_status()
