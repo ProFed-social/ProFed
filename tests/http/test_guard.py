@@ -79,3 +79,29 @@ async def test_http_client_blocks_private_target():
     with pytest.raises(BlockedAddressError):
         await HttpClient().get("http://169.254.169.254/latest/meta-data/")
 
+
+@pytest.mark.asyncio
+async def test_transport_validates_each_host_once_per_redirect_chain():
+    seen = []
+    resolved = []
+
+    async def _super(self, request):
+        seen.append(request.url.host)
+        if len(seen) == 1:
+            return httpx.Response(302, headers={"location": "/foo"}, request=request)
+        return httpx.Response(200, request=request)
+
+    def _getaddrinfo(host, port):
+        resolved.append(host)
+        return _infos("93.184.216.34")
+
+    with patch("profed.http.guard.asyncio.get_running_loop") as loop:
+        loop.return_value.getaddrinfo = AsyncMock(side_effect=_getaddrinfo)
+        with patch.object(httpx.AsyncHTTPTransport, "handle_async_request", _super):
+            async with httpx.AsyncClient(transport=GuardTransport(),
+                                         follow_redirects=True) as client:
+                await client.get("http://example.com/")
+
+    assert seen == ["example.com", "example.com"]
+    assert resolved == ["example.com"]
+

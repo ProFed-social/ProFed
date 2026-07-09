@@ -25,14 +25,20 @@ def _blocked_ip(ip):
 
 
 async def _assert_public(host):
-    infos = await asyncio.get_running_loop().getaddrinfo(host, None)
-    for info in infos:
+    for info in await asyncio.get_running_loop().getaddrinfo(host, None):
         if _blocked_ip(ipaddress.ip_address(info[4][0])):
-            raise BlockedAddressError(host)
+             raise BlockedAddressError(host)
 
 
 class GuardTransport(httpx.AsyncHTTPTransport):
+    def __init__(self, *args, **kwargs):
+        self._validated_hosts = set()
+        super().__init__(*args, **kwargs)
+
     async def handle_async_request(self, request):
-        await _assert_public(request.url.host)
+        host = request.url.host
+        if host not in self._validated_hosts:
+            await _assert_public(host)
+            self._validated_hosts.add(host)
         return await super().handle_async_request(request)
 
