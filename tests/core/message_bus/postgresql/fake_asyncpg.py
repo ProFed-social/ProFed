@@ -64,6 +64,9 @@ class FakeConnection:
                 if lr[l_col] == rr[r_col]]
 
     async def fetch(self, query: str, *args):
+        if "SELECT EXISTS" in query.upper():
+            ids = [m["message_id"] for m in self._db.messages[self._extract_table(query)]]
+            return [{"exists": args[0] in ids}]
         if "MAX(LAST_EVENT_ID)" in query.upper():
             ids = [s["last_event_id"]
                    for s in self._db.snapshots[self._extract_table(query)]]
@@ -107,6 +110,10 @@ class FakeConnection:
     async def fetchrow(self, query: str, *args):
         rows = await self.fetch(query, *args)
         return rows[0] if rows else None
+
+    async def fetchval(self, query: str, *args):
+        rows = await self.fetch(query, *args)
+        return next(iter(rows[0].values())) if rows else None
 
     async def add_listener(self, channel: str, callback) -> None:
         self._listeners.setdefault(channel, []).append(callback)

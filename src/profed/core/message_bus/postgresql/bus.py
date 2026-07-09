@@ -4,15 +4,18 @@
 from typing import Dict
 import asyncpg
 
+from .topic import Topic, MessageIdLookupTopic
+
 
 class MessageBus:
     def __init__(self, config: Dict[str, str], pool: asyncpg.Pool):
         self._config = config
         self._pool = pool
 
-    def topic(self, name: str):
-        from .topic import Topic
-        return Topic(self._pool, self._config, name)
+    def topic(self, name: str, lookup_message_ids: bool = False):
+        return (MessageIdLookupTopic
+                if lookup_message_ids
+                else Topic)(self._pool, self._config, name)
 
     async def health_check(self):
         async with self._pool.acquire() as conn:

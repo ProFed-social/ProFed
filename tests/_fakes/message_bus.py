@@ -71,12 +71,19 @@ class FakeTopic:
         return FakePublishContext(self)
 
 
+class MessageIdLookupFakeTopic(FakeTopic):
+    async def exists(self, message_id) -> bool:
+        return message_id in self._published_ids
+
+
 class FakeMessageBus:
     def __init__(self):
         self._topics = {}
 
-    def topic(self, name):
+    def topic(self, name, lookup_message_ids=False):
         if name not in self._topics:
             self._topics[name] = FakeTopic()
+        if lookup_message_ids and type(self._topics[name]) is FakeTopic:
+            self._topics[name].__class__ = MessageIdLookupFakeTopic
         return self._topics[name]
 

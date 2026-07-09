@@ -31,3 +31,13 @@ class Topic:
     def last_snapshot_id(self):
         return last_snapshot_id(self._pool, self._config["schema"], self._name)
 
+
+class MessageIdLookupTopic(Topic):
+    async def exists(self, message_id) -> bool:
+        async with self._pool.acquire() as conn:
+            return await conn.fetchval(f"""SELECT EXISTS
+                                               (SELECT 1
+                                                FROM {self._config['schema']}.{self._name}
+                                                WHERE message_id = $1)""",
+                                       message_id)
+
