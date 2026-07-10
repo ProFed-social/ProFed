@@ -14,6 +14,7 @@ from profed.topics import (accounts_topic,
                            person_topic,
                            preferences_topic,
                            remote_actors_topic,
+                           resolved_activities_topic,
                            users_topic)
 
 
@@ -30,6 +31,7 @@ oauth_tokens = oauth_tokens_topic.topic
 person = person_topic.topic
 preferences = preferences_topic.topic
 remote_actors = remote_actors_topic.topic
+resolved_activities = resolved_activities_topic.topic
 users = users_topic.topic
 
 
@@ -48,5 +50,6 @@ def names():
             person["name"],
             preferences["name"],
             remote_actors["name"],
+            resolved_activities["name"],
             users["name"]]
 
