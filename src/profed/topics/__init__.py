@@ -6,6 +6,7 @@ from profed.topics import (accounts_topic,
                            deliveries_topic,
                            followers_topic,
                            incoming_activities_topic,
+                           instance_topic,
                            known_accounts_topic,
                            media_topic,
                            oauth_apps_topic,
@@ -23,6 +24,7 @@ activities = activities_topic.topic
 deliveries = deliveries_topic.topic
 followers = followers_topic.topic
 incoming_activities = incoming_activities_topic.topic
+instance = instance_topic.topic
 known_accounts = known_accounts_topic.topic
 media = media_topic.topic
 oauth_apps = oauth_apps_topic.topic
@@ -42,6 +44,7 @@ def names():
             deliveries["name"],
             followers["name"],
             incoming_activities["name"],
+            instance["name"],
             known_accounts["name"],
             media["name"],
             oauth_apps["name"],

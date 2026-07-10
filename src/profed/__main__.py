@@ -21,6 +21,7 @@ from profed.topics import names
 
 STANDARD_COMPONENTS = ["api",
                        "client",
+                       "instance_actor",
                        "user_person",
                        "person_activities",
                        "person_account",
