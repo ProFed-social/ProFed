@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from unittest.mock import AsyncMock, Mock
-from profed.core import message_bus
+from unittest.mock import AsyncMock, Mock, patch
 from profed.components.api.s2s.inbox import storage as storage_module
 from profed.components.api.s2s.inbox.service import accept_inbox_activity
+from profed.components.api.s2s.inbox import service
 
 
 @pytest.fixture
@@ -72,3 +72,28 @@ async def test_preserves_actor_and_ids_through_sanitisation(fake_bus, fake_stora
     assert published[0]["object_id"] == CREATE_ACTIVITY["id"]
     assert published[0]["payload"]["activity"]["actor"] == CREATE_ACTIVITY["actor"]
 
+
+def test_signer_is_none_without_key():
+    with patch.object(service.instance_actor_projection, "signing_key", return_value=None):
+        assert service._signer() is None
+
+
+def test_signer_builds_make_sign_from_key():
+    with patch.object(service.instance_actor_projection, "signing_key", return_value=("kid", "pem")), \
+         patch.object(service, "make_sign") as make_sign:
+        service._signer()
+
+    make_sign.assert_called_once_with("kid", "pem")
+
+
+@pytest.mark.asyncio
+async def test_public_key_fetch_signs_federation_call():
+    sign = object()
+    store = Mock(get_by_actor_url=AsyncMock(return_value=None))
+
+    with patch.object(service, "_signer", return_value=sign), \
+         patch.object(service, "public_keys_storage", AsyncMock(return_value=store)), \
+         patch.object(service, "fetch_and_register_actor", AsyncMock(return_value=None)) as far:
+        await service._get_public_key_pem("https://r.example/actor")
+
+    far.assert_awaited_once_with("https://r.example/actor", sign)

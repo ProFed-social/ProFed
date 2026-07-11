@@ -10,6 +10,7 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
                                                                      lookup_by_actor_url,
                                                                      _do_webfinger_lookup)
 from profed.models.mastodon import Account
+from profed.components.api.c2s.shared.known_accounts import service
 
  
 NOW   = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -172,4 +173,31 @@ async def test_webfinger_lookup_resolves_remote_acct():
         result = await _do_webfinger_lookup(REMOTE_ACCT)
 
     assert result == REMOTE_ACCOUNT
+
+
+def test_signer_is_none_without_key():
+    with patch.object(service.instance_key, "signing_key", return_value=None):
+        assert service._signer() is None
+
+
+def test_signer_builds_make_sign_from_key():
+    with patch.object(service.instance_key, "signing_key", return_value=("kid", "pem")), \
+         patch.object(service, "make_sign") as make_sign:
+        service._signer()
+
+    make_sign.assert_called_once_with("kid", "pem")
+
+
+@pytest.mark.asyncio
+async def test_webfinger_lookup_signs_federation_calls():
+    sign = object()
+
+    with patch.object(service, "_signer", return_value=sign), \
+         patch.object(service, "lookup_actor_url", AsyncMock(return_value="https://r.example/actor")) as lau, \
+         patch.object(service, "fetch_and_register_actor", AsyncMock(return_value=None)) as far, \
+         patch.object(service, "is_local", return_value=False):
+        await service._do_webfinger_lookup("bob@r.example")
+
+    lau.assert_awaited_once_with("bob@r.example", sign)
+    far.assert_awaited_once_with("https://r.example/actor", sign)
 

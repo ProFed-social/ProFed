@@ -6,10 +6,11 @@ from profed.http.guard import GuardTransport
  
  
 class HttpClient:
-    async def request(self, method, url, *, raise_for_status=True, follow_redirects=True, **kwargs) \
+    async def request(self, method, url, *, sign=None, raise_for_status=True, follow_redirects=True, **kwargs) \
             -> httpx.Response:
         async with httpx.AsyncClient(transport=GuardTransport(), follow_redirects=follow_redirects) as client:
-            response = await client.request(method, url, **kwargs)
+            response = await (client.request(method, url, **kwargs) if sign is None else
+                              client.send(sign(client.build_request(method, url, **kwargs))))
             if raise_for_status:
                 response.raise_for_status()
             return response

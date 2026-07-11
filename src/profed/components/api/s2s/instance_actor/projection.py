@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.persistence.projections import build_projection
+from profed.identity import domain
 from profed.topics import instance
 
 
@@ -24,6 +25,12 @@ async def _store_item(item):
 
 def current() -> dict:
     return dict(_current)
+
+
+def signing_key():
+    return ((f"https://{domain()}/actor#main-key", _current["private_key_pem"])
+            if "private_key_pem" in _current else
+            None)
 
 
 handle_user_events, rebuild, _ = build_projection(topic=instance,

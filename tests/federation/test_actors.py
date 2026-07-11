@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from unittest.mock import AsyncMock, patch
-from profed.federation.actors import fetch_and_register_actor
+from unittest.mock import AsyncMock, MagicMock, patch
+from profed.federation.actors import fetch_and_register_actor, fetch_actor
 
 
 ACTOR_DATA = {"type": "Person", "publicKey": {"publicKeyPem": "X"}}
@@ -78,3 +78,13 @@ async def test_returns_sanitised_actor_with_intact_pem(fake_bus):
     assert result["summary"] == "<p>hi</p>"
     assert result["publicKey"]["publicKeyPem"] == PEM
 
+
+@pytest.mark.asyncio
+async def test_fetch_actor_passes_sign_to_http_client():
+    sign = object()
+
+    with patch("profed.federation.actors.HttpClient") as client:
+        client.return_value.get = AsyncMock(return_value=MagicMock(json=MagicMock(return_value={})))
+        await fetch_actor("https://r.example/actor", sign)
+
+    assert client.return_value.get.call_args.kwargs["sign"] is sign

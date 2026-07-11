@@ -51,13 +51,21 @@ def sign_request(method: str, url: str, body: bytes, key_id: str, private_key_pe
                                f'signature="{_signature(covered, private_key_pem)}"'),
                  **result})
 
+
     return _signature(private_key_pem,
                       *_covered(format_datetime(datetime.now(timezone.utc), usegmt=True),
                                 (("SHA-256=" + base64.b64encode(hashlib.sha256(body).digest()).decode())
                                  if body else
                                  None),
                                 *(_extract_url_parts(url))))
- 
+
+
+def make_sign(key_id: str, private_key_pem: str):
+    def sign(request):
+        request.headers.update(sign_request(request.method, str(request.url), request.content, key_id, private_key_pem))
+        return request
+    return sign
+
 
 def _parse_signature_header(header: str) -> dict:
     return {key.strip(): value.strip().strip('"')

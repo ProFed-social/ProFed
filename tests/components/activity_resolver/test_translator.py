@@ -71,3 +71,16 @@ async def test_already_resolved_source_event_is_skipped(fake_bus):
     ro.assert_not_called()
     assert len(topic.published) == before
 
+
+def test_signer_is_none_without_key():
+    with patch.object(translator.instance_key, "signing_key", return_value=None):
+        assert translator._signer() is None
+
+
+def test_signer_builds_make_sign_from_key():
+    with patch.object(translator.instance_key, "signing_key", return_value=("kid", "pem")), \
+         patch.object(translator, "make_sign") as make_sign:
+        translator._signer()
+
+    make_sign.assert_called_once_with("kid", "pem")
+

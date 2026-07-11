@@ -63,3 +63,36 @@ async def test_follows_redirects():
  
      assert mock_cls.call_args.kwargs.get("follow_redirects") is True
 
+
+@pytest.mark.asyncio
+async def test_sign_function_is_applied_and_sent():
+    with patch("profed.http.client.httpx.AsyncClient") as mock:
+        client = mock.return_value.__aenter__.return_value
+        built = MagicMock()
+        client.build_request = MagicMock(return_value=built)
+        client.send = AsyncMock(return_value=_mock_response())
+        seen = []
+        def sign(request):
+            seen.append(request)
+            return request
+
+        await HttpClient().get("https://example.com/", sign=sign)
+
+    assert seen == [built]
+    client.send.assert_awaited_once_with(built)
+
+
+@pytest.mark.asyncio
+async def test_without_sign_uses_request_directly():
+    with patch("profed.http.client.httpx.AsyncClient") as mock:
+        client = mock.return_value.__aenter__.return_value
+        client.request = AsyncMock(return_value=_mock_response())
+        client.build_request = MagicMock()
+        client.send = AsyncMock()
+
+        await HttpClient().get("https://example.com/")
+
+    client.request.assert_awaited_once()
+    client.build_request.assert_not_called()
+    client.send.assert_not_called()
+

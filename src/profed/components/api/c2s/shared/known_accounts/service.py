@@ -6,6 +6,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from profed.federation.webfinger import lookup_acct, lookup_actor_url
 from profed.federation.actors import fetch_and_register_actor
+from profed.http.signatures import make_sign
+from profed.components.api.c2s.shared import instance_key
 from profed.identity import is_local
 from .storage import storage
 from profed.models.mastodon import Account
@@ -13,12 +15,18 @@ from profed.models.mastodon import Account
  
 WEBFINGER_CACHE_TTL = 86400
 
- 
+
+def _signer():
+    key = instance_key.signing_key()
+    return make_sign(*key) if key else None
+
+
 async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
     if is_local(acct):
         return None
-    actor_url = await lookup_actor_url(acct)
-    actor_data = await fetch_and_register_actor(actor_url) if actor_url is not None else None
+    sign = _signer()
+    actor_url = await lookup_actor_url(acct, sign)
+    actor_data = await fetch_and_register_actor(actor_url, sign) if actor_url is not None else None
     if actor_data is None:
         return None
 
@@ -73,7 +81,7 @@ async def lookup_by_actor_url(actor_url: str,
     if row is not None and _is_fresh(row, _ttl(config)):
        return _account_from_row(row)
 
-    acct = await lookup_acct(actor_url)
+    acct = await lookup_acct(actor_url, _signer())
     return (await _do_webfinger_lookup(acct)
             if acct is not None else
             _account_from_row(row)

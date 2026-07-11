@@ -1,7 +1,8 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.http.signatures import sign_request, verify_request, generate_key_pair
+import httpx
+from profed.http.signatures import sign_request, verify_request, generate_key_pair, make_sign
 
 
 def test_get_is_signed_without_digest():
@@ -40,4 +41,12 @@ def test_signed_post_round_trips_through_verify():
                            "https://me.example/actor#main-key", private)
 
     assert verify_request("POST", "/inbox", headers, b"hello", public)
+
+
+def test_make_sign_produces_verifiable_signature():
+    public_pem, private_pem = generate_key_pair()
+    request = httpx.Request("GET", "https://remote.example/actors/bob")
+    signed = make_sign("https://me.example/actor#main-key", private_pem)(request)
+
+    assert verify_request("GET", "/actors/bob", dict(signed.headers), signed.content, public_pem)
 

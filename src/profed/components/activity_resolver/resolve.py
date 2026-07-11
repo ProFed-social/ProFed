@@ -10,16 +10,17 @@ def _host(url):
     return urlparse(url).hostname
 
 
-async def _fetch(url):
+async def _fetch(url, sign=None):
     try:
         return (await HttpClient().get(url,
                                        headers={"Accept": "application/activity+json"},
-                                       timeout=10.0)).json()
+                                       timeout=10.0,
+                                       sign=sign)).json()
     except Exception:
         return None
 
 
-async def resolve_object(reference, trusted_origin):
+async def resolve_object(reference, trusted_origin, sign=None):
     if isinstance(reference, dict):
         object_id = reference.get("id")
         if object_id is None or _host(object_id) == trusted_origin:
@@ -29,7 +30,7 @@ async def resolve_object(reference, trusted_origin):
     if not isinstance(reference, str):
         return reference
 
-    fetched = await _fetch(reference)
+    fetched = await _fetch(reference, sign)
     if fetched is None or _host(fetched.get("id", "")) != _host(reference):
         return reference
 

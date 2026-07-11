@@ -8,6 +8,8 @@ from profed.core.persistence.projections import (build_projection,
                                                  with_event_type,
                                                  with_sequence_id)
 from profed.topics import incoming_activities
+from profed.http.signatures import make_sign
+from profed.components.activity_resolver import instance_key
 from profed.components.activity_resolver.resolve import resolve_object
 
 
@@ -28,9 +30,14 @@ def _actor_host(activity):
     return urlparse(actor_id).hostname if actor_id else None
 
 
+def _signer():
+    key = instance_key.signing_key()
+    return make_sign(*key) if key else None
+
+
 def _forwarder(should_resolve: bool):
     async def _resolve_actually(activity):
-        return {**activity, "object": await resolve_object(activity.get("object"),_actor_host(activity))}
+        return {**activity, "object": await resolve_object(activity.get("object"), _actor_host(activity), _signer())}
 
     async def _resolve_nothing(activity):
         return activity

@@ -3,7 +3,7 @@
  
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from profed.federation.webfinger import lookup_acct, lookup_actor_url
+from profed.federation.webfinger import lookup_acct, lookup_actor_url, _fetch_webfinger
  
  
 ACTOR_URL = "https://mastodon.social/users/alice_{}"
@@ -188,4 +188,15 @@ async def test_lookup_acct_sanitises_subject():
         result = await lookup_acct(ACTOR_URL.format("sanitises_subject"))
 
     assert result == "bob@example.com"
+
+
+@pytest.mark.asyncio
+async def test_fetch_webfinger_passes_sign_to_http_client():
+    sign = object()
+
+    with patch("profed.federation.webfinger.HttpClient") as client:
+        client.return_value.get = AsyncMock(return_value=MagicMock(json=MagicMock(return_value={"subject": "acct:x@r"})))
+        await _fetch_webfinger("acct:unique-sign-probe@r.example", sign)
+
+    assert client.return_value.get.call_args.kwargs["sign"] is sign
 

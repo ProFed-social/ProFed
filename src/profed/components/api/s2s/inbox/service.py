@@ -2,11 +2,17 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.message_bus import message_bus
-from profed.http.signatures import key_id_from_signature_header, verify_request
+from profed.http.signatures import key_id_from_signature_header, make_sign, verify_request
 from profed.federation.actors import fetch_and_register_actor
 from profed.sanitize import sanitize_document
 from profed.components.api.s2s.inbox.storage import storage
 from profed.components.api.s2s.inbox.public_keys_storage import storage as public_keys_storage
+from profed.components.api.s2s.instance_actor import projection as instance_actor_projection
+
+
+def _signer():
+    key = instance_actor_projection.signing_key()
+    return make_sign(*key) if key else None
 
 
 def _valid_activity(activity) -> bool:
@@ -23,7 +29,7 @@ async def _get_public_key_pem(actor_url: str) -> tuple[str | None, bool]:
 
     return ((row["public_key_pem"], True)
             if row is not None else
-            (_pem_from_actor(await fetch_and_register_actor(actor_url)), False))
+            (_pem_from_actor(await fetch_and_register_actor(actor_url, _signer())), False))
 
 
 async def verify_inbox_request(method:  str,
@@ -43,7 +49,7 @@ async def verify_inbox_request(method:  str,
     if not from_projection:
         return False
 
-    public_key_pem = _pem_from_actor(await fetch_and_register_actor(actor_url))
+    public_key_pem = _pem_from_actor(await fetch_and_register_actor(actor_url, _signer()))
     if public_key_pem is None:
         return False
 
