@@ -23,34 +23,51 @@ from .nodeinfo import router as nodeinfo_router
 from .instance_actor import router as instance_actor_router
  
 
-async def init(config: dict, deactivate: List[str]) -> None:
-    if "actor" not in deactivate:
-        await init_media_storage()
-
-    for storage, projection, task_name in get_active({"webfinger": (webfinger_storage,
-                                                                    webfinger_projection,
-                                                                    "s2s_webfinger"),
-                                                      "actor": (actor_storage,
-                                                                actor_projection,
-                                                                "s2s_actor"),
-                                                      "inbox": (inbox_storage,
-                                                                inbox_projection,
-                                                                "s2s_inbox"),
-                                                      "inbox_public_keys": (inbox_public_keys_storage,
-                                                                            inbox_public_keys_projection,
-                                                                            "s2s_inbox_public_keys"),
-                                                      "outbox": (outbox_storage,
-                                                                 outbox_projection,
-                                                                 "s2s_outbox"),
-                                                      "instance_actor": (None,
-                                                                         instance_actor_projection,
-                                                                         "s2s_instance_actor")},
-                                                     deactivate):
+def _projection_initializer(storage, projection, handle_events, name):
+    async def _init(config: dict):
         if storage is not None:
             await storage.init(config)
             await (await storage.storage()).ensure_schema()
         await projection.rebuild()
-        asyncio.create_task(projection.handle_user_events(), name=task_name)
+        asyncio.create_task(handle_events(), name=name)
+    return _init
+
+
+async def init(config: dict, deactivate: List[str]) -> None:
+    if "actor" not in deactivate:
+        await init_media_storage()
+    for routers, init_fn in [(["webfinger"],
+                              _projection_initializer(webfinger_storage,
+                                                      webfinger_projection,
+                                                      webfinger_projection.handle_user_events,
+                                                      "s2s_webfinger")),
+                             (["actor"],
+                              _projection_initializer(actor_storage,
+                                                      actor_projection,
+                                                      actor_projection.handle_user_events,
+                                                      "s2s_actor")),
+                             (["inbox"],
+                              _projection_initializer(inbox_storage,
+                                                      inbox_projection,
+                                                      inbox_projection.handle_user_events,
+                                                      "s2s_inbox")),
+                             (["inbox_public_keys"],
+                              _projection_initializer(inbox_public_keys_storage,
+                                                      inbox_public_keys_projection,
+                                                      inbox_public_keys_projection.handle_user_events,
+                                                      "s2s_inbox_public_keys")),
+                             (["outbox"],
+                              _projection_initializer(outbox_storage,
+                                                      outbox_projection,
+                                                      outbox_projection.handle_user_events,
+                                                      "s2s_outbox")),
+                             (["instance_actor", "inbox"],
+                              _projection_initializer(None,
+                                                      instance_actor_projection,
+                                                      instance_actor_projection.handle_user_events,
+                                                      "s2s_instance_actor"))]:
+        if any(r not in deactivate for r in routers):
+            await init_fn(config)
 
  
 def mount_routers(parent, deactivate: List[str]) -> None:
