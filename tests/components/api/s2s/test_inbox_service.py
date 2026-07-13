@@ -97,3 +97,33 @@ async def test_public_key_fetch_signs_federation_call():
         await service._get_public_key_pem("https://r.example/actor")
 
     far.assert_awaited_once_with("https://r.example/actor", sign)
+
+
+
+@pytest.mark.asyncio
+async def test_accepts_type_as_array(fake_bus, fake_storage):
+    await accept_inbox_activity("cdonat", {"id":     "https://r.example/act/1",
+                                           "type":   ["Follow"],
+                                           "actor":  "https://r.example/a",
+                                           "object": "https://example.com/actors/cdonat"})
+
+    published = fake_bus.topic("incoming_activities").published
+    assert published[0]["event_type"] == "Follow"
+
+
+@pytest.mark.asyncio
+async def test_normalizes_actor_object(fake_bus, fake_storage):
+    await accept_inbox_activity("cdonat", {"id":     "https://r.example/act/1",
+                                           "type":   "Follow",
+                                           "actor":  {"id": "https://r.example/a", "type": "Person"},
+                                           "object": "https://example.com/actors/cdonat"})
+
+    published = fake_bus.topic("incoming_activities").published
+    assert published[0]["payload"]["activity"]["actor"] == "https://r.example/a"
+
+
+@pytest.mark.asyncio
+async def test_raises_for_activity_without_id(fake_bus, fake_storage):
+    with pytest.raises(ValueError):
+        await accept_inbox_activity("cdonat", {"type": "Follow", "actor": "https://r.example/a"})
+

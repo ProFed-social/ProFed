@@ -1,15 +1,23 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from pydantic import ConfigDict, field_validator, model_validator
-from typing import Any
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from typing import Annotated, Any
 from .activity_streams import ActivityStreamsObject
+from .fields import ActivityType, ActorRef
 
+
+class IncomingActivity(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str
+    type: Annotated[ActivityType, Field(min_length=1)]
+    actor: ActorRef | None = None
 
 class Activity(ActivityStreamsObject):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
-    actor: str
+    actor: ActorRef
     object: dict[str, Any] | str
     published: str | None = None
     to: list[str] | None = None
@@ -37,8 +45,8 @@ class RejectActivity(Activity):
 
 class FollowActivity(ActivityStreamsObject):
     type: str = "Follow"
-    actor: str
-    object: str
+    actor: ActorRef
+    object: ActorRef
  
     @field_validator("actor", "object")
     @classmethod
@@ -50,7 +58,7 @@ class FollowActivity(ActivityStreamsObject):
  
 class UndoFollowActivity(ActivityStreamsObject):
     type: str = "Undo"
-    actor: str
+    actor: ActorRef
     object: FollowActivity
  
     @field_validator("actor")

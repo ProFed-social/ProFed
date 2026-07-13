@@ -6,6 +6,7 @@ from .actor import Actor
 from .person import Person
 from .application import Application
 from .activity import (Activity,
+                       IncomingActivity,
                        CreateActivity,
                        UpdateActivity,
                        DeleteActivity,
@@ -19,7 +20,7 @@ __all__ = ["ActivityStreamsObject",
            "Actor",
            "Person",
            "Application",
-           "Activity", "CreateActivity", "UpdateActivity", "DeleteActivity",
+           "Activity", "IncomingActivity", "CreateActivity", "UpdateActivity", "DeleteActivity",
            "AcceptActivity", "RejectActivity", "FollowActivity", "UndoFollowActivity",
 
            Note]

@@ -26,8 +26,7 @@ async def _noop_item(item: dict) -> None:
 
 def _actor_host(activity):
     actor = activity.get("actor")
-    actor_id = actor.get("id") if isinstance(actor, dict) else actor
-    return urlparse(actor_id).hostname if actor_id else None
+    return urlparse(actor).hostname if actor else None
 
 
 def _signer():

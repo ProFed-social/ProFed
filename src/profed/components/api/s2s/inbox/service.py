@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.message_bus import message_bus
+from pydantic import ValidationError
 from profed.http.signatures import key_id_from_signature_header, make_sign, verify_request
 from profed.federation.actors import fetch_and_register_actor
 from profed.sanitize import sanitize_document
+from profed.models.activity_pub import IncomingActivity
 from profed.components.api.s2s.inbox.storage import storage
 from profed.components.api.s2s.inbox.public_keys_storage import storage as public_keys_storage
 from profed.components.api.s2s.instance_actor import projection as instance_actor_projection
@@ -14,11 +16,6 @@ def _signer():
     key = instance_actor_projection.signing_key()
     return make_sign(*key) if key else None
 
-
-def _valid_activity(activity) -> bool:
-    return (isinstance(activity, dict) and
-            isinstance(activity.get("type"), str) and
-            activity["type"] != "")
 
 def _pem_from_actor(actor: dict | None) -> str | None:
     return (actor.get("publicKey") or {}).get("publicKeyPem") if actor else None
@@ -61,18 +58,21 @@ async def accept_inbox_activity(username: str, activity: dict) -> bool:
 
     if not await inbox_users.exists(username):
         return False
-    if not _valid_activity(activity):
-        raise ValueError("Malformed ActivityPub activity")
-    if "id" not in activity:
-        raise ValueError("ActivityPub activity has no id")
+
+    try:
+        canonical = IncomingActivity.model_validate(activity)
+    except ValidationError as error:
+        raise ValueError("Malformed ActivityPub activity") from error
+
+    activity = canonical.model_dump(by_alias=True, exclude_none=True)
+    event_type = activity.pop("type")
+    object_id = activity.pop("id")
 
     async with message_bus().topic("incoming_activities").publish() as publish:
-        await publish(event_type=activity["type"],
-                      object_id=activity["id"],
+        await publish(event_type=event_type,
+                      object_id=object_id,
                       payload={"username": username,
-                               "activity": sanitize_document({k: v
-                                                              for k, v in activity.items()
-                                                              if k not in ("id", "type")})})
+                               "activity": sanitize_document(activity)})
 
     return True
 
