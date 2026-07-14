@@ -6,7 +6,7 @@ from profed.core.persistence.base_storage import BaseStorage, init_pool
 
 class _Storage(BaseStorage):
     def __init__(self, pool):
-        super().__init__(pool, None, subscriber_schemas=["delivery_distributor_keys"])
+        super().__init__(pool, None)
 
     async def ensure_schema(self) -> None:
         await super().ensure_schema()
@@ -23,7 +23,7 @@ class _Storage(BaseStorage):
                                      first_attempt_at TIMESTAMPTZ,
                                      PRIMARY KEY (recipient, activity_id))""")
         await self.execute("""CREATE TABLE IF NOT EXISTS
-                              delivery_distributor_keys.user_keys
+                              delivery_distributor.user_keys
                                     (username        TEXT PRIMARY KEY,
                                      public_key_pem  TEXT NOT NULL,
                                      private_key_pem TEXT NOT NULL)""")
@@ -82,7 +82,7 @@ class _Storage(BaseStorage):
 
     async def upsert_user_key(self, username: str, public_key_pem: str,
                               private_key_pem: str) -> None:
-        await self.execute("""INSERT INTO delivery_distributor_keys.user_keys
+        await self.execute("""INSERT INTO delivery_distributor.user_keys
                                     (username, public_key_pem, private_key_pem)
                               VALUES ($1, $2, $3)
                               ON CONFLICT (username) DO UPDATE
@@ -94,7 +94,7 @@ class _Storage(BaseStorage):
 
     async def get_user_key(self, username: str) -> tuple[str, str] | None:
         row = await self.fetch_one("""SELECT public_key_pem, private_key_pem
-                                      FROM delivery_distributor_keys.user_keys
+                                      FROM delivery_distributor.user_keys
                                       WHERE username = $1""",
                                    username)
         return (row["public_key_pem"], row["private_key_pem"]) if row else None

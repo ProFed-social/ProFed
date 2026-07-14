@@ -92,7 +92,7 @@ async def test_head_orders_by_seq(store, fake_conn):
 async def test_upsert_user_key(store, fake_conn):
     await store.upsert_user_key("alice", "PUB", "PRIV")
     sql, *args = fake_conn.execute.call_args[0]
-    assert "INSERT INTO delivery_distributor_keys.user_keys" in sql and "ON CONFLICT" in sql
+    assert "INSERT INTO delivery_distributor.user_keys" in sql and "ON CONFLICT" in sql
     assert args == ["alice", "PUB", "PRIV"]
 
 
