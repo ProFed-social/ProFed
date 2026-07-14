@@ -7,7 +7,7 @@ _DB_DEFAULTS = {"host":          "localhost",
                 "user":          "profed",
                 "password":      None,
                 "pool_min_size": "1",
-                "pool_max_size": "30"} 
+                "pool_max_size": "60"} 
 
 
 def with_database_defaults(component_cfg: dict, database_cfg: dict) -> dict:
