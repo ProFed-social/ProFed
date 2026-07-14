@@ -28,7 +28,8 @@ STANDARD_COMPONENTS = ["api",
                        "local_accounts",
                        "remote_accounts",
                        "activity_resolver",
-                       "activity_delivery",
+                       "delivery_splitter",
+                       "delivery_distributor",
                        "follow_handler",
                        "accept_handler"]
 

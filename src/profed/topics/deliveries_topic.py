@@ -28,8 +28,27 @@ def _validate_attempt(payload, context) -> Optional[Dict]:
     return payload
 
 
+def _validate_queued(payload, context) -> Optional[Dict]:
+    if not isinstance(payload, dict):
+        logger.warning(context("payload not a dict"))
+        return None
+
+    if not isinstance(payload.get("username"), str) or not payload["username"]:
+        logger.warning(context(f"missing or invalid username: {payload!r}"))
+        return None
+
+    if not isinstance(payload.get("activity"), dict):
+        logger.warning(context(f"missing or invalid activity: {payload!r}"))
+        return None
+
+    return payload
+
+
 def validate_deliveries_event(event_type: str, payload: Dict) -> Optional[Dict]:
-    if event_type not in ("delivery_succeeded", "delivery_failed", "delivery_gave_up"):
+    if event_type == "queued":
+        return _validate_queued(payload, _ignore)
+
+    if event_type not in ("attempting", "failed", "done", "gave_up"):
         logger.warning(_ignore(f"unknown event type {event_type!r}"))
         return None
 
