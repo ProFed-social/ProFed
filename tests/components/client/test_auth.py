@@ -75,7 +75,7 @@ def test_callback_rejects_state_mismatch():
 def test_callback_exchanges_token_and_creates_session():
     api = MagicMock()
     api.post = AsyncMock(return_value=_response(200, {"access_token": "acc-tok"}))
-    api.get = AsyncMock(return_value=_response(200, {"username": "alice"}))
+    api.get = AsyncMock(return_value=_response(200, {"username": "alice", "acct": "alice@example.com"}))
     kv = MagicMock()
     kv.set = AsyncMock()
 
@@ -92,7 +92,7 @@ def test_callback_exchanges_token_and_creates_session():
     assert api.post.await_args.kwargs["data"]["code"] == "the-code"
     assert api.get.await_args.kwargs["token"] == "acc-tok"
     assert kv.set.await_args.args[0].startswith("client:session:")
-    assert kv.set.await_args.args[1] == {"username": "alice", "token": "acc-tok"}
+    assert kv.set.await_args.args[1] == {"username": "alice", "acct": "alice@example.com", "token": "acc-tok"}
     assert response.cookies.get("session") is not None
 
 
@@ -163,7 +163,7 @@ def test_login_ignores_offsite_next():
 def _callback_client(return_target):
     api = MagicMock()
     api.post = AsyncMock(return_value=_response(200, {"access_token": "acc-tok"}))
-    api.get = AsyncMock(return_value=_response(200, {"username": "alice"}))
+    api.get = AsyncMock(return_value=_response(200, {"username": "alice", "acct": "alice@example.com"}))
     kv = MagicMock()
     kv.set = AsyncMock()
 

@@ -127,17 +127,19 @@ async def _access_token(code: str, client_id: str, client_secret: str):
     return token_response.json()["access_token"]
 
 
-async def _username(access_token: str):
+async def _account(access_token: str):
     account = await api_client().get("/api/v1/accounts/verify_credentials",
                                      token=access_token)
     account.raise_for_status()
-    return account.json()["username"]
+    return account.json()
 
 
 async def _start_session(access_token: str, session_ttl):
     sid = secrets.token_urlsafe(32)
+    me = await _account(access_token)
     await key_value_store().set(_session_key(sid),
-                                {"username": await _username(access_token),
+                                {"username": me["username"],
+                                 "acct": me["acct"],
                                  "token": access_token},
                                 session_ttl)
     return sid

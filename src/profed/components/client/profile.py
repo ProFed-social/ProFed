@@ -54,12 +54,16 @@ async def _follow_action(handle: str, action: str, token: str):
     return HTMLResponse(_follow_button(handle, response.json()))
 
 
+def _viewing_other(account, session):
+    return session is not None and account["acct"] != session.get("acct")
+
+
 @router.get("/@{handle}", response_class=HTMLResponse)
 async def profile(request: Request, handle: str):
     account = await _account_from_handle(handle)
     session = await current_user_optional(request)
     relationship = (await _relationship(account["id"], session["token"])
-                    if session is not None and account["acct"] != session["username"] else
+                    if _viewing_other(account, session) else
                     None)
     return HTMLResponse(environment().get_template("profile.html").render(
         account=account,

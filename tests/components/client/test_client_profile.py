@@ -78,3 +78,17 @@ async def test_follow_action_posts_with_token_and_renders_button():
     assert client.post.call_args.kwargs["token"] == "tok"
     assert b"Angefragt" in response.body
 
+
+def test_viewing_other_true_for_different_acct():
+    assert profile._viewing_other({"acct": "bob@remote.example"},
+                                  {"acct": "alice@example.com", "token": "t"}) is True
+
+
+def test_viewing_other_false_for_self():
+    assert profile._viewing_other({"acct": "alice@example.com"},
+                                  {"acct": "alice@example.com", "token": "t"}) is False
+
+
+def test_viewing_other_false_when_not_logged_in():
+    assert profile._viewing_other({"acct": "bob@remote.example"}, None) is False
+
