@@ -1,7 +1,6 @@
 /* Copyright (C) 2026 Christof Donat */
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
 
-/* Schriften (lokal, siehe static/fonts) */
 @font-face {
   font-family: "InterVariable";
   font-style: normal;
@@ -17,8 +16,6 @@
   src: url("/static/fonts/InterVariable-Italic.woff2") format("woff2");
 }
 
-/* Farben folgen dem System (Canvas/CanvasText); abgeleitete Toene via color-mix.
-   Akzent ist die Markenfarbe, im Dunkelmodus etwas aufgehellt fuer Kontrast. */
 :root {
   color-scheme: light dark;
   --accent: #1a6b72;
@@ -49,7 +46,6 @@ img { max-width: 100%; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* Kopfzeile mit Logo */
 .masthead {
   display: flex;
   align-items: center;
@@ -74,13 +70,11 @@ a:hover { text-decoration: underline; }
   gap: 1.25rem;
 }
 
-/* Zentrierte Inhaltsspalte */
 .column {
   max-width: var(--col);
   margin-inline: auto;
   padding-inline: 1.25rem;
 }
-/* Profil-Spalte */
 .profile {
   padding-bottom: 4rem;
   container-type: inline-size;
@@ -145,7 +139,6 @@ a:hover { text-decoration: underline; }
 .note { margin: 1.25rem 0 0; }
 .note p { margin: .5rem 0; }
 
-/* Lebenslauf */
 .resume h2,
 .posts h2 {
   margin: 2rem 0 .25rem;
@@ -176,7 +169,6 @@ a:hover { text-decoration: underline; }
 .job-projects { list-style-type: disc; padding: 0; margin: .3rem 1rem 0; font-size: .9rem; }
 .job-projects li { color: var(--muted); }
 
-/* Skills als Chips */
 .skills {
   list-style: none;
   display: flex;
@@ -193,7 +185,6 @@ a:hover { text-decoration: underline; }
   font-size: .85rem;
 }
 
-/* Beitraege */
 .status { padding: 1.1rem 0; border-top: 1px solid var(--line); }
 .status:first-of-type { border-top: 0; }
 .e-content :first-child { margin-top: 0; }
@@ -217,7 +208,6 @@ a:hover { text-decoration: underline; }
 .author .avatar { width: 36px; height: 36px; font-size: .8rem; }
 .author .acct { color: var(--muted); font-size: .9rem; }
 
-/* Schmale Viewports */
 @media (max-width: 480px) {
   .identity { grid-template-columns: 1fr; }
   .identity .joined { grid-column: 1; grid-row: auto; justify-self: start; }
@@ -225,4 +215,23 @@ a:hover { text-decoration: underline; }
   .h-event > :not(.dates) { grid-column: 1; }
   .h-event .dates { grid-column: 1; grid-row: auto; order: -1; }
 }
+
+
+.follow-button {
+  font: inherit;
+  margin-top: 0.5rem;
+  padding: 6px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: Canvas;
+  cursor: pointer;
+}
+.follow-button.is-following,
+.follow-button.is-requested {
+  background: transparent;
+  color: var(--accent);
+}
+
+.follow-button:disabled { opacity: 0.6; cursor: default; }
 

@@ -19,6 +19,7 @@
         <div><dt>{{ account.following_count }}</dt><dd>Following</dd></div>
         <div><dt>{{ account.followers_count }}</dt><dd>Followers</dd></div>
       </dl>
+      {% if relationship is not none %}{% include "follow_button.html" %}{% endif %}
     </div>
   </header>
   {% if account.note %}<div class="p-note note">{{ account.note | sanitize | safe }}</div>{% endif %}
