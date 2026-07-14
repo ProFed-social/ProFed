@@ -57,9 +57,9 @@ async def _fetch_webfinger(resource: str, sign=None) -> dict | None:
                                                          timeout=30.0,
                                                          sign=sign)).json(),
                                  html_fields=no_html_fields)
-    except Exception:
-        return None 
-
+    except Exception as exc:
+        logger.warning("webfinger fetch failed for %s: %r", resource, exc)
+        return None
  
 async def lookup_acct(resource: str, sign=None) -> Optional[str]:
     data = await _fetch_webfinger(resource, sign)

@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import uuid
 from profed.core.message_bus import message_bus
 from profed.core.persistence.projections import (build_projection,
@@ -11,6 +12,8 @@ from profed.identity import acct_from_username
 from profed.federation.webfinger import lookup_acct
 from .projections import recipients_at
 
+
+logger = logging.getLogger(__name__)
 
 _DIRECTED = {"Follow", "Accept", "Reject", "Undo"}
 
@@ -45,8 +48,10 @@ async def _recipients(event_type: str, activity: dict, username: str, emitted_at
 
 async def _fan_out(event_type, object_id, payload, emitted_at) -> None:
     activity = {"id": object_id, "type": event_type, **payload["activity"]}
+    recipients = await _recipients(event_type, activity, payload["username"], emitted_at)
+    logger.info("delivery_splitter: %s %s -> %d recipient(s): %s", event_type, object_id, len(recipients), recipients)
     deliveries = message_bus().topic("deliveries", lookup_message_ids=True)
-    for recipient in await _recipients(event_type, activity, payload["username"], emitted_at):
+    for recipient in recipients:
         message_id = uuid.uuid5(uuid.NAMESPACE_URL, f"{object_id}#{recipient}#queued")
         if not await deliveries.exists(message_id):
             async with deliveries.publish() as publish:
