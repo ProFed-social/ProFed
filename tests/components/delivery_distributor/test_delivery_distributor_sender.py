@@ -68,14 +68,14 @@ async def test_claim_wins_then_loses_on_same_message_id(fake_bus):
 @pytest.mark.asyncio
 async def test_deliver_success(monkeypatch):
     storage_module._instance = Mock(get_user_key=AsyncMock(return_value=None))
-    monkeypatch.setattr(sender, "_fetch_inbox_url", AsyncMock(return_value="https://r/inbox"))
+    monkeypatch.setattr(sender, "_inbox_url_for", AsyncMock(return_value="https://r/inbox"))
     monkeypatch.setattr(sender, "_post_to_inbox", AsyncMock(return_value=Mock(status_code=202)))
     assert await sender._deliver(_head(), "bob@r") is True
 
 
 @pytest.mark.asyncio
 async def test_deliver_without_inbox_fails(monkeypatch):
-    monkeypatch.setattr(sender, "_fetch_inbox_url", AsyncMock(return_value=None))
+    monkeypatch.setattr(sender, "_inbox_url_for", AsyncMock(return_value=None))
     assert await sender._deliver(_head(), "bob@r") is False
 
 
@@ -106,4 +106,26 @@ async def test_run_delivers_dequeues_then_exits(fake_bus, monkeypatch):
     types = [p["event_type"] for p in fake_bus.topic("deliveries").published]
     assert "attempting" in types and "done" in types
     assert fs.open == []
+
+
+@pytest.mark.asyncio
+async def test_inbox_url_for_resolves_actor_via_webfinger(monkeypatch):
+    lookup = AsyncMock(return_value="https://r/actors/bob")
+    monkeypatch.setattr(sender, "lookup_actor_url", lookup)
+    monkeypatch.setattr(sender, "_fetch_inbox_url", AsyncMock(return_value="https://r/actors/bob/inbox"))
+
+    assert await sender._inbox_url_for("bob@r") == "https://r/actors/bob/inbox"
+
+    lookup.assert_awaited_once_with("bob@r")
+
+
+@pytest.mark.asyncio
+async def test_inbox_url_for_without_webfinger_result_is_none(monkeypatch):
+    fetch = AsyncMock(return_value="https://r/inbox")
+    monkeypatch.setattr(sender, "lookup_actor_url", AsyncMock(return_value=None))
+    monkeypatch.setattr(sender, "_fetch_inbox_url", fetch)
+
+    assert await sender._inbox_url_for("bob@r") is None
+
+    fetch.assert_not_awaited()
 
