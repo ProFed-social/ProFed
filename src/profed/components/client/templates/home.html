@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
-{% if current_username %}
 <section class="h-feed posts">
   {% for status in statuses %}
   {% include "status.html" %}
@@ -8,12 +7,5 @@
   <p class="empty">Your timeline is empty. Follow someone to see their posts here.</p>
   {% endfor %}
 </section>
-{% else %}
-<section class="welcome">
-  <h1>ProFed</h1>
-  <p>A federated professional network.</p>
-  <p><a href="{{ login_url }}">Log in</a> to see your timeline.</p>
-</section>
-{% endif %}
 {% endblock %}
 

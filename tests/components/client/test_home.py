@@ -27,28 +27,6 @@ async def _fetch(app, path):
         return await client.get(path)
 
 
-async def test_home_renders_masthead_for_anonymous_visitor(monkeypatch):
-    response = await _fetch(_app(monkeypatch), "/")
-
-    assert response.status_code == 200
-    body = response.text
-    assert "ProFed" in body
-    assert "/login?next=" in body
-    assert "/settings" not in body and "/logout" not in body
-
-
-async def test_home_renders_logged_in_nav(monkeypatch):
-    monkeypatch.setattr(auth, "current_user_optional",
-                        AsyncMock(return_value={"username": "christof", "token": "t"}))
-
-    response = await _fetch(_app(monkeypatch), "/")
-
-    assert response.status_code == 200
-    body = response.text
-    assert "/@christof" in body and "/settings" in body and "/logout" in body
-    assert ">Login</a>" not in body
-
-
 def _resp(status=200, json_data=None):
     r = Mock()
     r.status_code = status
@@ -72,8 +50,26 @@ def _status(content="hello world", acct="bob@remote.example"):
 
 def _login(monkeypatch, username="christof", token="tok"):
     session = {"username": username, "acct": f"{username}@test.local", "token": token}
-    monkeypatch.setattr(home, "current_user_optional", AsyncMock(return_value=session))
     monkeypatch.setattr(auth, "current_user_optional", AsyncMock(return_value=session))
+
+
+async def test_home_redirects_an_anonymous_visitor_to_login(monkeypatch):
+    response = await _fetch(_app(monkeypatch), "/")
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/login?next=")
+
+
+async def test_home_renders_logged_in_nav(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=_resp(200, []))))
+
+    response = await _fetch(_app(monkeypatch), "/")
+
+    assert response.status_code == 200
+    body = response.text
+    assert "/@christof" in body and "/settings" in body and "/logout" in body
+    assert ">Login</a>" not in body
 
 
 async def test_home_timeline_is_fetched_with_the_session_token(monkeypatch):
@@ -116,13 +112,11 @@ async def test_home_of_a_logged_in_user_without_posts_says_so(monkeypatch):
     assert "Your timeline is empty" in response.text
 
 
-async def test_home_asks_an_anonymous_visitor_to_log_in(monkeypatch):
+async def test_home_does_not_touch_the_api_for_an_anonymous_visitor(monkeypatch):
     client = Mock(get=AsyncMock())
     monkeypatch.setattr(home, "api_client", lambda: client)
 
-    response = await _fetch(_app(monkeypatch), "/")
+    await _fetch(_app(monkeypatch), "/")
 
-    assert response.status_code == 200
-    assert "to see your timeline" in response.text
     client.get.assert_not_awaited()
 
