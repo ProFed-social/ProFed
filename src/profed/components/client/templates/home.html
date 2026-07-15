@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% include "compose.html" %}
 {% block content %}
+{% include "compose.html" %}
 <section class="h-feed posts">
   {% for status in statuses %}
   {% include "status.html" %}
