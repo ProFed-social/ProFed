@@ -355,7 +355,7 @@ async def test_duplicate_status_create_counts_once(fake_bus, fake_store, cfg):
                                              _msg(2, "Create", "n1", _status_create("n1"))]
 
     await translator.handle_statuses_events()
-    
+
     assert [a["payload"]["count"] for a in _accounts(fake_bus)] == [1]
 
 
@@ -364,6 +364,6 @@ async def test_deleting_unknown_status_emits_nothing(fake_bus, fake_store, cfg):
     fake_bus.topic("activities").messages = [_msg(1, "Delete", "n1", _status_delete("n1"))]
 
     await translator.handle_statuses_events()
-    
+
     assert _accounts(fake_bus) == []
 

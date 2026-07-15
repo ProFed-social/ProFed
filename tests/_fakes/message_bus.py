@@ -45,9 +45,9 @@ class FakePublishContext:
 
 class FakeTopic:
     def __init__(self):
-        self.messages  = [] 
-        self.published = [] 
-        self.snapshots = [] 
+        self.messages  = []
+        self.published = []
+        self.snapshots = []
         self.last_seen = 0
         self._published_ids = set()
 

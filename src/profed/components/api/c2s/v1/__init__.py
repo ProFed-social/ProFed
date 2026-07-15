@@ -39,7 +39,7 @@ def _projection_initializer(storage, projection, handle_events, name):
 
     return _init_projection
 
- 
+
 async def init(config: dict, deactivate: List[str]) -> None:
     if any(router not in deactivate for router in ("accounts", "statuses")):
         await init_media_storage()

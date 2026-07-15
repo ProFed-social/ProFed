@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,37 +13,37 @@ from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.sanitize import sanitize_html
- 
- 
+
+
 router = APIRouter()
-active = False 
+active = False
 _config: dict = {}
- 
- 
+
+
 def init(config: dict) -> None:
     global active, _config
     active = True
     _config = config
- 
- 
+
+
 class StatusCreate(BaseModel):
     status: str
     visibility: str = "public"
     sensitive: bool = False
     spoiler_text: str = ""
     language: str | None = None
- 
- 
+
+
 @router.post("/statuses")
 async def create_status(body: StatusCreate,
                         claims: Annotated[dict, Depends(current_user)]):
     username = claims.get("preferred_username") or claims.get("sub")
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
- 
+
     if len(body.status) > int(_config.get("status_max_characters", 5000)):
         raise HTTPException(status_code=422, detail="status too long")
- 
+
     actor_url  = actor_url_from_username(username)
     note = Note(id=f"{actor_url}/notes/{uuid.uuid4()}",
                 attributedTo=actor_url,

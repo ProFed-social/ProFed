@@ -112,7 +112,7 @@ def _configured_defaults():
     if privacy is not None and privacy not in PRIVACY_VALUES:
         logger.warning("Configured default privacy %r is invalid",
                        privacy)
-        privacy = None 
+        privacy = None
 
     sensitive = prefs.get("default_sensitive")
     if sensitive is not None and not isinstance(sensitive, bool):

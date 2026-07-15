@@ -18,7 +18,7 @@ class _Storage(BaseStorage):
                               person_account.statuses (username TEXT NOT NULL,
                                                        status_id TEXT NOT NULL,
                                                        PRIMARY KEY (username, status_id))""")
- 
+
     async def add_edge(self, follower: str, following: str) -> bool:
         row = await self.fetch_one("""INSERT INTO person_account.edges (follower, following)
                                       VALUES ($1, $2)

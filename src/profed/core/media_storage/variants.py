@@ -70,7 +70,7 @@ def _scale_pillow(image_bytes, width, height):
 
     fmt_in = img.format
     fmt_out = fmt_in if fmt_in in ("JPEG", "PNG", "WEBP") else "JPEG"
-    
+
     img = img.convert("RGB" + ("A"
                                if fmt_in == "PNG" and img.mode in ("RGBA", "LA", "P") else
                                "")).resize((width, height), Image.LANCZOS)

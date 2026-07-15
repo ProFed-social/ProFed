@@ -35,7 +35,7 @@ def init(config: dict) -> None:
     global active
     active = True
 
- 
+
 @router.get("/accounts/verify_credentials")
 async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
     username = claims.get("preferred_username") or claims.get("sub")
@@ -47,7 +47,7 @@ async def verify_credentials(claims: Annotated[dict, Depends(current_user)]):
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    return MastodonJSONResponse(jsonable_encoder(account), skip=skip_source) 
+    return MastodonJSONResponse(jsonable_encoder(account), skip=skip_source)
 
 @router.get("/accounts/relationships")
 async def relationships(id: list[str] = Query(default=[], alias="id[]"),
@@ -106,11 +106,11 @@ async def follow(id: str,
     username = claims.get("preferred_username") or claims.get("sub")
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
- 
+
     account = await _resolve_account(id, {})
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
- 
+
     actor_url = account.url
     follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
 
@@ -125,7 +125,7 @@ async def follow(id: str,
         await publish(event_type="requested",
                       object_id=f"{acct_from_username(username)}|{account.acct}",
                       payload={"follow_activity_id": follow_id})
- 
+
     return {"id": account.id,
             "following": False,
             "requested": True}

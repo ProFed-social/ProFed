@@ -1,12 +1,12 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import logging
 import asyncio
- 
+
 from profed.core.message_bus import message_bus
 from profed.identity import acct_from_username
-from profed.http.signatures import generate_key_pair 
+from profed.http.signatures import generate_key_pair
 from profed.models import UserProfile, MediaReference
 from profed.media import scale_image, should_redownload, download
 
@@ -14,8 +14,8 @@ from .fetcher import fetch_mf2
 from .normalizer import normalize_mf2_to_profile, DEFAULT_USERNAME, DEFAULT_NAME, DEFAULT_SUMMARY
 from .state_reader import reading_state
 from .media_reader import reading_media_state
- 
- 
+
+
 logger = logging.getLogger(__name__)
 
 _VARIANTS_FOR = {"avatar": [("large", {"width": 400, "height": 400}),
@@ -95,7 +95,7 @@ def _diff_events(current, new_profile):
             conversion = conversion if conversion is not None else lambda x: x
             return{field: conversion(attr)
                    for field, attr in ((field, getattr(new_profile, field)) for field in fields)
-                   if attr is not None} 
+                   if attr is not None}
 
         return [("created",
                  dict(public_key_pem=public_pem,

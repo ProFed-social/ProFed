@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated
@@ -9,7 +9,7 @@ from .oidc import validate_token, get_oidc_issuer
 
 
 _bearer = HTTPBearer()
-_bearer_optional = HTTPBearer(auto_error=False) 
+_bearer_optional = HTTPBearer(auto_error=False)
 
 
 async def _claims_for(credentials: HTTPAuthorizationCredentials) -> dict | None:
@@ -19,7 +19,7 @@ async def _claims_for(credentials: HTTPAuthorizationCredentials) -> dict | None:
             if token is not None else
             await validate_token(get_oidc_issuer(), credentials.credentials))
 
- 
+
 async def current_user(credentials: Annotated[HTTPAuthorizationCredentials,
                                               Depends(_bearer)]) -> dict:
     claims = await _claims_for(credentials)

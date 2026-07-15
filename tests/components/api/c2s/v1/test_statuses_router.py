@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import pytest
 from unittest.mock import patch, AsyncMock
 from fastapi import FastAPI
@@ -10,10 +10,10 @@ from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.auth import current_user
 from profed.models.mastodon import Account
 
- 
+
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
- 
- 
+
+
 @pytest.fixture
 def client(fake_bus):
     statuses_module.init({"status_max_characters": "5000"})
@@ -21,8 +21,8 @@ def client(fake_bus):
     app.include_router(statuses_module.router)
     app.dependency_overrides[current_user] = lambda: CLAIMS
     return TestClient(app)
- 
- 
+
+
 LOCAL_ACCOUNT = Account(id="1",
                         username="alice",
                         acct="alice@example.com",
@@ -41,8 +41,8 @@ def test_create_status_publishes_activity(client, fake_bus):
     assert published[0]["payload"]["username"] == "alice"
     assert published[0]["payload"]["activity"]["object"]["type"] == "Note"
     assert published[0]["payload"]["activity"]["object"]["content"] == "Hello Fediverse!"
- 
- 
+
+
 def test_create_status_returns_status_object(client, fake_bus):
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
                AsyncMock(return_value=LOCAL_ACCOUNT)):
@@ -52,20 +52,20 @@ def test_create_status_returns_status_object(client, fake_bus):
     assert data["content"] == "Hello Fediverse!"
     assert data["visibility"] == "public"
     assert "id" in data
-    assert data["account"]["username"] == "alice" 
+    assert data["account"]["username"] == "alice"
 
- 
+
 def test_create_status_too_long_returns_422(client, fake_bus):
     response = client.post("/statuses",
                            json={"status": "x" * 5001})
 
     assert response.status_code == 422
- 
- 
+
+
 def test_statuses_active_flag_set_after_init():
     statuses_module.init({})
     assert statuses_module.active is True
- 
+
 
 def test_create_status_activity_has_context_and_to(client, fake_bus):
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",

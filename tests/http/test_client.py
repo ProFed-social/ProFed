@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from profed.http.client import HttpClient
- 
- 
+
+
 def _mock_response(status_code=200, json_data=None):
     r = MagicMock()
     r.status_code = status_code
@@ -50,7 +50,7 @@ async def test_post_passes_method_correctly():
          request_mock = AsyncMock(return_value=_mock_response())
          mock.return_value.__aenter__.return_value.request = request_mock
          await HttpClient().post("https://example.com/", json={"x": 1})
- 
+
      assert request_mock.call_args[0][0] == "POST"
 
 
@@ -60,7 +60,7 @@ async def test_follows_redirects():
          mock_cls.return_value.__aenter__.return_value.request = \
              AsyncMock(return_value=_mock_response())
          await HttpClient().get("https://example.com/")
- 
+
      assert mock_cls.call_args.kwargs.get("follow_redirects") is True
 
 

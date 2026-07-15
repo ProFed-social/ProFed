@@ -139,7 +139,7 @@ def test_status_fragment_author_block_is_optional():
                           "avatar": None}}
 
     template = _ENV.get_template("status.html")
- 
+
     assert "Bob" in template.render(status=status)
     shown = template.render(status=status, show_author=True)
     assert "@bob@remote.tld" in shown and "https://remote.tld/@bob" in shown

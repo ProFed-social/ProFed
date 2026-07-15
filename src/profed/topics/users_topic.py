@@ -57,7 +57,7 @@ def _validate_profile_edited(payload):
         elif not isinstance(value, types):
             logger.warning(_ignore_msg(f"profile_edited field {key} has invalid type: {value!r}"))
         else:
-            return True 
+            return True
 
     return (dict(payload)
             if all(_is_types({"name": (str, type(None)),

@@ -20,7 +20,7 @@ async def init_message_bus(topic_names):
 
     db_cfg = config().get("database", {})
     cfg = with_database_defaults(cfg, db_cfg)
- 
+
     mod = import_module(f".{typ}", package=__name__)
     init = getattr(mod, "init")
     _instance = await init(cfg, topic_names)

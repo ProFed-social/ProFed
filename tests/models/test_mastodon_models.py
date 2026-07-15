@@ -92,7 +92,7 @@ def test_from_actor_maps_fields():
                               "image":   {"url": "https://remote.example/header.png"}},
                              acct="bob@remote.example",
                              url="https://remote.example/actors/bob")
- 
+
     assert acc.id            == account_id("bob@remote.example")
     assert acc.username      == "bob"
     assert acc.acct          == "bob@remote.example"
@@ -104,50 +104,50 @@ def test_from_actor_maps_fields():
     assert acc.header        == "https://remote.example/header.png"
     assert acc.locked        is False
     assert acc.bot           is False
- 
- 
+
+
 def test_from_actor_falls_back_to_username():
     acc = Account.from_actor({"type": "Person"},
                              acct="carol@other.example",
                              url="https://other.example/actors/carol")
- 
+
     assert acc.display_name == "carol"
     assert acc.avatar       is None
     assert acc.header       is None
- 
- 
+
+
 def test_from_actor_handles_missing_actor():
     acc = Account.from_actor({},
                              acct="carol@other.example",
                              url="https://other.example/actors/carol")
- 
+
     assert acc.display_name == "carol"
     assert acc.bot          is False
- 
- 
+
+
 def test_from_actor_sets_bot_for_service():
     acc = Account.from_actor({"type": "Service"},
                              acct="bot@example.com",
                              url="https://example.com/actors/bot")
- 
+
     assert acc.bot is True
- 
- 
+
+
 def test_from_actor_sets_locked_from_manually_approves():
     acc = Account.from_actor({"type": "Person", "manuallyApprovesFollowers": True},
                              acct="x@example.com",
                              url="https://example.com/actors/x")
- 
+
     assert acc.locked is True
- 
- 
+
+
 def test_from_actor_sets_created_at_from_datetime():
     created = datetime(2025, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
     acc = Account.from_actor({"type": "Person"},
                              acct="x@example.com",
                              url="https://example.com/actors/x",
                              created_at=created)
- 
+
     assert acc.created_at == created.isoformat()
 
 
@@ -155,16 +155,16 @@ def test_from_actor_uses_published_when_no_created_at():
     acc = Account.from_actor({"type": "Person", "published": "2020-05-05T00:00:00+00:00"},
                              acct="x@example.com",
                              url="https://example.com/actors/x")
- 
+
     assert acc.created_at == "2020-05-05T00:00:00+00:00"
- 
+
 
 def test_from_actor_created_at_overrides_published():
     acc = Account.from_actor({"type": "Person", "published": "2020-05-05T00:00:00+00:00"},
                              acct="x@example.com",
                              url="https://example.com/actors/x",
                              created_at="2021-06-06T00:00:00+00:00")
- 
+
     assert acc.created_at == "2021-06-06T00:00:00+00:00"
 
 

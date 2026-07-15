@@ -117,14 +117,14 @@ class FakeConnection:
 
     async def add_listener(self, channel: str, callback) -> None:
         self._listeners.setdefault(channel, []).append(callback)
- 
+
     async def remove_listener(self, channel: str, callback) -> None:
         if channel in self._listeners:
             try:
                 self._listeners[channel].remove(callback)
             except ValueError:
                 pass
- 
+
     def _extract_table(self, query: str) -> str:
         for part in query.split():
             if "." in part:

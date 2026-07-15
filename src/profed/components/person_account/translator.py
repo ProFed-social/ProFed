@@ -141,7 +141,7 @@ async def _apply_status(username: str, status_id, present: bool, sequence_id: in
     if changed:
         await _emit_count("statuses_changed", username,
                           await store.count_statuses(username), _ACTIVITIES_SOURCE, sequence_id)
- 
+
 
 async def _status_created(object_id, payload, sequence_id) -> None:
     if _is_actor_object(payload["activity"]):

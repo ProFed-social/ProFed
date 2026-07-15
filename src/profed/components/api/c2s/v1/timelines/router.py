@@ -1,23 +1,23 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Annotated, Optional
 from profed.identity import actor_url_from_username, acct_from_username
 from profed.components.api.c2s.v1.timelines.storage import storage
 from profed.components.api.c2s.shared.known_accounts.service import lookup_multiple
 from profed.components.api.c2s.shared.statuses import activity_to_status
-from profed.components.api.c2s.shared.auth import current_user 
- 
+from profed.components.api.c2s.shared.auth import current_user
+
 
 router = APIRouter()
 active = False
- 
+
 
 def init(config: dict) -> None:
     global active
-    active = True 
- 
+    active = True
+
 
 @router.get("/timelines/home")
 async def home_timeline(claims: Annotated[dict, Depends(current_user)],

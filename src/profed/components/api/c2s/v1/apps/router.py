@@ -1,22 +1,22 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import secrets
 from fastapi import APIRouter
 from pydantic import BaseModel
 from profed.core.message_bus import message_bus
 from profed.sanitize import strip_tags
- 
- 
+
+
 router = APIRouter()
 
 
 active = False
- 
- 
+
+
 def init(config: dict) -> None:
     global active
-    active = True 
+    active = True
 
 
 class AppRegistration(BaseModel):
@@ -24,14 +24,14 @@ class AppRegistration(BaseModel):
     redirect_uris: str
     scopes: str = "read"
     website: str = ""
- 
- 
+
+
 @router.post("/apps")
 async def register_app(body: AppRegistration):
     client_id     = secrets.token_urlsafe(16)
     client_secret = secrets.token_urlsafe(32)
     client_name   = strip_tags(body.client_name)
- 
+
     async with message_bus().topic("oauth_apps").publish() as publish:
         await publish(event_type="created",
                       object_id=client_id,

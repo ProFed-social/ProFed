@@ -1,16 +1,16 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Optional
- 
+
 from profed.core.message_bus import message_bus, CatchUp
 from profed.models import UserProfile
 from profed.topics import users as users_topic
- 
- 
+
+
 logger = logging.getLogger(__name__)
 _SUBSCRIBER = "profile_importer"
 
@@ -79,13 +79,13 @@ def _apply_event(state, username, event_type, validated):
 async def reading_state(username: str):
     state: dict = {"value": None}
     catch_up = CatchUp()
- 
+
     start_id, snapshot = await message_bus().topic("users").last_snapshot()
     for item in snapshot:
         validated = users_topic["snapshot_validate"](item)
         if validated is not None and validated.get("username") == username:
             state["value"] = validated
- 
+
     async def _update() -> None:
         async for _, event_type, object_id, _, payload \
                 in message_bus().topic("users").subscribe(_SUBSCRIBER, start_id, caught_up=catch_up.event):
@@ -97,7 +97,7 @@ async def reading_state(username: str):
                 continue
 
             _apply_event(state, username, event_type, validated)
- 
+
     def get_state() -> Optional[UserProfile]:
         raw = state["value"]
         if raw is None:
@@ -107,7 +107,7 @@ async def reading_state(username: str):
         except Exception as exc:
             logger.warning("Ignoring invalid user state for %s: %s", username, exc)
             return None
- 
+
     task = asyncio.create_task(_update())
     catch_up.watch(task)
     try:

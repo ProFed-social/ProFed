@@ -101,7 +101,7 @@ async def test_sign_is_threaded_to_fetch():
 @pytest.mark.asyncio
 async def test_fetch_passes_sign_to_http_client():
     sign = object()
-    
+
     with patch("profed.components.activity_resolver.resolve.HttpClient") as client:
         client.return_value.get = AsyncMock(return_value=MagicMock())
         await resolve._fetch("https://x.example/1", sign)

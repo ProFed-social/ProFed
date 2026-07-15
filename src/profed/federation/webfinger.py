@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import logging
 from datetime import datetime
 from functools import wraps
@@ -11,20 +11,20 @@ from profed.sanitize import sanitize_document, no_html_fields
 
 
 logger = logging.getLogger(__name__)
- 
- 
+
+
 def _domain_from_resource(resource: str) -> str:
     return (urlparse(resource).netloc
             if resource.startswith("https://") else
             resource.removeprefix("acct:").split("@", 1)[1])
- 
- 
+
+
 def _normalize_resource(resource: str) -> str:
     return (resource
             if resource.startswith("https://") or resource.startswith("acct:") else
             f"acct:{resource}")
- 
- 
+
+
 def cache(ttl: int):
     cached_results = {}
     def function_cache(f):
@@ -60,15 +60,16 @@ async def _fetch_webfinger(resource: str, sign=None) -> dict | None:
     except Exception as exc:
         logger.warning("webfinger fetch failed for %s: %r", resource, exc)
         return None
- 
+
+
 async def lookup_acct(resource: str, sign=None) -> Optional[str]:
     data = await _fetch_webfinger(resource, sign)
     if data is None:
         return None
     subject = data.get("subject", "")
     return subject.removeprefix("acct:") if subject.startswith("acct:") else None
- 
- 
+
+
 async def lookup_actor_url(acct: str, sign=None) -> Optional[str]:
     data = await _fetch_webfinger(acct, sign)
     if data is not None:

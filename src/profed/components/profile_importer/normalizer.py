@@ -5,8 +5,8 @@ from typing import Any, Callable, Optional
 from profed.models import Resume, UserProfile
 from profed.sanitize import sanitize_html, strip_tags
 from .composition import apply_template
- 
- 
+
+
 DEFAULT_USERNAME = "{given-name}_{family-name}"
 DEFAULT_NAME     = "{name|{given-name} {additional-name} {family-name}}"
 DEFAULT_SUMMARY  = "{summary|{note}}"
@@ -36,8 +36,8 @@ def _raw(value: Any) -> str:
     if isinstance(value, dict):
         return (value.get("html") or value.get("value") or "").strip()
     return value.strip() if isinstance(value, str) else ""
- 
- 
+
+
 def _values(props: dict, hcard_props: dict) -> dict[str, str]:
     merged = {**hcard_props, **props}
     return {key: raw

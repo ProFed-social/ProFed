@@ -1,13 +1,13 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 _DB_DEFAULTS = {"host":          "localhost",
                 "port":          "5432",
                 "database":      "profed",
                 "user":          "profed",
                 "password":      None,
                 "pool_min_size": "1",
-                "pool_max_size": "60"} 
+                "pool_max_size": "60"}
 
 
 def with_database_defaults(component_cfg: dict, database_cfg: dict) -> dict:

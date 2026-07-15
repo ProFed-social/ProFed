@@ -5,7 +5,7 @@ import os
 import sys
 from types import ModuleType
 import profed.core.config.raw as raw
-from profed.core.config import config 
+from profed.core.config import config
 
 
 

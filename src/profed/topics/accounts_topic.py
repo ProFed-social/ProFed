@@ -31,7 +31,7 @@ def validate_accounts_event(event_type: str, payload: Dict) -> Optional[Dict]:
         return None
 
     for types, result in {("created", "updated"):
-                            return_payload_if(lambda: (isinstance(payload.get("id"), str) and 
+                            return_payload_if(lambda: (isinstance(payload.get("id"), str) and
                                                        payload["id"]),
                                               payload,
                                               _ignore(f"missing or invalid id: {payload!r}")),

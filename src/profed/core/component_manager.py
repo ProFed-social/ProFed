@@ -24,13 +24,13 @@ class Component:
             self.using_schemata = getattr(mod, "using_schemata", [])
         except Exception as e:
             raise ComponentError(f"Error in component {self.name}: {e}")
- 
+
     async def __call__(self, cfg) -> None:
         await reset_schemata(self.using_schemata, cfg)
 
         if self.entry is not None:
             await (self.entry(cfg))
-    
+
 
 def run(config, init=None, services=None):
     @asynccontextmanager

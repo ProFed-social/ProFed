@@ -1,18 +1,18 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import base64
 import hashlib
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from urllib.parse import urlparse
- 
+
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives.asymmetric import rsa
- 
- 
+
+
 def generate_key_pair() -> tuple[str, str]:
     def _pair_as_pem(private_key):
         return (private_key.public_key().public_bytes(encoding=serialization.Encoding.PEM,
@@ -23,7 +23,7 @@ def generate_key_pair() -> tuple[str, str]:
 
     return _pair_as_pem(rsa.generate_private_key(public_exponent=65537, key_size=2048))
 
- 
+
 def sign_request(method: str, url: str, body: bytes, key_id: str, private_key_pem: str) -> dict[str, str]:
     def _extract_url_parts(url):
         parsed = urlparse(url)
@@ -45,7 +45,7 @@ def sign_request(method: str, url: str, body: bytes, key_id: str, private_key_pe
                                                                                  for name, value in covered).encode(),
                                                                        padding.PKCS1v15(),
                                                                        hashes.SHA256())).decode()
-     
+
         return ({"Signature": (f'keyId="{key_id}",algorithm="rsa-sha256",'
                                f'headers="{" ".join(name for name, _ in covered)}",'
                                f'signature="{_signature(covered, private_key_pem)}"'),
@@ -87,7 +87,7 @@ def verify_request(method: str, path: str, headers: dict, body: bytes, public_ke
             sig_header = h.get("signature", "")
             return and_then(h, sig_header) if sig_header else False
         return _sh
-     
+
     def _signature(and_then):
         def _sig(h, sig_header):
             params = _parse_signature_header(sig_header)

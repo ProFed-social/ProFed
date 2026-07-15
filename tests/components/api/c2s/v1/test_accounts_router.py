@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import os
 import pytest
 from unittest.mock import AsyncMock, patch
@@ -11,9 +11,9 @@ from profed.core.config import config, raw
 from profed.identity import account_id
 from profed.models.mastodon import Account
 from profed.components.api.c2s.v1.accounts import router as accounts_module
-from profed.components.api.c2s.shared.auth import current_user 
+from profed.components.api.c2s.shared.auth import current_user
 from profed.core.message_bus.source_key import source_key
- 
+
 from _fakes import FakeMessageBus
 
 
@@ -25,18 +25,18 @@ class Cfg:
                             for k, v in d.items()]
         os.environ = {k: v for k, v in os.environ.items()
                       if not k.startswith("PROFED_")}
- 
+
     def __enter__(self):
         config.reset()
- 
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
             raise exc_val
- 
- 
+
+
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
- 
- 
+
+
 LOCAL_ACCOUNT = Account(id="1",
                         username="alice",
                         acct="alice@example.com",
@@ -50,8 +50,8 @@ CRED_ACCOUNT = LOCAL_ACCOUNT.model_copy(update={"source": {"privacy": "public",
                                                            "note": "Software engineer",
                                                            "fields": [],
                                                            "follow_requests_count": 0}})
- 
- 
+
+
 @pytest.fixture
 def client():
     accounts_module.init({})
@@ -66,7 +66,7 @@ def anon_client():
     accounts_module.init({})
     app = FastAPI()
     app.include_router(accounts_module.router)
-    return TestClient(app) 
+    return TestClient(app)
 
 
 def test_verify_credentials_returns_account(client):
@@ -82,8 +82,8 @@ def test_verify_credentials_returns_account(client):
     assert data["display_name"] == "Alice Example"
     assert data["note"] == "Software engineer"
     assert data["acct"] == "alice@example.com"
- 
- 
+
+
 def test_verify_credentials_unknown_actor_returns_404(client):
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
@@ -91,8 +91,8 @@ def test_verify_credentials_unknown_actor_returns_404(client):
                    new=AsyncMock(return_value=None)):
             response = client.get("/accounts/verify_credentials")
     assert response.status_code == 404
- 
- 
+
+
 def test_accounts_active_flag_set_after_init():
     accounts_module.init({})
     assert accounts_module.active is True
@@ -671,7 +671,7 @@ def test_get_preferences_returns_defaults(client):
                _mock_storage_with({"privacy": "public",
                                    "sensitive": False,
                                    "language": "en"})):
-        response = client.get("/preferences") 
+        response = client.get("/preferences")
 
     assert response.status_code == 200
     assert response.json()["posting:default:visibility"] == "public"

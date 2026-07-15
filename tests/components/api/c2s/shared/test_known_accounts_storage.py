@@ -1,35 +1,35 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
-import profed.components.api.c2s.shared.known_accounts.storage as module 
- 
+import profed.components.api.c2s.shared.known_accounts.storage as module
+
 NOW = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
 ACCOUNT = {"id": "1234", "acct": "alice@example.com", "username": "alice",
-           "created_at": "2026-01-01T00:00:00+00:00"} 
- 
+           "created_at": "2026-01-01T00:00:00+00:00"}
+
 
 @pytest.fixture
 def fake_pool():
     conn = Mock()
     conn.execute  = AsyncMock()
     conn.fetchrow = AsyncMock()
- 
+
     class _Ctx:
         async def __aenter__(self): return conn
         async def __aexit__(self, *_): pass
- 
+
     pool = Mock()
     pool.acquire = Mock(return_value=_Ctx())
- 
+
     backup = module._instance
     module._instance = module._Storage(pool)
     yield pool
     module._instance = backup
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_upsert_calls_execute(fake_pool):
     store = await module.storage()
@@ -42,8 +42,8 @@ async def test_upsert_calls_execute(fake_pool):
         sql = conn.execute.call_args[0][0]
 
         assert "jsonb_set" in sql
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_get_by_id_returns_row(fake_pool):
     store = await module.storage()
@@ -57,8 +57,8 @@ async def test_get_by_id_returns_row(fake_pool):
 
     assert result is not None
     assert result["acct"] == "alice@example.com"
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_get_by_id_returns_none_when_missing(fake_pool):
     store = await module.storage()
@@ -67,8 +67,8 @@ async def test_get_by_id_returns_none_when_missing(fake_pool):
         result = await store.get_by_id(9999)
 
     assert result is None
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_get_by_acct_returns_row(fake_pool):
     store = await module.storage()
@@ -82,8 +82,8 @@ async def test_get_by_acct_returns_row(fake_pool):
 
     assert result is not None
     assert result["account_id"] == 1234
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_get_by_actor_url_returns_row(fake_pool):
     store = await module.storage()
@@ -97,8 +97,8 @@ async def test_get_by_actor_url_returns_row(fake_pool):
 
     assert result is not None
     assert result["acct"] == "alice@example.com"
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_update_merges_account(fake_pool):
     store = await module.storage()

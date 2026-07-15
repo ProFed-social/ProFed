@@ -66,7 +66,7 @@ async def test_read_blocks_until_rebuild_finished():
 
 async def test_barrier_is_nulled_after_first_read():
     d = _Dummy()
-    
+
     d.rebuild_finished()
 
     await d.read()

@@ -58,7 +58,7 @@ def test_valid_snapshot_item_returns_item():
 
 def test_snapshot_item_without_id_returns_none():
     assert validate_known_accounts_snapshot_item({"acct": "bob@remote.example"}) is None
- 
+
 
 
 def test_non_dict_snapshot_item_returns_none():

@@ -1,12 +1,12 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import time
 from typing import Optional
 from profed.core.persistence.projections import build_projection
 from profed.topics import oauth_apps, oauth_codes, oauth_tokens
- 
- 
+
+
 _apps: dict[str, dict] = {}
 _codes: dict[str, dict] = {}
 _tokens: dict[str, dict] = {}
@@ -46,13 +46,13 @@ tokens_handle_events, tokens_rebuild, tokens_reset_last_seen = \
                      init=_tokens_init,
                      on_snapshot_item=_token_snapshot,
                      on_message_type={"issued":  _token_issued,
-                                      "revoked": _token_revoked}) 
+                                      "revoked": _token_revoked})
 
 
 def get_app(client_id: str) -> Optional[dict]:
     return _apps.get(client_id)
- 
- 
+
+
 def get_code(code: str) -> Optional[dict]:
     entry = _codes.get(code)
 
@@ -64,12 +64,12 @@ def get_code(code: str) -> Optional[dict]:
         return None
 
     return entry
- 
- 
+
+
 async def _apps_init() -> None:
     _apps.clear()
- 
- 
+
+
 async def _app_created(object_id: str, payload: dict) -> None:
     _apps[object_id] = {"client_id": object_id,
                         "client_secret": payload["client_secret"],
@@ -79,7 +79,7 @@ async def _app_created(object_id: str, payload: dict) -> None:
 
 async def _app_snapshot(item: dict) -> None:
     _apps[item["client_id"]] = item
- 
+
 
 apps_handle_events, apps_rebuild, _ = \
     build_projection(topic=oauth_apps,
@@ -87,12 +87,12 @@ apps_handle_events, apps_rebuild, _ = \
                      init=_apps_init,
                      on_snapshot_item=_app_snapshot,
                      on_message_type={"created": _app_created})
- 
- 
+
+
 async def _codes_init() -> None:
     _codes.clear()
- 
- 
+
+
 async def _code_issued(object_id: str, payload: dict) -> None:
     if payload["expires_at"] > time.time():
         _codes[object_id] = {"code": object_id,
@@ -110,7 +110,7 @@ async def _code_snapshot(item: dict) -> None:
     if item["expires_at"] > time.time():
         _codes[item["code"]] = item
 
- 
+
 codes_handle_events, codes_rebuild, _ = \
     build_projection(topic=oauth_codes,
                      subscriber="api",

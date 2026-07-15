@@ -24,7 +24,7 @@ def update_raw(raw: _raw_conf_t, upd: _raw_conf_t) -> _raw_conf_t:
     for section, new_values in upd.items():
         raw.setdefault(section, {}).update(new_values)
     return raw
-    
+
 
 def files(paths: Sequence[Path]) -> _raw_conf_t:
     cp = configparser.ConfigParser()

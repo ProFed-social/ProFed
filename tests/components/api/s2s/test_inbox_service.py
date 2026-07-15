@@ -26,9 +26,9 @@ ACTIVITY = {"id": "https://mastodon.social/alice#follows/1",
 @pytest.mark.asyncio
 async def test_publishes_event_with_event_type_and_payload(fake_bus, fake_storage):
     await accept_inbox_activity("cdonat", ACTIVITY)
-    
+
     published = fake_bus.topic("incoming_activities").published
-    
+
     assert len(published) == 1
     assert published[0]["event_type"] == "Follow"
     assert published[0]["object_id"] == ACTIVITY["id"]
@@ -41,9 +41,9 @@ async def test_publishes_event_with_event_type_and_payload(fake_bus, fake_storag
 @pytest.mark.asyncio
 async def test_returns_false_for_unknown_user(fake_bus, fake_storage):
     fake_storage.exists.return_value = False
-    
+
     result = await accept_inbox_activity("unknown", ACTIVITY)
-    
+
     assert result is False
     assert fake_bus.topic("incoming_activities").published == []
 

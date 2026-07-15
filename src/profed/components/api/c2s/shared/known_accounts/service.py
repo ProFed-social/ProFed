@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -12,7 +12,7 @@ from profed.identity import is_local
 from .storage import storage
 from profed.models.mastodon import Account
 
- 
+
 WEBFINGER_CACHE_TTL = 86400
 
 
@@ -31,8 +31,8 @@ async def _do_webfinger_lookup(acct: str) -> Optional[dict]:
         return None
 
     return Account.from_actor(actor_data, acct=acct, url=actor_url)
- 
- 
+
+
 def _is_fresh(row: dict, ttl: int) -> bool:
     if is_local(row.get("acct") or ""):
         return True
@@ -49,11 +49,11 @@ def _is_fresh(row: dict, ttl: int) -> bool:
 def _ttl(config: dict | None) -> int:
     return int(((config or {}).get("webfinger_cache_ttl", WEBFINGER_CACHE_TTL)
                 if config is not None else
-                WEBFINGER_CACHE_TTL)) 
+                WEBFINGER_CACHE_TTL))
 
 
 def _account_from_row(row: dict) -> Account:
-    return Account.model_validate(row["account"]) 
+    return Account.model_validate(row["account"])
 
 
 async def lookup_by_id(account_id: int,
@@ -65,15 +65,15 @@ async def lookup_by_id(account_id: int,
             _account_from_row(row)
             if _is_fresh(row, _ttl(config)) else
             await _do_webfinger_lookup(row["acct"]) or _account_from_row(row))
- 
- 
+
+
 async def lookup_by_acct(acct: str,
                          config: dict | None = None) -> Optional[Account]:
     row = await (await storage()).get_by_acct(acct)
     return (_account_from_row(row)
-            if row is not None and _is_fresh(row, _ttl(config)) else 
+            if row is not None and _is_fresh(row, _ttl(config)) else
             await _do_webfinger_lookup(acct))
- 
+
 
 async def lookup_by_actor_url(actor_url: str,
                               config: dict | None = None) -> Optional[Account]:

@@ -22,7 +22,7 @@ class ActivityStreamsObject(BaseModel):
     @classmethod
     def coerce_context_to_list(cls, v: str | list) -> list:
         return [v] if isinstance(v, str) else v
- 
+
     @model_validator(mode="after")
     def set_default_context(self) -> "ActivityStreamsObject":
         if not self.context:

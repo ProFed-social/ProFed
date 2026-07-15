@@ -76,7 +76,7 @@ def requires_login(f):
     async def w(*args, **kwargs):
         request = kwargs["request"]
         session = await current_user_optional(request)
-        
+
         return (_login_response(request)
                 if session is None else
                 await f(*args, **{**kwargs, "session": session}))

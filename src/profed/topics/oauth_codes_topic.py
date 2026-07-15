@@ -40,7 +40,7 @@ def validate_oauth_codes_event(event_type: str, payload: Dict) -> Optional[Dict]
     if event_type not in validators:
         logger.warning(_ignore(f"unknown event type {event_type!r}"))
         return None
-    
+
     return validators[event_type](payload, _ignore)
 
 

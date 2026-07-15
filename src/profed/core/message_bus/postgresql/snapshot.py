@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from typing import Callable, Dict, Any, Awaitable
-from asyncpg import Connection, Pool 
+from asyncpg import Connection, Pool
 from asyncpg.transaction import Transaction
 
 def _publish_snapshot(conn: Connection, topic: str, schema: str) \
@@ -48,7 +48,7 @@ class SnapshotPublisher:
 async def last_snapshot(pool: Pool, schema: str, topic: str):
     async with pool.acquire() as conn:
         row = await conn.fetchrow(f"""
-                                  SELECT last_event_id, payload 
+                                  SELECT last_event_id, payload
                                   FROM {schema}.{topic}_snapshots
                                   ORDER BY last_event_id DESC
                                   LIMIT 1

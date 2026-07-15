@@ -31,7 +31,7 @@ def _enqueue(fake_bus,
                                                                     if activity_rest is None else
                                                                     activity_rest})]
 
-         
+
 @pytest.fixture
 def fake_storage():
     backup = storage_module._instance
@@ -60,11 +60,11 @@ async def test_accept_publishes_followers_accepted(fake_bus, fake_storage):
     assert published[0]["event_type"] == "accepted"
     assert published[0]["object_id"] == "alice@example.com|bob@remote.example"
 
- 
+
 @pytest.mark.asyncio
 async def test_reject_publishes_followers_rejected(fake_bus, fake_storage):
     _enqueue(fake_bus, event_type="Reject")
- 
+
     with patch("profed.components.accept_handler.handler.actor_url_from_username",
                return_value="https://example.com/actors/alice"), \
          patch("profed.components.accept_handler.handler.acct_from_username",
@@ -72,21 +72,21 @@ async def test_reject_publishes_followers_rejected(fake_bus, fake_storage):
          patch("profed.components.accept_handler.handler.lookup_acct",
                AsyncMock(return_value="bob@remote.example")):
         await handler.handle_incoming_activities()
- 
+
     published = fake_bus.topic("followers").published
     assert len(published) == 1
     assert published[0]["event_type"] == "rejected"
     assert published[0]["object_id"] == "alice@example.com|bob@remote.example"
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_reject_for_other_user_is_ignored(fake_bus, fake_storage):
     _enqueue(fake_bus, event_type="Reject")
- 
+
     with patch("profed.components.accept_handler.handler.actor_url_from_username",
                return_value="https://example.com/actors/bob"):
         await handler.handle_incoming_activities()
- 
+
     assert fake_bus.topic("followers").published == []
 
 

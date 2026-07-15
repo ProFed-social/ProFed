@@ -1,12 +1,12 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.components.api.c2s.v1.search import router, init
-from profed.components.api.c2s.shared.auth import current_user 
+from profed.components.api.c2s.shared.auth import current_user
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def client():
     init({})
     app.include_router(router, prefix="")
     app.dependency_overrides[current_user] = lambda: {"sub": "christof"}
-    yield TestClient(app) 
+    yield TestClient(app)
 
 
 ACTOR = {"id":   "https://mastodon.social/users/alice",
@@ -27,7 +27,7 @@ ROW = {"account_id":        123456,
        "acct":              "alice@mastodon.social",
        "actor_url":         "https://mastodon.social/users/alice",
        "actor_data":        ACTOR,
-       "last_webfinger_at": "2026-04-28T12:00:00+00:00"} 
+       "last_webfinger_at": "2026-04-28T12:00:00+00:00"}
 
 
 def test_search_without_resolve_returns_empty(client):
@@ -35,15 +35,15 @@ def test_search_without_resolve_returns_empty(client):
 
     assert response.status_code == 200
     assert response.json() == {}
- 
- 
+
+
 def test_search_non_acct_returns_empty(client):
     response = client.get("/search?q=python&resolve=true")
 
     assert response.status_code == 200
     assert response.json() == {}
- 
- 
+
+
 def test_search_with_resolve_returns_account(client):
     with patch("profed.components.api.c2s.shared.search.resolvers.accounts.lookup_by_acct",
                AsyncMock(return_value=ROW)):
@@ -54,8 +54,8 @@ def test_search_with_resolve_returns_account(client):
     assert "accounts" in result
     assert len(result["accounts"]) == 1
     assert result["accounts"][0]["acct"] == "alice@mastodon.social"
- 
- 
+
+
 def test_search_type_filter_limits_resolvers(client):
     with patch("profed.components.api.c2s.shared.search.resolvers.accounts.lookup_by_acct",
                AsyncMock(return_value=None)):
@@ -63,4 +63,4 @@ def test_search_type_filter_limits_resolvers(client):
 
     assert response.status_code == 200
     assert response.json() == {}
- 
+

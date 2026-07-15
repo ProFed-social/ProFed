@@ -32,7 +32,7 @@ def _preview_dimensions(orig_w: int, orig_h: int) -> tuple[int, int]:
 
 async def process_upload(username: str,
                          file: UploadFile,
-                         description: str | None) -> MediaAttachment: 
+                         description: str | None) -> MediaAttachment:
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=422, detail="unsupported_media_type")
 

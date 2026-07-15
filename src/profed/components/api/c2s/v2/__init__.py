@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from typing import List
 from fastapi import APIRouter
 from profed.components.api.http import MastodonJSONResponse
@@ -10,8 +10,8 @@ from .search import router as search
 from .suggestions import router as suggestions
 from .filters import router as filters
 from .media import router as media
- 
- 
+
+
 async def init(config: dict, deactivate: List[str]) -> None:
     for r in get_active({"instance": instance,
                          "search": search,

@@ -92,7 +92,7 @@ async def test_get_credentials_passes_username_and_defaults():
     store.fetch_one = AsyncMock(return_value=None)
 
     await store.get_credentials("alice")
-    
+
     assert store.fetch_one.await_args.args[1:] == ("alice", "public", False, "en")
 
 

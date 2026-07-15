@@ -40,34 +40,34 @@ class AcceptActivity(Activity):
 
 
 class RejectActivity(Activity):
-    type: str = "Reject" 
+    type: str = "Reject"
 
 
 class FollowActivity(ActivityStreamsObject):
     type: str = "Follow"
     actor: ActorRef
     object: ActorRef
- 
+
     @field_validator("actor", "object")
     @classmethod
     def must_be_nonempty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("must not be empty")
         return v
- 
- 
+
+
 class UndoFollowActivity(ActivityStreamsObject):
     type: str = "Undo"
     actor: ActorRef
     object: FollowActivity
- 
+
     @field_validator("actor")
     @classmethod
     def actor_must_be_nonempty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("must not be empty")
         return v
- 
+
     @model_validator(mode="after")
     def actor_must_match_follow_actor(self) -> "UndoFollowActivity":
         if self.actor != self.object.actor:

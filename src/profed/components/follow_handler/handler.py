@@ -1,8 +1,8 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import logging
- 
+
 from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.topics import incoming_activities
@@ -11,12 +11,12 @@ from profed.models.activity_pub import (AcceptActivity,
                                         FollowActivity,
                                         UndoFollowActivity)
 from profed.federation.webfinger import lookup_acct
- 
- 
-logger = logging.getLogger(__name__)
-_source_key = source_key("incoming_activities") 
 
- 
+
+logger = logging.getLogger(__name__)
+_source_key = source_key("incoming_activities")
+
+
 async def _handle_follow(username: str, activity: dict, seq: int) -> None:
     try:
         follow = FollowActivity.model_validate(activity)
@@ -26,7 +26,7 @@ async def _handle_follow(username: str, activity: dict, seq: int) -> None:
 
     following_acct = acct_from_username(username)
     local_actor_url = actor_url_from_username(username)
- 
+
     follower_acct = await lookup_acct(follow.actor)
     if follower_acct is None:
         logger.warning("follow_handler: WebFinger lookup returned None for %r", follow.actor)
@@ -53,19 +53,19 @@ async def _handle_follow(username: str, activity: dict, seq: int) -> None:
                       message_id=_source_key.message_id(seq))
 
     logger.info("follow_handler: Accept published for %r", follower_acct)
- 
- 
+
+
 async def _handle_undo_follow(username: str, activity: dict, seq: int) -> None:
     try:
         undo = UndoFollowActivity.model_validate(activity)
     except Exception:
         return
- 
+
     follower_acct = await lookup_acct(undo.actor)
     if follower_acct is None:
         logger.warning("WebFinger lookup failed for %s", undo.actor)
         return
- 
+
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type="deleted",
                       object_id=f"{follower_acct}|{acct_from_username(username)}",

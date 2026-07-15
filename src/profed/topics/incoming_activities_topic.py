@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from functools import partial
 from typing import Optional, Dict
 from profed.topics.common import ActivityEvent, validate_payload, validate_verb
 

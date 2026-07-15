@@ -1,16 +1,16 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from profed.core.persistence.projections import build_projection
 from profed.topics import accounts
 from .storage import storage
- 
- 
+
+
 async def _init() -> None:
     store = await storage()
     await store.ensure_schema()
- 
- 
+
+
 async def _apply_snapshot_item(item: dict) -> None:
     await (await storage()).add(item["username"], item)
 
@@ -33,7 +33,7 @@ async def _following_changed(object_id: str, payload: dict) -> None:
 
 async def _statuses_changed(object_id: str, payload: dict) -> None:
     await (await storage()).update(object_id, {"statuses_count": payload["count"]})
- 
+
 
 async def _deleted(object_id: str, payload: dict) -> None:
     await (await storage()).delete(object_id)
@@ -41,8 +41,8 @@ async def _deleted(object_id: str, payload: dict) -> None:
 
 async def _rebuild_finished() -> None:
     (await storage()).rebuild_finished()
- 
- 
+
+
 handle_account_events, rebuild, reset_last_seen = \
     build_projection(topic=accounts,
                      subscriber="api_c2s_actor",

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-from typing import Callable, Dict, Any, Coroutine 
+from typing import Callable, Dict, Any, Coroutine
 from asyncpg import Pool, Connection
 from asyncpg.transaction import Transaction
 

@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter, HTTPException, Path
 from profed.components.api.s2s.actor.service import resolve_actor
-from profed.models.activity_pub import Person 
+from profed.models.activity_pub import Person
 from profed.components.api.http import ActivityPubJSONResponse
 
 router = APIRouter()

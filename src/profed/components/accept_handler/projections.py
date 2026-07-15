@@ -1,15 +1,15 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from profed.core.persistence.projections import build_projection
 from profed.topics import known_accounts
 from .storage import storage
- 
- 
+
+
 async def _init() -> None:
     await (await storage()).ensure_schema()
- 
- 
+
+
 async def _store(payload: dict) -> None:
     await (await storage()).upsert(payload["url"], int(payload["id"]))
 

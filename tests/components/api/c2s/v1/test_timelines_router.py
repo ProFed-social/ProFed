@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from profed.models.mastodon import Account
@@ -10,7 +10,7 @@ from profed.components.api.c2s.v1.timelines import router as timelines_module
 from profed.components.api.c2s.v1.timelines import storage as timelines_storage
 from profed.components.api.c2s.shared.auth import current_user
 
- 
+
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
 
 
@@ -26,14 +26,14 @@ BOB = Account(id="999",
               username="bob",
               acct="bob@remote.example",
               display_name="Bob",
-              url="https://remote.example/actors/bob") 
+              url="https://remote.example/actors/bob")
 
 
 class FakeStorage:
     async def fetch(self, username, limit=20, max_id=None, since_id=None):
         return [("uuid-1", ACTIVITY)]
- 
- 
+
+
 @pytest.fixture
 def client():
     timelines_module.init({})
@@ -43,8 +43,8 @@ def client():
     app.dependency_overrides[current_user] = lambda: CLAIMS
     yield TestClient(app)
     timelines_storage._instance = None
- 
- 
+
+
 def test_home_timeline_returns_statuses(client):
     with patch("profed.components.api.c2s.v1.timelines.router.lookup_multiple",
                AsyncMock(return_value={"https://remote.example/actors/bob": BOB})):
@@ -56,8 +56,8 @@ def test_home_timeline_returns_statuses(client):
     assert data[0]["id"] == "uuid-1"
     assert data[0]["content"] == "Hello!"
     assert data[0]["account"]["username"] == "bob"
- 
- 
+
+
 def test_home_timeline_empty(client):
     timelines_storage._instance.fetch = AsyncMock(return_value=[])
     with patch("profed.components.api.c2s.v1.timelines.router.lookup_multiple",
@@ -66,8 +66,8 @@ def test_home_timeline_empty(client):
 
     assert response.status_code == 200
     assert response.json() == []
- 
- 
+
+
 def test_timelines_active_flag_set_after_init():
     timelines_module.init({})
     assert timelines_module.active is True

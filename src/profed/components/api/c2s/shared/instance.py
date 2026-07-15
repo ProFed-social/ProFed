@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from profed.languages import supported
 
 
@@ -22,4 +22,4 @@ def build_common_response(config: dict, d :str, max_chars: int) -> dict:
                                             "max_characters_per_option": 0,
                                             "min_expiration": 0,
                                             "max_expiration": 0}}}
-  
+

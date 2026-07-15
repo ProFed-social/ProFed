@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import time
 import re
 import pytest
@@ -11,18 +11,18 @@ from profed.core import message_bus
 from profed.components.api.c2s.oauth import router as oauth_router_module
 from profed.components.api.c2s.oauth import projection
 
- 
+
 CONFIG = {"oidc_issuer":      "https://cloud.example.com/",
           "oidc_client_id":  "profed",
           "oidc_client_secret": "secret",
           "oidc_callback_url": "https://profed.example.com/oauth/callback"}
- 
+
 APP = {"client_id":     "abc123",
        "client_secret": "appsecret",
        "client_name":   "TestApp",
        "redirect_uris": "https://app.example.com/callback",
        "scopes":        "read write"}
- 
+
 
 @pytest.fixture
 def client(fake_bus):
@@ -30,8 +30,8 @@ def client(fake_bus):
     app = FastAPI()
     app.include_router(oauth_router_module.router)
     return TestClient(app, follow_redirects=False)
- 
- 
+
+
 def test_authorize_unknown_client_returns_401(client):
     with patch("profed.components.api.c2s.oauth.router.get_app", return_value=None):
         response = client.get("/oauth/authorize"
@@ -39,8 +39,8 @@ def test_authorize_unknown_client_returns_401(client):
                               "&client_id=unknown"
                               "&redirect_uri=https://app.example.com/callback")
     assert response.status_code == 401
- 
- 
+
+
 def test_authorize_invalid_redirect_uri_returns_400(client):
     with patch("profed.components.api.c2s.oauth.router.get_app", return_value=APP):
         response = client.get("/oauth/authorize"
@@ -48,8 +48,8 @@ def test_authorize_invalid_redirect_uri_returns_400(client):
                               "&client_id=abc123"
                               "&redirect_uri=https://evil.example.com/callback")
     assert response.status_code == 400
- 
- 
+
+
 def test_authorize_redirects_to_nextcloud(client):
     with patch("profed.components.api.c2s.oauth.router.get_app", return_value=APP), \
          patch("profed.components.api.c2s.oauth.router.authorization_url",
@@ -60,13 +60,13 @@ def test_authorize_redirects_to_nextcloud(client):
                               "&redirect_uri=https://app.example.com/callback")
     assert response.status_code == 307
     assert response.headers["location"] == "https://cloud.example.com/authorize"
- 
- 
+
+
 def test_callback_invalid_state_returns_400(client):
     response = client.get("/oauth/callback?code=nc_code&state=unknown_state")
     assert response.status_code == 400
- 
- 
+
+
 def test_token_invalid_client_returns_401(client):
     with patch("profed.components.api.c2s.oauth.router.get_app", return_value=None):
         response = client.post("/oauth/token",
@@ -75,8 +75,8 @@ def test_token_invalid_client_returns_401(client):
                                      "client_id":     "unknown",
                                      "client_secret": "wrong"})
     assert response.status_code == 401
- 
- 
+
+
 def test_token_invalid_code_returns_400(client):
     with patch("profed.components.api.c2s.oauth.router.get_app", return_value=APP), \
          patch("profed.components.api.c2s.oauth.router.get_code", return_value=None):
@@ -86,8 +86,8 @@ def test_token_invalid_code_returns_400(client):
                                      "client_id":     "abc123",
                                      "client_secret": "appsecret"})
     assert response.status_code == 400
- 
- 
+
+
 def test_token_success_returns_access_token(client, fake_bus):
     code_entry = {"code":       "mycode",
                   "client_id":  "abc123",

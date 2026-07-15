@@ -1,15 +1,15 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from profed.core.persistence.projections import build_projection
 from profed.topics import resolved_activities
-from profed.components.api.c2s.v1.timelines.storage import storage 
+from profed.components.api.c2s.v1.timelines.storage import storage
 
- 
+
 async def _init() -> None:
     store = await storage()
     await store.ensure_schema()
- 
+
 
 def _inner_object_id(activity: dict) -> str | None:
     obj = activity.get("object")
@@ -20,7 +20,7 @@ def _inner_object_id(activity: dict) -> str | None:
         return obj.get("id")
 
     return None
- 
+
 
 async def _apply_item(data: dict) -> None:
     activity  = data["activity"]
@@ -28,7 +28,7 @@ async def _apply_item(data: dict) -> None:
     if status_id is None:
         return
 
-    await (await storage()).add(data["username"], status_id, activity) 
+    await (await storage()).add(data["username"], status_id, activity)
 
 
 async def _on_create(object_id: str, payload: dict) -> None:
@@ -61,7 +61,7 @@ async def _on_delete(object_id: str, payload: dict) -> None:
 async def _on_announce(object_id: str, payload: dict) -> None:
     activity = {"id": object_id, "type": "Announce", **payload["activity"]}
 
-    await (await storage()).add(payload["username"], object_id, activity) 
+    await (await storage()).add(payload["username"], object_id, activity)
 
 
 async def _rebuild_finished() -> None:

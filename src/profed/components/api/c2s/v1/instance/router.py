@@ -1,24 +1,24 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 from fastapi import APIRouter, Depends
 from typing import Annotated
 from profed.components.api.c2s.shared.auth import current_user
 from profed.identity import domain
 from profed.components.api.c2s.shared.instance import build_common_response
- 
- 
+
+
 router = APIRouter()
 active = False
 _config: dict = {}
- 
- 
+
+
 def init(config: dict) -> None:
     global active, _config
     active = True
     _config = config
- 
- 
+
+
 @router.get("/instance")
 async def instance():
     d = domain()

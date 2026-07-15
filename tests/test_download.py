@@ -26,7 +26,7 @@ def _fake_http_client(headers=None, content=b"", status_code=200):
         if raise_for_status and status_code >= 400:
             raise Exception(f"HTTP {status_code}")
         return response
- 
+
     client = MagicMock()
     client.get = AsyncMock(side_effect=_respond)
     client.head = AsyncMock(side_effect=_respond)
@@ -149,7 +149,7 @@ async def test_download_returns_existing_url_on_http_error(fake_bus):
 @pytest.mark.asyncio
 async def test_download_returns_none_when_no_existing_and_download_fails(fake_bus):
     client = _fake_http_client(status_code=500)
-    
+
     with patch("profed.media.download.HttpClient", return_value=client):
         result = await download("https://example.com/img.jpg", None, "alice@example.com")
 

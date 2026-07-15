@@ -21,7 +21,7 @@ from .inbox import router as inbox_router
 from .outbox import router as outbox_router
 from .nodeinfo import router as nodeinfo_router
 from .instance_actor import router as instance_actor_router
- 
+
 
 def _projection_initializer(storage, projection, handle_events, name):
     async def _init(config: dict):
@@ -69,7 +69,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
 
- 
+
 def mount_routers(parent, deactivate: List[str]) -> None:
     for r in get_active({"webfinger": webfinger_router,
                          "actor": actor_router,

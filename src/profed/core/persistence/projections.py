@@ -25,7 +25,7 @@ def configure_defaults(sanitize=None, correction_verb_map=None):
         _default_sanitize = sanitize
     if correction_verb_map is not None:
         _default_correction_verb_map = correction_verb_map
- 
+
 
 async def _no_rebuild_finished() -> None:
     pass
@@ -92,7 +92,7 @@ def build_projection(topic: Dict,
                             lambda i: True)
     last_seen = 0
     topic_name = topic["name"]
- 
+
     async def _heal(sequence_id, event_type, object_id, payload):
         verb = topic.get("correction_verb_map",
                          _default_correction_verb_map).get(event_type,
@@ -117,7 +117,7 @@ def build_projection(topic: Dict,
         async def _get_validated_and_sanitized():
             validated = topic["validate"](event_type, payload)
             if validated is None or not verify_event(event_type, validated):
-                return None 
+                return None
 
             sanitized = topic.get("sanitize", _identity)(validated)
             if sanitized != validated:
