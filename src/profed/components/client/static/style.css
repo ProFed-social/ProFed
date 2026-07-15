@@ -235,3 +235,27 @@ a:hover { text-decoration: underline; }
 
 .follow-button:disabled { opacity: 0.6; cursor: default; }
 
+
+.compose { display: grid; gap: .6rem; padding: 1.1rem 0; border-bottom: 1px solid var(--line); }
+.compose textarea {
+  width: 100%;
+  padding: .6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: CanvasText;
+  font: inherit;
+  resize: vertical;
+}
+.compose textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.compose button {
+  justify-self: end;
+  padding: .4rem 1.1rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: Canvas;
+  font: inherit;
+  cursor: pointer;
+}
+

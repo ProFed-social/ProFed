@@ -1,0 +1,4 @@
+<form class="compose" hx-post="/compose" hx-target=".posts" hx-swap="afterbegin" hx-on::after-request="if(event.detail.successful) this.reset()">
+  <textarea name="status" rows="3" required placeholder="What are you working on?"></textarea>
+  <button type="submit">Post</button>
+</form>
