@@ -3,7 +3,7 @@
         hx-swap="outerHTML" hx-disabled-elt="this">Unfollow</button>
 {% elif relationship and relationship.requested %}
 <button class="follow-button is-requested" hx-post="/@{{ handle }}/unfollow"
-        hx-swap="outerHTML" hx-disabled-elt="this">Requeste</button>
+        hx-swap="outerHTML" hx-disabled-elt="this">Requested</button>
 {% else %}
 <button class="follow-button" hx-post="/@{{ handle }}/follow"
         hx-swap="outerHTML" hx-disabled-elt="this">Follow</button>

@@ -49,19 +49,19 @@ async def test_relationship_error_returns_none():
 
 def test_follow_button_following_renders_unfollow():
     html = profile._follow_button("bob@remote.example", {"following": True, "requested": False})
-    assert "Entfolgen" in html
+    assert "Unfollow" in html
     assert "/@bob@remote.example/unfollow" in html
 
 
 def test_follow_button_requested_renders_requested():
     html = profile._follow_button("bob@remote.example", {"following": False, "requested": True})
-    assert "Angefragt" in html
+    assert "Requested" in html
     assert "/unfollow" in html
 
 
 def test_follow_button_none_renders_follow():
     html = profile._follow_button("bob@remote.example", {"following": False, "requested": False})
-    assert "Folgen" in html
+    assert "Follow" in html
     assert "/@bob@remote.example/follow" in html
 
 
@@ -74,7 +74,7 @@ async def test_follow_action_posts_with_token_and_renders_button():
         response = await profile._follow_action("bob@remote.example", "follow", "tok")
     assert client.post.call_args[0][0] == "/api/v1/accounts/5/follow"
     assert client.post.call_args.kwargs["token"] == "tok"
-    assert b"Angefragt" in response.body
+    assert b"Requested" in response.body
 
 
 def test_viewing_other_true_for_different_acct():
