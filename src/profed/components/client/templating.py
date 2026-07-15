@@ -20,14 +20,19 @@ def build_loader(standard_dir, theme_dir):
                                    [standard_dir])])
 
 
+def build_environment(standard_dir, theme_dir):
+    environment = Environment(loader=build_loader(standard_dir, theme_dir),
+                              autoescape=select_autoescape(["html", "xml"]))
+    environment.filters["sanitize"] = sanitize_html
+    return environment
+
+
 def environment():
     global _instance
 
     if _instance is None:
-        theme_dir = config().get("client", {}).get("theme_dir")
-        _instance = Environment(loader=build_loader(STANDARD_TEMPLATES, theme_dir),
-                                autoescape=select_autoescape(["html", "xml"]))
-        _instance.filters["sanitize"] = sanitize_html
+        _instance = build_environment(STANDARD_TEMPLATES,
+                                      config().get("client", {}).get("theme_dir"))
 
     return _instance
 

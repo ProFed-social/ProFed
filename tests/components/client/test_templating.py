@@ -50,3 +50,32 @@ def test_environment_is_cached_and_resettable(monkeypatch):
     assert templating.environment() is not first
     templating._reset_environment()
 
+
+def test_build_environment_provides_the_sanitize_filter(tmp_path):
+    standard = tmp_path / "standard"
+    _write(standard, "a.html", "{{ content | sanitize | safe }}")
+
+    env = templating.build_environment(standard, None)
+
+    assert env.get_template("a.html").render(content="<p>hi</p><script>evil()</script>") == "<p>hi</p>"
+
+
+def test_build_environment_escapes_html_by_default(tmp_path):
+    standard = tmp_path / "standard"
+    _write(standard, "a.html", "{{ content }}")
+
+    env = templating.build_environment(standard, None)
+
+    assert env.get_template("a.html").render(content="<b>x</b>") == "&lt;b&gt;x&lt;/b&gt;"
+
+
+def test_build_environment_prefers_the_theme(tmp_path):
+    standard, theme = tmp_path / "standard", tmp_path / "theme"
+    _write(standard, "a.html", "standard-a")
+    _write(theme, "a.html", "theme-a")
+
+    env = templating.build_environment(standard, theme)
+
+    assert env.get_template("a.html").render() == "theme-a"
+
+

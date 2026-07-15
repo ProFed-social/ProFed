@@ -70,7 +70,7 @@ async def profile(request: Request, handle: str):
         statuses=await _account_statuses(account["id"]),
         handle=handle,
         relationship=relationship,
-        **(await page_context(request))))
+        **(await page_context(request, session))))
 
 
 @router.post("/@{handle}/follow", response_class=HTMLResponse)

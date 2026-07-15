@@ -30,5 +30,6 @@ async def home(request: Request):
     return HTMLResponse(environment().get_template("home.html").render(statuses=await _home_timeline(session["token"])
                                                                        if session else
                                                                        [],
-                                                                       **(await page_context(request))))
+                                                                       **(await page_context(request, session))))
+
 

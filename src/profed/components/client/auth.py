@@ -61,9 +61,11 @@ async def current_user(request: Request):
     return session
 
 
-async def page_context(request):
-    return {"current_username": (await current_user_optional(request) or {}).get("username"),
+async def page_context(request, session=None):
+    session = session if session is not None else await current_user_optional(request)
+    return {"current_username": (session or {}).get("username"),
             "login_url": _login_url(request)}
+
 
 def _login_response(request):
     return (RedirectResponse(_login_url(request), status_code=303)

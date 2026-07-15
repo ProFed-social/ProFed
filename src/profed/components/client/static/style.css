@@ -235,3 +235,8 @@ a:hover { text-decoration: underline; }
 
 .follow-button:disabled { opacity: 0.6; cursor: default; }
 
+.welcome { padding: 3rem 0; }
+.welcome h1 { margin: 0 0 .5rem; font-size: clamp(1.8rem, 1.2rem + 2cqw, 2.6rem); }
+.welcome p { margin: .4rem 0; color: var(--muted); }
+.welcome a { color: var(--accent); }
+

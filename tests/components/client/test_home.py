@@ -5,15 +5,11 @@ from unittest.mock import AsyncMock, Mock
 
 import httpx
 from fastapi import FastAPI
-from jinja2 import Environment, select_autoescape
 
 from profed.components.client import auth, home, templating
-from profed.sanitize import sanitize_html
 
 
-_ENV = Environment(loader=templating.build_loader(templating.STANDARD_TEMPLATES, None),
-                   autoescape=select_autoescape(["html", "xml"]))
-_ENV.filters["sanitize"] = sanitize_html
+_ENV = templating.build_environment(templating.STANDARD_TEMPLATES, None)
 
 
 def _app(monkeypatch):

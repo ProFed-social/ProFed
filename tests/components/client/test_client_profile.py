@@ -3,15 +3,13 @@
 
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
-from profed.components.client import profile
+from profed.components.client import profile, templating
 
 
 @pytest.fixture(autouse=True)
 def standalone_env():
     from pathlib import Path
-    from jinja2 import Environment, FileSystemLoader
-    templates = Path(profile.__file__).parent / "templates"
-    env = Environment(loader=FileSystemLoader(str(templates)), autoescape=True)
+    env = templating.build_environment(Path(profile.__file__).parent / "templates", None)
     with patch.object(profile, "environment", lambda: env):
         yield
 

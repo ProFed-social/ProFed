@@ -5,13 +5,11 @@ import logging
 
 import httpx
 from fastapi import FastAPI
-from jinja2 import Environment, select_autoescape
 
 from profed.components.client import profile, templating
 
 
-_ENV = Environment(loader=templating.build_loader(templating.STANDARD_TEMPLATES, None),
-                   autoescape=select_autoescape(["html", "xml"]))
+_ENV = templating.build_environment(templating.STANDARD_TEMPLATES, None)
 
 
 def _resp(status_code, **kwargs):
