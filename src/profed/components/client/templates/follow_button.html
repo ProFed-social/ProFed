@@ -1,11 +1,11 @@
 {% if relationship and relationship.following %}
 <button class="follow-button is-following" hx-post="/@{{ handle }}/unfollow"
-        hx-swap="outerHTML" hx-disabled-elt="this">Entfolgen</button>
+        hx-swap="outerHTML" hx-disabled-elt="this">Unfollow</button>
 {% elif relationship and relationship.requested %}
 <button class="follow-button is-requested" hx-post="/@{{ handle }}/unfollow"
-        hx-swap="outerHTML" hx-disabled-elt="this">Angefragt</button>
+        hx-swap="outerHTML" hx-disabled-elt="this">Requeste</button>
 {% else %}
 <button class="follow-button" hx-post="/@{{ handle }}/follow"
-        hx-swap="outerHTML" hx-disabled-elt="this">Folgen</button>
+        hx-swap="outerHTML" hx-disabled-elt="this">Follow</button>
 {% endif %}
 
