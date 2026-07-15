@@ -3,8 +3,9 @@
 
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from profed.components.accept_handler import handler
+from profed.components.accept_handler import projections
 import profed.components.accept_handler.storage as storage_module
 
 
@@ -129,4 +130,13 @@ async def test_non_accept_activity_is_ignored(fake_bus, fake_storage):
 
     await handler.handle_incoming_activities()
     assert fake_bus.topic("known_accounts").published == []
+
+
+@pytest.mark.asyncio
+async def test_known_accounts_rebuild_signals_rebuild_finished(fake_bus, fake_storage):
+    fake_storage.ensure_schema = AsyncMock()
+    fake_storage.rebuild_finished = MagicMock()
+    fake_bus.topic("known_accounts").messages = []
+    await projections.rebuild()
+    fake_storage.rebuild_finished.assert_called_once()
 

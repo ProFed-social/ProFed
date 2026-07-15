@@ -42,10 +42,15 @@ async def _removed(object_id: str, payload: dict, emitted_at, sequence_id: int) 
     await (await storage()).dequeue(recipient, activity_id)
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 queue_handle_events, queue_rebuild, _ = \
     build_projection(topic=deliveries,
                      subscriber="delivery_distributor_queue",
                      init=_init,
+                     rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_noop_item,
                      on_message_type={"queued":     _queued,
                                       "attempting": _attempting,
@@ -79,6 +84,7 @@ keys_handle_events, keys_rebuild, _ = \
     build_projection(topic=users,
                      subscriber="delivery_distributor_keys",
                      init=_keys_init,
+                     rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_upsert_key_snapshot,
                      on_message_type={"created": _upsert_key,
                                       "keys_generated": _upsert_key})

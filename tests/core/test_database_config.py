@@ -56,6 +56,6 @@ def test_empty_database_cfg_is_harmless():
                                   "user": "profed",
                                   "password": None,
                                   "pool_min_size": "1",
-                                  "pool_max_size": "30"})
+                                  "pool_max_size": "60"})
     assert result == expected
 

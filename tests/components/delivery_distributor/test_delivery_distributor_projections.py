@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+from unittest.mock import MagicMock
 from datetime import datetime, timezone
 from profed.components.delivery_distributor import projections
 from profed.components.delivery_distributor import storage as storage_module
@@ -73,4 +74,12 @@ async def test_keys_upsert(fake_storage):
 async def test_keys_upsert_skips_incomplete(fake_storage):
     await projections._upsert_key("alice", {"public_key_pem": "PUB"})
     assert fake_storage.calls == []
+
+
+@pytest.mark.asyncio
+async def test_queue_rebuild_signals_rebuild_finished(fake_storage, fake_bus):
+    fake_storage.rebuild_finished = MagicMock()
+    fake_bus.topic("deliveries").messages = []
+    await projections.queue_rebuild()
+    fake_storage.rebuild_finished.assert_called_once()
 

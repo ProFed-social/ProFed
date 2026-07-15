@@ -25,10 +25,15 @@ async def _snapshot(item: dict) -> None:
         await (await storage()).accept_edge(item["following"], item["follower"], item["accepted_at"])
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 followers_handle_events, followers_rebuild, _ = \
     build_projection(topic=followers,
                      subscriber="delivery_splitter",
                      init=_init,
+                     rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_snapshot,
                      on_message_type={"accepted": _accepted,
                                       "deleted": _deleted},

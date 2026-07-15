@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+from unittest.mock import MagicMock
 from datetime import datetime, timezone
 from profed.components.delivery_splitter import projections
 from profed.components.delivery_splitter import storage as storage_module
@@ -76,4 +77,12 @@ async def test_recipients_at_excludes_edge_deleted_before_t(fake_storage):
                                datetime(2026, 5, 1, tzinfo=timezone.utc))
     after_delete = datetime(2026, 6, 1, tzinfo=timezone.utc)
     assert await projections.recipients_at("alice@example.com", after_delete) == set()
+
+
+@pytest.mark.asyncio
+async def test_followers_rebuild_signals_rebuild_finished(fake_storage, fake_bus):
+    fake_storage.rebuild_finished = MagicMock()
+    fake_bus.topic("followers").messages = []
+    await projections.followers_rebuild()
+    fake_storage.rebuild_finished.assert_called_once()
 

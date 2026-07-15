@@ -25,11 +25,16 @@ async def _updated(object_id: str, payload: dict) -> None:
 async def _snapshot(item: dict) -> None:
     await _store(item)
 
- 
+
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
 handle_events, rebuild, _ = \
     build_projection(topic=known_accounts,
                      subscriber="accept_handler",
                      init=_init,
+                     rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_snapshot,
                      on_message_type={"created": _created,
                                       "updated": _updated})

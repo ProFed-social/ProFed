@@ -160,11 +160,6 @@ def subscribe(pool: Pool,
                     if caught_up is not None:
                         last_seen = CatchUpCursor(int(last_seen), caught_up, await _max_id(conn))
                     tracker = GapTracker(int(last_seen), gap_timeout)
-                    logger.info("subscribe[%s/%s]: start last_seen=%d head=%s",
-                                topic,
-                                subscriber,
-                                int(last_seen),
-                                getattr(last_seen, "_h", "n/a"))
 
                 listening = False
                 try:
@@ -173,20 +168,10 @@ def subscribe(pool: Pool,
                         processed = False
 
                         threshold = datetime.now(timezone.utc) - gap_timeout
-                        rows = await _fetch_new(conn, int(last_seen))
-                        if rows:
-                            logger.info("subscribe[%s/%s]: fetched=%d since=%d first_id=%s",
-                                        topic, subscriber, len(rows), int(last_seen), rows[0]["id"])
-                        for row in rows:
+                        for row in await _fetch_new(conn, int(last_seen)):
                             rid = row["id"]
                             if rid != int(last_seen) + 1:
                                 if _as_dt(row["emitted_at"]) >= threshold:
-                                    logger.info("subscribe[%s/%s]: recent-gap break id=%d last_seen=%d emitted=%s",
-                                                topic,
-                                                subscriber,
-                                                rid,
-                                                int(last_seen),
-                                                row["emitted_at"])
                                     break
                                 tracker.accept_gap(int(last_seen) + 1, rid - 1)
                             yield (rid,
