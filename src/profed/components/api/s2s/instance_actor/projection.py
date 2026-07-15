@@ -4,13 +4,10 @@
 from profed.core.persistence.projections import build_projection
 from profed.identity import domain
 from profed.topics import instance
+from profed.util import noop
 
 
 _current = {}
-
-
-async def _noop():
-    pass
 
 
 async def _store(object_id, payload):
@@ -35,7 +32,7 @@ def signing_key():
 
 handle_user_events, rebuild, _ = build_projection(topic=instance,
                                                   subscriber="s2s_instance_actor",
-                                                  init=_noop,
+                                                  init=noop,
                                                   on_snapshot_item=_store_item,
                                                   on_message_type={"set": _store})
 

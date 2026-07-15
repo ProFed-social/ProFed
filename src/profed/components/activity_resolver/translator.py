@@ -11,17 +11,10 @@ from profed.topics import incoming_activities
 from profed.http.signatures import make_sign
 from profed.components.activity_resolver import instance_key
 from profed.components.activity_resolver.resolve import resolve_object
+from profed.util import noop
 
 
 _SOURCE = source_key("incoming_activities")
-
-
-async def _noop() -> None:
-    pass
-
-
-async def _noop_item(item: dict) -> None:
-    pass
 
 
 def _actor_host(activity):
@@ -64,8 +57,8 @@ def _forwarder(should_resolve: bool):
 
 handle_events, rebuild, _ = build_projection(topic=incoming_activities,
                                              subscriber="activity_resolver",
-                                             init=_noop,
-                                             on_snapshot_item=_noop_item,
+                                             init=noop,
+                                             on_snapshot_item=noop,
                                              on_message_type={"Create":   _forwarder(True),
                                                               "Update":   _forwarder(True),
                                                               "Announce": _forwarder(True),

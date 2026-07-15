@@ -8,6 +8,7 @@ from profed.core.persistence.projections import build_projection, with_sequence_
 from profed.topics import person, followers, activities
 from profed.identity import acct_from_username, username_from_acct, domain
 from profed.models.mastodon import Account
+from profed.util import noop
 from .storage import storage
 
 
@@ -18,14 +19,6 @@ _FOLLOWING_SOURCE = source_key("followers:following")
 _ACTIVITIES_SOURCE = source_key("activities")
 
 _ACTOR_TYPES = {"Person", "Service", "Group", "Organization", "Application"}
-
-
-async def _noop() -> None:
-    pass
-
-
-async def _noop_item(item: dict) -> None:
-    pass
 
 
 async def _publish(event_type: str, object_id: str, payload: dict, message_id) -> None:
@@ -64,8 +57,8 @@ async def _person_deleted(object_id, payload, sequence_id) -> None:
 handle_person_events, _, _ = \
     build_projection(topic=person,
                      subscriber="person_account_person",
-                     init=_noop,
-                     on_snapshot_item=_noop_item,
+                     init=noop,
+                     on_snapshot_item=noop,
                      on_message_type={"created": _person_created,
                                       "updated": _person_updated,
                                       "deleted": _person_deleted},
@@ -111,8 +104,8 @@ async def _follower_deleted(object_id, payload, sequence_id) -> None:
 handle_followers_events, _, _ = \
     build_projection(topic=followers,
                      subscriber="person_account_followers",
-                     init=_noop,
-                     on_snapshot_item=_noop_item,
+                     init=noop,
+                     on_snapshot_item=noop,
                      on_message_type={"accepted": _follower_accepted,
                                       "deleted": _follower_deleted},
                      event_handler_signature=with_sequence_id)
@@ -162,8 +155,8 @@ async def _status_deleted(object_id, payload, sequence_id) -> None:
 handle_statuses_events, _, _ = \
     build_projection(topic=activities,
                      subscriber="person_account_statuses",
-                     init=_noop,
-                     on_snapshot_item=_noop_item,
+                     init=noop,
+                     on_snapshot_item=noop,
                      on_message_type={"Create": _status_created,
                                       "Announce": _status_announced,
                                       "Delete": _status_deleted},

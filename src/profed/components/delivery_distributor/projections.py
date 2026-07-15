@@ -5,16 +5,9 @@ from profed.core.persistence.projections import (build_projection,
                                                  with_emitted_at,
                                                  with_sequence_id)
 from profed.topics import deliveries, users
+from profed.util import noop
 from .storage import storage
 from . import sender
-
-
-async def _init() -> None:
-    pass
-
-
-async def _noop_item(item: dict) -> None:
-    pass
 
 
 async def _queued(object_id: str, payload: dict, emitted_at, sequence_id: int) -> None:
@@ -49,9 +42,9 @@ async def _rebuild_finished() -> None:
 queue_handle_events, queue_rebuild, _ = \
     build_projection(topic=deliveries,
                      subscriber="delivery_distributor_queue",
-                     init=_init,
+                     init=noop,
                      rebuild_finished=_rebuild_finished,
-                     on_snapshot_item=_noop_item,
+                     on_snapshot_item=noop,
                      on_message_type={"queued":     _queued,
                                       "attempting": _attempting,
                                       "failed":     _failed,

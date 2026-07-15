@@ -7,18 +7,11 @@ from profed.core.message_bus.source_key import source_key
 from profed.core.persistence.projections import build_projection, with_sequence_id
 from profed.topics import remote_actors
 from profed.models.mastodon import Account
+from profed.util import noop
 
 
 logger = logging.getLogger(__name__)
 _REMOTE_ACTORS_SOURCE = source_key("remote_actors")
-
-
-async def _noop() -> None:
-    pass
-
-
-async def _noop_item(item: dict) -> None:
-    pass
 
 
 async def _discovered(object_id, payload, sequence_id) -> None:
@@ -36,8 +29,8 @@ async def _discovered(object_id, payload, sequence_id) -> None:
 
 handle_events, rebuild, _ = build_projection(topic=remote_actors,
                                              subscriber="remote_accounts",
-                                             init=_noop,
-                                             on_snapshot_item=_noop_item,
+                                             init=noop,
+                                             on_snapshot_item=noop,
                                              on_message_type={"discovered": _discovered},
                                              event_handler_signature=with_sequence_id)
 

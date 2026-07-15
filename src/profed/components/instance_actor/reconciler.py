@@ -6,13 +6,11 @@ from profed.core.persistence.projections import build_projection
 from profed.http.signatures import generate_key_pair
 from profed.identity import domain
 from profed.topics import instance
+from profed.util import noop
 
 
 async def run_reconcile(config):
     current = {}
-
-    async def _noop():
-        pass
 
     def _desired_metadata(config):
         return {"preferredUsername": config.get("preferredUsername", domain()),
@@ -41,7 +39,7 @@ async def run_reconcile(config):
 
     _, rebuild, _ = build_projection(topic=instance,
                                      subscriber="instance_actor",
-                                     init=_noop,
+                                     init=noop,
                                      on_snapshot_item=_store_item,
                                      on_message_type={"set": _store},
                                      rebuild_finished=_reconcile)
