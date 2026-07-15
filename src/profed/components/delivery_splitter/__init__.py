@@ -14,13 +14,16 @@ using_schemata = ["delivery_splitter"]
 
 
 async def DeliverySplitter(config: dict) -> None:
+    async def rebuild_activities_and_run():
+        await activities_rebuild()
+        logger.info("delivery_splitter: activities rebuilt, now tailing live")
+        await activities_handle_events()
+
     await init_storage(config)
     await (await _storage()).ensure_schema()
     logger.info("delivery_splitter: schema ready, rebuilding follower history")
     await followers_rebuild()
     logger.info("delivery_splitter: follower history rebuilt, rebuilding activities")
-    asyncio.create_task(followers_handle_events(), name="delivery_splitter_followers")
-    await activities_rebuild()
-    logger.info("delivery_splitter: activities rebuilt, now tailing live")
-    await activities_handle_events()
 
+    await asyncio.gather(followers_handle_events(),
+                         rebuild_activities_and_run())

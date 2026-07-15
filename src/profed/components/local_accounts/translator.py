@@ -7,6 +7,7 @@ from profed.core.message_bus.source_key import source_key
 from profed.core.persistence.projections import build_projection, with_sequence_id
 from profed.topics import accounts
 from profed.identity import acct_from_username, account_id
+from profed.util import noop
 
 
 logger = logging.getLogger(__name__)
@@ -14,14 +15,6 @@ _ACCOUNTS_SOURCE = source_key("accounts")
 
 _VERBS = ("created", "updated", "followers_changed", "following_changed",
           "statuses_changed", "deleted")
-
-
-async def _noop() -> None:
-    pass
-
-
-async def _noop_item(item: dict) -> None:
-    pass
 
 
 async def _forward(event_type: str, username: str, payload: dict, sequence_id: int) -> None:
@@ -41,8 +34,8 @@ def _forwarder(event_type: str):
 
 handle_events, rebuild, _ = build_projection(topic=accounts,
                                              subscriber="local_accounts",
-                                             init=_noop,
-                                             on_snapshot_item=_noop_item,
+                                             init=noop,
+                                             on_snapshot_item=noop,
                                              on_message_type={verb: _forwarder(verb)
                                                               for verb in _VERBS},
                                              event_handler_signature=with_sequence_id)

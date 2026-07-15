@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.persistence.projections import build_projection
-from profed.topics import resolved_activities
+from profed.topics import timeline
 from profed.components.api.c2s.v1.timelines.storage import storage
 
 
@@ -69,7 +69,7 @@ async def _rebuild_finished() -> None:
 
 
 handle_events, rebuild, _ = \
-    build_projection(topic=resolved_activities,
+    build_projection(topic=timeline,
                      subscriber="api_home_timeline",
                      init=_init,
                      rebuild_finished=_rebuild_finished,

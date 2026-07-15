@@ -19,6 +19,7 @@ async def DeliveryDistributor(config: dict) -> None:
     await (await _storage()).ensure_schema()
     await asyncio.gather(queue_rebuild(), keys_rebuild())
     sender.start(config, await (await _storage()).recipients_with_work())
-    asyncio.create_task(keys_handle_events(), name="delivery_distributor_keys")
-    await queue_handle_events()
+
+    await asyncio.gather(keys_handle_events(),
+                         queue_handle_events())
 
