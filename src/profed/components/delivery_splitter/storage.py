@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import json
 from profed.core.persistence.base_storage import BaseStorage, init_pool
 
 
@@ -15,6 +16,31 @@ class _Storage(BaseStorage):
                                      follower  TEXT      NOT NULL,
                                      valid     TSTZRANGE NOT NULL,
                                      PRIMARY KEY (following, follower))""")
+        await self.execute("""CREATE TABLE IF NOT EXISTS
+                              delivery_splitter.object_recipients
+                                    (object_url TEXT  PRIMARY KEY,
+                                     recipients JSONB NOT NULL)""")
+
+    async def get_recipients(self, object_url: str) -> set[str]:
+        row = await self.fetch_one("""SELECT recipients
+                                      FROM delivery_splitter.object_recipients
+                                      WHERE object_url = $1""",
+                                   object_url)
+        return set(json.loads(row["recipients"])) if row else set()
+
+    async def put_recipients(self, object_url: str, recipients: set[str]) -> None:
+        await self.execute("""INSERT INTO delivery_splitter.object_recipients
+                                    (object_url, recipients)
+                              VALUES ($1, $2)
+                              ON CONFLICT (object_url) DO UPDATE
+                                  SET recipients = $2""",
+                           object_url,
+                           json.dumps(sorted(recipients)))
+
+    async def drop_recipients(self, object_url: str) -> None:
+        await self.execute("""DELETE FROM delivery_splitter.object_recipients
+                              WHERE object_url = $1""",
+                           object_url)
 
     async def accept_edge(self, following: str, follower: str, at) -> None:
         await self.execute("""INSERT INTO delivery_splitter.follower_history
