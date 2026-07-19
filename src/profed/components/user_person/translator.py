@@ -97,7 +97,6 @@ async def _tick(object_id, payload, emitted_at, sequence_id) -> None:
 
 handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=users,
-                         subscriber="user_person",
                          init=_init,
                          on_snapshot_item=_apply_snapshot_item,
                          on_message_type={"created": _created,

@@ -90,7 +90,6 @@ async def _rebuild_finished() -> None:
 
 handle_events, rebuild, _ = \
     build_projection(topic=activities,
-                     subscriber="api_user_statuses",
                      init=_init,
                      rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_apply_item,

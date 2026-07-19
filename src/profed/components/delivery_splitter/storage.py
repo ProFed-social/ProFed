@@ -6,10 +6,9 @@ from profed.core.persistence.base_storage import BaseStorage, init_pool
 
 class _Storage(BaseStorage):
     def __init__(self, pool):
-        super().__init__(pool, None)
+        super().__init__(pool)
 
     async def ensure_schema(self) -> None:
-        await super().ensure_schema()
         await self.execute("""CREATE TABLE IF NOT EXISTS
                               delivery_splitter.follower_history
                                     (following TEXT      NOT NULL,

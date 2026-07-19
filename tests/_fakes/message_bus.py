@@ -57,7 +57,7 @@ class FakeTopic:
     async def last_snapshot_id(self):
         return self.snapshots[-1][0] if self.snapshots else 0
 
-    def subscribe(self, subscriber, last_seen=0, caught_up=None):
+    def subscribe(self, last_seen=0, caught_up=None):
         async def generator():
             for msg in self.messages:
                 if msg[0] > last_seen:

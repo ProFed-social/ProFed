@@ -21,7 +21,6 @@ async def _forward(event_type: str, object_id: str, payload: dict, sequence_id: 
 
 
 handle_events, rebuild, _ = build_projection(topic=activities,
-                                             subscriber="own_timeline",
                                              init=noop,
                                              on_snapshot_item=noop,
                                              on_message_type={verb: _forward for verb in TIMELINE_VERBS},

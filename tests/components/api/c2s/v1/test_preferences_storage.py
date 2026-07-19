@@ -4,7 +4,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from profed.components.api.c2s.v1.accounts.preferences.storage import _Storage, _configured_defaults
-from profed.core.persistence.base_storage import BaseStorage
 from profed.languages import supported
 
 
@@ -64,8 +63,7 @@ async def test_ensure_schema_populates_languages_from_supported():
     store = _Storage(None)
     store.execute = AsyncMock()
 
-    with patch.object(BaseStorage, "ensure_schema", AsyncMock()):
-        await store.ensure_schema()
+    await store.ensure_schema()
 
     populate = [call
                 for call in store.execute.await_args_list
@@ -79,8 +77,7 @@ async def test_ensure_schema_creates_privacy_enum():
     store = _Storage(None)
     store.execute = AsyncMock()
 
-    with patch.object(BaseStorage, "ensure_schema", AsyncMock()):
-        await store.ensure_schema()
+    await store.ensure_schema()
 
     assert any("CREATE TYPE api.privacy_values" in call.args[0]
                for call in store.execute.await_args_list)

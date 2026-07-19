@@ -10,7 +10,7 @@ async def test_publish_and_receive(topic):
     async with topic.publish() as publish:
         await publish(event_type="created", object_id="o1", payload={"x": 1})
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
 
     seq, event_type, object_id, _, payload = await subscriber.__anext__()
 

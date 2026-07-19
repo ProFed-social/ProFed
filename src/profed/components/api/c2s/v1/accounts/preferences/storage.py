@@ -23,10 +23,9 @@ class _Storage(BaseStorage):
         self.DEFAULT_PRIVACY = self.DEFAULT_PRIVACY if default_privacy is None else default_privacy
         self.DEFAULT_SENSITIVE = self.DEFAULT_SENSITIVE if default_sensitive is None else default_sensitive
         self.DEFAULT_LANGUAGE = self.DEFAULT_LANGUAGE if default_language is None else default_language
-        super().__init__(pool, None, subscriber_schemas=["api_c2s_preferences"])
+        super().__init__(pool)
 
     async def ensure_schema(self) -> None:
-        await super().ensure_schema()
         await self.execute("""DO $$ BEGIN
                                   CREATE TYPE api.privacy_values
                                       AS ENUM ('public', 'unlisted', 'private', 'direct');

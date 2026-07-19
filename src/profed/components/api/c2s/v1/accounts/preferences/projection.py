@@ -42,7 +42,6 @@ async def _rebuild_finished() -> None:
 
 handle_events, rebuild, reset_last_seen = \
     build_projection(topic=preferences_topic,
-                     subscriber="api_c2s_preferences",
                      init=_init,
                      rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_snapshot,

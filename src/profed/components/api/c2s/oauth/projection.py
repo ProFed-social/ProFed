@@ -42,7 +42,6 @@ async def _token_snapshot(item: dict) -> None:
 
 tokens_handle_events, tokens_rebuild, tokens_reset_last_seen = \
     build_projection(topic=oauth_tokens,
-                     subscriber="api",
                      init=_tokens_init,
                      on_snapshot_item=_token_snapshot,
                      on_message_type={"issued":  _token_issued,
@@ -83,7 +82,6 @@ async def _app_snapshot(item: dict) -> None:
 
 apps_handle_events, apps_rebuild, _ = \
     build_projection(topic=oauth_apps,
-                     subscriber="api",
                      init=_apps_init,
                      on_snapshot_item=_app_snapshot,
                      on_message_type={"created": _app_created})
@@ -113,7 +111,6 @@ async def _code_snapshot(item: dict) -> None:
 
 codes_handle_events, codes_rebuild, _ = \
     build_projection(topic=oauth_codes,
-                     subscriber="api",
                      init=_codes_init,
                      on_snapshot_item=_code_snapshot,
                      on_message_type={"issued": _code_issued,

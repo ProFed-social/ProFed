@@ -25,7 +25,6 @@ def signing_key():
 
 
 handle_events, rebuild, _ = build_projection(topic=instance,
-                                             subscriber="c2s_instance_key",
                                              init=noop,
                                              on_snapshot_item=_store_item,
                                              on_message_type={"set": _store})

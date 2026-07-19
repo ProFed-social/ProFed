@@ -28,7 +28,6 @@ async def _discovered(object_id, payload, sequence_id) -> None:
 
 
 handle_events, rebuild, _ = build_projection(topic=remote_actors,
-                                             subscriber="remote_accounts",
                                              init=noop,
                                              on_snapshot_item=noop,
                                              on_message_type={"discovered": _discovered},

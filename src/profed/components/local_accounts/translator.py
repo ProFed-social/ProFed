@@ -33,7 +33,6 @@ def _forwarder(event_type: str):
 
 
 handle_events, rebuild, _ = build_projection(topic=accounts,
-                                             subscriber="local_accounts",
                                              init=noop,
                                              on_snapshot_item=noop,
                                              on_message_type={verb: _forwarder(verb)

@@ -53,7 +53,6 @@ async def _deleted(object_id, payload, sequence_id) -> None:
 
 handle_person_events, rebuild, reset_last_seen = \
         build_projection(topic=person,
-                         subscriber="person_activities",
                          init=_init,
                          on_snapshot_item=_apply_snapshot_item,
                          on_message_type={"created": _created,

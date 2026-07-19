@@ -56,7 +56,6 @@ async def _person_deleted(object_id, payload, sequence_id) -> None:
 
 handle_person_events, _, _ = \
     build_projection(topic=person,
-                     subscriber="person_account_person",
                      init=noop,
                      on_snapshot_item=noop,
                      on_message_type={"created": _person_created,
@@ -103,7 +102,6 @@ async def _follower_deleted(object_id, payload, sequence_id) -> None:
 
 handle_followers_events, _, _ = \
     build_projection(topic=followers,
-                     subscriber="person_account_followers",
                      init=noop,
                      on_snapshot_item=noop,
                      on_message_type={"accepted": _follower_accepted,
@@ -154,7 +152,6 @@ async def _status_deleted(object_id, payload, sequence_id) -> None:
 
 handle_statuses_events, _, _ = \
     build_projection(topic=activities,
-                     subscriber="person_account_statuses",
                      init=noop,
                      on_snapshot_item=noop,
                      on_message_type={"Create": _status_created,

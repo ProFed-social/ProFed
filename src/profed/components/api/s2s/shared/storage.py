@@ -13,11 +13,10 @@ def build_storage(table_name: str) \
 
     class _storage(BaseStorage):
         def __init__(self, pool):
-            super().__init__(pool, None)
+            super().__init__(pool)
             self._table_name = table_name
 
         async def ensure_schema(self) -> None:
-            await super().ensure_schema()
             await self.execute(f"""CREATE TABLE IF NOT EXISTS
                                api.{self._table_name} (username TEXT PRIMARY KEY)""")
 

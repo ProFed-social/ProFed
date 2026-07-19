@@ -23,26 +23,13 @@ def wait_for_rebuild(f):
 
 class BaseStorage:
     def __init__(self,
-                 pool: asyncpg.Pool,
-                 schema: str | None,
-                 subscriber_schemas: list[str] | None = None):
+                 pool: asyncpg.Pool):
         self._pool = pool
-        self._schema = schema
-        self._subscriber_schemas = subscriber_schemas or []
         self._is_rebuilt = asyncio.Event()
 
     def rebuild_finished(self) -> None:
         if self._is_rebuilt is not None:
             self._is_rebuilt.set()
-
-    async def ensure_schema(self) -> None:
-        async with self._pool.acquire() as conn:
-            for sub in self._subscriber_schemas:
-                await conn.execute(f"DROP SCHEMA IF EXISTS {sub} CASCADE")
-
-            if self._schema is not None:
-                await conn.execute(f"DROP SCHEMA IF EXISTS {self._schema} CASCADE")
-                await conn.execute(f"CREATE SCHEMA {self._schema}")
 
     async def execute(self, sql: str, *args: Any) -> None:
         async with self._pool.acquire() as conn:

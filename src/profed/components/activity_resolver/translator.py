@@ -56,7 +56,6 @@ def _forwarder(should_resolve: bool):
 
 
 handle_events, rebuild, _ = build_projection(topic=incoming_activities,
-                                             subscriber="activity_resolver",
                                              init=noop,
                                              on_snapshot_item=noop,
                                              on_message_type={"Create":   _forwarder(True),

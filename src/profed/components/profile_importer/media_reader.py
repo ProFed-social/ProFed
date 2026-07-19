@@ -9,7 +9,6 @@ from profed.topics import media as media_topic
 
 
 logger = logging.getLogger(__name__)
-_SUBSCRIBER = "profile_importer_media"
 
 
 @asynccontextmanager
@@ -41,8 +40,7 @@ async def reading_media_state(source_urls: frozenset):
         nonlocal state
 
         async for _, event_type, object_id, _, payload in \
-                message_bus().topic("media").subscribe(_SUBSCRIBER,
-                                                       start_id,
+                message_bus().topic("media").subscribe(start_id,
                                                        caught_up=catch_up.event):
             validated = media_topic["validate"](event_type, payload)
             if validated is None:

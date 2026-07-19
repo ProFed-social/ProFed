@@ -12,7 +12,6 @@ from profed.topics import users as users_topic
 
 
 logger = logging.getLogger(__name__)
-_SUBSCRIBER = "profile_importer"
 
 
 def _apply_created(state, username, validated):
@@ -88,7 +87,7 @@ async def reading_state(username: str):
 
     async def _update() -> None:
         async for _, event_type, object_id, _, payload \
-                in message_bus().topic("users").subscribe(_SUBSCRIBER, start_id, caught_up=catch_up.event):
+                in message_bus().topic("users").subscribe(start_id, caught_up=catch_up.event):
             if object_id != username:
                 continue
 

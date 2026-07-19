@@ -38,7 +38,6 @@ async def run_reconcile(config):
             await _publish({"public_key_pem": public_pem, "private_key_pem": private_pem, **desired})
 
     _, rebuild, _ = build_projection(topic=instance,
-                                     subscriber="instance_actor",
                                      init=noop,
                                      on_snapshot_item=_store_item,
                                      on_message_type={"set": _store},

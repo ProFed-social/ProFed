@@ -61,15 +61,12 @@ def topic(bus):
 
 @async_fixture
 async def drain(topic):
-    """Subscribe, collect messages until caught_up, cancel, return messages."""
     async def _drain(**subscribe_kwargs):
         caught_up = asyncio.Event()
         collected = []
 
         async def consume():
-            async for msg in topic.subscribe("test",
-                                              caught_up=caught_up,
-                                              **subscribe_kwargs):
+            async for msg in topic.subscribe(caught_up=caught_up, **subscribe_kwargs):
                 collected.append(msg)
 
         task = asyncio.create_task(consume())

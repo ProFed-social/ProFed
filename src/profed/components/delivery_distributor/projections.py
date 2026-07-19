@@ -41,7 +41,6 @@ async def _rebuild_finished() -> None:
 
 queue_handle_events, queue_rebuild, _ = \
     build_projection(topic=deliveries,
-                     subscriber="delivery_distributor_queue",
                      init=noop,
                      rebuild_finished=_rebuild_finished,
                      on_snapshot_item=noop,
@@ -75,7 +74,6 @@ async def _upsert_key_snapshot(item: dict) -> None:
 
 keys_handle_events, keys_rebuild, _ = \
     build_projection(topic=users,
-                     subscriber="delivery_distributor_keys",
                      init=_keys_init,
                      rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_upsert_key_snapshot,

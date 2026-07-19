@@ -73,7 +73,6 @@ with_sequence_id = _EventHandlerSignature(include_sequence_id=True)
 
 
 def build_projection(topic: Dict,
-                     subscriber: str,
                      init: Callable[[], Awaitable[None]],
                      on_message_type: Dict[str, Callable[..., Awaitable[None]]],
                      on_snapshot_item: Callable[[Dict], Awaitable[None]],
@@ -137,7 +136,7 @@ def build_projection(topic: Dict,
 
     async def handle_events():
         async for sequence_id, event_type, object_id, emitted_at, payload \
-                in message_bus().topic(topic_name).subscribe(subscriber, last_seen):
+                in message_bus().topic(topic_name).subscribe(last_seen):
             await _dispatch(sequence_id, event_type, object_id, emitted_at, payload)
 
     async def rebuild():
@@ -154,8 +153,7 @@ def build_projection(topic: Dict,
             nonlocal last_seen
 
             async for sequence_id, event_type, object_id, emitted_at, payload \
-                    in message_bus().topic(topic_name).subscribe(subscriber,
-                                                                 last_seen,
+                    in message_bus().topic(topic_name).subscribe(last_seen,
                                                                  caught_up=catch_up.event):
                 await _dispatch(sequence_id, event_type, object_id, emitted_at, payload)
                 last_seen = sequence_id

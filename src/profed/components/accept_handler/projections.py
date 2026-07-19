@@ -32,7 +32,6 @@ async def _rebuild_finished() -> None:
 
 handle_events, rebuild, _ = \
     build_projection(topic=known_accounts,
-                     subscriber="accept_handler",
                      init=_init,
                      rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_snapshot,

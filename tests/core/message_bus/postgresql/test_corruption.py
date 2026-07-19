@@ -32,7 +32,7 @@ def test_expected_clips_a_gap_to_the_window():
 async def test_corruption_detected_when_burned_id_reappears(topic, db):
     db.messages["public.test"] = [_row(1, "a"), _row(3, "c")]
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
 
     assert (await subscriber.__anext__())[0] == 1
     assert (await subscriber.__anext__())[0] == 3

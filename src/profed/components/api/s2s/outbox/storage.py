@@ -7,10 +7,9 @@ from profed.core.persistence.base_storage import BaseStorage, init_pool
 
 class _storage(BaseStorage):
     def __init__(self, pool):
-        super().__init__(pool, None)
+        super().__init__(pool)
 
     async def ensure_schema(self) -> None:
-        await super().ensure_schema()
         await self.execute("""CREATE TABLE IF NOT EXISTS
                               api.s2s_outbox (username   TEXT        NOT NULL,
                                               created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -102,7 +102,6 @@ class GapTracker:
 def subscribe(pool: Pool,
               config: Dict[str, str],
               topic: str,
-              subscriber: str,
               last_seen: int,
               caught_up: asyncio.Event | None = None) \
         -> AsyncGenerator[Tuple[int, str, str, Any, Dict[str, Any]], None]:

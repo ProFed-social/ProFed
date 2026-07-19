@@ -45,7 +45,6 @@ async def _rebuild_finished() -> None:
 
 handle_account_events, rebuild, reset_last_seen = \
     build_projection(topic=accounts,
-                     subscriber="api_c2s_actor",
                      init=_init,
                      rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_apply_snapshot_item,

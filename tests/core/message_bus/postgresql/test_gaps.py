@@ -23,7 +23,7 @@ async def test_gap_detected_and_late_message_processed(topic, db):
                                        "emitted_at": datetime.now(timezone.utc).isoformat(),
                                        "payload": {"v": "c"}})
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
 
     first = await subscriber.__anext__()
     assert first[4]["v"] == "a"

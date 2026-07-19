@@ -12,7 +12,7 @@ async def test_messages_are_yielded_in_order(topic, db):
     db.insert_message("public.test", {"v": "b"})
     db.insert_message("public.test", {"v": "c"})
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
 
     messages = [
         await subscriber.__anext__(),
@@ -67,7 +67,7 @@ async def test_reconnects_after_a_dropped_connection(topic, db, monkeypatch):
 
     monkeypatch.setattr(fake_asyncpg.FakeConnection, "fetch", flaky_fetch)
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
     message = await subscriber.__anext__()
     assert message[4]["v"] == "a"
 

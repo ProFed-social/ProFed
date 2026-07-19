@@ -31,7 +31,6 @@ async def _rebuild_finished() -> None:
 
 followers_handle_events, followers_rebuild, _ = \
     build_projection(topic=followers,
-                     subscriber="delivery_splitter",
                      init=_init,
                      rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_snapshot,

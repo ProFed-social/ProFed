@@ -9,7 +9,7 @@ class _FakeTopic:
     async def last_snapshot(self):
         return 0, []
 
-    def subscribe(self, subscriber, last_seen=0, caught_up=None):
+    def subscribe(self, last_seen=0, caught_up=None):
         async def _gen():
             if caught_up is not None:
                 caught_up.set()
@@ -40,7 +40,6 @@ async def test_rebuild_calls_rebuild_finished(monkeypatch):
         called.append(True)
 
     _, rebuild, _ = projections.build_projection(topic=_TOPIC,
-                                                 subscriber="s",
                                                  init=_noop,
                                                  on_snapshot_item=_noop,
                                                  on_message_type={},
@@ -53,7 +52,6 @@ async def test_rebuild_finished_defaults_to_noop(monkeypatch):
     monkeypatch.setattr(projections, "message_bus", lambda: _FakeBus())
 
     _, rebuild, _ = projections.build_projection(topic=_TOPIC,
-                                                 subscriber="s",
                                                  init=_noop,
                                                  on_snapshot_item=_noop,
                                                  on_message_type={})
@@ -69,7 +67,7 @@ class _HealTopic:
     async def last_snapshot(self):
         return 0, []
 
-    def subscribe(self, subscriber, last_seen=0, caught_up=None):
+    def subscribe(self, last_seen=0, caught_up=None):
         async def _gen():
             for msg in self.messages:
                 yield msg
@@ -116,11 +114,10 @@ _HEAL_TOPIC = {"name":                "t",
                "correction_verb_map": {"Create": "Update", "created": "updated"}}
 
 
-def _heal_projection(received, subscriber="s"):
+def _heal_projection(received):
     async def _handler(object_id, payload):
         received.append(payload)
     handle, _, _ = projections.build_projection(topic=_HEAL_TOPIC,
-                                                subscriber=subscriber,
                                                 init=_noop,
                                                 on_snapshot_item=_noop,
                                                 on_message_type={"created": _handler,
@@ -160,8 +157,8 @@ async def test_correction_deduped_across_instances_logs_once(fake_bus, caplog):
     fake_bus.topic("t").messages = [(1, "created", "alice", None, {"summary": "<p>ok</p><script>s</script>"})]
 
     with caplog.at_level("WARNING"):
-        await _heal_projection([], subscriber="s1")()
-        await _heal_projection([], subscriber="s2")()
+        await _heal_projection([])()
+        await _heal_projection([])()
 
     corrections = [p for p in fake_bus.topic("t").published if p["event_type"] == "updated"]
     assert len(corrections) == 1

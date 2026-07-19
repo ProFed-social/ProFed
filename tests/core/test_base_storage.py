@@ -37,7 +37,7 @@ class _FakePool:
 
 
 def _storage(row=None, rows=None):
-    s = BaseStorage(_FakePool(_FakeConn(row, rows)), None)
+    s = BaseStorage(_FakePool(_FakeConn(row, rows)))
     s._is_rebuilt = asyncio.Event()
     return s
 

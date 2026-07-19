@@ -42,7 +42,6 @@ async def _rebuild_finished() -> None:
 
 
 handle_events, rebuild, _ = build_projection(topic=media,
-                                             subscriber="api_c2s_media",
                                              init=_init,
                                              rebuild_finished=_rebuild_finished,
                                              on_snapshot_item=_uploaded_snapshot,

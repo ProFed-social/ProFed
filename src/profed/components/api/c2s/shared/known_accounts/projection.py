@@ -52,7 +52,6 @@ async def _rebuild_finished() -> None:
 
 
 handle_events, rebuild, _ = build_projection(topic=known_accounts,
-                                             subscriber="api_c2s_known_accounts",
                                              init=_init,
                                              rebuild_finished=_rebuild_finished,
                                              on_snapshot_item=_snapshot,

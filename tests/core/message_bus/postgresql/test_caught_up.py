@@ -8,7 +8,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_caught_up_set_when_no_messages_exist(topic, db):
     caught_up = asyncio.Event()
-    subscriber = topic.subscribe("test", caught_up=caught_up)
+    subscriber = topic.subscribe(caught_up=caught_up)
 
     first = asyncio.create_task(subscriber.__anext__())
     await asyncio.sleep(0.1)
@@ -26,7 +26,7 @@ async def test_caught_up_set_after_existing_messages_delivered(topic, db):
 
     messages = []
     async def consume():
-        async for msg in topic.subscribe("test", caught_up=caught_up):
+        async for msg in topic.subscribe(caught_up=caught_up):
             messages.append(msg)
 
     task = asyncio.create_task(consume())
@@ -50,7 +50,7 @@ async def test_caught_up_not_set_before_messages_delivered(topic, db):
 
     messages = []
     async def consume():
-        async for msg in topic.subscribe("test", caught_up=caught_up):
+        async for msg in topic.subscribe(caught_up=caught_up):
             messages.append(msg)
 
     task = asyncio.create_task(consume())
@@ -70,7 +70,7 @@ async def test_caught_up_set_only_once(topic, db):
     caught_up = asyncio.Event()
 
     async def consume():
-        async for _ in topic.subscribe("test", caught_up=caught_up):
+        async for _ in topic.subscribe(caught_up=caught_up):
             pass
     task = asyncio.create_task(consume())
     await asyncio.wait_for(caught_up.wait(), timeout=2.0)
@@ -91,7 +91,7 @@ async def test_caught_up_set_only_once(topic, db):
 async def test_no_caught_up_argument_does_not_raise(topic, db):
     db.insert_message("public.test", {"v": "a"})
 
-    subscriber = topic.subscribe("test")
+    subscriber = topic.subscribe()
     msg = await subscriber.__anext__()
 
     assert msg[4]["v"] == "a"

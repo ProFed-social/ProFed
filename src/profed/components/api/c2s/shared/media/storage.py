@@ -7,10 +7,9 @@ from profed.core.persistence.base_storage import BaseStorage, init_pool
 
 class _Storage(BaseStorage):
     def __init__(self, pool):
-        super().__init__(pool, None, subscriber_schemas=["api_c2s_media"])
+        super().__init__(pool)
 
     async def ensure_schema(self) -> None:
-        await super().ensure_schema()
         await self.execute("""CREATE TABLE IF NOT EXISTS
                               api.media (file_id TEXT PRIMARY KEY,
                                          url TEXT NOT NULL,

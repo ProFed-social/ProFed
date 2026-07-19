@@ -68,7 +68,7 @@ async def _handle_reject(username: str, activity: dict, seq: int) -> None:
 
 async def handle_incoming_activities() -> None:
     async for seq, event_type, object_id, _, payload in \
-              message_bus().topic("incoming_activities").subscribe("accept_handler"):
+              message_bus().topic("incoming_activities").subscribe():
         validated = incoming_activities["validate"](event_type, payload)
         if validated is None:
             continue

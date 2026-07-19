@@ -55,7 +55,6 @@ async def _fan_out(event_type, object_id, payload, emitted_at) -> None:
 
 
 handle_events, rebuild, _ = build_projection(topic=activities,
-                                             subscriber="delivery_splitter_activities",
                                              init=noop,
                                              on_snapshot_item=noop,
                                              on_message_type={"Create": _fan_out,

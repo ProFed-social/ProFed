@@ -21,9 +21,9 @@ class Topic:
     def publish_snapshot(self) -> SnapshotPublisher:
         return SnapshotPublisher(self._pool, self._config["schema"], self._name)
 
-    def subscribe(self, subscriber: str, last_seen: int = 0, caught_up: asyncio.Event | None = None) \
+    def subscribe(self, last_seen: int = 0, caught_up: asyncio.Event | None = None) \
             -> AsyncGenerator[Tuple[int, str, str, Any, Dict[str, Any]], None]:
-        return subscribe(self._pool, self._config, self._name, subscriber, last_seen, caught_up)
+        return subscribe(self._pool, self._config, self._name, last_seen, caught_up)
 
     def last_snapshot(self):
         return last_snapshot(self._pool, self._config["schema"], self._name)

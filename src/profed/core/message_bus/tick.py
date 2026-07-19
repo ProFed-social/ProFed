@@ -35,7 +35,7 @@ class Ticker:
                 await publish(TICK, "", {}, message_id=_TICK_SOURCE.message_id(self._last_tick))
 
     async def _track(self) -> None:
-        async for sequence_id, event_type, _, _, _ in self._topic.subscribe("__ticker__"):
+        async for sequence_id, event_type, _, _, _ in self._topic.subscribe():
             self.observe(sequence_id, event_type)
 
     async def _emit_loop(self) -> None:

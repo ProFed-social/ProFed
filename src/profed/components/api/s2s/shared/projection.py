@@ -34,7 +34,6 @@ def build_person_projection(storage):
         (await storage()).rebuild_finished()
 
     return build_projection(topic=person,
-                            subscriber="api",
                             init=_init,
                             rebuild_finished=_rebuild_finished,
                             on_snapshot_item=_apply_snapshot_item,

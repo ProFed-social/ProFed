@@ -46,7 +46,6 @@ async def _rebuild_finished() -> None:
 
 handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=remote_actors,
-                         subscriber="s2s_inbox_public_keys",
                          init=_init,
                          rebuild_finished=_rebuild_finished,
                          on_snapshot_item=_discovered_snapshot,

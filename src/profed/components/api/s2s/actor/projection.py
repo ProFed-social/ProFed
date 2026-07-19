@@ -32,7 +32,6 @@ async def _rebuild_finished() -> None:
 
 handle_user_events, rebuild, reset_last_seen = \
         build_projection(topic=person,
-                         subscriber="api",
                          init=_init,
                          rebuild_finished=_rebuild_finished,
                          on_snapshot_item=_apply_snapshot_item,
