@@ -45,7 +45,7 @@ async def _handle_follow(username: str, activity: dict, seq: int) -> None:
                             object=follow.model_dump(by_alias=True,
                                                      exclude_none=True))
 
-    async with message_bus().topic("activities").publish() as publish:
+    async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Accept",
                       object_id=accept.id,
                       payload={"username": username,

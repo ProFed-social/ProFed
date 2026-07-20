@@ -8,16 +8,16 @@ from typing import Optional, Dict
 logger = logging.getLogger(__name__)
 
 
-_KNOWN_VERBS = {"Create",
-                "Update",
-                "Delete",
-                "Follow",
-                "Accept",
-                "Reject",
-                "Undo",
-                "Like",
-                "Announce",
-                "Block"}
+ACTIVITIES_VERBS = {"Create",
+                    "Update",
+                    "Delete",
+                    "Follow",
+                    "Accept",
+                    "Reject",
+                    "Undo",
+                    "Like",
+                    "Announce",
+                    "Block"}
 
 
 def _ignore(msg):
@@ -45,7 +45,7 @@ def _validate_activity_payload(payload, context) -> Optional[Dict]:
 
 
 def validate_activities_event(event_type: str, payload: Dict) -> Optional[Dict]:
-    if event_type not in _KNOWN_VERBS:
+    if event_type not in ACTIVITIES_VERBS:
         logger.warning(_ignore(f"unknown event type {event_type!r}"))
         return None
 

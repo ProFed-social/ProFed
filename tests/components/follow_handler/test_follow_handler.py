@@ -51,7 +51,7 @@ async def test_follow_publishes_accept_activity(fake_bus):
                       new=AsyncMock(return_value="alice@mastodon.social")):
         await handler.handle_incoming_activities()
 
-    published = fake_bus.topic("activities").published
+    published = fake_bus.topic("raw_activities").published
     assert len(published) == 1
     assert published[0]["event_type"] == "Accept"
     assert published[0]["payload"]["username"] == "cdonat"
@@ -66,7 +66,7 @@ async def test_follow_webfinger_failure_publishes_nothing(fake_bus):
         await handler.handle_incoming_activities()
 
     assert fake_bus.topic("followers").published   == []
-    assert fake_bus.topic("activities").published  == []
+    assert fake_bus.topic("raw_activities").published  == []
 
 
 @pytest.mark.asyncio
@@ -136,5 +136,5 @@ async def test_non_follow_activity_is_ignored(fake_bus):
         await handler.handle_incoming_activities()
 
     assert fake_bus.topic("followers").published == []
-    assert fake_bus.topic("activities").published == []
+    assert fake_bus.topic("raw_activities").published == []
 

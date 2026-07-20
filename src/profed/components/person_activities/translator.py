@@ -22,7 +22,7 @@ async def _apply_snapshot_item(item: dict) -> None:
 
 
 async def _emit(username, activity, sequence_id) -> None:
-    async with message_bus().topic("activities").publish() as publish:
+    async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type=activity.type,
                       object_id=activity.id,
                       payload={"username": username,

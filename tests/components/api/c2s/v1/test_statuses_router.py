@@ -35,7 +35,7 @@ def test_create_status_publishes_activity(client, fake_bus):
         response = client.post("/statuses", json={"status": "Hello Fediverse!"})
 
     assert response.status_code == 200
-    published = fake_bus.topic("activities").published
+    published = fake_bus.topic("raw_activities").published
     assert len(published) == 1
     assert published[0]["event_type"] == "Create"
     assert published[0]["payload"]["username"] == "alice"
@@ -72,7 +72,7 @@ def test_create_status_activity_has_context_and_to(client, fake_bus):
                AsyncMock(return_value=LOCAL_ACCOUNT)):
         client.post("/statuses", json={"status": "Hello Fediverse!"})
 
-    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert activity["@context"] == ["https://www.w3.org/ns/activitystreams"]
     assert activity["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
     assert activity["object"]["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
@@ -88,7 +88,7 @@ def test_delete_status_publishes_delete_activity(client, fake_bus):
     response = client.delete("/statuses/notes-123")
 
     assert response.status_code == 200
-    published = fake_bus.topic("activities").published
+    published = fake_bus.topic("raw_activities").published
     assert len(published) == 1
     assert published[0]["event_type"] == "Delete"
     assert published[0]["payload"]["username"] == "alice"
@@ -146,7 +146,7 @@ def test_create_status_sanitises_published_content(client, fake_bus):
                AsyncMock(return_value=LOCAL_ACCOUNT)):
         client.post("/statuses", json={"status": "<p>hi</p><script>steal()</script>"})
 
-    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert activity["object"]["content"] == "<p>hi</p>"
 
 
@@ -165,7 +165,7 @@ def test_create_status_federates_sanitised_spoiler_as_summary(client, fake_bus):
         client.post("/statuses", json={"status": "hi",
                                        "spoiler_text": "CW <script>x</script>spoiler"})
 
-    obj = fake_bus.topic("activities").published[0]["payload"]["activity"]["object"]
+    obj = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
     assert obj["summary"] == "CW spoiler"
 
 
@@ -174,7 +174,7 @@ def test_create_status_without_spoiler_has_no_summary(client, fake_bus):
                AsyncMock(return_value=LOCAL_ACCOUNT)):
         client.post("/statuses", json={"status": "hi"})
 
-    obj = fake_bus.topic("activities").published[0]["payload"]["activity"]["object"]
+    obj = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
     assert "summary" not in obj
 
 
@@ -194,7 +194,7 @@ def test_create_status_federates_mentions_as_tag_and_cc(client, fake_bus):
                AsyncMock(return_value="https://remote.example/actors/dave")):
         client.post("/statuses", json={"status": "hi @dave@remote.example"})
 
-    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert activity["object"]["tag"] == [{"type": "Mention",
                                           "href": "https://remote.example/actors/dave",
                                           "name": "@dave@remote.example"}]
@@ -207,7 +207,7 @@ def test_create_status_without_mentions_omits_activity_cc(client, fake_bus):
                AsyncMock(return_value=LOCAL_ACCOUNT)):
         client.post("/statuses", json={"status": "no mentions here"})
 
-    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert "cc" not in activity
     assert activity["object"]["tag"] == []
     assert activity["object"]["cc"] == []
@@ -224,7 +224,7 @@ def test_create_status_federates_bare_local_mention(client, fake_bus):
                lambda h: f"https://example.com/actors/{h}"):
         client.post("/statuses", json={"status": "hi @bob"})
 
-    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert activity["object"]["tag"] == [{"type": "Mention",
                                           "href": "https://example.com/actors/bob",
                                           "name": "@bob@example.com"}]
@@ -239,7 +239,7 @@ def test_create_status_drops_unresolvable_mention(client, fake_bus):
         response = client.post("/statuses", json={"status": "hi @ghost@nowhere.example"})
 
     assert response.status_code == 200
-    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert "cc" not in activity
     assert activity["object"]["tag"] == []
 

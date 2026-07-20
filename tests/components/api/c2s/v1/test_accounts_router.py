@@ -119,7 +119,7 @@ def test_follow_by_numeric_id_publishes_events(client):
     assert response.status_code == 200
     data = response.json()
     assert data["requested"] is True
-    activities_events = fake_bus.topic("activities").published
+    activities_events = fake_bus.topic("raw_activities").published
     assert len(activities_events) == 1
     assert activities_events[0]["event_type"] == "Follow"
     assert activities_events[0]["payload"]["activity"]["object"] == ROW["actor_url"]
@@ -268,7 +268,7 @@ def test_authorize_publishes_accepted_and_federates(client):
     followers = fake_bus.topic("followers").published
     assert followers[0]["event_type"] == "accepted"
     assert followers[0]["object_id"] == "bob@remote.example|alice@example.com"
-    assert fake_bus.topic("activities").published[0]["event_type"] == "Accept"
+    assert fake_bus.topic("raw_activities").published[0]["event_type"] == "Accept"
 
 
 def test_reject_publishes_rejected_and_federates(client):
@@ -290,7 +290,7 @@ def test_reject_publishes_rejected_and_federates(client):
     assert response.status_code == 200
     assert response.json()["followed_by"] is False
     assert fake_bus.topic("followers").published[0]["event_type"] == "rejected"
-    assert fake_bus.topic("activities").published[0]["event_type"] == "Reject"
+    assert fake_bus.topic("raw_activities").published[0]["event_type"] == "Reject"
 
 
 def test_follow_publishes_follow_activity_id_consistently(client):
@@ -308,7 +308,7 @@ def test_follow_publishes_follow_activity_id_consistently(client):
     assert response.status_code == 200
     follow_id = fake_bus.topic("followers").published[0]["payload"]["follow_activity_id"]
     assert follow_id.startswith("https://example.com/actors/alice#follows/")
-    activities_events = fake_bus.topic("activities").published
+    activities_events = fake_bus.topic("raw_activities").published
     assert activities_events[0]["object_id"] == follow_id
 
 
@@ -377,7 +377,7 @@ def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
             response = client.post("/accounts/123456/unfollow")
 
     assert response.status_code == 200
-    events = fake_bus.topic("activities").published
+    events = fake_bus.topic("raw_activities").published
     assert len(events) == 1
     assert events[0]["event_type"] == "Undo"
     activity = events[0]["payload"]["activity"]
@@ -405,7 +405,7 @@ def test_unfollow_without_follow_activity_id_uses_fallback_id(client):
             response = client.post("/accounts/123456/unfollow")
 
     assert response.status_code == 200
-    events = fake_bus.topic("activities").published
+    events = fake_bus.topic("raw_activities").published
     assert len(events) == 1
     assert events[0]["payload"]["activity"]["object"]["id"].endswith(f"#follows/{account_id(ROW['acct'])}")
 

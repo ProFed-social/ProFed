@@ -61,7 +61,7 @@ async def create_status(body: StatusCreate,
                               object=note.model_dump(by_alias=True,
                                                      exclude_none=True))
 
-    async with message_bus().topic("activities").publish() as publish:
+    async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Create",
                       object_id=activity.id,
                       payload={"username": username,
@@ -100,7 +100,7 @@ async def delete_status(id: str,
                               actor=actor_url,
                               object=id)
 
-    async with message_bus().topic("activities").publish() as publish:
+    async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Delete",
                       object_id=f"{actor_url}#delete/{id}",
                       payload={"username": username,

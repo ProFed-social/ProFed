@@ -25,7 +25,7 @@ def _msg(seq, event_type, object_id, payload, ts=TS):
 
 
 def _activities(fake_bus):
-    return fake_bus.topic("activities").published
+    return fake_bus.topic("raw_activities").published
 
 
 @pytest.mark.asyncio

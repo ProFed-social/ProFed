@@ -114,7 +114,7 @@ async def follow(id: str,
     actor_url = account.url
     follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
 
-    async with message_bus().topic("activities").publish() as publish:
+    async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Follow",
                       object_id=follow_id,
                       payload={"username": username,
@@ -175,7 +175,7 @@ async def unfollow(id: str,
     actor_url  = actor_url_from_username(username)
     undo_id    = f"{actor_url}#unfollows/{uuid.uuid4()}"
 
-    async with message_bus().topic("activities").publish() as publish:
+    async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Undo",
                       object_id=undo_id,
                       payload={"username": username,
@@ -304,7 +304,7 @@ async def _federate_follow_response(username: str,
                         actor=actor_url_from_username(username),
                         object=follow)
 
-    async with message_bus().topic("activities").publish() as publish:
+    async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type=response.type,
                       object_id=response.id,
                       payload={"username": username,
