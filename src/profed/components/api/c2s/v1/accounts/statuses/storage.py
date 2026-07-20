@@ -14,6 +14,7 @@ class _storage(BaseStorage):
                               api.c2s_user_statuses
                                     (username    TEXT   NOT NULL,
                                      status_id   TEXT   NOT NULL,
+                                     mastodon_id TEXT   NOT NULL,
                                      sequence_id BIGINT NOT NULL,
                                      activity    JSONB  NOT NULL,
                                      PRIMARY KEY (username, status_id))""")
@@ -25,14 +26,16 @@ class _storage(BaseStorage):
     async def add(self,
                   username: str,
                   status_id: str,
+                  mastodon_id: str,
                   sequence_id: int,
                   activity: dict) -> None:
         await self.execute("""INSERT INTO api.c2s_user_statuses
-                                          (username, status_id, sequence_id, activity)
-                              VALUES ($1, $2, $3, $4)
+                                    (username, status_id, mastodon_id, sequence_id, activity)
+                              VALUES ($1, $2, $3, $4, $5)
                               ON CONFLICT (username, status_id) DO NOTHING""",
                            username,
                            status_id,
+                           mastodon_id,
                            sequence_id,
                            activity)
 
@@ -57,15 +60,15 @@ class _storage(BaseStorage):
                            username,
                            status_id)
 
-    async def fetch(self, username: str, limit: int = 20) -> List[tuple[int, dict]]:
-        rows = await self.fetch_all("""SELECT sequence_id, activity
+    async def fetch(self, username: str, limit: int = 20) -> List[tuple[str, dict]]:
+        rows = await self.fetch_all("""SELECT mastodon_id, activity
                                        FROM api.c2s_user_statuses
                                        WHERE username = $1
                                        ORDER BY sequence_id DESC
                                        LIMIT $2""",
                                     username,
                                     limit)
-        return [(row["sequence_id"], row["activity"]) for row in rows]
+        return [(row["mastodon_id"], row["activity"]) for row in rows]
 
 
 _instance: _storage | None = None

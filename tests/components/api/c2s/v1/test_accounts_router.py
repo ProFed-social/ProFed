@@ -756,7 +756,7 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
                 "object": {"id": "https://example.com/actors/bob/notes/1",
                            "content": "<p>hello world</p>",
                            "published": "2026-01-01T00:00:00.000Z"}}
-    storage_mock = AsyncMock(fetch=AsyncMock(return_value=[(42, activity)]))
+    storage_mock = AsyncMock(fetch=AsyncMock(return_value=[(str(source_key("activities").message_id(42)), activity)]))
     with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW_FULL["actor_data"],

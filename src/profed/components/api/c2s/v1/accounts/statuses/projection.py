@@ -2,8 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.persistence.projections import build_projection, with_sequence_id
+from profed.core.message_bus.source_key import source_key
 from profed.topics import activities
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage
+
+
+_ACTIVITIES_SOURCE = source_key("activities")
 
 
 async def _init() -> None:
@@ -39,9 +43,11 @@ async def _apply_item(data: dict) -> None:
     if status_id is None:
         return
 
+    sequence_id = data.get("sequence_id", 0)
     await (await storage()).add(data["username"],
                                 status_id,
-                                data.get("sequence_id", 0),
+                                str(_ACTIVITIES_SOURCE.message_id(sequence_id)),
+                                sequence_id,
                                 activity)
 
 
@@ -54,7 +60,11 @@ async def _on_create(object_id: str, payload: dict, sequence_id: int) -> None:
     if status_id is None:
         return
 
-    await (await storage()).add(payload["username"], status_id, sequence_id, activity)
+    await (await storage()).add(payload["username"],
+                                status_id,
+                                str(_ACTIVITIES_SOURCE.message_id(sequence_id)),
+                                sequence_id,
+                                activity)
 
 
 async def _on_update(object_id: str, payload: dict, sequence_id: int) -> None:
@@ -81,7 +91,11 @@ async def _on_delete(object_id: str, payload: dict, sequence_id: int) -> None:
 async def _on_announce(object_id: str, payload: dict, sequence_id: int) -> None:
     activity = {"id": object_id, "type": "Announce", **payload["activity"]}
 
-    await (await storage()).add(payload["username"], object_id, sequence_id, activity)
+    await (await storage()).add(payload["username"],
+                                object_id,
+                                str(_ACTIVITIES_SOURCE.message_id(sequence_id)),
+                                sequence_id,
+                                activity)
 
 
 async def _rebuild_finished() -> None:

@@ -21,12 +21,9 @@ from profed.components.api.c2s.v1.accounts.follows.storage import storage as fol
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
 from profed.components.api.c2s.v1.accounts.preferences.storage import storage as preferences_storage
 from profed.components.api.c2s.shared.statuses import activity_to_status
-from profed.core.message_bus.source_key import source_key
 from profed.languages import is_supported
 from profed.topics.preferences_topic import PRIVACY_VALUES
 
-
-_ACTIVITIES_SOURCE = source_key("activities")
 
 router = APIRouter()
 active = False
@@ -151,11 +148,8 @@ async def account_statuses(id: str,
         raise HTTPException(status_code=404)
 
     account = await _with_counts(account)
-    return [activity_to_status(str(_ACTIVITIES_SOURCE.message_id(seq)),
-                               activity,
-                               {actor_url_from_username(account.username): account})
-            for seq, activity in await (await user_statuses_storage()).fetch(account.username,
-                                                                             limit=limit)]
+    return [activity_to_status(mastodon_id, activity, {actor_url_from_username(account.username): account})
+            for mastodon_id, activity in await (await user_statuses_storage()).fetch(account.username, limit=limit)]
 
 
 @router.post("/accounts/{id}/unfollow")

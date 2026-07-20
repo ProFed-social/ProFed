@@ -4,6 +4,7 @@
 import pytest
 from profed.components.api.c2s.v1.accounts.statuses import storage as storage_module
 from profed.components.api.c2s.v1.accounts.statuses import projection
+from profed.core.message_bus.source_key import source_key
 
 
 class FakeStatusStorage:
@@ -13,9 +14,9 @@ class FakeStatusStorage:
     async def ensure_schema(self):
         pass
 
-    async def add(self, username, status_id, sequence_id, activity):
+    async def add(self, username, status_id, mastodon_id, sequence_id, activity):
         self.rows.setdefault((username, status_id),
-                             {"sequence_id": sequence_id, "activity": activity})
+                             {"mastodon_id": mastodon_id, "sequence_id": sequence_id, "activity": activity})
 
     async def update_status(self, username, status_id, activity):
         if (username, status_id) in self.rows:
@@ -46,6 +47,18 @@ async def test_create_stores_sequence_id(fake_status_storage):
     assert row["sequence_id"] == 42
     assert row["activity"]["type"] == "Create"
     assert row["activity"]["object"]["content"] == "<p>hi</p>"
+
+
+@pytest.mark.asyncio
+async def test_create_stores_mastodon_id(fake_status_storage):
+    await projection._on_create("https://example.com/actors/alice#create/1",
+                                {"username": "alice",
+                                 "activity": {"object": {"id": "https://example.com/actors/alice/notes/1",
+                                                         "content": "<p>hi</p>"}}},
+                                42)
+
+    row = fake_status_storage.rows[("alice", "https://example.com/actors/alice/notes/1")]
+    assert row["mastodon_id"] == str(source_key("activities").message_id(42))
 
 
 @pytest.mark.asyncio
@@ -91,6 +104,19 @@ async def test_announce_uses_announce_id_and_sequence(fake_status_storage):
     row = fake_status_storage.rows[("alice", announce)]
     assert row["sequence_id"] == 7
     assert row["activity"]["type"] == "Announce"
+
+
+@pytest.mark.asyncio
+async def test_announce_stores_mastodon_id(fake_status_storage):
+    announce = "https://example.com/actors/alice#announce/1"
+
+    await projection._on_announce(announce,
+                                  {"username": "alice",
+                                   "activity": {"object": "https://remote.example/notes/9"}},
+                                  7)
+
+    row = fake_status_storage.rows[("alice", announce)]
+    assert row["mastodon_id"] == str(source_key("activities").message_id(7))
 
 
 @pytest.mark.asyncio
