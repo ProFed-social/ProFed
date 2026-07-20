@@ -186,3 +186,60 @@ def test_create_status_returns_sanitised_spoiler_text(client, fake_bus):
 
     assert response.json()["spoiler_text"] == "CW !"
 
+
+def test_create_status_federates_mentions_as_tag_and_cc(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         patch("profed.components.api.c2s.v1.statuses.mentions.lookup_actor_url",
+               AsyncMock(return_value="https://remote.example/actors/dave")):
+        client.post("/statuses", json={"status": "hi @dave@remote.example"})
+
+    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    assert activity["object"]["tag"] == [{"type": "Mention",
+                                          "href": "https://remote.example/actors/dave",
+                                          "name": "@dave@remote.example"}]
+    assert activity["object"]["cc"] == ["https://remote.example/actors/dave"]
+    assert activity["cc"] == ["https://remote.example/actors/dave"]
+
+
+def test_create_status_without_mentions_omits_activity_cc(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
+        client.post("/statuses", json={"status": "no mentions here"})
+
+    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    assert "cc" not in activity
+    assert activity["object"]["tag"] == []
+    assert activity["object"]["cc"] == []
+
+
+def test_create_status_federates_bare_local_mention(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         patch("profed.components.api.c2s.v1.statuses.mentions.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         patch("profed.components.api.c2s.v1.statuses.mentions.acct_from_username",
+               lambda h: f"{h}@example.com"), \
+         patch("profed.components.api.c2s.v1.statuses.mentions.actor_url_from_username",
+               lambda h: f"https://example.com/actors/{h}"):
+        client.post("/statuses", json={"status": "hi @bob"})
+
+    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    assert activity["object"]["tag"] == [{"type": "Mention",
+                                          "href": "https://example.com/actors/bob",
+                                          "name": "@bob@example.com"}]
+    assert activity["cc"] == ["https://example.com/actors/bob"]
+
+
+def test_create_status_drops_unresolvable_mention(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         patch("profed.components.api.c2s.v1.statuses.mentions.lookup_actor_url",
+               AsyncMock(return_value=None)):
+        response = client.post("/statuses", json={"status": "hi @ghost@nowhere.example"})
+
+    assert response.status_code == 200
+    activity = fake_bus.topic("activities").published[0]["payload"]["activity"]
+    assert "cc" not in activity
+    assert activity["object"]["tag"] == []
+

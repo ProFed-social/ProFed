@@ -21,6 +21,7 @@ class Activity(ActivityStreamsObject):
     object: dict[str, Any] | str
     published: str | None = None
     to: list[str] | None = None
+    cc: list[str] | None = None
 
 
 class CreateActivity(Activity):

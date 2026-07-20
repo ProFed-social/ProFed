@@ -11,4 +11,6 @@ class Note(ActivityStreamsObject):
     summary: str | None = None
     published: str
     to: list[str] = ["https://www.w3.org/ns/activitystreams#Public"]
+    tag: list[dict] = []
+    cc: list[str] = []
 
