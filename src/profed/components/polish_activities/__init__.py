@@ -4,7 +4,8 @@
 import asyncio
 import logging
 from .storage import init as init_storage, storage as _storage
-from .accounts_projection import accounts_handle_events, accounts_rebuild
+from .known_accounts_projection import known_accounts_handle_events, known_accounts_rebuild
+from .instance_key import handle_events as instance_key_handle_events, rebuild as instance_key_rebuild
 from .translator import handle_events
 
 
@@ -15,9 +16,11 @@ using_schemata = ["polish_activities"]
 async def PolishActivities(config: dict) -> None:
     await init_storage(config)
     await (await _storage()).ensure_schema()
-    await accounts_rebuild()
-    logger.info("polish_activities: accounts projection rebuilt, tailing")
+    await instance_key_rebuild()
+    await known_accounts_rebuild()
+    logger.info("polish_activities: projections rebuilt, tailing")
 
-    await asyncio.gather(accounts_handle_events(),
+    await asyncio.gather(known_accounts_handle_events(),
+                         instance_key_handle_events(),
                          handle_events())
 
