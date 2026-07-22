@@ -12,13 +12,22 @@ from profed.models.activity_pub import CreateActivity, DeleteActivity, Note
 from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
-from profed.components.api.c2s.v1.statuses.mentions import parse_mentions, resolve_mentions
+from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
 from profed.sanitize import sanitize_html
+from profed import mentions
 
 
 router = APIRouter()
 active = False
 _config: dict = {}
+
+
+async def _preliminary_lookup(acct: str):
+    row = await (await _known_accounts_storage()).get_by_acct(acct)
+    return row["actor_url"] if row else None
+
+
+_preliminary_resolver = mentions.resolver(_preliminary_lookup)
 
 
 def init(config: dict) -> None:
@@ -46,18 +55,14 @@ async def create_status(body: StatusCreate,
         raise HTTPException(status_code=422, detail="status too long")
 
     actor_url  = actor_url_from_username(username)
-    tag, cc = await resolve_mentions(parse_mentions(body.status))
     note = Note(id=f"{actor_url}/notes/{uuid.uuid4()}",
                 attributedTo=actor_url,
                 content=sanitize_html(body.status),
                 summary=sanitize_html(body.spoiler_text) or None,
-                published=datetime.now(timezone.utc).isoformat(),
-                tag=tag,
-                cc=cc)
+                published=datetime.now(timezone.utc).isoformat())
     activity = CreateActivity(id=f"{actor_url}#create/{uuid.uuid4()}",
                               actor=actor_url,
                               to=note.to,
-                              cc=note.cc or None,
                               object=note.model_dump(by_alias=True,
                                                      exclude_none=True))
 
@@ -78,7 +83,9 @@ async def create_status(body: StatusCreate,
                   language=body.language,
                   uri=note.id,
                   url=note.id,
-                  content=note.content,
+                  content=mentions.linkify_resolved(note.content,
+                                                    await mentions.resolve_all(note.content,
+                                                                               _preliminary_resolver)),
                   account=await resolve_actor(username))
 
 
