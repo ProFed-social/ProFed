@@ -69,11 +69,7 @@ async def _convert_delete(event_type: str, object_id: str, payload: dict, sequen
     if status_id is None:
         return
 
-    await _publish(event_type,
-                   object_id,
-                   {"username": payload["username"],
-                    "status_id": status_id},
-                   sequence_id)
+    await _publish(event_type, object_id, {"username": payload["username"], "status_id": status_id}, sequence_id)
 
 
 handle_events, rebuild, _ = \

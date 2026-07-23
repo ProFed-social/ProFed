@@ -17,8 +17,7 @@ NOTE_PAYLOAD = {"username": "alice",
                                         "content": "hi"}}}
 
 DELETE_PAYLOAD = {"username": "alice",
-                  "activity": {"actor": "https://local/actors/alice",
-                               "object": "https://local/notes/1"}}
+                  "activity": {"actor": "https://local/actors/alice", "object": "https://local/notes/1"}}
 
 PERSON_PAYLOAD = {"username": "alice",
                   "activity": {"actor": "https://local/actors/alice",
@@ -143,8 +142,7 @@ async def test_delete_publishes_only_the_status_id():
         await mod._convert_delete("Delete", "https://local/notes/1#delete", DELETE_PAYLOAD, 7)
 
     assert published[0]["event_type"] == "Delete"
-    assert published[0]["payload"] == {"username": "alice",
-                                       "status_id": "https://local/notes/1"}
+    assert published[0]["payload"] == {"username": "alice", "status_id": "https://local/notes/1"}
 
 
 @pytest.mark.asyncio
