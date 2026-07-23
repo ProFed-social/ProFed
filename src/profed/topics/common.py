@@ -40,5 +40,6 @@ class StatusEvent(BaseModel):
     model_config = ConfigDict(extra="allow")
     username: str = Field(min_length=1)
     status_id: str = Field(min_length=1)
+    actor_url: Optional[str] = None
     status: Optional[Dict] = None
 

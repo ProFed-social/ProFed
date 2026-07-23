@@ -148,8 +148,9 @@ async def account_statuses(id: str,
         raise HTTPException(status_code=404)
 
     account = await _with_counts(account)
-    return [Status.from_activity(activity, id=mastodon_id, account=account)
-            for mastodon_id, activity in await (await user_statuses_storage()).fetch(account.username, limit=limit)]
+
+    return [Status(**status, account=account)
+            for status in await (await user_statuses_storage()).fetch(account.username, limit=limit)]
 
 
 @router.post("/accounts/{id}/unfollow")

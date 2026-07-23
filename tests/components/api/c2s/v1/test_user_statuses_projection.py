@@ -7,6 +7,17 @@ from profed.components.api.c2s.v1.accounts.statuses import projection
 from profed.core.message_bus.source_key import source_key
 
 
+NOTE = "https://example.com/actors/alice/notes/1"
+MASTODON_ID = str(source_key("activities").message_id(42).int)
+STATUS = {"id": MASTODON_ID,
+          "created_at": "2026-01-01T00:00:00.000Z",
+          "uri": "https://example.com/actors/alice#create/1",
+          "url": NOTE,
+          "content": "<p>hi</p>",
+          "mentions": [],
+          "tags": []}
+
+
 class FakeStatusStorage:
     def __init__(self):
         self.rows = {}
@@ -14,13 +25,13 @@ class FakeStatusStorage:
     async def ensure_schema(self):
         pass
 
-    async def add(self, username, status_id, mastodon_id, sequence_id, activity):
-        self.rows.setdefault((username, status_id),
-                             {"mastodon_id": mastodon_id, "sequence_id": sequence_id, "activity": activity})
+    async def add(self, username, status_id, mastodon_id, status):
+        self.rows.setdefault((username, status_id), {"mastodon_id": mastodon_id, "status": status})
 
-    async def update_status(self, username, status_id, activity):
+
+    async def update_status(self, username, status_id, status):
         if (username, status_id) in self.rows:
-            self.rows[(username, status_id)]["activity"] = activity
+            self.rows[(username, status_id)]["status"] = status
 
     async def delete_status(self, username, status_id):
         self.rows.pop((username, status_id), None)
@@ -35,118 +46,67 @@ def fake_status_storage():
 
 
 @pytest.mark.asyncio
-async def test_create_stores_sequence_id(fake_status_storage):
-    await projection._on_create("https://example.com/actors/alice#create/1",
-                                {"username": "alice",
-                                 "activity": {"actor": "https://example.com/actors/alice",
-                                              "object": {"id": "https://example.com/actors/alice/notes/1",
-                                                         "content": "<p>hi</p>"}}},
-                                42)
+async def test_create_stores_the_status_content(fake_status_storage):
+    await projection._on_store("https://example.com/actors/alice#create/1",
+                               {"username": "alice", "status_id": NOTE, "status": STATUS})
 
-    row = fake_status_storage.rows[("alice", "https://example.com/actors/alice/notes/1")]
-    assert row["sequence_id"] == 42
-    assert row["activity"]["type"] == "Create"
-    assert row["activity"]["object"]["content"] == "<p>hi</p>"
+    assert fake_status_storage.rows[("alice", NOTE)]["status"] == STATUS
 
 
 @pytest.mark.asyncio
-async def test_create_stores_mastodon_id(fake_status_storage):
-    await projection._on_create("https://example.com/actors/alice#create/1",
-                                {"username": "alice",
-                                 "activity": {"object": {"id": "https://example.com/actors/alice/notes/1",
-                                                         "content": "<p>hi</p>"}}},
-                                42)
+async def test_create_uses_the_status_id_as_sort_key(fake_status_storage):
+    await projection._on_store("https://example.com/actors/alice#create/1",
+                               {"username": "alice", "status_id": NOTE, "status": STATUS})
 
-    row = fake_status_storage.rows[("alice", "https://example.com/actors/alice/notes/1")]
-    assert row["mastodon_id"] == str(source_key("activities").message_id(42))
+    assert fake_status_storage.rows[("alice", NOTE)]["mastodon_id"] == MASTODON_ID
 
 
 @pytest.mark.asyncio
-async def test_update_keeps_sequence_id_and_changes_content(fake_status_storage):
-    note = "https://example.com/actors/alice/notes/1"
-    await projection._on_create("https://example.com/actors/alice#create/1",
-                                {"username": "alice",
-                                 "activity": {"object": {"id": note, "content": "<p>original</p>"}}},
-                                42)
+async def test_update_replaces_the_status_content(fake_status_storage):
+    await projection._on_store("https://example.com/actors/alice#create/1",
+                               {"username": "alice", "status_id": NOTE, "status": STATUS})
     await projection._on_update("https://example.com/actors/alice#update/1",
                                 {"username": "alice",
-                                 "activity": {"object": {"id": note, "content": "<p>edited</p>"}}},
-                                99)
+                                 "status_id": NOTE,
+                                 "status": {**STATUS, "content": "<p>edited</p>"}})
 
-    row = fake_status_storage.rows[("alice", note)]
-    assert row["sequence_id"] == 42
-    assert row["activity"]["object"]["content"] == "<p>edited</p>"
+    assert fake_status_storage.rows[("alice", NOTE)]["status"]["content"] == "<p>edited</p>"
 
 
 @pytest.mark.asyncio
-async def test_delete_removes_status(fake_status_storage):
-    note = "https://example.com/actors/alice/notes/1"
+async def test_update_keeps_the_sort_key(fake_status_storage):
+    await projection._on_store("https://example.com/actors/alice#create/1",
+                               {"username": "alice", "status_id": NOTE, "status": STATUS})
+    await projection._on_update("https://example.com/actors/alice#update/1",
+                                {"username": "alice",
+                                 "status_id": NOTE,
+                                 "status": {**STATUS, "content": "<p>edited</p>"}})
 
-    await projection._on_create("https://example.com/actors/alice#create/1",
-                                {"username": "alice", "activity": {"object": {"id": note}}},
-                                1)
+    assert fake_status_storage.rows[("alice", NOTE)]["mastodon_id"] == MASTODON_ID
+
+
+@pytest.mark.asyncio
+async def test_delete_removes_the_status(fake_status_storage):
+    await projection._on_store("https://example.com/actors/alice#create/1",
+                               {"username": "alice", "status_id": NOTE, "status": STATUS})
     await projection._on_delete("https://example.com/actors/alice#delete/1",
-                                {"username": "alice", "activity": {"object": note}},
-                                2)
+                                {"username": "alice", "status_id": NOTE})
 
-    assert ("alice", note) not in fake_status_storage.rows
+    assert ("alice", NOTE) not in fake_status_storage.rows
 
 
 @pytest.mark.asyncio
-async def test_announce_uses_announce_id_and_sequence(fake_status_storage):
+async def test_announce_stores_the_status_content(fake_status_storage):
     announce = "https://example.com/actors/alice#announce/1"
+    await projection._on_store(announce,
+                               {"username": "alice", "status_id": announce, "status": STATUS})
 
-    await projection._on_announce(announce,
-                                  {"username": "alice",
-                                   "activity": {"object": "https://remote.example/notes/9"}},
-                                  7)
-
-    row = fake_status_storage.rows[("alice", announce)]
-    assert row["sequence_id"] == 7
-    assert row["activity"]["type"] == "Announce"
+    assert fake_status_storage.rows[("alice", announce)]["status"] == STATUS
 
 
 @pytest.mark.asyncio
-async def test_announce_stores_mastodon_id(fake_status_storage):
-    announce = "https://example.com/actors/alice#announce/1"
+async def test_snapshot_stores_the_status_content(fake_status_storage):
+    await projection._apply_item({"username": "alice", "status_id": NOTE, "status": STATUS})
 
-    await projection._on_announce(announce,
-                                  {"username": "alice",
-                                   "activity": {"object": "https://remote.example/notes/9"}},
-                                  7)
-
-    row = fake_status_storage.rows[("alice", announce)]
-    assert row["mastodon_id"] == str(source_key("activities").message_id(7))
-
-
-@pytest.mark.asyncio
-async def test_create_skips_actor_object(fake_status_storage):
-    await projection._on_create("https://example.com/actors/alice#create",
-                                {"username": "alice",
-                                 "activity": {"actor": "https://example.com/actors/alice",
-                                              "object": {"id": "https://example.com/actors/alice",
-                                                         "type": "Person",
-                                                         "name": "Alice"}}},
-                                5)
-    assert fake_status_storage.rows == {}
-
-
-@pytest.mark.asyncio
-async def test_update_skips_actor_object(fake_status_storage):
-    await projection._on_update("https://example.com/actors/alice#update",
-                                {"username": "alice",
-                                 "activity": {"object": {"id": "https://example.com/actors/alice",
-                                                         "type": "Service"}}},
-                                6)
-    assert fake_status_storage.rows == {}
-
-
-@pytest.mark.asyncio
-async def test_create_keeps_note_with_explicit_type(fake_status_storage):
-    note = "https://example.com/actors/alice/notes/2"
-    await projection._on_create("https://example.com/actors/alice#create/2",
-                                {"username": "alice",
-                                 "activity": {"object": {"id": note, "type": "Note", "content": "<p>ok</p>"}}},
-                                8)
-    assert ("alice", note) in fake_status_storage.rows
+    assert fake_status_storage.rows[("alice", NOTE)]["status"] == STATUS
 

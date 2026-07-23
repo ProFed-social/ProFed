@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import hashlib
+from datetime import datetime, timezone
 from profed.core.config import config
 
 def domain() -> str:
@@ -25,6 +26,15 @@ def username_from_acct(acct: str) -> str:
 
 
 def account_id(acct: str) -> str:
-    """Stable numeric ID derived from acct string (user@domain)."""
     return str(int(hashlib.sha256(acct.encode()).hexdigest()[:15], 16))
+
+
+_STATUS_ID_EPOCH_MS = int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def status_id(emitted_at: datetime, sequence_id: int, own: bool) -> str:
+    milliseconds = int(emitted_at.timestamp() * 1000) - _STATUS_ID_EPOCH_MS
+    return str(((milliseconds & (2 ** 45 - 1)) << 19) +
+               ((sequence_id & (2 ** 18 - 1)) << 1) +
+               (1 if own else 0))
 

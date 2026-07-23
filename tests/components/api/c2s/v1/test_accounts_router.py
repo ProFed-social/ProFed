@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core.config import config, raw
 from profed.identity import account_id
-from profed.models.mastodon import Account
+from profed.models.mastodon import Account, Status
 from profed.components.api.c2s.v1.accounts import router as accounts_module
 from profed.components.api.c2s.shared.auth import current_user
 from profed.core.message_bus.source_key import source_key
@@ -756,7 +756,10 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
                 "object": {"id": "https://example.com/actors/bob/notes/1",
                            "content": "<p>hello world</p>",
                            "published": "2026-01-01T00:00:00.000Z"}}
-    storage_mock = AsyncMock(fetch=AsyncMock(return_value=[(str(source_key("activities").message_id(42)), activity)]))
+    mastodon_id = str(source_key("activities").message_id(42).int)
+    status = Status.from_activity(activity, id=mastodon_id).model_dump(exclude={"account"})
+    storage_mock = AsyncMock(fetch=AsyncMock(return_value=[status]))
+
     with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW_FULL["actor_data"],
@@ -764,14 +767,13 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
                                                              url=ROW_FULL["actor_url"]))), \
              patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
                    AsyncMock(return_value=storage_mock)):
-
             response = anon_client.get("/accounts/123456/statuses")
 
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
     assert data[0]["content"] == "<p>hello world</p>"
-    assert data[0]["id"] == str(source_key("activities").message_id(42))
+    assert data[0]["id"] == mastodon_id
 
 
 def test_lookup_returns_resume(anon_client):

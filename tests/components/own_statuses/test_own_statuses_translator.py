@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 import profed.components.own_statuses.translator as mod
 from profed.core.message_bus.source_key import source_key
+from profed.identity import status_id
 
 
 NOTE_PAYLOAD = {"username": "alice",
@@ -24,6 +25,8 @@ PERSON_PAYLOAD = {"username": "alice",
                                "object": {"id": "https://local/actors/alice",
                                           "type": "Person",
                                           "name": "Alice"}}}
+
+EMITTED_AT = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 UNIDENTIFIED_PAYLOAD = {"username": "alice",
                         "activity": {"actor": "https://local/actors/alice",
@@ -51,7 +54,7 @@ async def test_create_publishes_status_content_to_statuses():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, 7)
+        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 7)
 
     assert bus.topic.call_args[0][0] == "statuses"
     assert len(published) == 1
@@ -67,20 +70,20 @@ async def test_create_omits_the_account_from_the_status_content():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, 7)
+        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 7)
 
     assert "account" not in published[0]["payload"]["status"]
 
 
 @pytest.mark.asyncio
-async def test_create_numbers_the_status_id_from_the_activities_sequence():
+async def test_create_numbers_the_status_id_from_time_and_sequence():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, 42)
+        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 42)
 
-    assert published[0]["payload"]["status"]["id"] == str(source_key("activities").message_id(42).int)
-    assert published[0]["payload"]["status"]["id"].isdigit()
+    assert published[0]["payload"]["status"]["id"] == status_id(EMITTED_AT, 42, own=True)
+    assert int(published[0]["payload"]["status"]["id"]) < 2 ** 64
 
 
 @pytest.mark.asyncio
@@ -88,7 +91,7 @@ async def test_create_derives_message_id_from_the_activities_sequence():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, 42)
+        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 42)
 
     assert published[0]["message_id"] == source_key("activities").message_id(42)
 
@@ -98,7 +101,7 @@ async def test_create_skips_activities_without_an_object_id():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Create", "https://local/notes/1#create", UNIDENTIFIED_PAYLOAD, 7)
+        await mod._convert("Create", "https://local/notes/1#create", UNIDENTIFIED_PAYLOAD, EMITTED_AT, 7)
 
     assert published == []
 
@@ -108,7 +111,7 @@ async def test_create_skips_actor_objects():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Create", "https://local/actors/alice#create", PERSON_PAYLOAD, 7)
+        await mod._convert("Create", "https://local/actors/alice#create", PERSON_PAYLOAD, EMITTED_AT, 7)
 
     assert published == []
 
@@ -118,7 +121,7 @@ async def test_update_publishes_status_content():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Update", "https://local/notes/1#update", NOTE_PAYLOAD, 7)
+        await mod._convert("Update", "https://local/notes/1#update", NOTE_PAYLOAD, EMITTED_AT, 7)
 
     assert published[0]["event_type"] == "Update"
     assert published[0]["payload"]["status_id"] == "https://local/notes/1"
@@ -129,7 +132,7 @@ async def test_update_skips_actor_objects():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Update", "https://local/actors/alice#update", PERSON_PAYLOAD, 7)
+        await mod._convert("Update", "https://local/actors/alice#update", PERSON_PAYLOAD, EMITTED_AT, 7)
 
     assert published == []
 
@@ -139,7 +142,7 @@ async def test_delete_publishes_only_the_status_id():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert_delete("Delete", "https://local/notes/1#delete", DELETE_PAYLOAD, 7)
+        await mod._convert_delete("Delete", "https://local/notes/1#delete", DELETE_PAYLOAD, EMITTED_AT, 7)
 
     assert published[0]["event_type"] == "Delete"
     assert published[0]["payload"] == {"username": "alice", "status_id": "https://local/notes/1"}
@@ -151,7 +154,7 @@ async def test_delete_skips_activities_without_an_object_id():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert_delete("Delete", "https://local/notes/1#delete", payload, 7)
+        await mod._convert_delete("Delete", "https://local/notes/1#delete", payload, EMITTED_AT, 7)
 
     assert published == []
 
@@ -161,7 +164,7 @@ async def test_announce_uses_the_activity_id_as_status_id():
     bus, published = _fake_bus()
 
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._convert("Announce", "https://local/actors/alice#announce/1", NOTE_PAYLOAD, 7)
+        await mod._convert("Announce", "https://local/actors/alice#announce/1", NOTE_PAYLOAD, EMITTED_AT, 7)
 
     assert published[0]["event_type"] == "Announce"
     assert published[0]["payload"]["status_id"] == "https://local/actors/alice#announce/1"
@@ -206,4 +209,14 @@ async def test_undo_activities_are_not_converted(fake_bus):
     await mod.rebuild()
 
     assert len(fake_bus.topic("statuses").published) == 0
+
+
+@pytest.mark.asyncio
+async def test_create_carries_the_actor_url_for_the_read_side_account_join():
+    bus, published = _fake_bus()
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert("Create", "https://local/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 7)
+
+    assert published[0]["payload"]["actor_url"] == "https://local/actors/alice"
 

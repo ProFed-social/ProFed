@@ -3,7 +3,8 @@
 
 from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
-from profed.core.persistence.projections import build_projection, with_event_type, with_sequence_id
+from profed.core.persistence.projections import build_projection, with_emitted_at, with_event_type, with_sequence_id
+from profed.identity import status_id
 from profed.models.mastodon import Status
 from profed.topics import activities
 from profed.topics.statuses_topic import STATUS_VERBS
@@ -36,10 +37,6 @@ def status_id_of(event_type: str, object_id: str, activity: dict) -> str | None:
     return object_id if event_type == "Announce" else _inner_object_id(activity)
 
 
-def mastodon_id_of(sequence_id: int) -> str:
-    return str(_ACTIVITIES_SOURCE.message_id(sequence_id).int)
-
-
 async def _publish(event_type: str, object_id: str, payload: dict, sequence_id: int) -> None:
     async with message_bus().topic("statuses").publish() as publish:
         await publish(event_type=event_type,
@@ -48,28 +45,29 @@ async def _publish(event_type: str, object_id: str, payload: dict, sequence_id: 
                       message_id=_ACTIVITIES_SOURCE.message_id(sequence_id))
 
 
-async def _convert(event_type: str, object_id: str, payload: dict, sequence_id: int) -> None:
+async def _convert(event_type: str, object_id: str, payload: dict, emitted_at, sequence_id: int) -> None:
     activity = {"id": object_id, "type": event_type, **payload["activity"]}
-    status_id = status_id_of(event_type, object_id, activity)
-    if status_id is None or _is_actor_object(activity):
+    object_key = status_id_of(event_type, object_id, activity)
+    if object_key is None or _is_actor_object(activity):
         return
 
-    status = Status.from_activity(activity, id=mastodon_id_of(sequence_id))
+    status = Status.from_activity(activity, id=status_id(emitted_at, sequence_id, own=True))
     await _publish(event_type,
                    object_id,
                    {"username": payload["username"],
-                    "status_id": status_id,
+                    "status_id": object_key,
+                    "actor_url": activity.get("actor", ""),
                     "status": status.model_dump(exclude={"account"})},
                    sequence_id)
 
 
-async def _convert_delete(event_type: str, object_id: str, payload: dict, sequence_id: int) -> None:
+async def _convert_delete(event_type: str, object_id: str, payload: dict, emitted_at, sequence_id: int) -> None:
     activity = {"id": object_id, "type": event_type, **payload["activity"]}
-    status_id = _inner_object_id(activity)
-    if status_id is None:
+    object_key = _inner_object_id(activity)
+    if object_key is None:
         return
 
-    await _publish(event_type, object_id, {"username": payload["username"], "status_id": status_id}, sequence_id)
+    await _publish(event_type, object_id, {"username": payload["username"], "status_id": object_key}, sequence_id)
 
 
 handle_events, rebuild, _ = \
@@ -80,5 +78,5 @@ handle_events, rebuild, _ = \
                                              if verb == "Delete" else
                                              _convert)
                                       for verb in STATUS_VERBS},
-                     event_handler_signature=with_event_type & with_sequence_id)
+                     event_handler_signature=with_event_type & with_emitted_at & with_sequence_id)
 
