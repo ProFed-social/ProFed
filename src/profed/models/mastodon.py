@@ -132,7 +132,7 @@ class Status(BaseModel):
         def get_obj(activity):
             o = activity.get("object", {})
             return {} if isinstance(o, str) else o
-        
+ 
         def default_account(actor_url):
             username = actor_url.rstrip("/").split("/")[-1]
             return Account(id="0", username=username, acct=actor_url, display_name=username, url=actor_url)

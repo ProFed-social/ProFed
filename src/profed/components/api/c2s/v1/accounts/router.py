@@ -148,9 +148,7 @@ async def account_statuses(id: str,
         raise HTTPException(status_code=404)
 
     account = await _with_counts(account)
-    return [Status.from_activity(activity,
-                                 id=mastodon_id,
-                                 account={actor_url_from_username(account.username): account}.get(activity.get("actor", "")))
+    return [Status.from_activity(activity, id=mastodon_id, account=account)
             for mastodon_id, activity in await (await user_statuses_storage()).fetch(account.username, limit=limit)]
 
 
