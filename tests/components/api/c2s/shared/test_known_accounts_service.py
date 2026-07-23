@@ -201,3 +201,35 @@ async def test_webfinger_lookup_signs_federation_calls():
     lau.assert_awaited_once_with("bob@r.example", sign)
     far.assert_awaited_once_with("https://r.example/actor", sign)
 
+
+@pytest.mark.asyncio
+async def test_cached_by_actor_url_returns_account_from_row(fake_storage):
+    fake_storage.get_by_actor_url.return_value = STORED_ROW
+    assert await service.cached_by_actor_url(ACTOR_URL) == ACCOUNT
+
+
+@pytest.mark.asyncio
+async def test_cached_by_actor_url_returns_none_when_missing(fake_storage):
+    fake_storage.get_by_actor_url.return_value = None
+    assert await service.cached_by_actor_url(ACTOR_URL) is None
+
+
+@pytest.mark.asyncio
+async def test_cached_by_actor_url_ignores_staleness_without_webfinger(fake_storage):
+    fake_storage.get_by_actor_url.return_value = {**REMOTE_ROW, "last_webfinger_at": STALE}
+    with patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
+               AsyncMock()) as mock_wf:
+        result = await service.cached_by_actor_url(REMOTE_ACTOR_URL)
+    assert result == REMOTE_ACCOUNT
+    mock_wf.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cached_multiple_maps_urls_and_drops_missing(fake_storage):
+    async def _by_url(url):
+        return {ACTOR_URL: STORED_ROW}.get(url)
+    fake_storage.get_by_actor_url.side_effect = _by_url
+
+    result = await service.cached_multiple([ACTOR_URL, REMOTE_ACTOR_URL])
+    assert result == {ACTOR_URL: ACCOUNT}
+

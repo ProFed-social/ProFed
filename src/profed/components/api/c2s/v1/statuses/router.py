@@ -7,11 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Annotated
 from profed.core.message_bus import message_bus
-from profed.identity import actor_url_from_username, acct_from_username
+from profed.identity import actor_url_from_username
 from profed.models.activity_pub import CreateActivity, DeleteActivity, Note
 from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
+from profed.models.mastodon import mentions_from_tag
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
 from profed.sanitize import sanitize_html
 from profed import mentions
@@ -75,6 +76,7 @@ async def create_status(body: StatusCreate,
                                                                             exclude_none=True).items()
                                             if k not in ("id", "type")}})
 
+    resolved = await mentions.resolve_all(note.content, _preliminary_resolver)
     return Status(id=note.id,
                   created_at=note.published,
                   visibility=body.visibility,
@@ -83,9 +85,8 @@ async def create_status(body: StatusCreate,
                   language=body.language,
                   uri=note.id,
                   url=note.id,
-                  content=mentions.linkify_resolved(note.content,
-                                                    await mentions.resolve_all(note.content,
-                                                                               _preliminary_resolver)),
+                  content=mentions.linkify_resolved(note.content, resolved),
+                  mentions=mentions_from_tag(mentions.tag_cc(resolved)[0]),
                   account=await resolve_actor(username))
 
 

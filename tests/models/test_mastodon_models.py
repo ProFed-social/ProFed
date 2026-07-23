@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 
 from profed.identity import account_id
 from profed.models.mastodon import (Account,
+                                    Status,
+                                    mentions_from_tag,
+                                    tags_from_tag,
                                     Relationship,
                                     MediaAttachment,
                                     MediaAttachmentMeta,
@@ -201,4 +204,61 @@ def test_from_actor_preserves_resume():
                              url="https://remote.example/actors/bob")
 
     assert acc.resume.skills == [{"name": "Python"}]
+
+
+MENTION = {"type": "Mention", "href": "https://r.example/actors/dave", "name": "@dave@r.example"}
+HASHTAG = {"type": "Hashtag", "href": "https://x.example/tags/news", "name": "#news"}
+
+
+def test_mentions_from_tag_builds_mastodon_mention():
+    assert mentions_from_tag([MENTION]) == [{"id": account_id("dave@r.example"),
+                                             "username": "dave",
+                                             "url": "https://r.example/actors/dave",
+                                             "acct": "dave@r.example"}]
+
+
+def test_mentions_from_tag_ignores_hashtags():
+    assert mentions_from_tag([HASHTAG]) == []
+
+
+def test_tags_from_tag_builds_hashtag():
+    assert tags_from_tag([HASHTAG]) == [{"name": "news", "url": "https://x.example/tags/news"}]
+
+
+def test_from_activity_builds_status_with_given_account():
+    account = Account(id="7", username="dave", acct="dave@r.example",
+                      display_name="Dave", url="https://r.example/actors/dave")
+    activity = {"actor": "https://r.example/actors/dave",
+                "id": "https://r.example/notes/1#create",
+                "object": {"id": "https://r.example/notes/1",
+                           "url": "https://r.example/notes/1",
+                           "published": "2026-01-01T00:00:00.000Z",
+                           "content": "hi @dave@r.example",
+                           "tag": [MENTION]}}
+    status = Status.from_activity(activity, id="42", account=account)
+
+    assert status.id == "42"
+    assert status.account.id == "7"
+    assert status.uri == "https://r.example/notes/1#create"
+    assert status.url == "https://r.example/notes/1"
+    assert status.content == "hi @dave@r.example"
+    assert status.mentions == [{"id": account_id("dave@r.example"), "username": "dave",
+                                "url": "https://r.example/actors/dave", "acct": "dave@r.example"}]
+
+
+def test_from_activity_uses_placeholder_account_when_missing():
+    activity = {"actor": "https://local/actors/alice", "object": {"content": "hi"}}
+    status = Status.from_activity(activity, id="42")
+
+    assert status.account.id == "0"
+    assert status.account.username == "alice"
+
+
+def test_from_activity_account_less_content_dump_excludes_account():
+    activity = {"actor": "https://local/actors/alice", "object": {"content": "hi"}}
+    dump = Status.from_activity(activity, id="42").model_dump(exclude={"account"})
+
+    assert "account" not in dump
+    assert dump["id"] == "42"
+    assert dump["content"] == "hi"
 

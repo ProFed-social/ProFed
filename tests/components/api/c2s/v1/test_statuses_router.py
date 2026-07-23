@@ -9,6 +9,7 @@ from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.auth import current_user
 from profed.models.mastodon import Account
+from profed.identity import account_id
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
@@ -202,8 +203,7 @@ def test_create_status_does_not_federate_mentions(client, fake_bus):
 
 
 def test_create_status_response_linkifies_known_mention(client, fake_bus):
-    store = AsyncMock(get_by_acct=AsyncMock(
-        return_value={"actor_url": "https://remote.example/actors/dave"}))
+    store = AsyncMock(get_by_acct=AsyncMock(return_value={"actor_url": "https://remote.example/actors/dave"}))
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
                AsyncMock(return_value=LOCAL_ACCOUNT)), \
          patch("profed.components.api.c2s.v1.statuses.router._known_accounts_storage",
@@ -227,8 +227,7 @@ def test_create_status_response_leaves_unknown_mention_plain(client, fake_bus):
 
 
 def test_create_status_topic_content_stays_unlinked_for_polish(client, fake_bus):
-    store = AsyncMock(get_by_acct=AsyncMock(
-        return_value={"actor_url": "https://remote.example/actors/dave"}))
+    store = AsyncMock(get_by_acct=AsyncMock(return_value={"actor_url": "https://remote.example/actors/dave"}))
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
                AsyncMock(return_value=LOCAL_ACCOUNT)), \
          patch("profed.components.api.c2s.v1.statuses.router._known_accounts_storage",
@@ -237,4 +236,17 @@ def test_create_status_topic_content_stays_unlinked_for_polish(client, fake_bus)
 
     activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert activity["object"]["content"] == "hi @dave@remote.example"
+
+
+def test_create_status_response_sets_mentions(client, fake_bus):
+    store = AsyncMock(get_by_acct=AsyncMock(return_value={"actor_url": "https://remote.example/actors/dave"}))
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         patch("profed.components.api.c2s.v1.statuses.router._known_accounts_storage",
+               AsyncMock(return_value=store)):
+        response = client.post("/statuses", json={"status": "hi @dave@remote.example"})
+    assert response.json()["mentions"] == [{"id": account_id("dave@remote.example"),
+                                            "username": "dave",
+                                            "url": "https://remote.example/actors/dave",
+                                            "acct": "dave@remote.example"}]
 

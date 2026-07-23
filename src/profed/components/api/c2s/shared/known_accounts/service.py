@@ -97,3 +97,16 @@ async def lookup_multiple(actor_urls: list[str],
                                                    for u in actor_urls)))
             if a is not None}
 
+
+async def cached_by_actor_url(actor_url: str) -> Optional[Account]:
+    row = await (await storage()).get_by_actor_url(actor_url)
+    return _account_from_row(row) if row is not None else None
+
+
+async def cached_multiple(actor_urls: list[str]) -> dict[str, Account]:
+    return {url: account
+            for url, account in zip(actor_urls,
+                                    await asyncio.gather(*(cached_by_actor_url(url)
+                                                           for url in actor_urls)))
+            if account is not None}
+

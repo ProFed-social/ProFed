@@ -20,7 +20,7 @@ from profed.models.activity_pub import AcceptActivity, RejectActivity
 from profed.components.api.c2s.v1.accounts.follows.storage import storage as follows_storage
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
 from profed.components.api.c2s.v1.accounts.preferences.storage import storage as preferences_storage
-from profed.components.api.c2s.shared.statuses import activity_to_status
+from profed.models.mastodon import Status
 from profed.languages import is_supported
 from profed.topics.preferences_topic import PRIVACY_VALUES
 
@@ -148,7 +148,9 @@ async def account_statuses(id: str,
         raise HTTPException(status_code=404)
 
     account = await _with_counts(account)
-    return [activity_to_status(mastodon_id, activity, {actor_url_from_username(account.username): account})
+    return [Status.from_activity(activity,
+                                 id=mastodon_id,
+                                 account={actor_url_from_username(account.username): account}.get(activity.get("actor", "")))
             for mastodon_id, activity in await (await user_statuses_storage()).fetch(account.username, limit=limit)]
 
 

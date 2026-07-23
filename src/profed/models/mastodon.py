@@ -78,6 +78,25 @@ class Relationship(BaseModel):
     note: str = ""
 
 
+def _mention_object(acct: str, url: str) -> dict:
+    return {"id": account_id(acct),
+            "username": acct.split("@")[0],
+            "url": url,
+            "acct": acct}
+
+
+def mentions_from_tag(tag: list) -> list[dict]:
+    return [_mention_object(entry["name"].lstrip("@"), entry.get("href", ""))
+            for entry in tag
+            if isinstance(entry, dict) and entry.get("type") == "Mention" and entry.get("name")]
+
+
+def tags_from_tag(tag: list) -> list[dict]:
+    return [{"name": entry["name"].lstrip("#"), "url": entry.get("href", "")}
+            for entry in tag
+            if isinstance(entry, dict) and entry.get("type") == "Hashtag" and entry.get("name")]
+
+
 class Status(BaseModel):
     id: str
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -107,6 +126,33 @@ class Status(BaseModel):
     reblogged: bool = False
     muted: bool = False
     pinned: bool = False
+
+    @classmethod
+    def from_activity(cls, activity: dict, *, id: str, account: "Account | None" = None) -> "Status":
+        def get_obj(activity):
+            o = activity.get("object", {})
+            return {} if isinstance(o, str) else o
+        
+        def default_account(actor_url):
+            username = actor_url.rstrip("/").split("/")[-1]
+            return Account(id="0", username=username, acct=actor_url, display_name=username, url=actor_url)
+
+        def create_status(cls, id, account, activity, obj):
+            tag = obj.get("tag", [])
+            return cls(id=id,
+                       account=account,
+                       created_at=obj.get("published", "1970-01-01T00:00:00.000Z"),
+                       uri=activity.get("id", ""),
+                       url=obj.get("url", activity.get("id", "")),
+                       content=obj.get("content", ""),
+                       mentions=mentions_from_tag(tag),
+                       tags=tags_from_tag(tag))
+
+        return create_status(cls=cls,
+                             id=id,
+                             account=account or default_account(actor_url=activity.get("actor", "")),
+                             activity=activity,
+                             obj=get_obj(activity))
 
 
 class StatusContext(BaseModel):

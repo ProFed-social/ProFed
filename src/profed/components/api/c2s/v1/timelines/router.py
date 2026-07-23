@@ -6,7 +6,7 @@ from typing import Annotated, Optional
 from profed.identity import actor_url_from_username, acct_from_username
 from profed.components.api.c2s.v1.timelines.storage import storage
 from profed.components.api.c2s.shared.known_accounts.service import lookup_multiple
-from profed.components.api.c2s.shared.statuses import activity_to_status
+from profed.models.mastodon import Status
 from profed.components.api.c2s.shared.auth import current_user
 
 
@@ -30,7 +30,8 @@ async def home_timeline(claims: Annotated[dict, Depends(current_user)],
                                          since_id=since_id)
     accounts   = await lookup_multiple(list({activity.get("actor", "")
                                              for _, activity in rows}))
-    return [activity_to_status(row_id, activity, accounts) for row_id, activity in rows]
+    return [Status.from_activity(activity, id=row_id, account=accounts.get(activity.get("actor", "")))
+            for row_id, activity in rows]
 
 
 @router.get("/timelines/public")
