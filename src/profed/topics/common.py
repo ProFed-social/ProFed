@@ -34,3 +34,11 @@ class ActivityEvent(BaseModel):
 
     username: str = Field(min_length=1)
     activity: Dict
+
+
+class StatusEvent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    username: str = Field(min_length=1)
+    status_id: str = Field(min_length=1)
+    status: Optional[Dict] = None
+

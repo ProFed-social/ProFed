@@ -17,6 +17,7 @@ from profed.topics import (accounts_topic,
                            raw_activities_topic,
                            remote_actors_topic,
                            resolved_activities_topic,
+                           statuses_topic,
                            timeline_topic,
                            users_topic)
 
@@ -37,6 +38,7 @@ preferences = preferences_topic.topic
 raw_activities = raw_activities_topic.topic
 remote_actors = remote_actors_topic.topic
 resolved_activities = resolved_activities_topic.topic
+statuses = statuses_topic.topic
 timeline = timeline_topic.topic
 users = users_topic.topic
 
@@ -59,6 +61,7 @@ def names():
             raw_activities["name"],
             remote_actors["name"],
             resolved_activities["name"],
+            statuses["name"],
             timeline["name"],
             users["name"]]
 
