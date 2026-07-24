@@ -8,6 +8,7 @@ from profed.models.mastodon import (Account,
                                     Status,
                                     mentions_from_tag,
                                     tags_from_tag,
+                                    media_attachments_from_attachment,
                                     Relationship,
                                     MediaAttachment,
                                     MediaAttachmentMeta,
@@ -261,4 +262,99 @@ def test_from_activity_account_less_content_dump_excludes_account():
     assert "account" not in dump
     assert dump["id"] == "42"
     assert dump["content"] == "hi"
+
+
+IMAGE_ATTACHMENT = {"type": "Document",
+                    "mediaType": "image/jpeg",
+                    "url": "https://r.example/media/1.jpg",
+                    "name": "Ein Alt-Text",
+                    "blurhash": "L6PZ",
+                    "width": 1200,
+                    "height": 800}
+
+
+def test_media_attachments_reads_the_url():
+    assert media_attachments_from_attachment([IMAGE_ATTACHMENT])[0]["url"] == "https://r.example/media/1.jpg"
+
+
+def test_media_attachments_carry_the_alt_text_as_description():
+    assert media_attachments_from_attachment([IMAGE_ATTACHMENT])[0]["description"] == "Ein Alt-Text"
+
+
+def test_media_attachments_keep_the_blurhash():
+    assert media_attachments_from_attachment([IMAGE_ATTACHMENT])[0]["blurhash"] == "L6PZ"
+
+
+def test_media_attachments_record_the_dimensions():
+    meta = media_attachments_from_attachment([IMAGE_ATTACHMENT])[0]["meta"]
+
+    assert meta["original"] == {"width": 1200, "height": 800}
+
+
+def test_an_image_media_type_yields_an_image():
+    assert media_attachments_from_attachment([IMAGE_ATTACHMENT])[0]["type"] == "image"
+
+
+def test_a_video_media_type_yields_a_video():
+    entry = {"type": "Document", "mediaType": "video/mp4", "url": "https://r.example/v.mp4"}
+
+    assert media_attachments_from_attachment([entry])[0]["type"] == "video"
+
+
+def test_an_audio_media_type_yields_audio():
+    entry = {"type": "Document", "mediaType": "audio/ogg", "url": "https://r.example/a.ogg"}
+
+    assert media_attachments_from_attachment([entry])[0]["type"] == "audio"
+
+
+def test_the_object_type_types_the_attachment_without_a_media_type():
+    entry = {"type": "Image", "url": "https://r.example/i.png"}
+
+    assert media_attachments_from_attachment([entry])[0]["type"] == "image"
+
+
+def test_an_unknown_kind_is_typed_as_unknown():
+    entry = {"url": "https://r.example/x.bin"}
+
+    assert media_attachments_from_attachment([entry])[0]["type"] == "unknown"
+
+
+def test_a_link_object_url_is_resolved():
+    entry = {"type": "Image", "url": {"type": "Link", "href": "https://r.example/l.png"}}
+
+    assert media_attachments_from_attachment([entry])[0]["url"] == "https://r.example/l.png"
+
+
+def test_a_list_of_links_takes_the_first_usable_href():
+    entry = {"url": [{"type": "Link"}, {"href": "https://r.example/first.png"}]}
+
+    assert media_attachments_from_attachment([entry])[0]["url"] == "https://r.example/first.png"
+
+
+def test_an_attachment_without_a_url_is_skipped():
+    assert media_attachments_from_attachment([{"type": "Document", "mediaType": "image/png"}]) == []
+
+
+def test_a_non_dict_attachment_is_skipped():
+    assert media_attachments_from_attachment(["kaputt", 5, None]) == []
+
+
+def test_an_empty_attachment_list_yields_no_media():
+    assert media_attachments_from_attachment([]) == []
+
+
+def test_from_activity_reads_media_from_the_object():
+    activity = {"actor": "https://r.example/actors/dave",
+                "object": {"content": "hi", "attachment": [IMAGE_ATTACHMENT]}}
+
+    status = Status.from_activity(activity, id="42")
+
+    assert status.media_attachments[0]["url"] == "https://r.example/media/1.jpg"
+
+
+def test_from_activity_without_media_leaves_the_list_empty():
+    activity = {"actor": "https://r.example/actors/dave", "object": {"content": "hi"}}
+
+    assert Status.from_activity(activity, id="42").media_attachments == []
+
 
