@@ -7,10 +7,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import profed.components.incoming_timeline.translator as mod
 import profed.components.own_timeline.translator as own_mod
 from profed.core.message_bus.source_key import source_key
+from profed.identity import status_id
 
 
-PAYLOAD = {"username": "alice",
-           "activity": {"actor": "https://remote/bob", "object": {"content": "hi"}}}
+EMITTED_AT = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+NOTE_PAYLOAD = {"username": "alice",
+                "activity": {"actor": "https://remote/bob",
+                             "object": {"id": "https://remote/notes/1",
+                                        "type": "Note",
+                                        "url": "https://remote/notes/1",
+                                        "published": "2026-01-01T00:00:00.000Z",
+                                        "content": "hi"}}}
+
+DELETE_PAYLOAD = {"username": "alice",
+                  "activity": {"actor": "https://remote/bob", "object": "https://remote/notes/1"}}
 
 
 def _fake_bus():
@@ -30,105 +41,100 @@ def _fake_bus():
 
 
 @pytest.mark.asyncio
-async def test_forward_publishes_to_timeline_unchanged():
+async def test_create_publishes_status_content_to_timeline():
     bus, published = _fake_bus()
+
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._forward("Create", "https://remote/notes/1", PAYLOAD, 3)
+        await mod._convert("Create", "https://remote/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 7)
 
     assert bus.topic.call_args[0][0] == "timeline"
-    assert published[0]["event_type"] == "Create"
-    assert published[0]["object_id"] == "https://remote/notes/1"
-    assert published[0]["payload"] == PAYLOAD
+    assert published[0]["payload"]["status_id"] == "https://remote/notes/1"
+    assert published[0]["payload"]["status"]["content"] == "hi"
 
 
 @pytest.mark.asyncio
-async def test_forward_derives_message_id_from_resolved_activities_sequence():
+async def test_create_carries_the_remote_actor_url():
     bus, published = _fake_bus()
+
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._forward("Delete", "https://remote/notes/1", PAYLOAD, 42)
+        await mod._convert("Create", "https://remote/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 7)
+
+    assert published[0]["payload"]["actor_url"] == "https://remote/bob"
+
+
+@pytest.mark.asyncio
+async def test_create_marks_the_status_as_incoming():
+    bus, published = _fake_bus()
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert("Create", "https://remote/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 42)
+
+    assert published[0]["payload"]["status"]["id"] == status_id(EMITTED_AT, 42, own=False)
+    assert int(published[0]["payload"]["status"]["id"]) % 2 == 0
+
+
+@pytest.mark.asyncio
+async def test_create_derives_message_id_from_resolved_activities_sequence():
+    bus, published = _fake_bus()
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert("Create", "https://remote/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 42)
 
     assert published[0]["message_id"] == source_key("resolved_activities").message_id(42)
 
 
 @pytest.mark.asyncio
+async def test_delete_publishes_only_the_status_id():
+    bus, published = _fake_bus()
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert_delete("Delete", "https://remote/notes/1#delete", DELETE_PAYLOAD, EMITTED_AT, 7)
+
+    assert published[0]["payload"] == {"username": "alice", "status_id": "https://remote/notes/1"}
+
+
+@pytest.mark.asyncio
 async def test_both_sources_never_dedup_against_each_other():
-    own_bus, own_published = _fake_bus()
-    incoming_bus, incoming_published = _fake_bus()
+    bus_incoming, incoming = _fake_bus()
+    bus_own, own = _fake_bus()
 
-    with patch.object(own_mod, "message_bus", return_value=own_bus):
-        await own_mod._forward("Create", "https://x/notes/1", PAYLOAD, 5)
-    with patch.object(mod, "message_bus", return_value=incoming_bus):
-        await mod._forward("Create", "https://x/notes/1", PAYLOAD, 5)
+    with patch.object(mod, "message_bus", return_value=bus_incoming):
+        await mod._convert("Create", "https://remote/notes/1#create", NOTE_PAYLOAD, EMITTED_AT, 42)
+    with patch.object(own_mod, "message_bus", return_value=bus_own):
+        await own_mod._forward("Create", "https://local/notes/1", {"username": "alice"}, 42)
 
-    assert own_published[0]["message_id"] != incoming_published[0]["message_id"]
-
-
-@pytest.mark.asyncio
-
-async def test_create_activities_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Create", "https://remote/notes/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
-
-    await mod.rebuild()
+    assert incoming[0]["message_id"] != own[0]["message_id"]
 
 
-    assert len(fake_bus.topic("timeline").published) == 1
-    assert fake_bus.topic("timeline").published[0]["event_type"] == "Create"
 @pytest.mark.asyncio
-async def test_update_activities_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Update", "https://remote/notes/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
-    await mod.rebuild()
-    assert len(fake_bus.topic("timeline").published) == 1
-    assert fake_bus.topic("timeline").published[0]["event_type"] == "Update"
+async def test_incoming_and_own_statuses_get_different_ids_at_the_same_time():
+    assert status_id(EMITTED_AT, 42, own=False) != status_id(EMITTED_AT, 42, own=True)
+
+
 @pytest.mark.asyncio
-async def test_delete_activities_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Delete", "https://remote/notes/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
+async def test_create_activities_are_converted_on_rebuild(fake_bus):
+    fake_bus.topic("resolved_activities").messages = [(1,
+                                                       "Create",
+                                                       "https://remote/notes/1#create",
+                                                       EMITTED_AT,
+                                                       NOTE_PAYLOAD)]
+
     await mod.rebuild()
-    assert len(fake_bus.topic("timeline").published) == 1
-    assert fake_bus.topic("timeline").published[0]["event_type"] == "Delete"
+
+    published = fake_bus.topic("timeline").published
+    assert len(published) == 1
+    assert published[0]["payload"]["status"]["content"] == "hi"
+
+
 @pytest.mark.asyncio
-async def test_announce_activities_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Announce", "https://remote/notes/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
+async def test_follow_activities_are_not_converted(fake_bus):
+    fake_bus.topic("resolved_activities").messages = [(1,
+                                                       "Follow",
+                                                       "https://remote/activities/1",
+                                                       EMITTED_AT,
+                                                       NOTE_PAYLOAD)]
+
     await mod.rebuild()
-    assert len(fake_bus.topic("timeline").published) == 1
-    assert fake_bus.topic("timeline").published[0]["event_type"] == "Announce"
-@pytest.mark.asyncio
-async def test_follow_activities_not_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Follow", "https://remote/activities/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
-    await mod.rebuild()
-    assert len(fake_bus.topic("timeline").published) == 0
-@pytest.mark.asyncio
-async def test_accept_activities_not_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Accept", "https://remote/activities/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
-    await mod.rebuild()
-    assert len(fake_bus.topic("timeline").published) == 0
-@pytest.mark.asyncio
-async def test_reject_activities_not_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Reject", "https://remote/activities/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
-    await mod.rebuild()
-    assert len(fake_bus.topic("timeline").published) == 0
-@pytest.mark.asyncio
-async def test_undo_activities_not_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Undo", "https://remote/activities/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
-    await mod.rebuild()
-    assert len(fake_bus.topic("timeline").published) == 0
-@pytest.mark.asyncio
-async def test_like_activities_not_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Like", "https://remote/activities/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
-    await mod.rebuild()
-    assert len(fake_bus.topic("timeline").published) == 0
-@pytest.mark.asyncio
-async def test_block_activities_not_passed_through(fake_bus):
-    fake_bus.topic("resolved_activities").messages = [(1, "Block", "https://remote/activities/1",
-                                                       datetime.now(timezone.utc), PAYLOAD)]
-    await mod.rebuild()
+
     assert len(fake_bus.topic("timeline").published) == 0
 

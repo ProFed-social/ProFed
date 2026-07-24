@@ -91,6 +91,11 @@ def mentions_from_tag(tag: list) -> list[dict]:
             if isinstance(entry, dict) and entry.get("type") == "Mention" and entry.get("name")]
 
 
+def placeholder_account(actor_url: str) -> Account:
+    username = actor_url.rstrip("/").split("/")[-1]
+    return Account(id="0", username=username, acct=actor_url, display_name=username, url=actor_url)
+
+
 def tags_from_tag(tag: list) -> list[dict]:
     return [{"name": entry["name"].lstrip("#"), "url": entry.get("href", "")}
             for entry in tag
@@ -133,10 +138,6 @@ class Status(BaseModel):
             o = activity.get("object", {})
             return {} if isinstance(o, str) else o
  
-        def default_account(actor_url):
-            username = actor_url.rstrip("/").split("/")[-1]
-            return Account(id="0", username=username, acct=actor_url, display_name=username, url=actor_url)
-
         def create_status(cls, id, account, activity, obj):
             tag = obj.get("tag", [])
             return cls(id=id,
@@ -150,7 +151,7 @@ class Status(BaseModel):
 
         return create_status(cls=cls,
                              id=id,
-                             account=account or default_account(actor_url=activity.get("actor", "")),
+                             account=account or placeholder_account(activity.get("actor", "")),
                              activity=activity,
                              obj=get_obj(activity))
 

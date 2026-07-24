@@ -8,7 +8,9 @@ from profed.topics.timeline_topic import (validate_timeline_event,
 
 
 PAYLOAD = {"username": "alice",
-           "activity": {"id": "https://remote/notes/1", "actor": "https://remote/bob"}}
+           "status_id": "https://remote/notes/1",
+           "actor_url": "https://remote/bob",
+           "status": {"id": "42", "content": "<p>hi</p>"}}
 
 
 @pytest.mark.parametrize("verb", ["Create", "Update", "Delete", "Announce"])
@@ -29,15 +31,22 @@ def test_payload_must_be_a_dict():
 
 
 def test_missing_username_is_rejected():
-    assert validate_timeline_event("Create", {"activity": {"id": "https://remote/notes/1"}}) is None
+    assert validate_timeline_event("Create", {"status_id": "https://remote/notes/1"}) is None
 
 
 def test_empty_username_is_rejected():
-    assert validate_timeline_event("Create", {"username": "", "activity": {}}) is None
+    assert validate_timeline_event("Create", {"username": "", "status_id": "https://remote/notes/1"}) is None
 
 
-def test_missing_activity_is_rejected():
+def test_missing_status_id_is_rejected():
     assert validate_timeline_event("Create", {"username": "alice"}) is None
+
+
+def test_delete_without_status_is_accepted():
+    payload = validate_timeline_event("Delete", {"username": "alice", "status_id": "https://remote/notes/1"})
+
+    assert payload is not None
+    assert payload["status"] is None
 
 
 def test_snapshot_items_are_not_supported():

@@ -11,57 +11,24 @@ async def _init() -> None:
     await store.ensure_schema()
 
 
-def _inner_object_id(activity: dict) -> str | None:
-    obj = activity.get("object")
-    if isinstance(obj, str):
-        return obj
-
-    if isinstance(obj, dict):
-        return obj.get("id")
-
-    return None
+async def _store(username: str, status_id: str, actor_url: str, status: dict) -> None:
+    await (await storage()).add(username, status_id, status["id"], actor_url, status)
 
 
 async def _apply_item(data: dict) -> None:
-    activity  = data["activity"]
-    status_id = _inner_object_id(activity) or activity.get("id")
-    if status_id is None:
-        return
-
-    await (await storage()).add(data["username"], status_id, activity)
+    await _store(data["username"], data["status_id"], data.get("actor_url", ""), data["status"])
 
 
-async def _on_create(object_id: str, payload: dict) -> None:
-    activity  = {"id": object_id, "type": "Create", **payload["activity"]}
-    status_id = _inner_object_id(activity)
-    if status_id is None:
-        return
-
-    await (await storage()).add(payload["username"], status_id, activity)
+async def _on_store(object_id: str, payload: dict) -> None:
+    await _store(payload["username"], payload["status_id"], payload.get("actor_url", ""), payload["status"])
 
 
 async def _on_update(object_id: str, payload: dict) -> None:
-    activity  = {"id": object_id, "type": "Update", **payload["activity"]}
-    status_id = _inner_object_id(activity)
-    if status_id is None:
-        return
-
-    await (await storage()).update_status(payload["username"], status_id, activity)
+    await (await storage()).update_status(payload["username"], payload["status_id"], payload["status"])
 
 
 async def _on_delete(object_id: str, payload: dict) -> None:
-    activity  = {"id": object_id, "type": "Delete", **payload["activity"]}
-    status_id = _inner_object_id(activity)
-    if status_id is None:
-        return
-
-    await (await storage()).delete_status(payload["username"], status_id)
-
-
-async def _on_announce(object_id: str, payload: dict) -> None:
-    activity = {"id": object_id, "type": "Announce", **payload["activity"]}
-
-    await (await storage()).add(payload["username"], object_id, activity)
+    await (await storage()).delete_status(payload["username"], payload["status_id"])
 
 
 async def _rebuild_finished() -> None:
@@ -73,8 +40,8 @@ handle_events, rebuild, _ = \
                      init=_init,
                      rebuild_finished=_rebuild_finished,
                      on_snapshot_item=_apply_item,
-                     on_message_type={"Create": _on_create,
+                     on_message_type={"Create": _on_store,
                                       "Update": _on_update,
                                       "Delete": _on_delete,
-                                      "Announce": _on_announce})
+                                      "Announce": _on_store})
 

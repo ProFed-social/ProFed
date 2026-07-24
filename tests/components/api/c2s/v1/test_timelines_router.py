@@ -13,14 +13,14 @@ from profed.components.api.c2s.shared.auth import current_user
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
 
-
-ACTIVITY = {"id":     "https://example.com/act/1",
-            "type":   "Create",
-            "actor":  "https://remote.example/actors/bob",
-            "object": {"type":      "Note",
-                       "content":   "Hello!",
-                       "published": "2026-01-01T00:00:00+00:00"}}
-
+ACTOR_URL = "https://remote.example/actors/bob"
+STATUS = {"id": "424242",
+          "created_at": "2026-01-01T00:00:00+00:00",
+          "uri": "https://example.com/act/1",
+          "url": "https://example.com/act/1",
+          "content": "Hello!",
+          "mentions": [],
+          "tags": []}
 
 BOB = Account(id="999",
               username="bob",
@@ -31,7 +31,7 @@ BOB = Account(id="999",
 
 class FakeStorage:
     async def fetch(self, username, limit=20, max_id=None, since_id=None):
-        return [("uuid-1", ACTIVITY)]
+        return [(ACTOR_URL, STATUS)]
 
 
 @pytest.fixture
@@ -46,22 +46,39 @@ def client():
 
 
 def test_home_timeline_returns_statuses(client):
-    with patch("profed.components.api.c2s.v1.timelines.router.lookup_multiple",
-               AsyncMock(return_value={"https://remote.example/actors/bob": BOB})):
+    with patch("profed.components.api.c2s.v1.timelines.router.cached_multiple",
+               AsyncMock(return_value={ACTOR_URL: BOB})):
         response = client.get("/timelines/home")
 
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["id"] == "uuid-1"
+    assert data[0]["id"] == "424242"
     assert data[0]["content"] == "Hello!"
     assert data[0]["account"]["username"] == "bob"
 
 
+def test_home_timeline_falls_back_to_a_placeholder_account(client):
+    with patch("profed.components.api.c2s.v1.timelines.router.cached_multiple",
+               AsyncMock(return_value={})):
+        response = client.get("/timelines/home")
+
+    assert response.status_code == 200
+    assert response.json()[0]["account"]["username"] == "bob"
+
+
+def test_home_timeline_does_not_webfinger_on_read(client):
+    with patch("profed.components.api.c2s.v1.timelines.router.cached_multiple",
+               AsyncMock(return_value={ACTOR_URL: BOB})) as cached:
+        client.get("/timelines/home")
+
+    cached.assert_awaited_once()
+
+
 def test_home_timeline_empty(client):
     timelines_storage._instance.fetch = AsyncMock(return_value=[])
-    with patch("profed.components.api.c2s.v1.timelines.router.lookup_multiple",
-               AsyncMock(return_value={})):
+
+    with patch("profed.components.api.c2s.v1.timelines.router.cached_multiple", AsyncMock(return_value={})):
         response = client.get("/timelines/home")
 
     assert response.status_code == 200

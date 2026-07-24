@@ -3,10 +3,9 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Annotated, Optional
-from profed.identity import actor_url_from_username, acct_from_username
 from profed.components.api.c2s.v1.timelines.storage import storage
-from profed.components.api.c2s.shared.known_accounts.service import lookup_multiple
-from profed.models.mastodon import Status
+from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
+from profed.models.mastodon import Status, placeholder_account
 from profed.components.api.c2s.shared.auth import current_user
 
 
@@ -28,10 +27,10 @@ async def home_timeline(claims: Annotated[dict, Depends(current_user)],
                                          limit=limit,
                                          max_id=max_id,
                                          since_id=since_id)
-    accounts   = await lookup_multiple(list({activity.get("actor", "")
-                                             for _, activity in rows}))
-    return [Status.from_activity(activity, id=row_id, account=accounts.get(activity.get("actor", "")))
-            for row_id, activity in rows]
+
+    accounts = await cached_multiple(list({actor_url for actor_url, _ in rows}))
+    return [Status(**status, account=accounts.get(actor_url) or placeholder_account(actor_url))
+            for actor_url, status in rows]
 
 
 @router.get("/timelines/public")
