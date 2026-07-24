@@ -1,0 +1,24 @@
+<div class="{% if nested_in_resume %}p-contact {% endif %}h-card profile-card">
+  {% if account.header %}<img class="header" src="{{ account.header }}" alt="">{% endif %}
+  <header class="profile-head">
+    {% if account.avatar %}
+    <img class="u-photo avatar" src="{{ account.avatar }}" alt="">
+    {% else %}
+    <div class="avatar avatar-fallback">{{ (account.display_name or account.username)[:2] | upper }}</div>
+    {% endif %}
+
+    <div class="identity">
+      <h1 class="p-name">{{ account.display_name or account.username }}</h1>
+      <p class="acct"><a class="u-url" href="{{ account.url }}">@{{ account.acct }}</a></p>
+      <p class="joined">Joined {{ account.created_at[:10] }}</p>
+      <dl class="counts">
+        <div><dt>{{ account.statuses_count }}</dt><dd>Posts</dd></div>
+        <div><dt>{{ account.following_count }}</dt><dd>Following</dd></div>
+        <div><dt>{{ account.followers_count }}</dt><dd>Followers</dd></div>
+      </dl>
+      {% if relationship is not none %}{% include "follow_button.html" %}{% endif %}
+    </div>
+  </header>
+  {% if account.note %}<div class="p-note note">{{ account.note | sanitize | safe }}</div>{% endif %}
+</div>
+

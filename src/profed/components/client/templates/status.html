@@ -1,6 +1,6 @@
 <article class="h-entry status">
   {% if show_author is not defined or show_author %}
-  <a class="p-author h-card author" href="{{ status.account.url }}">
+  <a class="p-author h-card author" rel="author" href="{{ status.account.url }}">
     {% if status.account.avatar %}
     <img class="u-photo avatar" src="{{ status.account.avatar }}" alt="">
     {% else %}
@@ -11,8 +11,18 @@
   </a>
   {% endif %}
   <div class="e-content">{{ status.content | sanitize | safe }}</div>
+  {% if status.tags %}
+  <ul class="tags">
+    {% for tag in status.tags %}
+    <li><a class="tag" rel="tag" href="{{ tag.url }}">#<span class="p-category">{{ tag.name }}</span></a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
   <footer class="status-meta">
-    <time class="dt-published" datetime="{{ status.created_at }}">{{ status.created_at[:10] }}</time>
+    <a class="u-url permalink" href="{{ status.url }}">
+      <time class="dt-published" datetime="{{ status.created_at }}">{{ status.created_at[:10] }}</time>
+    </a>
+    <data class="u-uid" value="{{ status.uri }}"></data>
     <span class="reblogs">&#8634; {{ status.reblogs_count }}</span>
     <span class="favourites">&#9829; {{ status.favourites_count }}</span>
   </footer>

@@ -1,39 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ account.display_name or account.username }} (@{{ account.acct }}) — ProFed{% endblock %}
 {% block content %}
-<article class="h-card profile">
-  {% if account.header %}<img class="header" src="{{ account.header }}" alt="">{% endif %}
-  <header class="profile-head">
-    {% if account.avatar %}
-    <img class="u-photo avatar" src="{{ account.avatar }}" alt="">
-    {% else %}
-    <div class="avatar avatar-fallback">{{ (account.display_name or account.username)[:2] | upper }}</div>
-    {% endif %}
-
-  <div class="identity">
-      <h1 class="p-name">{{ account.display_name or account.username }}</h1>
-      <p class="acct"><a class="u-url" href="{{ account.url }}">@{{ account.acct }}</a></p>
-      <p class="joined">Joined {{ account.created_at[:10] }}</p>
-      <dl class="counts">
-        <div><dt>{{ account.statuses_count }}</dt><dd>Posts</dd></div>
-        <div><dt>{{ account.following_count }}</dt><dd>Following</dd></div>
-        <div><dt>{{ account.followers_count }}</dt><dd>Followers</dd></div>
-      </dl>
-      {% if relationship is not none %}{% include "follow_button.html" %}{% endif %}
-    </div>
-  </header>
-  {% if account.note %}<div class="p-note note">{{ account.note | sanitize | safe }}</div>{% endif %}
-
-
-  {% if account.resume %}
-  <section class="h-resume resume">
+{% if account.resume %}
+<article class="h-resume profile">
+  {% set nested_in_resume = true %}
+  {% include "profile_card.html" %}
+  <section class="resume">
     {% if account.resume.experience %}
     <h2>Experience</h2>
     {% for job in account.resume.experience %}
     <div class="p-experience h-event">
       <p><span class="p-name">{{ job.name }}</span>{% if job.organization %} at <span class="p-location">{{ job.organization }}</span>{% endif %}</p>
-      {% if job.start or job.end %}<p class="dates">{{ job.start }}{% if job.end %} - {{ job.end }}{% endif %}</p>{% endif %}
-      {% if job.description %}<p class="p-summary">{{ job.description | sanitize | safe }}</p>{% endif %}
+      {% if job.start or job.end %}<p class="dates"><time class="dt-start" datetime="{{ job.start }}">{{ job.start }}</time>{% if job.end %} - <time class="dt-end" datetime="{{ job.end }}">{{ job.end }}</time>{% endif %}</p>{% endif %}
+      {% if job.description %}<div class="p-description">{{ job.description | sanitize | safe }}</div>{% endif %}
       {% if job.url %}<a class="u-url" href="{{ job.url }}">{{ job.url }}</a>{% endif %}
       {% if job.projects %}<ul class="job-projects">{% for project in job.projects %}<li>{{ project }}</li>{% endfor %}</ul>{% endif %}
     </div>
@@ -45,8 +24,8 @@
     {% for edu in account.resume.education %}
     <div class="p-education h-event">
       <p><span class="p-name">{{ edu.name }}</span>{% if edu.organization %} at <span class="p-location">{{ edu.organization }}</span>{% endif %}</p>
-      {% if edu.start or edu.end %}<p class="dates">{{ edu.start }}{% if edu.end %} - {{ edu.end }}{% endif %}</p>{% endif %}
-      {% if edu.description %}<p class="p-summary">{{ edu.description | sanitize | safe }}</p>{% endif %}
+      {% if edu.start or edu.end %}<p class="dates"><time class="dt-start" datetime="{{ edu.start }}">{{ edu.start }}</time>{% if edu.end %} - <time class="dt-end" datetime="{{ edu.end }}">{{ edu.end }}</time>{% endif %}</p>{% endif %}
+      {% if edu.description %}<div class="p-description">{{ edu.description | sanitize | safe }}</div>{% endif %}
     </div>
     {% endfor %}
     {% endif %}
@@ -54,9 +33,9 @@
     {% if account.resume.projects %}
     <h2>Projects</h2>
     {% for proj in account.resume.projects %}
-    <div class="p-experience h-event">
+    <div class="p-x-project h-item">
       <p class="p-name">{{ proj.name }}</p>
-      {% if proj.description %}<p class="p-summary">{{ proj.description | sanitize | safe }}</p>{% endif %}
+      {% if proj.description %}<div class="p-description">{{ proj.description | sanitize | safe }}</div>{% endif %}
       {% if proj.url %}<a class="u-url" href="{{ proj.url }}">{{ proj.url }}</a>{% endif %}
     </div>
     {% endfor %}
@@ -70,16 +49,20 @@
     {% endif %}
   </section>
   {% endif %}
-
-  <section class="h-feed posts">
-    <h2>Latest posts</h2>
-    {% set show_author = false %}
-    {% for status in statuses %}
-    {% include "status.html" %}
-    {% else %}
-    <p class="empty">No posts yet.</p>
-    {% endfor %}
-  </section>
 </article>
+
+{% else %}
+{% include "profile_card.html" %}
+{% endif %}
+
+<section class="h-feed posts">
+  <h2>Latest posts</h2>
+  {% set show_author = false %}
+  {% for status in statuses %}
+  {% include "status.html" %}
+  {% else %}
+  <p class="empty">No posts yet.</p>
+  {% endfor %}
+</section>
 {% endblock %}
 
