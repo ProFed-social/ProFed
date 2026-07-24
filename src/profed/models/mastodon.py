@@ -102,6 +102,49 @@ def tags_from_tag(tag: list) -> list[dict]:
             if isinstance(entry, dict) and entry.get("type") == "Hashtag" and entry.get("name")]
 
 
+def _attachment_type(entry: dict) -> str:
+    media_type = entry.get("mediaType", "")
+    if media_type.startswith("video/"):
+        return "video"
+    if media_type.startswith("audio/"):
+        return "audio"
+    if media_type.startswith("image/"):
+        return "image"
+    return {"Image": "image",
+            "Video": "video",
+            "Audio": "audio"}.get(entry.get("type", ""), "unknown")
+
+
+def _attachment_url(entry: dict) -> str | None:
+    url = entry.get("url")
+    if isinstance(url, str):
+        return url
+    if isinstance(url, dict):
+        return url.get("href")
+    if isinstance(url, list):
+        for link in url:
+            if isinstance(link, str) and link:
+                return link
+            if isinstance(link, dict) and link.get("href"):
+                return link["href"]
+    return None
+
+
+def media_attachments_from_attachment(attachment: list) -> list[dict]:
+    def entry_of(item):
+        url = _attachment_url(item)
+        width, height = item.get("width"), item.get("height")
+        meta = {"original": {"width": width, "height": height}} if width or height else None
+        return {"id": url,
+                "type": _attachment_type(item),
+                "url": url,
+                "description": item.get("name"),
+                "blurhash": item.get("blurhash"),
+                "meta": meta}
+
+    return [entry_of(item) for item in attachment if isinstance(item, dict) and _attachment_url(item)]
+
+
 class Status(BaseModel):
     id: str
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -147,7 +190,8 @@ class Status(BaseModel):
                        url=obj.get("url", activity.get("id", "")),
                        content=obj.get("content", ""),
                        mentions=mentions_from_tag(tag),
-                       tags=tags_from_tag(tag))
+                       tags=tags_from_tag(tag),
+                       media_attachments=media_attachments_from_attachment(obj.get("attachment", [])))
 
         return create_status(cls=cls,
                              id=id,

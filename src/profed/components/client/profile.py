@@ -4,7 +4,7 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from .api_client import api_client
 from .auth import page_context, current_user_optional, requires_login
@@ -46,7 +46,7 @@ async def _relationship(account_id, token):
 def _follow_button(handle, relationship):
     return environment().get_template("follow_button.html").render(handle=handle,
                                                                    relationship=relationship)
-async def _follow_action(handle: str, action: str, token: str):
+async def _follow_action(handle: str, action: str, token: str) -> HTMLResponse:
     account = await _account_from_handle(handle)
     response = await api_client().post(f"/api/v1/accounts/{account['id']}/{action}", token=token)
     response.raise_for_status()
@@ -71,6 +71,17 @@ async def profile(request: Request, handle: str):
         handle=handle,
         relationship=relationship,
         **(await page_context(request, session))))
+
+
+@router.get("/@{handle}/feed.xml")
+async def feed(request: Request, handle: str):
+    account = await _account_from_handle(handle)
+    return Response(environment().get_template("feed.xml").render(account=account,
+                                                                  statuses=await _account_statuses(account["id"]),
+                                                                  profile_url=str(request.url_for("profile",
+                                                                                                  handle=handle)),
+                                                                  feed_url=str(request.url)),
+                    media_type="application/rss+xml")
 
 
 @router.post("/@{handle}/follow", response_class=HTMLResponse)

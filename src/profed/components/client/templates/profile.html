@@ -1,5 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{{ account.display_name or account.username }} (@{{ account.acct }}) — ProFed{% endblock %}
+
+{% block head_extra %}
+<link rel="alternate" type="application/rss+xml"
+      title="{{ account.display_name or account.username }} (@{{ account.acct }})"
+      href="/@{{ handle }}/feed.xml">
+<meta name="fediverse:creator" content="@{{ account.acct }}">
+{% endblock %}
+
 {% block content %}
 {% if account.resume %}
 <article class="h-resume profile">

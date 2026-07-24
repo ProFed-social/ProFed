@@ -1,6 +1,8 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from datetime import datetime
+from email.utils import format_datetime
 from pathlib import Path
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, select_autoescape
 
@@ -20,10 +22,18 @@ def build_loader(standard_dir, theme_dir):
                                    [standard_dir])])
 
 
+def rfc822(timestamp: str) -> str:
+    """Convert an ISO 8601 timestamp into the date format RSS requires."""
+    try:
+        return format_datetime(datetime.fromisoformat(timestamp))
+    except (TypeError, ValueError):
+        return ""
+
+
 def build_environment(standard_dir, theme_dir):
     environment = Environment(loader=build_loader(standard_dir, theme_dir),
                               autoescape=select_autoescape(["html", "xml"]))
-    environment.filters["sanitize"] = sanitize_html
+    environment.filters.update(sanitize=sanitize_html, rfc822=rfc822)
     return environment
 
 

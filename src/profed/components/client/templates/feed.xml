@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<rss version="2.0"
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:dc="http://purl.org/dc/elements/1.1/"
+     xmlns:profed="https://codeberg.org/ProFed/ns#">
+  <channel>
+    <title>{{ account.display_name or account.username }} (@{{ account.acct }})</title>
+    <link>{{ profile_url }}</link>
+    <description>{{ account.note | sanitize | striptags }}</description>
+    <atom:link href="{{ feed_url }}" rel="self" type="application/rss+xml"/>
+    <dc:creator>{{ account.display_name or account.username }}</dc:creator>
+    <generator>ProFed</generator>
+    {% if account.avatar %}
+    <image>
+      <url>{{ account.avatar }}</url>
+      <title>{{ account.display_name or account.username }} (@{{ account.acct }})</title>
+      <link>{{ profile_url }}</link>
+    </image>
+    {% endif %}
+    {% for status in statuses %}
+    {% set author = status.reblog.account if status.reblog else account %}
+    <item>
+      <title>{{ status.content | sanitize | striptags | truncate(70) }}</title>
+      <link>{{ status.url }}</link>
+      <guid isPermaLink="true">{{ status.url }}</guid>
+      <pubDate>{{ status.created_at | rfc822 }}</pubDate>
+      <dc:creator>{{ author.display_name or author.username }}</dc:creator>
+      <atom:author>
+        <atom:name>{{ author.display_name or author.username }}</atom:name>
+        <atom:uri>{{ author.url }}</atom:uri>
+        <profed:fediverse>@{{ author.acct }}</profed:fediverse>
+      </atom:author>
+      {% for tag in status.tags %}
+      <category domain="{{ tag.url }}">{{ tag.name }}</category>
+      {% endfor %}
+      <description>{{ status.content | sanitize }}</description>
+    </item>
+    {% endfor %}
+  </channel>
+</rss>
+
