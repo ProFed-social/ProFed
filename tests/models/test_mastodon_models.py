@@ -264,6 +264,16 @@ def test_from_activity_account_less_content_dump_excludes_account():
     assert dump["content"] == "hi"
 
 
+def test_media_attachments_keep_the_exact_mime_type():
+    assert media_attachments_from_attachment([IMAGE_ATTACHMENT])[0]["mime_type"] == "image/jpeg"
+
+
+def test_a_missing_media_type_leaves_the_mime_type_empty():
+    entry = {"type": "Image", "url": "https://r.example/i.png"}
+
+    assert media_attachments_from_attachment([entry])[0]["mime_type"] is None
+
+
 IMAGE_ATTACHMENT = {"type": "Document",
                     "mediaType": "image/jpeg",
                     "url": "https://r.example/media/1.jpg",

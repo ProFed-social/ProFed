@@ -269,3 +269,46 @@ async def test_the_profile_head_advertises_the_fediverse_creator(monkeypatch):
     assert 'name="fediverse:creator"' in body
     assert 'content="@alice@example.test"' in body
 
+
+def _media_post(media):
+    return {**_posts()[0], "media_attachments": media}
+
+
+async def test_a_media_attachment_becomes_an_enclosure(monkeypatch):
+    post = _media_post([{"url": "https://example.test/m/1.jpg",
+                         "type": "image",
+                         "mime_type": "image/jpeg"}])
+
+    item = _channel((await _feed(monkeypatch, posts=[post])).text).find("item")
+
+    enclosure = item.find("enclosure")
+    assert enclosure.get("url") == "https://example.test/m/1.jpg"
+    assert enclosure.get("type") == "image/jpeg"
+
+
+async def test_every_attachment_becomes_its_own_enclosure(monkeypatch):
+    post = _media_post([{"url": "https://example.test/m/1.jpg", "type": "image",
+                         "mime_type": "image/jpeg"},
+                        {"url": "https://example.test/m/2.mp4", "type": "video",
+                         "mime_type": "video/mp4"}])
+
+    item = _channel((await _feed(monkeypatch, posts=[post])).text).find("item")
+
+    assert len(item.findall("enclosure")) == 2
+
+
+async def test_an_enclosure_falls_back_to_the_category_type(monkeypatch):
+    post = _media_post([{"url": "https://example.test/m/1.bin", "type": "image", "mime_type": None}])
+
+    item = _channel((await _feed(monkeypatch, posts=[post])).text).find("item")
+
+    assert item.find("enclosure").get("type") == "image"
+
+
+async def test_a_post_without_media_has_no_enclosure(monkeypatch):
+    post = _media_post([])
+
+    item = _channel((await _feed(monkeypatch, posts=[post])).text).find("item")
+
+    assert item.find("enclosure") is None
+

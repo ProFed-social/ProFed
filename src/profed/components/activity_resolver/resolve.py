@@ -2,22 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from urllib.parse import urlparse
-from profed.http.client import HttpClient
+from profed.federation.objects import fetch_object
 from profed.sanitize import sanitize_as_object
 
 
 def _host(url):
     return urlparse(url).hostname
-
-
-async def _fetch(url, sign=None):
-    try:
-        return (await HttpClient().get(url,
-                                       headers={"Accept": "application/activity+json"},
-                                       timeout=10.0,
-                                       sign=sign)).json()
-    except Exception:
-        return None
 
 
 async def resolve_object(reference, trusted_origin, sign=None):
@@ -30,7 +20,7 @@ async def resolve_object(reference, trusted_origin, sign=None):
     if not isinstance(reference, str):
         return reference
 
-    fetched = await _fetch(reference, sign)
+    fetched = await fetch_object(reference, sign)
     if fetched is None or _host(fetched.get("id", "")) != _host(reference):
         return reference
 

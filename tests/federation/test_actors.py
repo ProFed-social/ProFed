@@ -83,7 +83,7 @@ async def test_returns_sanitised_actor_with_intact_pem(fake_bus):
 async def test_fetch_actor_passes_sign_to_http_client():
     sign = object()
 
-    with patch("profed.federation.actors.HttpClient") as client:
+    with patch("profed.federation.objects.HttpClient") as client:
         client.return_value.get = AsyncMock(return_value=MagicMock(json=MagicMock(return_value={})))
         await fetch_actor("https://r.example/actor", sign)
 

@@ -1,8 +1,25 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from dataclasses import dataclass, field
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Any, ClassVar
+
+
+@dataclass(frozen=True)
+class Reference:
+    url: str
+    embedded: dict | None = field(default=None, compare=False)
+
+
+@dataclass(frozen=True)
+class AnnounceReference(Reference):
+    pass
+
+
+@dataclass(frozen=True)
+class ReplyToReference(Reference):
+    pass
 
 
 class ActivityStreamsObject(BaseModel):
@@ -54,6 +71,30 @@ class ActivityStreamsObject(BaseModel):
         return target.model_validate({"id": object_id,
                                       "type": event_type,
                                       **payload})
+
+    def referenced_objects(self) -> set[Reference]:
+        def url_of(item):
+            return (item
+                    if isinstance(item, str) else
+                    item.get("id")
+                    if isinstance(item, dict) else
+                    None)
+
+        def references(kind, value) -> set:
+            return {kind(url=url_of(item), embedded=item if isinstance(item, dict) else None)
+                    for item in (value if isinstance(value, list) else [value])
+                    if url_of(item)}
+
+        def bearer(obj):
+            return obj["object"] if isinstance(obj.get("object"), dict) else obj
+
+        def collect(obj) -> set:
+            return ((references(AnnounceReference, obj.get("object"))
+                     if obj.get("type") == "Announce" else
+                     set()) |
+                    references(ReplyToReference, bearer(obj).get("inReplyTo")))
+
+        return collect(self.model_dump(by_alias=True))
 
     id: str
     type: str

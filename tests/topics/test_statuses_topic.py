@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from profed.identity import status_id
 from profed.topics.statuses_topic import (delete_event,
                                           inner_object_id,
+                                          reference_of,
                                           is_actor_object,
                                           object_key_of,
                                           status_event,
@@ -62,27 +63,27 @@ def test_snapshot_items_are_not_supported():
 
 
 def test_inner_object_id_reads_a_referenced_object():
-    assert inner_object_id({"object": NOTE_ID}) == NOTE_ID
+    assert inner_object_id(NOTE_ID) == NOTE_ID
 
 
 def test_inner_object_id_reads_an_embedded_object():
-    assert inner_object_id({"object": {"id": NOTE_ID}}) == NOTE_ID
+    assert inner_object_id({"id": NOTE_ID}) == NOTE_ID
 
 
 def test_inner_object_id_without_object_is_none():
-    assert inner_object_id({"actor": "https://remote/bob"}) is None
+    assert inner_object_id(None) is None
 
 
 def test_inner_object_id_of_embedded_object_without_id_is_none():
-    assert inner_object_id({"object": {"content": "hi"}}) is None
+    assert inner_object_id({"content": "hi"}) is None
 
 
 def test_is_actor_object_detects_a_person():
-    assert is_actor_object({"object": {"id": "https://remote/bob", "type": "Person"}}) is True
+    assert is_actor_object({"id": "https://remote/bob", "type": "Person"}) is True
 
 
 def test_is_actor_object_ignores_a_note():
-    assert is_actor_object({"object": {"id": NOTE_ID, "type": "Note"}}) is False
+    assert is_actor_object({"id": NOTE_ID, "type": "Note"}) is False
 
 
 def test_object_key_of_announce_is_the_activity_id():
@@ -130,4 +131,53 @@ def test_delete_event_carries_only_the_object_key():
 
 def test_delete_event_without_an_object_is_none():
     assert delete_event("Delete", "https://remote/activities/1", {"username": "alice", "activity": {}}) is None
+
+
+def _event(event_type, activity):
+    return status_event(event_type, activity.get("id", "https://remote/oid"),
+                        {"username": "alice", "activity": activity}, EMITTED_AT, 1, own=False)
+
+
+BOOST = {"actor": "https://remote/bob",
+         "id": "https://remote/bob#announce/1",
+         "type": "Announce",
+         "object": "https://remote/notes/original"}
+
+REPLY = {"actor": "https://remote/bob",
+         "id": "https://remote/bob#create/1",
+         "type": "Create",
+         "object": {"id": "https://remote/notes/2",
+                    "type": "Note",
+                    "content": "re",
+                    "inReplyTo": "https://remote/notes/parent"}}
+
+POST = {"actor": "https://remote/bob",
+        "id": "https://remote/bob#create/2",
+        "type": "Create",
+        "object": {"id": "https://remote/notes/3", "type": "Note", "content": "hi"}}
+
+
+def test_a_boost_carries_an_announce_reference():
+    assert _event("Announce", BOOST)["reference"] == {"kind": "announce", "url": "https://remote/notes/original"}
+
+
+def test_a_reply_carries_a_reply_reference():
+    assert _event("Create", REPLY)["reference"] == {"kind": "reply", "url": "https://remote/notes/parent"}
+
+
+def test_an_ordinary_post_has_no_reference():
+    assert _event("Create", POST)["reference"] is None
+
+
+def test_reference_of_reads_a_boost_target():
+    assert reference_of("Announce", BOOST) == {"kind": "announce", "url": "https://remote/notes/original"}
+
+
+def test_reference_of_reads_a_reply_parent():
+    assert reference_of("Create", REPLY) == {"kind": "reply", "url": "https://remote/notes/parent"}
+
+
+def test_reference_of_an_ordinary_post_is_none():
+    assert reference_of("Create", POST) is None
+
 

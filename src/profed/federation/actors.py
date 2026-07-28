@@ -4,20 +4,13 @@
 from datetime import datetime, timezone
 from typing import Optional
 from profed.core.message_bus import message_bus
+from profed.federation.objects import fetch_object
 from profed.federation.webfinger import lookup_acct
-from profed.http.client import HttpClient
 from profed.identity import account_id as compute_account_id, is_local
 from profed.sanitize import sanitize_document
 
 
-async def fetch_actor(actor_url: str, sign=None) -> Optional[dict]:
-    try:
-        return (await HttpClient().get(actor_url,
-                                       headers={"Accept": "application/activity+json"},
-                                       timeout=10.0,
-                                       sign=sign)).json()
-    except Exception:
-        return None
+fetch_actor = fetch_object
 
 
 async def fetch_and_register_actor(actor_url: str, sign=None) -> Optional[dict]:

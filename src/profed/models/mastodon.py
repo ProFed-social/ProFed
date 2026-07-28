@@ -137,6 +137,7 @@ def media_attachments_from_attachment(attachment: list) -> list[dict]:
         meta = {"original": {"width": width, "height": height}} if width or height else None
         return {"id": url,
                 "type": _attachment_type(item),
+                "mime_type": item.get("mediaType"),
                 "url": url,
                 "description": item.get("name"),
                 "blurhash": item.get("blurhash"),

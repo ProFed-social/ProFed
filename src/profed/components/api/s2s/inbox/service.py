@@ -1,11 +1,11 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.core.message_bus import message_bus
 from pydantic import ValidationError
 from profed.http.signatures import key_id_from_signature_header, make_sign, verify_request
 from profed.federation.actors import fetch_and_register_actor
 from profed.sanitize import sanitize_document
+from profed.topics.incoming_activities_topic import publish_incoming
 from profed.models.activity_pub import IncomingActivity
 from profed.components.api.s2s.inbox.storage import storage
 from profed.components.api.s2s.inbox.public_keys_storage import storage as public_keys_storage
@@ -68,11 +68,7 @@ async def accept_inbox_activity(username: str, activity: dict) -> bool:
     event_type = activity.pop("type")
     object_id = activity.pop("id")
 
-    async with message_bus().topic("incoming_activities").publish() as publish:
-        await publish(event_type=event_type,
-                      object_id=object_id,
-                      payload={"username": username,
-                               "activity": sanitize_document(activity)})
+    await publish_incoming(event_type, object_id, username, sanitize_document(activity))
 
     return True
 

@@ -34,6 +34,9 @@
       {% for tag in status.tags %}
       <category domain="{{ tag.url }}">{{ tag.name }}</category>
       {% endfor %}
+      {% for media in status.media_attachments %}
+      <enclosure url="{{ media.url }}" length="0" type="{{ media.mime_type or media.type }}"/>
+      {% endfor %}
       <description>{{ status.content | sanitize }}</description>
     </item>
     {% endfor %}
