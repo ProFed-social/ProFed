@@ -25,7 +25,7 @@ async def test_get_returns_response():
     assert response.status_code == 200
 
 
-@pytest.mark.asynci
+@pytest.mark.asyncio
 async def test_raises_on_http_error():
      with patch("profed.http.client.httpx.AsyncClient") as mock:
          mock.return_value.__aenter__.return_value.request = \

@@ -247,6 +247,18 @@ def test_from_activity_builds_status_with_given_account():
                                 "url": "https://r.example/actors/dave", "acct": "dave@r.example"}]
 
 
+def test_from_activity_reads_the_url_from_a_link_array():
+    activity = {"actor": "https://r.example/actors/dave",
+                "id": "https://r.example/notes/1#create",
+                "object": {"id": "https://r.example/notes/1",
+                           "url": [{"href": "https://r.example/notes/1", "type": "Link"}],
+                           "content": "hi"}}
+
+    status = Status.from_activity(activity, id="42")
+
+    assert status.url == "https://r.example/notes/1"
+
+
 def test_from_activity_uses_placeholder_account_when_missing():
     activity = {"actor": "https://local/actors/alice", "object": {"content": "hi"}}
     status = Status.from_activity(activity, id="42")

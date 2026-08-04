@@ -115,19 +115,22 @@ def _attachment_type(entry: dict) -> str:
             "Audio": "audio"}.get(entry.get("type", ""), "unknown")
 
 
-def _attachment_url(entry: dict) -> str | None:
-    url = entry.get("url")
-    if isinstance(url, str):
-        return url
-    if isinstance(url, dict):
-        return url.get("href")
-    if isinstance(url, list):
-        for link in url:
+def _href(value) -> str | None:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return value.get("href")
+    if isinstance(value, list):
+        for link in value:
             if isinstance(link, str) and link:
                 return link
             if isinstance(link, dict) and link.get("href"):
                 return link["href"]
     return None
+
+
+def _attachment_url(entry: dict) -> str | None:
+    return _href(entry.get("url"))
 
 
 def media_attachments_from_attachment(attachment: list) -> list[dict]:
@@ -188,7 +191,7 @@ class Status(BaseModel):
                        account=account,
                        created_at=obj.get("published", "1970-01-01T00:00:00.000Z"),
                        uri=activity.get("id", ""),
-                       url=obj.get("url", activity.get("id", "")),
+                       url=_href(obj.get("url")) or activity.get("id", ""),
                        content=obj.get("content", ""),
                        mentions=mentions_from_tag(tag),
                        tags=tags_from_tag(tag),
