@@ -34,11 +34,13 @@ async def test_create_flattens_and_publishes(fake_bus):
 
 
 @pytest.mark.asyncio
-async def test_flatten_receives_the_emitted_at_and_the_fetcher_enqueue(fake_bus):
+async def test_flatten_receives_the_envelope_and_the_fetcher_enqueue(fake_bus):
     with patch.object(translator, "flatten_references", Mock(return_value={})) as flatten:
         await translator._forwarder(True)("Create", "https://remote.example/act/1", _payload(), EMITTED, 5)
 
-    _, emitted_at, _sign, enqueue = flatten.call_args.args
+    _, object_id, event_type, emitted_at, _, enqueue = flatten.call_args.args
+    assert object_id == "https://remote.example/act/1"
+    assert event_type == "Create"
     assert emitted_at == EMITTED
     assert enqueue is translator.fetcher.enqueue
 

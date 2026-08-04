@@ -16,17 +16,17 @@ def _as_url(value):
     return value["id"] if isinstance(value, dict) else value
 
 
-def _flattened(activity):
+def _flattened(activity, event_type):
     obj = activity.get("object")
     return ({**activity, "object": _as_url(obj)}
-            if activity.get("type") == "Announce" else
+            if event_type == "Announce" else
             {**activity, "object": {**obj, "inReplyTo": _as_url(obj["inReplyTo"])}}
             if isinstance(obj, dict) and isinstance(obj.get("inReplyTo"), dict) else
             activity)
 
 
-def flatten_references(activity: dict, emitted_at, sign, enqueue) -> dict:
-    for reference in ActivityStreamsObject.model_validate(activity).referenced_objects():
+def flatten_references(activity: dict, object_id, event_type, emitted_at, sign, enqueue) -> dict:
+    for reference in ActivityStreamsObject.from_payload(object_id, event_type, activity).referenced_objects():
         enqueue(reference.url, reference.referrer, _sought(reference), emitted_at, sign)
-    return _flattened(activity)
+    return _flattened(activity, event_type)
 

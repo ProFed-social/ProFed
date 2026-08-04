@@ -24,10 +24,10 @@ def _signer():
 
 
 def _forwarder(should_resolve: bool):
-    def _flatten(activity, emitted_at):
-        return flatten_references(activity, emitted_at, _signer(), fetcher.enqueue)
+    def _flatten(activity, object_id, event_type, emitted_at):
+        return flatten_references(activity, object_id, event_type, emitted_at, _signer(), fetcher.enqueue)
 
-    def _keep(activity, emitted_at):
+    def _keep(activity, object_id, event_type, emitted_at):
         return activity
 
     _resolve = _flatten if should_resolve else _keep
@@ -37,9 +37,9 @@ def _forwarder(should_resolve: bool):
             async with topic.publish() as publish:
                 await publish(event_type=event_type,
                               object_id=object_id,
-                              payload={**payload, "activity": _resolve(payload["activity"], emitted_at)},
+                              payload={**payload,
+                                       "activity": _resolve(payload["activity"], object_id, event_type, emitted_at)},
                               message_id=message_id)
-
 
     async def _handle(event_type, object_id, payload, emitted_at, sequence_id) -> None:
         await _publish_if_not_exists(topic=message_bus().topic("resolved_activities", lookup_message_ids=True),

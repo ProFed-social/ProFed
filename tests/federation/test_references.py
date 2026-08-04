@@ -20,27 +20,31 @@ PARENT = {"id": "https://remote/notes/parent",
 EMITTED = "2026-05-01T00:00:00Z"
 
 
-def _run(activity):
+def _run(activity, object_id, event_type):
     enqueue = Mock()
-    result = references.flatten_references(activity, EMITTED, None, enqueue)
+    result = references.flatten_references(activity, object_id, event_type, EMITTED, None, enqueue)
     return result, enqueue
 
 
 def test_a_boost_by_url_enqueues_the_target_and_flattens_to_url():
-    activity = {"id": "a", "type": "Announce", "actor": "https://remote/bob", "object": "https://remote/notes/orig"}
+    activity = {"actor": "https://remote/bob", "object": "https://remote/notes/orig"}
 
-    result, enqueue = _run(activity)
+    result, enqueue = _run(activity, "https://remote/announce/1", "Announce")
 
-    enqueue.assert_called_once_with("https://remote/notes/orig", "a", None, EMITTED, None)
+    enqueue.assert_called_once_with("https://remote/notes/orig", "https://remote/announce/1", None, EMITTED, None)
     assert result["object"] == "https://remote/notes/orig"
 
 
 def test_an_embedded_boost_enqueues_with_the_objects_version_and_flattens_to_url():
-    activity = {"id": "a", "type": "Announce", "actor": "https://remote/bob", "object": BOOSTED}
+    activity = {"actor": "https://remote/bob", "object": BOOSTED}
 
-    result, enqueue = _run(activity)
+    result, enqueue = _run(activity, "https://remote/announce/1", "Announce")
 
-    enqueue.assert_called_once_with("https://remote/notes/orig", "a", "2026-01-01T00:00:00Z", EMITTED, None)
+    enqueue.assert_called_once_with("https://remote/notes/orig",
+                                    "https://remote/announce/1",
+                                    "2026-01-01T00:00:00Z",
+                                    EMITTED,
+                                    None)
     assert result["object"] == "https://remote/notes/orig"
 
 
@@ -50,10 +54,10 @@ def test_a_reply_by_url_enqueues_the_parent_and_keeps_the_note():
             "attributedTo": "https://remote/bob",
             "content": "re",
             "inReplyTo": "https://remote/notes/parent"}
-    activity = {"id": "c", "type": "Create", "actor": "https://remote/bob", "object": note}
 
-    result, enqueue = _run(activity)
+    activity = {"actor": "https://remote/bob", "object": note}
 
+    result, enqueue = _run(activity, "https://remote/create/1", "Create")
     enqueue.assert_called_once_with("https://remote/notes/parent", "https://remote/notes/2", None, EMITTED, None)
     assert result["object"]["inReplyTo"] == "https://remote/notes/parent"
     assert result["object"]["content"] == "re"
@@ -65,10 +69,10 @@ def test_an_embedded_reply_parent_enqueues_with_version_and_flattens_to_its_url(
             "attributedTo": "https://remote/bob",
             "content": "re",
             "inReplyTo": PARENT}
-    activity = {"id": "c", "type": "Create", "actor": "https://remote/bob", "object": note}
 
-    result, enqueue = _run(activity)
+    activity = {"actor": "https://remote/bob", "object": note}
 
+    result, enqueue = _run(activity, "https://remote/create/1", "Create")
     enqueue.assert_called_once_with("https://remote/notes/parent",
                                     "https://remote/notes/2",
                                     "2026-02-01T00:00:00Z",
@@ -79,9 +83,9 @@ def test_an_embedded_reply_parent_enqueues_with_version_and_flattens_to_its_url(
 
 def test_an_ordinary_post_enqueues_nothing():
     note = {"id": "https://remote/notes/3", "type": "Note", "attributedTo": "https://remote/bob", "content": "hi"}
-    activity = {"id": "c", "type": "Create", "actor": "https://remote/bob", "object": note}
+    activity = {"actor": "https://remote/bob", "object": note}
 
-    result, enqueue = _run(activity)
+    result, enqueue = _run(activity, "https://remote/create/1", "Create")
 
     enqueue.assert_not_called()
     assert result == activity
