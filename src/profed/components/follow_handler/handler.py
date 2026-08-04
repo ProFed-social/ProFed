@@ -77,17 +77,14 @@ async def handle_incoming_activities() -> None:
     async for seq, event_type, object_id, _, payload \
             in message_bus().topic("incoming_activities").subscribe():
         validated = incoming_activities["validate"](event_type, payload)
-        if validated is None:
-            logger.warning("follow_handler: ignoring invalid event: %r", event_type)
-            continue
-
-        username = validated["username"]
-        activity = {"id":   object_id,
-                    "type": event_type,
-                    **validated["activity"]}
+        if validated is not None:
+            username = validated["username"]
+            activity = {"id":   object_id,
+                        "type": event_type,
+                        **validated["activity"]}
 
         async def _unknown_type(u, a, s):
-            logger.debug(f"ignoring event in follow_handler: {event_type}")
+            pass
 
         await {"Follow": _handle_follow,
                "Undo": _handle_undo_follow}.get(event_type, _unknown_type)(username, activity, seq)
