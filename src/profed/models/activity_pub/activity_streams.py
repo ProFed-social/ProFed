@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 class Reference:
     url: str
     embedded: dict | None = field(default=None, compare=False)
+    referrer: str | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)
@@ -80,8 +81,8 @@ class ActivityStreamsObject(BaseModel):
                     if isinstance(item, dict) else
                     None)
 
-        def references(kind, value) -> set:
-            return {kind(url=url_of(item), embedded=item if isinstance(item, dict) else None)
+        def references(kind, value, referrer) -> set:
+            return {kind(url=url_of(item), embedded=item if isinstance(item, dict) else None, referrer=referrer)
                     for item in (value if isinstance(value, list) else [value])
                     if url_of(item)}
 
@@ -89,10 +90,10 @@ class ActivityStreamsObject(BaseModel):
             return obj["object"] if isinstance(obj.get("object"), dict) else obj
 
         def collect(obj) -> set:
-            return ((references(AnnounceReference, obj.get("object"))
+            return ((references(AnnounceReference, obj.get("object"), obj.get("id"))
                      if obj.get("type") == "Announce" else
                      set()) |
-                    references(ReplyToReference, bearer(obj).get("inReplyTo")))
+                    references(ReplyToReference, bearer(obj).get("inReplyTo"), bearer(obj).get("id")))
 
         return collect(self.model_dump(by_alias=True))
 

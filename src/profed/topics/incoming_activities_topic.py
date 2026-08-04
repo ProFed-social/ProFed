@@ -28,10 +28,12 @@ def validate_incoming_activities_snapshot_item(item) -> Optional[Dict]:
     return None
 
 
-async def publish_incoming(event_type: str, object_id: str, username: str, activity: dict) -> None:
+async def publish_incoming(event_type: str, object_id: str, username: str, activity: dict, message_id=None) -> None:
     async with message_bus().topic("incoming_activities").publish() as publish:
-        await publish(event_type=event_type, object_id=object_id, payload={"username": username, "activity": activity})
-
+        await publish(event_type=event_type,
+                      object_id=object_id,
+                      payload={"username": username, "activity": activity},
+                      message_id=message_id)
 
 topic = {"name":              "incoming_activities",
          "validate":          validate_incoming_activities_event,

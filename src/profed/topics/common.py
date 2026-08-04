@@ -43,3 +43,12 @@ class StatusEvent(BaseModel):
     actor_url: Optional[str] = None
     status: Optional[Dict] = None
 
+
+class ResolutionEvent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    object_id: str = Field(min_length=1)
+    version: Optional[str] = None
+    cache_end: Optional[str] = None
+    attempt: int = 0
+    not_found_count: int = 0
+
