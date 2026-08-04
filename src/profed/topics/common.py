@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 logger = logging.getLogger(__name__)
 
+_SYSTEM_VERBS = {"Tick"}
+
 
 def validate_payload(model: Type[BaseModel],
                      payload: Dict,
@@ -25,7 +27,8 @@ def validate_verb(event_type: str, known_verbs: set, topic_name: str) -> bool:
     if event_type in known_verbs:
         return True
 
-    logger.warning(f"Ignoring malformed {topic_name} event: unknown event type {event_type!r}")
+    if event_type not in _SYSTEM_VERBS:
+        logger.warning(f"Ignoring malformed {topic_name} event: unknown event type {event_type!r}")
     return False
 
 

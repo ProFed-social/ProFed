@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from typing import Optional
 
 from pydantic import BaseModel
@@ -17,8 +18,16 @@ def test_validate_verb_accepts_known_verb():
     assert validate_verb("Create", {"Create", "Update"}, "demo") is True
 
 
-def test_validate_verb_rejects_unknown_verb():
-    assert validate_verb("Tick", {"Create", "Update"}, "demo") is False
+def test_validate_verb_rejects_unknown_verb(caplog):
+    with caplog.at_level(logging.WARNING):
+        assert validate_verb("Frobnicate", {"Create", "Update"}, "demo") is False
+    assert "Frobnicate" in caplog.text
+
+
+def test_validate_verb_ignores_the_system_tick_without_warning(caplog):
+    with caplog.at_level(logging.WARNING):
+        assert validate_verb("Tick", {"Create", "Update"}, "demo") is False
+    assert "unknown event type" not in caplog.text
 
 
 def test_validate_payload_returns_dumped_model():
