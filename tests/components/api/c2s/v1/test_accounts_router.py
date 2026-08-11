@@ -734,16 +734,17 @@ def test_get_suggestions_returns_empty_list(client):
 
 
 def test_account_statuses_anonymous_returns_list(anon_client):
-    storage_mock = AsyncMock(fetch=AsyncMock(return_value=[]))
+    store = AsyncMock(fetch_by_actor=AsyncMock(return_value=[]))
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW_FULL["actor_data"],
                                                              acct=ROW_FULL["acct"],
                                                              url=ROW_FULL["actor_url"]))), \
-             patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
-                   AsyncMock(return_value=storage_mock)):
-
+             patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                   AsyncMock(return_value=store)), \
+             patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
+                   AsyncMock(return_value={})):
             response = anon_client.get("/accounts/123456/statuses")
 
     assert response.status_code == 200
@@ -758,15 +759,23 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
                            "published": "2026-01-01T00:00:00.000Z"}}
     mastodon_id = str(source_key("activities").message_id(42).int)
     status = Status.from_activity(activity, id=mastodon_id).model_dump(exclude={"account"})
-    storage_mock = AsyncMock(fetch=AsyncMock(return_value=[status]))
+    actor_url = ROW_FULL["actor_url"]
+    account = Account.from_actor(ROW_FULL["actor_data"], acct=ROW_FULL["acct"], url=actor_url)
+    row = {"mastodon_id": int(mastodon_id),
+           "url": activity["object"]["id"],
+           "actor_url": actor_url,
+           "reblog_of_url": None,
+           "status": status,
+           "content": {"status": status, "actor": actor_url}}
+    store = AsyncMock(fetch_by_actor=AsyncMock(return_value=[row]))
 
     with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
-                   AsyncMock(return_value=Account.from_actor(ROW_FULL["actor_data"],
-                                                             acct=ROW_FULL["acct"],
-                                                             url=ROW_FULL["actor_url"]))), \
-             patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
-                   AsyncMock(return_value=storage_mock)):
+                   AsyncMock(return_value=account)), \
+             patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                   AsyncMock(return_value=store)), \
+             patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
+                   AsyncMock(return_value={actor_url: account})):
             response = anon_client.get("/accounts/123456/statuses")
 
     assert response.status_code == 200

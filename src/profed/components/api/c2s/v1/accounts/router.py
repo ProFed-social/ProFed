@@ -14,13 +14,13 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
                                                                      lookup_by_actor_url)
 from profed.components.api.c2s.v1.accounts.credentials.service import credential_account
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
+from profed.components.api.c2s.shared.statuses import as_objects, service
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
 from profed.models.activity_pub import AcceptActivity, RejectActivity
 from profed.components.api.c2s.v1.accounts.follows.storage import storage as follows_storage
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
 from profed.components.api.c2s.v1.accounts.preferences.storage import storage as preferences_storage
-from profed.models.mastodon import Status
 from profed.languages import is_supported
 from profed.topics.preferences_topic import PRIVACY_VALUES
 
@@ -147,10 +147,8 @@ async def account_statuses(id: str,
     if account is None:
         raise HTTPException(status_code=404)
 
-    account = await _with_counts(account)
+    return await service.make_statuses(await (await as_objects.storage()).fetch_by_actor(account.url, limit=limit))
 
-    return [Status(**status, account=account)
-            for status in await (await user_statuses_storage()).fetch(account.username, limit=limit)]
 
 
 @router.post("/accounts/{id}/unfollow")

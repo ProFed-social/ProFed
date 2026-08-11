@@ -7,47 +7,88 @@ from profed.models.mastodon import Account
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.components.api.c2s.v1.timelines import router as timelines_module
-from profed.components.api.c2s.v1.timelines import storage as timelines_storage
+from profed.components.api.c2s.shared.statuses import user_timeline
 from profed.components.api.c2s.shared.auth import current_user
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
 
-ACTOR_URL = "https://remote.example/actors/bob"
+NOTE_URL = "https://example.com/act/1"
+BOOST_URL = "https://remote.example/carol/announce/1"
+BOB_URL = "https://remote.example/actors/bob"
+CAROL_URL = "https://remote.example/actors/carol"
+
 STATUS = {"id": "424242",
           "created_at": "2026-01-01T00:00:00+00:00",
-          "uri": "https://example.com/act/1",
-          "url": "https://example.com/act/1",
+          "uri": NOTE_URL,
+          "url": NOTE_URL,
           "content": "Hello!",
+          "reblog": None,
           "mentions": [],
           "tags": []}
 
-BOB = Account(id="999",
-              username="bob",
-              acct="bob@remote.example",
-              display_name="Bob",
-              url="https://remote.example/actors/bob")
+BOOST = {"id": "500",
+         "created_at": "2026-01-02T00:00:00+00:00",
+         "uri": BOOST_URL,
+         "url": BOOST_URL,
+         "content": "",
+         "reblog": None,
+         "mentions": [],
+         "tags": []}
+
+BOB = Account(id="999", username="bob", acct="bob@remote.example", display_name="Bob", url=BOB_URL)
+
+CAROL = Account(id="777", username="carol", acct="carol@remote.example", display_name="Carol", url=CAROL_URL)
+
+
+
+def _content_row():
+    return {"mastodon_id": 424242,
+            "url": NOTE_URL,
+            "actor_url": BOB_URL,
+            "reblog_of_url": None,
+            "status": STATUS,
+            "content": {"status": STATUS, "actor": BOB_URL}}
+
+
+def _boost_row():
+    return {"mastodon_id": 500,
+            "url": BOOST_URL,
+            "actor_url": CAROL_URL,
+            "reblog_of_url": NOTE_URL,
+            "status": BOOST,
+            "content": {"status": STATUS, "actor": BOB_URL}}
 
 
 class FakeStorage:
-    async def fetch(self, username, limit=20, max_id=None, since_id=None):
-        return [(ACTOR_URL, STATUS)]
+    def __init__(self, rows):
+        self._rows = rows
+    async def fetch(self, username, limit=20, max_id=None, since_id=None, max_depth=20):
+        return self._rows
+
+
+def _patched_accounts(mapping):
+    return patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
+                 AsyncMock(return_value=mapping))
 
 
 @pytest.fixture
 def client():
     timelines_module.init({})
-    timelines_storage._instance = FakeStorage()
+    backup = user_timeline._instance
+    user_timeline._instance = FakeStorage([_content_row()])
     app = FastAPI()
     app.include_router(timelines_module.router)
     app.dependency_overrides[current_user] = lambda: CLAIMS
+
     yield TestClient(app)
-    timelines_storage._instance = None
+
+    user_timeline._instance = backup
 
 
-def test_home_timeline_returns_statuses(client):
-    with patch("profed.components.api.c2s.v1.timelines.router.cached_multiple",
-               AsyncMock(return_value={ACTOR_URL: BOB})):
+
+def test_home_timeline_returns_the_content_status(client):
+    with _patched_accounts({BOB_URL: BOB}):
         response = client.get("/timelines/home")
 
     assert response.status_code == 200
@@ -56,11 +97,24 @@ def test_home_timeline_returns_statuses(client):
     assert data[0]["id"] == "424242"
     assert data[0]["content"] == "Hello!"
     assert data[0]["account"]["username"] == "bob"
+    assert data[0]["reblog"] is None
+
+
+def test_home_timeline_nests_a_boost_as_a_reblog(client):
+    user_timeline._instance = FakeStorage([_boost_row()])
+
+    with _patched_accounts({BOB_URL: BOB, CAROL_URL: CAROL}):
+        response = client.get("/timelines/home")
+
+    data = response.json()
+    assert data[0]["account"]["username"] == "carol"
+    assert data[0]["reblog"]["id"] == "424242"
+    assert data[0]["reblog"]["content"] == "Hello!"
+    assert data[0]["reblog"]["account"]["username"] == "bob"
 
 
 def test_home_timeline_falls_back_to_a_placeholder_account(client):
-    with patch("profed.components.api.c2s.v1.timelines.router.cached_multiple",
-               AsyncMock(return_value={})):
+    with _patched_accounts({}):
         response = client.get("/timelines/home")
 
     assert response.status_code == 200
@@ -68,17 +122,16 @@ def test_home_timeline_falls_back_to_a_placeholder_account(client):
 
 
 def test_home_timeline_does_not_webfinger_on_read(client):
-    with patch("profed.components.api.c2s.v1.timelines.router.cached_multiple",
-               AsyncMock(return_value={ACTOR_URL: BOB})) as cached:
+    with _patched_accounts({BOB_URL: BOB}) as cached:
         client.get("/timelines/home")
 
     cached.assert_awaited_once()
 
 
 def test_home_timeline_empty(client):
-    timelines_storage._instance.fetch = AsyncMock(return_value=[])
+    user_timeline._instance = FakeStorage([])
 
-    with patch("profed.components.api.c2s.v1.timelines.router.cached_multiple", AsyncMock(return_value={})):
+    with _patched_accounts({}):
         response = client.get("/timelines/home")
 
     assert response.status_code == 200

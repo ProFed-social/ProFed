@@ -14,6 +14,7 @@ from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
+from profed.components.api.c2s.shared.statuses import as_objects, service
 from profed.sanitize import sanitize_html
 from profed import mentions
 
@@ -93,7 +94,10 @@ async def create_status(body: StatusCreate,
 @router.get("/statuses/{id}")
 async def get_status(id: str,
                      claims: Annotated[dict, Depends(current_user)] = None):
-    raise HTTPException(status_code=404, detail="status_not_found")
+    row = await (await as_objects.storage()).get(id, 20) if id.isdigit() else None
+    if row is None or row["content"] is None:
+        raise HTTPException(status_code=404, detail="status_not_found")
+    return (await service.make_statuses([row]))[0]
 
 
 @router.delete("/statuses/{id}")

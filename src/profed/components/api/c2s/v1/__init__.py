@@ -3,6 +3,7 @@
 
 import asyncio
 from typing import List
+from collections.abc import Iterable
 from fastapi import APIRouter
 from profed.components.api.http import MastodonJSONResponse
 from profed.core.media_storage import init_media_storage
@@ -16,8 +17,10 @@ from .apps import router as apps
 from .instance import router as instance
 from .accounts import router as accounts
 from .statuses import router as statuses
-from .timelines import storage as timelines_storage
-from .timelines import projection as timelines_projection
+from profed.components.api.c2s.shared.statuses import as_objects as statuses_objects
+from profed.components.api.c2s.shared.statuses import user_timeline as statuses_memberships
+from profed.components.api.c2s.shared.statuses import projection as statuses_projection
+from profed.components.api.c2s.shared.statuses import compressor as statuses_compressor
 from .timelines import router as timelines
 from .notifications import router as notifications
 from .lists import router as lists
@@ -30,14 +33,21 @@ from .accounts.statuses import storage as user_statuses_storage
 from .accounts.statuses import projection as user_statuses_projection
 
 
-def _projection_initializer(storage, projection, handle_events, name):
+def _projection_initializer(storages, projection, handle_events, name):
     async def _init_projection(config: dict):
-        await storage.init(config)
-        await (await storage.storage()).ensure_schema()
+        for storage in storages if isinstance(storages, Iterable) else [storages]:
+            await storage.init(config)
+            await (await storage.storage()).ensure_schema()
         await projection.rebuild()
         asyncio.create_task(handle_events(), name=name)
 
     return _init_projection
+
+
+def _compressor_initializer(compressor):
+    async def _init(config: dict):
+        compressor.start(config.get("compression", {}))
+    return _init
 
 
 async def init(config: dict, deactivate: List[str]) -> None:
@@ -49,11 +59,12 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       actors_projection,
                                                       actors_projection.handle_account_events,
                                                       "c2s_actor")),
-                             (["timelines"],
-                              _projection_initializer(timelines_storage,
-                                                      timelines_projection,
-                                                      timelines_projection.handle_events,
-                                                      "c2s_v1_timelines")),
+                             (["timelines", "statuses", "accounts"],
+                              _projection_initializer([statuses_objects, statuses_memberships],
+                                                      statuses_projection,
+                                                      statuses_projection.handle_events,
+                                                      "c2s_statuses")),
+                             (["timelines", "statuses", "accounts"], _compressor_initializer(statuses_compressor)),
                              (["accounts"],
                               _projection_initializer(follows_storage,
                                                       follows_projection,
@@ -65,7 +76,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       preferences_projection.handle_events,
                                                       "c2s_v1_preferences")),
                              (["accounts"],
-                               _projection_initializer(user_statuses_storage,
+                              _projection_initializer(user_statuses_storage,
                                                       user_statuses_projection,
                                                       user_statuses_projection.handle_events,
                                                       "c2s_v1_user_statuses"))]:

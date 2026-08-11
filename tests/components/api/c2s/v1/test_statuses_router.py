@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, Mock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core import message_bus
@@ -29,6 +29,63 @@ LOCAL_ACCOUNT = Account(id="1",
                         acct="alice@example.com",
                         display_name="Alice",
                         url="https://example.com/actors/alice")
+
+NOTE_URL = "https://example.com/act/1"
+ 
+BOB_URL = "https://remote.example/actors/bob"
+ 
+CAROL_URL = "https://remote.example/actors/carol"
+ 
+BOB = Account(id="999", username="bob", acct="bob@remote.example", display_name="Bob", url=BOB_URL)
+ 
+CAROL = Account(id="777", username="carol", acct="carol@remote.example", display_name="Carol", url=CAROL_URL)
+ 
+NOTE_STATUS = {"id": "424242",
+               "created_at": "2026-01-01T00:00:00+00:00",
+               "uri": NOTE_URL,
+               "url": NOTE_URL,
+               "content": "Hello!",
+               "reblog": None,
+               "mentions": [],
+               "tags": []}
+ 
+BOOST_STATUS = {"id": "500",
+                "created_at": "2026-01-02T00:00:00+00:00",
+                "uri": "https://remote.example/carol/announce/1",
+                "url": "https://remote.example/carol/announce/1",
+                "content": "",
+                "reblog": None,
+                "mentions": [],
+                "tags": []}
+ 
+ 
+def _content_row():
+    return {"mastodon_id": 424242,
+            "url": NOTE_URL,
+            "actor_url": BOB_URL,
+            "reblog_of_url": None,
+            "status": NOTE_STATUS,
+            "content": {"status": NOTE_STATUS, "actor": BOB_URL}}
+ 
+ 
+def _boost_row():
+    return {"mastodon_id": 500,
+            "url": "https://remote.example/carol/announce/1",
+            "actor_url": CAROL_URL,
+            "reblog_of_url": NOTE_URL,
+            "status": BOOST_STATUS,
+            "content": {"status": NOTE_STATUS, "actor": BOB_URL}}
+ 
+ 
+def _store_returning(row):
+    return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                 AsyncMock(return_value=Mock(get=AsyncMock(return_value=row))))
+ 
+ 
+def _patched_accounts(mapping):
+    return patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
+                 AsyncMock(return_value=mapping))
+ 
 
 def test_create_status_publishes_activity(client, fake_bus):
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
@@ -249,4 +306,40 @@ def test_create_status_response_sets_mentions(client, fake_bus):
                                             "username": "dave",
                                             "url": "https://remote.example/actors/dave",
                                             "acct": "dave@remote.example"}]
+
+def test_get_status_returns_the_content_status(client):
+    with _store_returning(_content_row()), _patched_accounts({BOB_URL: BOB}):
+        response = client.get("/statuses/424242")
+ 
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "424242"
+    assert data["content"] == "Hello!"
+    assert data["account"]["username"] == "bob"
+    assert data["reblog"] is None
+ 
+ 
+def test_get_status_nests_a_boost_as_a_reblog(client):
+    with _store_returning(_boost_row()), _patched_accounts({BOB_URL: BOB, CAROL_URL: CAROL}):
+        response = client.get("/statuses/500")
+ 
+    data = response.json()
+    assert data["account"]["username"] == "carol"
+    assert data["reblog"]["id"] == "424242"
+    assert data["reblog"]["account"]["username"] == "bob"
+ 
+ 
+def test_get_status_404_for_an_unknown_id(client):
+    with _store_returning(None):
+        response = client.get("/statuses/999")
+ 
+    assert response.status_code == 404
+ 
+ 
+def test_get_status_404_when_the_boost_target_is_unresolvable(client):
+    with _store_returning({**_boost_row(), "content": None}):
+        response = client.get("/statuses/500")
+ 
+    assert response.status_code == 404
+
 
