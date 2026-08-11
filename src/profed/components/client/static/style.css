@@ -221,6 +221,9 @@ a:hover { text-decoration: underline; }
 .status-side { margin-left: auto; display: inline-flex; align-items: center; gap: .5rem; color: var(--muted); font-size: .85rem; white-space: nowrap; }
 .status-side .permalink { color: var(--muted); }
 
+.status-head.meta-only { margin-bottom: .3rem; }
+.status-head.meta-only .status-side { margin-left: 0; }
+
 .boost-head, .reply-head { margin: 0 0 .3rem; color: var(--muted); font-size: .85rem; }
 .boost-head .boost-who, .reply-head .reply-who { color: CanvasText; font-weight: 600; }
 
@@ -232,6 +235,7 @@ a:hover { text-decoration: underline; }
 }
 .actions .action:hover { border-color: var(--line); color: CanvasText; }
 .actions .action .count { font-size: .8rem; }
+.actions .action svg { display: block; }
 .actions .action.menu { margin-left: auto; }
 
 @media (max-width: 480px) {

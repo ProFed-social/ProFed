@@ -1,6 +1,6 @@
 {% macro status_entry(s, booster=None, show_author=true) %}
 <article class="h-entry status">
-  <header class="status-head">
+  <header class="status-head{% if not show_author %} meta-only{% endif %}">
     {% if show_author %}
     <a class="p-author h-card author" rel="author" href="{{ s.account.url }}">
       <span class="avatar-wrap">
@@ -44,7 +44,7 @@
     <button type="button" class="action respond" title="Antworten" aria-label="Antworten">&#8617;</button>
     <button type="button" class="action boost" title="Teilen" aria-label="Teilen">&#8634; <span class="count">{{ s.reblogs_count }}</span></button>
     <button type="button" class="action like" title="Gefällt mir" aria-label="Gefällt mir">&#9825; <span class="count">{{ s.favourites_count }}</span></button>
-    <button type="button" class="action bookmark" title="Lesezeichen" aria-label="Lesezeichen">&#128278;</button>
+    <button type="button" class="action bookmark" title="Lesezeichen" aria-label="Lesezeichen"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
     <button type="button" class="action menu" title="Mehr" aria-label="Mehr">&#8943;</button>
     <data class="u-uid" value="{{ s.uri }}"></data>
   </footer>
