@@ -1,30 +1,67 @@
+{% macro status_entry(s, booster=None, show_author=true) %}
 <article class="h-entry status">
-  {% if show_author is not defined or show_author %}
-  <a class="p-author h-card author" rel="author" href="{{ status.account.url }}">
-    {% if status.account.avatar %}
-    <img class="u-photo avatar" src="{{ status.account.avatar }}" alt="">
-    {% else %}
-    <span class="avatar avatar-fallback">{{ (status.account.display_name or status.account.username)[:2] | upper }}</span>
+  <header class="status-head">
+    {% if show_author %}
+    <a class="p-author h-card author" rel="author" href="{{ s.account.url }}">
+      <span class="avatar-wrap">
+        {% if s.account.avatar %}
+        <img class="u-photo avatar" src="{{ s.account.avatar }}" alt="">
+        {% else %}
+        <span class="avatar avatar-fallback">{{ (s.account.display_name or s.account.username)[:2] | upper }}</span>
+        {% endif %}
+        {% if booster and booster.avatar %}
+        <img class="booster-badge" src="{{ booster.avatar }}" alt="" title="{{ booster.display_name or booster.username }}">
+        {% endif %}
+      </span>
+      <span class="names">
+        <span class="p-name">{{ s.account.display_name or s.account.username }}</span>
+        <span class="acct">@{{ s.account.acct }}</span>
+      </span>
+    </a>
     {% endif %}
-    <span class="p-name">{{ status.account.display_name or status.account.username }}</span>
-    <span class="acct">@{{ status.account.acct }}</span>
-  </a>
-  {% endif %}
-  <div class="e-content">{{ status.content | sanitize | safe }}</div>
-  {% if status.tags %}
+    <span class="status-side">
+      <span class="visibility" title="{{ s.visibility }}">
+        {%- if s.visibility == "private" -%}&#128274;
+        {%- elif s.visibility == "unlisted" -%}&#128275;
+        {%- elif s.visibility == "direct" -%}&#9993;
+        {%- else -%}&#127760;
+        {%- endif -%}
+      </span>
+      <a class="u-url permalink" href="{{ s.url }}">
+        <time class="dt-published" datetime="{{ s.created_at }}">{{ s.created_at[:10] }}</time>
+      </a>
+    </span>
+  </header>
+  <div class="e-content">{{ s.content | sanitize | safe }}</div>
+  {% if s.tags %}
   <ul class="tags">
-    {% for tag in status.tags %}
+    {% for tag in s.tags %}
     <li><a class="tag" rel="tag" href="{{ tag.url }}">#<span class="p-category">{{ tag.name }}</span></a></li>
     {% endfor %}
   </ul>
   {% endif %}
-  <footer class="status-meta">
-    <a class="u-url permalink" href="{{ status.url }}">
-      <time class="dt-published" datetime="{{ status.created_at }}">{{ status.created_at[:10] }}</time>
-    </a>
-    <data class="u-uid" value="{{ status.uri }}"></data>
-    <span class="reblogs">&#8634; {{ status.reblogs_count }}</span>
-    <span class="favourites">&#9829; {{ status.favourites_count }}</span>
+  <footer class="actions">
+    <button type="button" class="action respond" title="Antworten" aria-label="Antworten">&#8617;</button>
+    <button type="button" class="action boost" title="Teilen" aria-label="Teilen">&#8634; <span class="count">{{ s.reblogs_count }}</span></button>
+    <button type="button" class="action like" title="Gefällt mir" aria-label="Gefällt mir">&#9825; <span class="count">{{ s.favourites_count }}</span></button>
+    <button type="button" class="action bookmark" title="Lesezeichen" aria-label="Lesezeichen">&#128278;</button>
+    <button type="button" class="action menu" title="Mehr" aria-label="Mehr">&#8943;</button>
+    <data class="u-uid" value="{{ s.uri }}"></data>
   </footer>
 </article>
+{% endmacro %}
+{%- set page_show_author = show_author if show_author is defined else true -%}
+{% if status.reblog %}
+<div class="boost">
+  <p class="boost-head"><span class="boost-who">{{ status.account.display_name or status.account.username }}</span> teilte</p>
+  {{ status_entry(status.reblog, booster=status.account, show_author=true) }}
+</div>
+{% elif status.in_reply_to_id %}
+<div class="reply">
+  <p class="reply-head">antwortete{% if status.mentions %} <span class="reply-who">@{{ status.mentions[0].acct }}</span>{% endif %}</p>
+  {{ status_entry(status, show_author=page_show_author) }}
+</div>
+{% else %}
+{{ status_entry(status, show_author=page_show_author) }}
+{% endif %}
 

@@ -20,6 +20,12 @@ STATUS = {"content": "<p>Hallo Welt</p>",
                       "username": "alice",
                       "avatar": ""}}
 
+BOOSTER = {"url": "https://example.com/@bob",
+           "acct": "bob",
+           "display_name": "Bob",
+           "username": "bob",
+           "avatar": ""}
+
 
 def _render(status=STATUS, **context):
     environment = build_environment(STANDARD_TEMPLATES, None)
@@ -120,4 +126,37 @@ def test_the_author_name_falls_back_to_the_username():
     entry = _parse(status)["items"][0]["children"][0]
 
     assert entry["properties"]["author"][0]["properties"]["name"] == ["alice"]
+
+
+def test_a_boost_renders_the_original_post_as_the_entry():
+    boost = {**STATUS, "content": "", "reblog": STATUS, "account": BOOSTER}
+    entry = _parse(boost)["items"][0]["children"][0]
+ 
+    assert "Hallo Welt" in entry["properties"]["content"][0]["html"]
+    assert entry["properties"]["author"][0]["properties"]["name"] == ["Alice"]
+ 
+def test_a_boost_names_the_booster_in_the_header():
+    boost = {**STATUS, "content": "", "reblog": STATUS, "account": BOOSTER}
+    rendered = _render(boost)
+ 
+    assert "Bob" in rendered
+    assert "teilte" in rendered
+ 
+def test_a_boost_shows_the_original_author_even_when_authors_are_hidden():
+    boost = {**STATUS, "content": "", "reblog": STATUS, "account": BOOSTER}
+    entry = _parse(boost, show_author=False)["items"][0]["children"][0]
+ 
+    assert entry["properties"].get("author") is not None
+ 
+def test_a_reply_keeps_its_own_content_and_shows_the_replied_to_handle():
+    reply = {**STATUS,
+             "in_reply_to_id": "99",
+             "in_reply_to_account_id": "42",
+             "mentions": [{"id": "42", "acct": "bob@remote.example", "username": "bob", "url": ""}]}
+    rendered = _render(reply)
+    entry = _parse(reply)["items"][0]["children"][0]
+ 
+    assert "Hallo Welt" in entry["properties"]["content"][0]["html"]
+    assert "antwortete" in rendered
+    assert "@bob@remote.example" in rendered
 
