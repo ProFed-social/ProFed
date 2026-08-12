@@ -267,6 +267,21 @@ def test_from_activity_uses_placeholder_account_when_missing():
     assert status.account.username == "alice"
 
 
+def test_from_activity_carries_in_reply_to_as_the_parent_url():
+    activity = {"actor": "https://local/actors/alice",
+                "object": {"content": "a reply", "inReplyTo": "https://r.example/notes/7"}}
+    status = Status.from_activity(activity, id="42")
+ 
+    assert status.in_reply_to_id == "https://r.example/notes/7"
+
+
+def test_from_activity_leaves_in_reply_to_none_for_a_top_level_post():
+    activity = {"actor": "https://local/actors/alice", "object": {"content": "hi"}}
+    status = Status.from_activity(activity, id="42")
+ 
+    assert status.in_reply_to_id is None
+
+
 def test_from_activity_account_less_content_dump_excludes_account():
     activity = {"actor": "https://local/actors/alice", "object": {"content": "hi"}}
     dump = Status.from_activity(activity, id="42").model_dump(exclude={"account"})

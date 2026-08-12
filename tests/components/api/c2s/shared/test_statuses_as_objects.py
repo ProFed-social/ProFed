@@ -128,6 +128,19 @@ async def test_fetch_by_actor_resolves_filters_unresolved_and_paginates(fake_poo
     assert [row["mastodon_id"] for row in result] == [43]
 
 
+async def test_mastodon_ids_for_maps_urls_to_string_ids(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"url": "https://x/1", "mastodon_id": 11},
+                                    {"url": "https://x/2", "mastodon_id": 22}]
+ 
+    result = await (await as_objects.storage()).mastodon_ids_for(["https://x/1", "https://x/2"])
+ 
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "mastodon_id" in sql
+    assert "ANY($1" in sql
+    assert args == [["https://x/1", "https://x/2"]]
+    assert result == {"https://x/1": "11", "https://x/2": "22"}
+
+
 @pytest.mark.asyncio
 async def test_compress_chains_calls_the_function_for_heads_and_returns_the_count(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = {"changed": 3}

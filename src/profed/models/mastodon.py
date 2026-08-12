@@ -190,6 +190,7 @@ class Status(BaseModel):
             return cls(id=id,
                        account=account,
                        created_at=obj.get("published", "1970-01-01T00:00:00.000Z"),
+                       in_reply_to_id=_href(obj.get("inReplyTo")),
                        uri=activity.get("id", ""),
                        url=_href(obj.get("url")) or activity.get("id", ""),
                        content=obj.get("content", ""),

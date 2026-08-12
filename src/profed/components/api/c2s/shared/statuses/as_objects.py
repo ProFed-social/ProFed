@@ -145,6 +145,13 @@ class _storage(BaseStorage):
                                     since_id,
                                     max_depth)
 
+    async def mastodon_ids_for(self, urls: list[str]) -> dict:
+        rows = await self.fetch_all("""SELECT url, mastodon_id
+                                       FROM api.as_objects
+                                       WHERE url = ANY($1::text[])""",
+                                    urls)
+        return {row["url"]: str(row["mastodon_id"]) for row in rows}
+
     async def compress_chains(self) -> int:
         row = await self.fetch_one("SELECT api.compress_reblogs('chain') AS changed")
         return row["changed"]
