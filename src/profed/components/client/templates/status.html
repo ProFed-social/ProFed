@@ -59,12 +59,12 @@
 {%- set page_show_author = show_author if show_author is defined else true -%}
 {% if status.reblog %}
 <div class="boost">
-  <p class="boost-head"><span class="boost-who">{{ status.account.display_name or status.account.username }}</span> teilte</p>
+  <p class="boost-head"><span class="boost-who">{{ status.account.display_name or status.account.username }}</span> shared</p>
   {{ status_entry(status.reblog, booster=status.account, show_author=true) }}
 </div>
 {% elif status.in_reply_to_id %}
 <div class="reply">
-  <p class="reply-head">antwortete{% if status.mentions %} <span class="reply-who">@{{ status.mentions[0].acct }}</span>{% endif %}</p>
+  <p class="reply-head">responded to{% if status.mentions %} <span class="reply-who">@{{ status.mentions[0].acct }}</span>{% endif %}</p>
   {{ status_entry(status, show_author=page_show_author) }}
 </div>
 {% else %}
