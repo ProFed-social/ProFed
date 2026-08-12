@@ -54,8 +54,13 @@ async def _tombstone(object_id, payload, emitted_at) -> None:
     await _versioned("tombstone", object_id, payload, emitted_at)
 
 
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+ 
+ 
 handle_events, rebuild, _ = build_projection(topic=resolution,
                                              init=noop,
+                                             rebuild_finished=_rebuild_finished,
                                              on_snapshot_item=noop,
                                              on_message_type={"attempting": _attempting,
                                                               "succeeded": _succeeded,

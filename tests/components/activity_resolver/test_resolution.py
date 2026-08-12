@@ -19,6 +19,9 @@ class FakeStorage:
 
     async def record_version(self, *a):
         self.calls.append(("record_version", a))
+ 
+    def rebuild_finished(self):
+        self.calls.append(("rebuild_finished",))
 
 
 @pytest.fixture
@@ -45,7 +48,6 @@ async def test_not_found_records_process_with_its_count(fake_storage):
     await resolution._not_found("https://x/1", {"attempt": 3, "not_found_count": 5}, AT)
 
     assert fake_storage.calls == [("record_process", ("https://x/1", "not_found", AT, 3, 5))]
-
 
 
 async def test_succeeded_records_the_parsed_version_and_cache_end(fake_storage):
@@ -78,4 +80,10 @@ async def test_a_missing_version_and_cache_end_parse_to_none(fake_storage):
 
     _, args = fake_storage.calls[0]
     assert args[3] is None
+
+ 
+async def test_rebuild_unblocks_the_store_even_without_events(fake_bus, fake_storage):
+    await resolution.rebuild()
+ 
+    assert ("rebuild_finished",) in fake_storage.calls
 
