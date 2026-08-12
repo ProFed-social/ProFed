@@ -290,3 +290,30 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 
+.e-content.not-expandable,
+.e-content.expandable {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  line-clamp: 8;
+  overflow: hidden;
+}
+.e-content.expandable { position: relative; }
+.e-content.expandable::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3em;
+  background: linear-gradient(to bottom, transparent, Canvas);
+  pointer-events: none;
+}
+.show-more, .show-less {
+  display: none;
+  margin-top: .3rem; padding: 0;
+  background: none; border: none;
+  color: var(--accent); font: inherit; cursor: pointer;
+}
+.show-more:hover, .show-less:hover { text-decoration: underline; }
+.e-content.expandable ~ .show-more { display: inline-block; }
+.e-content.collapsable ~ .show-less { display: inline-block; }
+

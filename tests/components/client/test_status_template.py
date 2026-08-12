@@ -134,20 +134,23 @@ def test_a_boost_renders_the_original_post_as_the_entry():
  
     assert "Hallo Welt" in entry["properties"]["content"][0]["html"]
     assert entry["properties"]["author"][0]["properties"]["name"] == ["Alice"]
- 
+
+
 def test_a_boost_names_the_booster_in_the_header():
     boost = {**STATUS, "content": "", "reblog": STATUS, "account": BOOSTER}
     rendered = _render(boost)
  
     assert "Bob" in rendered
     assert "teilte" in rendered
- 
+
+
 def test_a_boost_shows_the_original_author_even_when_authors_are_hidden():
     boost = {**STATUS, "content": "", "reblog": STATUS, "account": BOOSTER}
     entry = _parse(boost, show_author=False)["items"][0]["children"][0]
  
     assert entry["properties"].get("author") is not None
- 
+
+
 def test_a_reply_keeps_its_own_content_and_shows_the_replied_to_handle():
     reply = {**STATUS,
              "in_reply_to_id": "99",
@@ -159,4 +162,12 @@ def test_a_reply_keeps_its_own_content_and_shows_the_replied_to_handle():
     assert "Hallo Welt" in entry["properties"]["content"][0]["html"]
     assert "antwortete" in rendered
     assert "@bob@remote.example" in rendered
+
+
+def test_content_starts_collapsible_with_both_toggles():
+    rendered = _render(STATUS)
+ 
+    assert "e-content not-expandable" in rendered
+    assert 'class="show-more"' in rendered
+    assert 'class="show-less"' in rendered
 
