@@ -21,10 +21,14 @@
     {% endif %}
     <span class="status-side">
       <span class="visibility" title="{{ s.visibility }}">
-        {%- if s.visibility == "private" -%}&#128274;
-        {%- elif s.visibility == "unlisted" -%}&#128275;
-        {%- elif s.visibility == "direct" -%}&#9993;
-        {%- else -%}&#127760;
+        {%- if s.visibility == "private" -%}
+        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        {%- elif s.visibility == "unlisted" -%}
+        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 7.5-1.8"/></svg>
+        {%- elif s.visibility == "direct" -%}
+        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3.5 6.5 12 13l8.5-6.5"/></svg>
+        {%- else -%}
+        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg>
         {%- endif -%}
       </span>
       <a class="u-url permalink" href="{{ s.url }}">

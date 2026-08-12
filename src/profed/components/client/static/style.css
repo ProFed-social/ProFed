@@ -236,6 +236,7 @@ a:hover { text-decoration: underline; }
 .actions .action:hover { border-color: var(--line); color: CanvasText; }
 .actions .action .count { font-size: .8rem; }
 .actions .action svg { display: block; }
+.visibility svg { display: block; }
 .actions .action.menu { margin-left: auto; }
 
 @media (max-width: 480px) {
