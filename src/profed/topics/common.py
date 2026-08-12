@@ -39,12 +39,19 @@ class ActivityEvent(BaseModel):
     activity: Dict
 
 
-class StatusEvent(BaseModel):
+class StatusEventBase(BaseModel):
     model_config = ConfigDict(extra="allow")
-    username: str = Field(min_length=1)
     status_id: str = Field(min_length=1)
     actor_url: Optional[str] = None
     status: Optional[Dict] = None
+
+
+class StatusEvent(StatusEventBase):
+    username: str = Field(min_length=1)
+ 
+ 
+class TimelineEvent(StatusEventBase):
+    username: str
 
 
 class ResolutionEvent(BaseModel):

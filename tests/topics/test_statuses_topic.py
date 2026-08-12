@@ -48,6 +48,10 @@ def test_missing_username_is_rejected():
     assert validate_statuses_event("Create", {"status_id": NOTE_ID}) is None
 
 
+def test_empty_username_is_rejected():
+    assert validate_statuses_event("Create", {"username": "", "status_id": NOTE_ID}) is None
+
+
 def test_missing_status_id_is_rejected():
     assert validate_statuses_event("Create", {"username": "alice"}) is None
 
