@@ -35,10 +35,10 @@ def test_missing_username_returns_none():
     assert validate_incoming_activities_event("Follow", bad) is None
 
 
-def test_empty_username_returns_none():
-    bad = {"username": "", "activity": {}}
+def test_empty_username_is_accepted_for_fetched_objects():
+    fetched = {"username": "", "activity": {"actor": "https://remote/bob"}}
 
-    assert validate_incoming_activities_event("Follow", bad) is None
+    assert validate_incoming_activities_event("Create", fetched) is not None
 
 
 def test_missing_activity_returns_none():

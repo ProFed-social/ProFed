@@ -35,7 +35,7 @@ def validate_verb(event_type: str, known_verbs: set, topic_name: str) -> bool:
 class ActivityEvent(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    username: str = Field(min_length=1)
+    username: str
     activity: Dict
 
 

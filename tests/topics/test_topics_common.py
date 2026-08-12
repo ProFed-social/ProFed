@@ -58,8 +58,12 @@ def test_activity_event_keeps_extra_fields():
     assert validate_payload(ActivityEvent, payload, "demo") == payload
 
 
-def test_activity_event_requires_non_empty_username():
-    assert validate_payload(ActivityEvent, {"username": "", "activity": {}}, "demo") is None
+def test_activity_event_accepts_empty_username_for_fetched_objects():
+    assert validate_payload(ActivityEvent, {"username": "", "activity": {}}, "demo") is not None
+ 
+ 
+def test_activity_event_still_requires_the_username_key():
+    assert validate_payload(ActivityEvent, {"activity": {}}, "demo") is None
 
 
 def test_activity_event_requires_activity_dict():
