@@ -141,7 +141,7 @@ def test_a_boost_names_the_booster_in_the_header():
     rendered = _render(boost)
  
     assert "Bob" in rendered
-    assert "teilte" in rendered
+    assert "shared" in rendered
 
 
 def test_a_boost_shows_the_original_author_even_when_authors_are_hidden():
@@ -160,7 +160,7 @@ def test_a_reply_keeps_its_own_content_and_shows_the_replied_to_handle():
     entry = _parse(reply)["items"][0]["children"][0]
  
     assert "Hallo Welt" in entry["properties"]["content"][0]["html"]
-    assert "antwortete" in rendered
+    assert "responded to" in rendered
     assert "@bob@remote.example" in rendered
 
 
