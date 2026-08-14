@@ -3,19 +3,19 @@
  
 (function () {
   function measure(root) {
-    root.querySelectorAll(".e-content.not-expandable").forEach(function (content) {
+    root.querySelectorAll(".e-content.not-expandable, .thread-body.not-expandable").forEach(function (content) {
       if (content.scrollHeight - content.clientHeight > 2) {
         content.classList.replace("not-expandable", "expandable");
       }
     });
     root.querySelectorAll(".show-more").forEach(function (more) {
       more.addEventListener("click", function () {
-        more.parentElement.querySelector(".e-content").classList.replace("expandable", "collapsable");
+        more.parentElement.querySelector(".thread-body, .e-content").classList.replace("expandable", "collapsable");
       });
     });
     root.querySelectorAll(".show-less").forEach(function (less) {
       less.addEventListener("click", function () {
-        less.parentElement.querySelector(".e-content").classList.replace("collapsable", "expandable");
+        less.parentElement.querySelector(".thread-body, .e-content").classList.replace("collapsable", "expandable");
       });
     });
   }

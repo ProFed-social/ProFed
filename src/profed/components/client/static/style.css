@@ -322,10 +322,17 @@ a:hover { text-decoration: underline; }
 .thread .thread-part .part-content :first-child { margin-top: 0; }
 .thread .thread-part .part-content p { margin: .4rem 0; }
 .thread .boosted-part { box-shadow: inset 3px 0 0 var(--accent); padding-left: .7rem; }
-.e-content.thread-body.not-expandable,
-.e-content.thread-body.expandable {
-  display: block;
-  -webkit-line-clamp: none;
-  line-clamp: none;
-  max-height: 22em;
+.thread-body.not-expandable,
+.thread-body.expandable { max-height: 22em; overflow: hidden; }
+.thread-body.expandable { position: relative; }
+.thread-body.expandable::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3em;
+  background: linear-gradient(to bottom, transparent, Canvas);
+  pointer-events: none;
 }
+.thread-body.expandable ~ .show-more { display: inline-block; }
+.thread-body.collapsable ~ .show-less { display: inline-block; }
+

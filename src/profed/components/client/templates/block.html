@@ -27,7 +27,7 @@
       </span>
     </a>
   </header>
-  <div class="e-content thread-body not-expandable">
+  <div class="thread-body not-expandable">
     {% for part in parts %}
     <div class="thread-part{% if part.id in block.boosted %} boosted-part{% endif %}">
       <div class="status-head meta-only">
@@ -38,7 +38,7 @@
           </a>
         </span>
       </div>
-      <div class="part-content">{{ part.content | sanitize | safe }}</div>
+      <div class="e-content part-content">{{ part.content | sanitize | safe }}</div>
       {{ status_actions(part) }}
     </div>
     {% endfor %}
