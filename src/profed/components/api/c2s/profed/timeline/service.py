@@ -10,6 +10,8 @@ from profed.components.api.c2s.profed.timeline.grouping import timeline_blocks
 
 async def _build_block(row):
     part_rows = await (await as_objects.storage()).thread_of(row["root"])
+    if not part_rows:
+        return None
     parts = await make_statuses(part_rows)
     booster = None
     boosted = set()
