@@ -1,3 +1,26 @@
+{% macro visibility_icon(s) %}
+<span class="visibility" title="{{ s.visibility }}">
+  {%- if s.visibility == "private" -%}
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+  {%- elif s.visibility == "unlisted" -%}
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 7.5-1.8"/></svg>
+  {%- elif s.visibility == "direct" -%}
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3.5 6.5 12 13l8.5-6.5"/></svg>
+  {%- else -%}
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg>
+  {%- endif -%}
+</span>
+{% endmacro %}
+{% macro status_actions(s) %}
+<footer class="actions">
+  <button type="button" class="action respond" title="Antworten" aria-label="Antworten">&#8617;</button>
+  <button type="button" class="action boost" title="Teilen" aria-label="Teilen">&#8634; <span class="count">{{ s.reblogs_count }}</span></button>
+  <button type="button" class="action like" title="Gefällt mir" aria-label="Gefällt mir">&#9825; <span class="count">{{ s.favourites_count }}</span></button>
+  <button type="button" class="action bookmark" title="Lesezeichen" aria-label="Lesezeichen"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+  <button type="button" class="action menu" title="Mehr" aria-label="Mehr">&#8943;</button>
+  <data class="u-uid" value="{{ s.uri }}"></data>
+</footer>
+{% endmacro %}
 {% macro status_entry(s, booster=None, show_author=true) %}
 <article class="h-entry status">
   <header class="status-head{% if not show_author %} meta-only{% endif %}">
@@ -20,17 +43,7 @@
     </a>
     {% endif %}
     <span class="status-side">
-      <span class="visibility" title="{{ s.visibility }}">
-        {%- if s.visibility == "private" -%}
-        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-        {%- elif s.visibility == "unlisted" -%}
-        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 7.5-1.8"/></svg>
-        {%- elif s.visibility == "direct" -%}
-        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3.5 6.5 12 13l8.5-6.5"/></svg>
-        {%- else -%}
-        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg>
-        {%- endif -%}
-      </span>
+      {{ visibility_icon(s) }}
       <a class="u-url permalink" href="{{ s.url }}">
         <time class="dt-published" datetime="{{ s.created_at }}">{{ s.created_at[:10] }}</time>
       </a>
@@ -46,16 +59,10 @@
     {% endfor %}
   </ul>
   {% endif %}
-  <footer class="actions">
-    <button type="button" class="action respond" title="Antworten" aria-label="Antworten">&#8617;</button>
-    <button type="button" class="action boost" title="Teilen" aria-label="Teilen">&#8634; <span class="count">{{ s.reblogs_count }}</span></button>
-    <button type="button" class="action like" title="Gefällt mir" aria-label="Gefällt mir">&#9825; <span class="count">{{ s.favourites_count }}</span></button>
-    <button type="button" class="action bookmark" title="Lesezeichen" aria-label="Lesezeichen"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
-    <button type="button" class="action menu" title="Mehr" aria-label="Mehr">&#8943;</button>
-    <data class="u-uid" value="{{ s.uri }}"></data>
-  </footer>
+  {{ status_actions(s) }}
 </article>
 {% endmacro %}
+{%- if status is defined -%}
 {%- set page_show_author = show_author if show_author is defined else true -%}
 {% if status.reblog %}
 <div class="boost">
@@ -70,4 +77,5 @@
 {% else %}
 {{ status_entry(status, show_author=page_show_author) }}
 {% endif %}
+{%- endif -%}
 

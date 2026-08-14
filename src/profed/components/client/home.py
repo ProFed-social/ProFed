@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 async def _home_timeline(token: str):
-    response = await api_client().get("/api/v1/timelines/home", params={"limit": 20}, token=token)
+    response = await api_client().get("/api/profed/timeline", params={"limit": 20}, token=token)
     if response.status_code != 200:
         logger.warning("fetching home timeline failed: %s %s", response.status_code, response.text)
         return []
@@ -26,6 +26,6 @@ async def _home_timeline(token: str):
 @requires_login
 async def home(request: Request, session):
     return HTMLResponse(environment().get_template("home.html")
-                        .render(statuses=await _home_timeline(session["token"]),
+                        .render(blocks=await _home_timeline(session["token"]),
                                 **(await page_context(request, session))))
 

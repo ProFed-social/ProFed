@@ -17,10 +17,6 @@ from .apps import router as apps
 from .instance import router as instance
 from .accounts import router as accounts
 from .statuses import router as statuses
-from profed.components.api.c2s.shared.statuses import as_objects as statuses_objects
-from profed.components.api.c2s.shared.statuses import user_timeline as statuses_memberships
-from profed.components.api.c2s.shared.statuses import projection as statuses_projection
-from profed.components.api.c2s.shared.statuses import compressor as statuses_compressor
 from .timelines import router as timelines
 from .notifications import router as notifications
 from .lists import router as lists
@@ -44,12 +40,6 @@ def _projection_initializer(storages, projection, handle_events, name):
     return _init_projection
 
 
-def _compressor_initializer(compressor):
-    async def _init(config: dict):
-        compressor.start(config.get("compression", {}))
-    return _init
-
-
 async def init(config: dict, deactivate: List[str]) -> None:
     if any(router not in deactivate for router in ("accounts", "statuses")):
         await init_media_storage()
@@ -59,12 +49,6 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       actors_projection,
                                                       actors_projection.handle_account_events,
                                                       "c2s_actor")),
-                             (["timelines", "statuses", "accounts"],
-                              _projection_initializer([statuses_objects, statuses_memberships],
-                                                      statuses_projection,
-                                                      statuses_projection.handle_events,
-                                                      "c2s_statuses")),
-                             (["timelines", "statuses", "accounts"], _compressor_initializer(statuses_compressor)),
                              (["accounts"],
                               _projection_initializer(follows_storage,
                                                       follows_projection,

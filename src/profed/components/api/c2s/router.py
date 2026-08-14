@@ -5,13 +5,14 @@
 from typing import List
 from fastapi import APIRouter
 from profed.components.api.active_routers import narrow_deactivate_routers
-from . import oauth, v1, v2
+from . import oauth, v1, v2, profed
 
 
 def mount_routers(parent, deactivate: List[str]) -> None:
     api = APIRouter(prefix="/api")
     v1.mount_routers(api, narrow_deactivate_routers("v1_", deactivate))
     v2.mount_routers(api, narrow_deactivate_routers("v2_", deactivate))
+    profed.mount_routers(api, narrow_deactivate_routers("profed_", deactivate))
     parent.include_router(api)
     if "oauth" not in deactivate:
         oauth.mount_routers(parent, deactivate)

@@ -41,7 +41,7 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
 
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
 
-    assert fake_conn.execute.await_count == 7
+    assert fake_conn.execute.await_count == 9
     assert any("CREATE TABLE" in s for s in statements)
     assert any("jsonb_build_object('status', status, 'actor', actor_url)" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.resolve_content" in s and "CYCLE url SET is_cycle" in s
@@ -50,6 +50,9 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
                for s in statements)
     assert any("CREATE TYPE api.reblog_compression_kind AS ENUM" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION\n" in s and "api.compress_reblogs" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.thread_root" in s and "p.actor_url = c.actor_url" in s
+               for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.content_url" in s for s in statements)
 
 
 @pytest.mark.asyncio
@@ -169,3 +172,35 @@ async def test_compress_all_sums_the_chain_and_cycle_counts(fake_pool, fake_conn
 
     assert await (await as_objects.storage()).compress_all(10) == 5
 
+
+@pytest.mark.asyncio
+async def test_thread_of_walks_same_author_replies_ordered_and_resolved(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"url": "https://r/a1", "content": {"id": "1"}},
+                                    {"url": "https://r/a2", "content": {"id": "2"}}]
+
+    result = await (await as_objects.storage()).thread_of("https://r/a1", max_depth=10)
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "WITH RECURSIVE thread" in sql
+    assert "c.status->>'in_reply_to_id' = t.url" in sql
+    assert "c.actor_url = t.actor_url" in sql
+    assert "api.resolve_content(o.url, $2)" in sql
+    assert "ORDER BY th.sortkey" in sql
+    assert args == ["https://r/a1", 10]
+    assert [row["url"] for row in result] == ["https://r/a1", "https://r/a2"]
+
+
+@pytest.mark.asyncio
+async def test_boosted_parts_returns_the_thread_urls_the_booster_boosted(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"boosted_part": "https://r/a2"}, {"boosted_part": "https://r/a4"}]
+
+    result = await (await as_objects.storage()).boosted_parts("https://r/x",
+                                                              ["https://r/a1", "https://r/a2", "https://r/a4"],
+                                                              max_depth=10)
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "api.content_url(o.url, $3)" in sql
+    assert "o.reblog_of_url IS NOT NULL" in sql
+    assert "ANY($2::text[])" in sql
+    assert args == ["https://r/x", ["https://r/a1", "https://r/a2", "https://r/a4"], 10]
+    assert result == ["https://r/a2", "https://r/a4"]

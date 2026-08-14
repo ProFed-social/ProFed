@@ -36,6 +36,41 @@ class _storage(BaseStorage):
                                   WHERE reblog_of_url IS NULL AND NOT is_cycle
                                   LIMIT 1
                               $$""")
+        await self.execute("""CREATE OR REPLACE FUNCTION api.thread_root(start_url TEXT, max_depth INT)
+                              RETURNS TEXT LANGUAGE sql STABLE AS $$
+                                  WITH RECURSIVE chain AS (
+                                      SELECT url, actor_url, status->>'in_reply_to_id' AS parent_url, 1 AS depth
+                                      FROM api.as_objects
+                                      WHERE url = start_url
+                                    UNION ALL
+                                      SELECT p.url, p.actor_url, p.status->>'in_reply_to_id', c.depth + 1
+                                      FROM api.as_objects p
+                                      JOIN chain c ON p.url = c.parent_url AND p.actor_url = c.actor_url
+                                      WHERE c.depth < max_depth
+                                  ) CYCLE url SET is_cycle USING path
+                                  SELECT url
+                                  FROM chain
+                                  WHERE NOT is_cycle
+                                  ORDER BY depth DESC
+                                  LIMIT 1
+                              $$""")
+        await self.execute("""CREATE OR REPLACE FUNCTION api.content_url(start_url TEXT, max_depth INT)
+                              RETURNS TEXT LANGUAGE sql STABLE AS $$
+                                  WITH RECURSIVE chain AS (
+                                      SELECT url, reblog_of_url, 1 AS depth
+                                      FROM api.as_objects
+                                      WHERE url = start_url
+                                    UNION ALL
+                                      SELECT o.url, o.reblog_of_url, c.depth + 1
+                                      FROM api.as_objects o
+                                      JOIN chain c ON o.url = c.reblog_of_url
+                                      WHERE c.depth < max_depth
+                                  ) CYCLE url SET is_cycle USING path
+                                  SELECT url
+                                  FROM chain
+                                  WHERE reblog_of_url IS NULL AND NOT is_cycle
+                                  LIMIT 1
+                              $$""")
         await self.execute("""CREATE OR REPLACE VIEW api.reblog_compression AS
                               SELECT w.a_url, w.b_url, w.newref, w.chain_start
                               FROM (SELECT a.url AS a_url,
@@ -151,6 +186,41 @@ class _storage(BaseStorage):
                                        WHERE url = ANY($1::text[])""",
                                     urls)
         return {row["url"]: str(row["mastodon_id"]) for row in rows}
+
+    async def thread_of(self, root_url: str, max_depth: int = 20) -> List[dict]:
+        return await self.fetch_all("""WITH RECURSIVE thread AS (
+                                           SELECT url, actor_url, ARRAY[status->>'created_at'] AS sortkey, 0 AS depth
+                                           FROM api.as_objects
+                                           WHERE url = $1
+                                         UNION ALL
+                                           SELECT c.url, c.actor_url,
+                                                  t.sortkey || (c.status->>'created_at'), t.depth + 1
+                                           FROM api.as_objects c
+                                           JOIN thread t ON c.status->>'in_reply_to_id' = t.url
+                                                        AND c.actor_url = t.actor_url
+                                           WHERE t.depth < $2
+                                       ) CYCLE url SET is_cycle USING cyclepath
+                                       SELECT o.mastodon_id, o.url, o.actor_url, o.reblog_of_url, o.status,
+                                              r.content
+                                       FROM thread th
+                                       JOIN api.as_objects o ON o.url = th.url
+                                       CROSS JOIN LATERAL
+                                            (SELECT api.resolve_content(o.url, $2) AS content) r
+                                       WHERE NOT th.is_cycle
+                                       ORDER BY th.sortkey""",
+                                    root_url,
+                                    max_depth)
+
+    async def boosted_parts(self, booster: str, part_urls: list[str], max_depth: int = 20) -> list[str]:
+        rows = await self.fetch_all("""SELECT api.content_url(o.url, $3) AS boosted_part
+                                       FROM api.as_objects o
+                                       WHERE o.actor_url = $1
+                                         AND o.reblog_of_url IS NOT NULL
+                                         AND api.content_url(o.url, $3) = ANY($2::text[])""",
+                                    booster,
+                                    part_urls,
+                                    max_depth)
+        return [row["boosted_part"] for row in rows]
 
     async def compress_chains(self) -> int:
         row = await self.fetch_one("SELECT api.compress_reblogs('chain') AS changed")

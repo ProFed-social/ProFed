@@ -6,7 +6,9 @@ from profed.components.client.templating import STANDARD_TEMPLATES, build_enviro
 from profed.components.profile_importer.normalizer import normalize_mf2_to_profile
 
 
-STATUS = {"content": "<p>Hallo Welt</p>",
+STATUS = {"id": "1",
+          "visibility": "public",
+          "content": "<p>Hallo Welt</p>",
           "created_at": "2026-01-01T10:00:00.000Z",
           "url": "https://example.com/@alice/1",
           "uri": "https://example.com/actors/alice/notes/1",
@@ -34,9 +36,13 @@ ACCOUNT = {"username": "alice",
            "resume": None}
 
 
-def _parse_home(statuses):
+def _block(*parts):
+    return {"parts": list(parts), "booster": None, "boosted": [], "cursor": "1"}
+ 
+ 
+def _parse_home(blocks):
     environment = build_environment(STANDARD_TEMPLATES, None)
-    return mf2py.parse(doc=environment.get_template("home.html").render(statuses=statuses))
+    return mf2py.parse(doc=environment.get_template("home.html").render(blocks=blocks))
 
 
 def _feeds(parsed):
@@ -44,11 +50,11 @@ def _feeds(parsed):
 
 
 def test_the_timeline_is_a_top_level_h_feed():
-    assert len(_feeds(_parse_home([STATUS]))) == 1
+    assert len(_feeds(_parse_home([_block(STATUS)]))) == 1
 
 
 def test_the_timeline_lists_its_statuses_as_children():
-    feed = _feeds(_parse_home([STATUS, STATUS]))[0]
+    feed = _feeds(_parse_home([_block(STATUS), _block(STATUS)]))[0]
 
     assert [child["type"] for child in feed["children"]] == [["h-entry"], ["h-entry"]]
 
@@ -60,13 +66,13 @@ def test_an_empty_timeline_has_no_entries():
 
 
 def test_the_timeline_entries_keep_their_content():
-    feed = _feeds(_parse_home([STATUS]))[0]
+    feed = _feeds(_parse_home([_block(STATUS)]))[0]
 
     assert "Hallo Welt" in feed["children"][0]["properties"]["content"][0]["html"]
 
 
 def test_the_timeline_entries_carry_their_permalink():
-    feed = _feeds(_parse_home([STATUS]))[0]
+    feed = _feeds(_parse_home([_block(STATUS)]))[0]
 
     assert feed["children"][0]["properties"]["url"] == ["https://example.com/@alice/1"]
 

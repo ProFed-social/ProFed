@@ -317,3 +317,15 @@ a:hover { text-decoration: underline; }
 .e-content.expandable ~ .show-more { display: inline-block; }
 .e-content.collapsable ~ .show-less { display: inline-block; }
 
+.thread .thread-part { padding-top: .7rem; }
+.thread .thread-part + .thread-part { margin-top: .7rem; border-top: 1px solid var(--line); }
+.thread .thread-part .part-content :first-child { margin-top: 0; }
+.thread .thread-part .part-content p { margin: .4rem 0; }
+.thread .boosted-part { box-shadow: inset 3px 0 0 var(--accent); padding-left: .7rem; }
+.e-content.thread-body.not-expandable,
+.e-content.thread-body.expandable {
+  display: block;
+  -webkit-line-clamp: none;
+  line-clamp: none;
+  max-height: 22em;
+}

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
+import inspect
 from functools import wraps
 from typing import Any, Optional
 import asyncpg
@@ -10,13 +11,22 @@ from profed.core.persistence.db_connections import fetch_pool
 
 
 def wait_for_rebuild(f):
-    @wraps(f)
-    async def wrapper(self, *args, **kwargs):
+    async def waited(self):
         if self._is_rebuilt is not None:
             await self._is_rebuilt.wait()
             self._is_rebuilt = None
 
-        return await f(self, *args, **kwargs)
+    if inspect.isasyncgenfunction(f):
+        @wraps(f)
+        async def wrapper(self, *args, **kwargs):
+            await waited(self)
+            async for row in f(self, *args, **kwargs):
+                yield row
+    else:
+        @wraps(f)
+        async def wrapper(self, *args, **kwargs):
+            await waited(self)
+            return await f(self, *args, **kwargs)
 
     return wrapper
 
@@ -48,7 +58,14 @@ class BaseStorage:
             rows = await conn.fetch(sql, *args)
 
         return [dict(row) for row in rows]
-
+ 
+    @wait_for_rebuild
+    async def stream(self, sql: str, *args: Any):
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                async for row in conn.cursor(sql, *args):
+                    yield dict(row)
+ 
 
 async def init_pool(config: dict) -> asyncpg.Pool:
     return await fetch_pool(host=config["host"],

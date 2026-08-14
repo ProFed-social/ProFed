@@ -64,6 +64,17 @@ class _storage(BaseStorage):
                                     since_id,
                                     max_depth)
 
+    def thread_roots(self, username: str, max_depth: int = 20):
+        return self.stream("""SELECT ut.mastodon_id,
+                                     api.thread_root(api.content_url(o.url, $2), $2) AS root,
+                                     CASE WHEN o.reblog_of_url IS NOT NULL THEN o.actor_url END AS booster
+                              FROM api.user_timeline ut
+                              JOIN api.as_objects o ON o.url = ut.object_url
+                              WHERE ut.username = $1
+                              ORDER BY ut.mastodon_id DESC""",
+                           username,
+                           max_depth)
+ 
 
 _instance: _storage | None = None
 

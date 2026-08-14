@@ -1,0 +1,50 @@
+{% from "status.html" import visibility_icon, status_actions %}
+{% macro timeline_block(block) %}
+{% set parts = block.parts %}
+{% set head = parts[0] %}
+<article class="h-entry status thread{% if block.booster %} boosted{% endif %}">
+  {% if block.booster %}
+  <p class="boost-head"><span class="boost-who">{{ block.booster.display_name or block.booster.username }}</span> shared</p>
+  {% endif %}
+  {% if head.in_reply_to_id %}
+  <p class="reply-head">responded to{% if head.mentions %} <span class="reply-who">@{{ head.mentions[0].acct }}</span>{% endif %}</p>
+  {% endif %}
+  <header class="status-head">
+    <a class="p-author h-card author" rel="author" href="{{ head.account.url }}">
+      <span class="avatar-wrap">
+        {% if head.account.avatar %}
+        <img class="u-photo avatar" src="{{ head.account.avatar }}" alt="">
+        {% else %}
+        <span class="avatar avatar-fallback">{{ (head.account.display_name or head.account.username)[:2] | upper }}</span>
+        {% endif %}
+        {% if block.booster and block.booster.avatar %}
+        <img class="booster-badge" src="{{ block.booster.avatar }}" alt="" title="{{ block.booster.display_name or block.booster.username }}">
+        {% endif %}
+      </span>
+      <span class="names">
+        <span class="p-name">{{ head.account.display_name or head.account.username }}</span>
+        <span class="acct">@{{ head.account.acct }}</span>
+      </span>
+    </a>
+  </header>
+  <div class="e-content thread-body not-expandable">
+    {% for part in parts %}
+    <div class="thread-part{% if part.id in block.boosted %} boosted-part{% endif %}">
+      <div class="status-head meta-only">
+        <span class="status-side">
+          {{ visibility_icon(part) }}
+          <a class="u-url permalink" href="{{ part.url }}">
+            <time class="dt-published" datetime="{{ part.created_at }}">{{ part.created_at[:10] }}</time>
+          </a>
+        </span>
+      </div>
+      <div class="part-content">{{ part.content | sanitize | safe }}</div>
+      {{ status_actions(part) }}
+    </div>
+    {% endfor %}
+  </div>
+  <button type="button" class="show-more">show more</button>
+  <button type="button" class="show-less">show less</button>
+</article>
+{% endmacro %}
+

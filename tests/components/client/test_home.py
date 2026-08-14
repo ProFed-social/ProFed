@@ -48,6 +48,10 @@ def _status(content="hello world", acct="bob@remote.example"):
                         "avatar": None}}
 
 
+def _block(status):
+    return {"parts": [status], "booster": None, "boosted": [], "cursor": "1"}
+ 
+ 
 def _login(monkeypatch, username="christof", token="tok"):
     session = {"username": username, "acct": f"{username}@test.local", "token": token}
     monkeypatch.setattr(auth, "current_user_optional", AsyncMock(return_value=session))
@@ -79,7 +83,7 @@ async def test_home_timeline_is_fetched_with_the_session_token(monkeypatch):
     statuses = await home._home_timeline("tok")
 
     assert statuses == [_status()]
-    assert client.get.call_args.args[0] == "/api/v1/timelines/home"
+    assert client.get.call_args.args[0] == "/api/profed/timeline"
     assert client.get.call_args.kwargs["token"] == "tok"
     assert client.get.call_args.kwargs["params"] == {"limit": 20}
 
@@ -93,7 +97,7 @@ async def test_home_timeline_failure_yields_no_statuses(monkeypatch):
 async def test_home_shows_the_timeline_of_a_logged_in_user(monkeypatch):
     _login(monkeypatch)
     monkeypatch.setattr(home, "api_client",
-                        lambda: Mock(get=AsyncMock(return_value=_resp(200, [_status("a federated post")]))))
+                        lambda: Mock(get=AsyncMock(return_value=_resp(200, [_block(_status("a federated post"))]))))
 
     response = await _fetch(_app(monkeypatch), "/")
 

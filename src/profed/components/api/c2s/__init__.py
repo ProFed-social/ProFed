@@ -4,6 +4,7 @@
 
 import asyncio
 from typing import List
+from collections.abc import Iterable
 from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import narrow_deactivate_routers
 from profed.components.api.c2s.shared.known_accounts import storage as known_accounts_storage
@@ -11,18 +12,29 @@ from profed.components.api.c2s.shared.known_accounts import projection as known_
 from profed.components.api.c2s.shared import instance_key as instance_key_projection
 from profed.components.api.c2s.shared.media import storage as media_db_storage
 from profed.components.api.c2s.shared.media import projection as media_projection
+from profed.components.api.c2s.shared.statuses import as_objects as statuses_objects
+from profed.components.api.c2s.shared.statuses import user_timeline as statuses_memberships
+from profed.components.api.c2s.shared.statuses import projection as statuses_projection
+from profed.components.api.c2s.shared.statuses import compressor as statuses_compressor
 from . import oauth
-from . import v1, v2
+from . import v1, v2, profed
 from .router import mount_routers
 
 
-def _projection_initializer(storage, projection, handle_events, name):
+def _projection_initializer(storages, projection, handle_events, name):
     async def _init(config: dict):
-        if storage is not None:
-            await storage.init(config)
-            await (await storage.storage()).ensure_schema()
+        for storage in storages if isinstance(storages, Iterable) else [storages]:
+            if storage is not None:
+                await storage.init(config)
+                await (await storage.storage()).ensure_schema()
         await projection.rebuild()
         asyncio.create_task(handle_events(), name=name)
+    return _init
+
+
+def _compressor_initializer(compressor):
+    async def _init(config: dict):
+        compressor.start(config.get("compression", {}))
     return _init
 
 
@@ -38,23 +50,31 @@ async def init(config: dict, deactivate: List[str]) -> None:
     v1_deactivate = narrow_deactivate_routers("v1_", deactivate)
     v2_deactivate = narrow_deactivate_routers("v2_", deactivate)
     for routers, init_fn in [(["v1_search", "v1_accounts", "v1_timelines", "v2_search"],
-                               _projection_initializer(known_accounts_storage,
-                                                       known_accounts_projection,
-                                                       known_accounts_projection.handle_events,
-                                                       "c2s_known_accounts")),
-                              (["v1_search", "v1_accounts", "v1_timelines", "v2_search"],
-                               _projection_initializer(None,
-                                                       instance_key_projection,
-                                                       instance_key_projection.handle_events,
-                                                       "c2s_instance_key")),
-                              (["v1_media", "v2_media"],
-                               _media_projection_initializer(media_db_storage,
-                                                             media_projection,
-                                                             media_projection.handle_events))]:
+                              _projection_initializer(known_accounts_storage,
+                                                      known_accounts_projection,
+                                                      known_accounts_projection.handle_events,
+                                                      "c2s_known_accounts")),
+                             (["v1_search", "v1_accounts", "v1_timelines", "v2_search"],
+                              _projection_initializer(None,
+                                                      instance_key_projection,
+                                                      instance_key_projection.handle_events,
+                                                      "c2s_instance_key")),
+                             (["v1_timelines", "v1_statuses", "v1_accounts", "profed_timeline"],
+                              _projection_initializer([statuses_objects, statuses_memberships],
+                                                      statuses_projection,
+                                                      statuses_projection.handle_events,
+                                                      "c2s_statuses")),
+                             (["v1_timelines", "v1_statuses", "v1_accounts", "profed_timeline"],
+                              _compressor_initializer(statuses_compressor)),
+                             (["v1_media", "v2_media"],
+                              _media_projection_initializer(media_db_storage,
+                                                            media_projection,
+                                                            media_projection.handle_events))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
     if "oauth" not in deactivate:
         await oauth.init(config)
     await v1.init(config, v1_deactivate)
     await v2.init(config, v2_deactivate)
+    await profed.init(config, narrow_deactivate_routers("profed_", deactivate))
 
