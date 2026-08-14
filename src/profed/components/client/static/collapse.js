@@ -4,7 +4,11 @@
 (function () {
   function measure(root) {
     root.querySelectorAll(".e-content.not-expandable, .thread-body.not-expandable").forEach(function (content) {
-      if (content.scrollHeight - content.clientHeight > 2) {
+      var max = parseFloat(getComputedStyle(content).maxHeight);
+      var overflows = isNaN(max)
+        ? content.scrollHeight - content.clientHeight > 2
+        : content.scrollHeight > max + 2;
+      if (overflows) { 
         content.classList.replace("not-expandable", "expandable");
       }
     });
