@@ -321,7 +321,13 @@ a:hover { text-decoration: underline; }
 .thread .thread-part + .thread-part { margin-top: .7rem; border-top: 1px solid var(--line); }
 .thread .thread-part .part-content :first-child { margin-top: 0; }
 .thread .thread-part .part-content p { margin: .4rem 0; }
-.thread .boosted-part { box-shadow: inset 3px 0 0 var(--accent); padding-left: .7rem; }
+
+.thread .boosted-part { position: relative; }
+.thread .boosted-part::before { content: ""; position: absolute; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+.thread:not(.multipart) .boosted-part { padding-left: .7rem; }
+.thread:not(.multipart) .boosted-part::before { left: 0; }
+.thread.multipart .boosted-part::before { left: -.7rem; }
+
 .thread-body.not-expandable,
 .thread-body.expandable { max-height: 22em; overflow: hidden; }
 .thread-body.expandable { position: relative; }
