@@ -2,7 +2,7 @@
 {% macro timeline_block(block) %}
 {% set parts = block.parts %}
 {% set head = parts[0] %}
-<article class="h-entry status thread{% if block.booster %} boosted{% endif %}">
+<article class="h-entry status thread{% if parts|length > 1 %} multipart{% endif %}{% if block.booster %} boosted{% endif %}">
   {% if block.booster %}
   <p class="boost-head"><span class="boost-who">{{ block.booster.display_name or block.booster.username }}</span> shared</p>
   {% endif %}
