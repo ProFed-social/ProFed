@@ -64,3 +64,12 @@ async def test_it_streams_without_consuming_the_whole_iterable():
     blocks = await _run(gen(), None, 1)
     assert [block["trigger"] for block in blocks] == [3]
 
+
+async def test_a_block_that_build_returns_none_for_is_skipped():
+    async def build(row):
+        return None if row["root"] == "x" else {"trigger": row["mastodon_id"]}
+
+    rows = [_row(3, "x"), _row(2, "a"), _row(1, "b")]
+    blocks = [block async for block in timeline_blocks(_aiter(rows), None, 20, build)]
+    assert [block["trigger"] for block in blocks] == [2, 1]
+

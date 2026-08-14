@@ -63,3 +63,14 @@ async def test_timeline_wires_thread_roots_through_grouping(monkeypatch):
 
     assert [block["cursor"] async for block in blocks] == [2]
 
+@pytest.mark.asyncio
+async def test_build_block_returns_none_when_the_thread_cannot_be_resolved(monkeypatch):
+    ao = SimpleNamespace(thread_of=AsyncMock(return_value=[]), boosted_parts=AsyncMock())
+    monkeypatch.setattr(service.as_objects, "storage", AsyncMock(return_value=ao))
+    make = AsyncMock()
+    monkeypatch.setattr(service, "make_statuses", make)
+
+    assert await service._build_block({"root": None, "booster": None, "mastodon_id": 5}) is None
+    ao.thread_of.assert_awaited_once_with(None)
+    make.assert_not_awaited()
+
