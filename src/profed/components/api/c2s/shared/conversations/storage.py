@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from datetime import datetime
 from typing import Dict, List, Optional
 from profed.core.persistence.base_storage import BaseStorage, init_pool
 
@@ -32,7 +33,7 @@ class _storage(BaseStorage):
     async def record(self,
                      message_url:  str,
                      parent:       Optional[str],
-                     message_time: str,
+                     message_time: datetime,
                      sender:       str,
                      recipients:   List[str]) -> None:
         keep_earliest = """ON CONFLICT (conversation_id, actor_url) DO UPDATE

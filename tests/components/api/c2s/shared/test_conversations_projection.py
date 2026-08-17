@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from datetime import datetime
 import pytest
 from profed.components.api.c2s.shared.conversations import projection, storage
 
@@ -48,7 +49,7 @@ async def test_records_a_direct_message(fake_conversations):
 
     assert fake_conversations.records == [("https://remote/notes/1",
                                            "https://remote/notes/root",
-                                           "2026-01-01T00:00:00.000Z",
+                                           datetime.fromisoformat("2026-01-01T00:00:00.000Z"),
                                            "https://s/alice",
                                            ["https://s/bob", "https://s/carol"])]
 

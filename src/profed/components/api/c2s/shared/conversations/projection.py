@@ -1,6 +1,8 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from datetime import datetime
+
 from profed.core.persistence.projections import build_projection
 from profed.topics import timeline
 from profed.components.api.c2s.shared.conversations import storage
@@ -15,7 +17,7 @@ async def _record(message_url: str, actor_url: str, status: dict) -> None:
         return
     await (await storage.storage()).record(message_url,
                                            status.get("in_reply_to_id"),
-                                           status["created_at"],
+                                           datetime.fromisoformat(status["created_at"]),
                                            actor_url,
                                            [mention["url"] for mention in status.get("mentions", [])])
 
