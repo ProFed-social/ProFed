@@ -128,6 +128,27 @@ def _href(value) -> str | None:
                 return link["href"]
     return None
 
+ 
+_PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
+ 
+ 
+def _as_list(value) -> list:
+    return value if isinstance(value, list) else [] if value is None else [value]
+ 
+ 
+def _visibility(obj: dict, activity: dict, mentions: list[dict]) -> str:
+    to = _as_list(obj.get("to")) or _as_list(activity.get("to"))
+    cc = _as_list(obj.get("cc")) or _as_list(activity.get("cc"))
+    if _PUBLIC in to:
+        return "public"
+    if _PUBLIC in cc:
+        return "unlisted"
+    recipients = (set(to) | set(cc)) - {_PUBLIC}
+    hrefs = {mention["url"] for mention in mentions}
+    return ("direct"
+            if recipients and recipients <= hrefs else
+            "private")
+
 
 def _attachment_url(entry: dict) -> str | None:
     return _href(entry.get("url"))
@@ -187,14 +208,16 @@ class Status(BaseModel):
  
         def create_status(cls, id, account, activity, obj):
             tag = obj.get("tag", [])
+            mentions = mentions_from_tag(tag)
             return cls(id=id,
                        account=account,
                        created_at=obj.get("published", "1970-01-01T00:00:00.000Z"),
                        in_reply_to_id=_href(obj.get("inReplyTo")),
+                       visibility=_visibility(obj, activity, mentions),
                        uri=activity.get("id", ""),
                        url=_href(obj.get("url")) or activity.get("id", ""),
                        content=obj.get("content", ""),
-                       mentions=mentions_from_tag(tag),
+                       mentions=mentions,
                        tags=tags_from_tag(tag),
                        media_attachments=media_attachments_from_attachment(obj.get("attachment", [])))
 
@@ -210,6 +233,13 @@ class StatusContext(BaseModel):
     descendants: list[Status] = []
 
 
+class Conversation(BaseModel):
+    id:          str
+    unread:      bool = False
+    accounts:    list[Account] = []
+    last_status: Status | None = None
+ 
+ 
 class MediaAttachmentMeta(BaseModel):
     width:  int | None = None
     height: int | None = None

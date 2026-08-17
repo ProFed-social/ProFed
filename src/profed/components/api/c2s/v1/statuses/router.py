@@ -121,9 +121,18 @@ async def delete_status(id: str,
 
 
 @router.get("/statuses/{id}/context")
-async def status_context(id: str,
-                         claims: Annotated[dict, Depends(current_user)] = None):
-    return StatusContext()
+async def status_context(id: str, claims: Annotated[dict, Depends(current_user)] = None):
+    if not id.isdigit():
+        return StatusContext()
+    storage = await as_objects.storage()
+    row = await storage.get(id, 20)
+    if row is None:
+        return StatusContext()
+
+    ancestors = await storage.discussion_ancestors(row["url"])
+    descendants = [r for r in await storage.discussion_of(row["url"]) if r["url"] != row["url"]]
+    return StatusContext(ancestors=await service.make_statuses(ancestors),
+                         descendants=await service.make_statuses(descendants))
 
 
 @router.post("/statuses/{id}/favourite")

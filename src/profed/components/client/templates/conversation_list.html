@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Conversations — ProFed{% endblock %}
+{% block content %}
+<section class="conversations">
+  <h1 class="conversations-title">Conversations</h1>
+  {% for conversation in conversations %}
+  <a class="conversation{% if conversation.unread %} unread{% endif %}" href="/conversations/{{ conversation.id }}">
+    <span class="conversation-accounts">
+      {% for account in conversation.accounts %}{{ account.display_name or account.username }}{% if not loop.last %}, {% endif %}{% else %}Conversation{% endfor %}
+    </span>
+    {% if conversation.last_status %}
+    <span class="conversation-preview">{{ conversation.last_status.content | striptags | truncate(80) }}</span>
+    <time class="conversation-time" datetime="{{ conversation.last_status.created_at }}">{{ conversation.last_status.created_at[:10] }}</time>
+    {% endif %}
+  </a>
+  {% else %}
+  <p class="empty">No conversations yet.</p>
+  {% endfor %}
+</section>
+{% endblock %}
+

@@ -16,6 +16,8 @@ from profed.components.api.c2s.shared.statuses import as_objects as statuses_obj
 from profed.components.api.c2s.shared.statuses import user_timeline as statuses_memberships
 from profed.components.api.c2s.shared.statuses import projection as statuses_projection
 from profed.components.api.c2s.shared.statuses import compressor as statuses_compressor
+from profed.components.api.c2s.shared.conversations import storage as conversations_storage
+from profed.components.api.c2s.shared.conversations import projection as conversations_projection
 from . import oauth
 from . import v1, v2, profed
 from .router import mount_routers
@@ -64,6 +66,11 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       statuses_projection,
                                                       statuses_projection.handle_events,
                                                       "c2s_statuses")),
+                             (["v1_timelines", "v1_statuses", "v1_accounts", "profed_timeline"],
+                              _projection_initializer(conversations_storage,
+                                                      conversations_projection,
+                                                      conversations_projection.handle_events,
+                                                      "c2s_conversations")),
                              (["v1_timelines", "v1_statuses", "v1_accounts", "profed_timeline"],
                               _compressor_initializer(statuses_compressor)),
                              (["v1_media", "v2_media"],

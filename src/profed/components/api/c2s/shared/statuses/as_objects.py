@@ -158,6 +158,14 @@ class _storage(BaseStorage):
                                     mastodon_id,
                                     max_depth)
 
+    async def rows_for_urls(self, urls: list[str], max_depth: int) -> List[dict]:
+        return await self.fetch_all("""SELECT mastodon_id, url, actor_url, reblog_of_url, status,
+                                          api.resolve_content(url, $2) AS content
+                                       FROM api.as_objects
+                                       WHERE url = ANY($1::text[])""",
+                                    urls,
+                                    max_depth)
+
     async def fetch_by_actor(self,
                              actor_url: str,
                              limit: int = 20,
@@ -187,29 +195,81 @@ class _storage(BaseStorage):
                                     urls)
         return {row["url"]: str(row["mastodon_id"]) for row in rows}
 
-    async def thread_of(self, root_url: str, max_depth: int = 20) -> List[dict]:
-        return await self.fetch_all("""WITH RECURSIVE thread AS (
-                                           SELECT url, actor_url, ARRAY[status->>'created_at'] AS sortkey, 0 AS depth
-                                           FROM api.as_objects
-                                           WHERE url = $1
-                                         UNION ALL
-                                           SELECT c.url, c.actor_url,
-                                                  t.sortkey || (c.status->>'created_at'), t.depth + 1
-                                           FROM api.as_objects c
-                                           JOIN thread t ON c.status->>'in_reply_to_id' = t.url
-                                                        AND c.actor_url = t.actor_url
-                                           WHERE t.depth < $2
-                                       ) CYCLE url SET is_cycle USING cyclepath
-                                       SELECT o.mastodon_id, o.url, o.actor_url, o.reblog_of_url, o.status,
-                                              r.content
-                                       FROM thread th
-                                       JOIN api.as_objects o ON o.url = th.url
-                                       CROSS JOIN LATERAL
-                                            (SELECT api.resolve_content(o.url, $2) AS content) r
-                                       WHERE NOT th.is_cycle
-                                       ORDER BY th.sortkey""",
+    async def descendants_of(self, root_url: str, max_depth: int, break_on_author: bool) -> List[dict]:
+        return await self.fetch_all("""
+            WITH RECURSIVE thread AS
+                    (SELECT
+                        url,
+                        actor_url,
+                        ARRAY[status->>'created_at'] AS sortkey,
+                        0 AS depth
+                    FROM
+                        api.as_objects
+                    WHERE
+                        url = $1
+                UNION ALL
+                    SELECT
+                        c.url,
+                        c.actor_url,
+                        t.sortkey || (c.status->>'created_at'),
+                        t.depth + 1
+                    FROM
+                        api.as_objects AS c INNER JOIN
+                        thread AS t ON c.status->>'in_reply_to_id' = t.url AND
+                                       (NOT $3::boolean OR c.actor_url = t.actor_url)
+                    WHERE
+                        t.depth < $2) CYCLE url SET is_cycle USING cyclepath
+            SELECT
+                o.mastodon_id,
+                o.url,
+                o.actor_url,
+                o.reblog_of_url,
+                o.status,
+                r.content
+            FROM
+                thread AS th INNER JOIN
+                api.as_objects AS o ON o.url = th.url CROSS JOIN LATERAL
+                (SELECT api.resolve_content(o.url, $2) AS content) AS r
+            WHERE
+                NOT th.is_cycle
+            ORDER BY
+                th.sortkey""",
                                     root_url,
-                                    max_depth)
+                                    max_depth,
+                                    break_on_author)
+
+    async def thread_of(self, root_url: str, max_depth: int = 20) -> List[dict]:
+        return await self.descendants_of(root_url, max_depth, True)
+
+    async def discussion_of(self, root_url: str, max_depth: int = 20) -> List[dict]:
+        return await self.descendants_of(root_url, max_depth, False)
+
+    async def ancestors_of(self, url: str, max_depth: int, break_on_author: bool) -> List[dict]:
+        return await self.fetch_all("""
+            SELECT
+                o.mastodon_id,
+                o.url,
+                o.actor_url,
+                o.reblog_of_url,
+                o.status,
+                r.content
+            FROM
+                api.ancestor_chain($1, $2, $3::boolean) AS a INNER JOIN
+                api.as_objects AS o ON o.url = a.url CROSS JOIN LATERAL
+                (SELECT api.resolve_content(o.url, $2) AS content) AS r
+            WHERE
+                a.depth > 1
+            ORDER BY
+                a.depth DESC""",
+                                    url,
+                                    max_depth,
+                                    break_on_author)
+
+    async def thread_ancestors(self, url: str, max_depth: int = 20) -> List[dict]:
+        return await self.ancestors_of(url, max_depth, True)
+
+    async def discussion_ancestors(self, url: str, max_depth: int = 20) -> List[dict]:
+        return await self.ancestors_of(url, max_depth, False)
 
     async def boosted_parts(self, booster: str, part_urls: list[str], max_depth: int = 20) -> list[str]:
         rows = await self.fetch_all("""SELECT api.content_url(o.url, $3) AS boosted_part

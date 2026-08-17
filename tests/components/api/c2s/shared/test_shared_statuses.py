@@ -37,3 +37,34 @@ def test_activity_to_status_fills_resolved_account():
 
     assert status.account.id == "7"
 
+
+PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
+FOLLOWERS = "https://local/actors/alice/followers"
+
+
+def _visibility_of(to, cc, tag):
+    activity = {"actor": "https://local/actors/alice",
+                "id": "https://local/notes/1#create",
+                "object": {"content": "hi", "to": to, "cc": cc, "tag": tag}}
+    return Status.from_activity(activity, id="42", account="").visibility
+
+
+def test_public_when_public_collection_in_to():
+    assert _visibility_of([PUBLIC], [FOLLOWERS], []) == "public"
+
+
+def test_unlisted_when_public_collection_in_cc():
+    assert _visibility_of([FOLLOWERS], [PUBLIC], []) == "unlisted"
+
+
+def test_private_when_followers_collection_without_public():
+    assert _visibility_of([FOLLOWERS], [], []) == "private"
+
+
+def test_direct_when_every_recipient_is_mentioned():
+    assert _visibility_of([MENTION["href"]], [], [MENTION]) == "direct"
+
+
+def test_private_when_a_recipient_is_not_mentioned():
+    assert _visibility_of([MENTION["href"], FOLLOWERS], [], [MENTION]) == "private"
+

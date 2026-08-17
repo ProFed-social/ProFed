@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "status.html" import status_entry %}
+{% block title %}Conversations — ProFed{% endblock %}
+{% block content %}
+<section class="conversation">
+  <header class="conversation-head">
+    <a class="back" href="/conversations">&#8592; Conversations</a>
+  </header>
+  <div class="conversation-messages h-feed">
+    {% for message in messages %}
+    {{ status_entry(message, show_author=true) }}
+    {% else %}
+    <p class="empty">No messages in this conversation.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+

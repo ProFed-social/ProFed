@@ -60,6 +60,22 @@ async def test_get_by_id_returns_row(fake_pool):
 
 
 @pytest.mark.asyncio
+async def test_get_by_actor_url_returns_row(fake_pool):
+    store = await module.storage()
+    async with fake_pool.acquire() as conn:
+        conn.fetchrow.return_value = {"account_id": 1234,
+                                      "acct": "bob@remote.example",
+                                      "actor_url": "https://remote.example/actors/bob",
+                                      "account": ACCOUNT,
+                                      "last_webfinger_at": NOW}
+        result = await store.get_by_actor_url("https://remote.example/actors/bob")
+ 
+        sql = conn.fetchrow.await_args.args[0]
+    assert "WHERE actor_url = $1" in sql
+    assert result["actor_url"] == "https://remote.example/actors/bob"
+
+
+@pytest.mark.asyncio
 async def test_get_by_id_returns_none_when_missing(fake_pool):
     store = await module.storage()
     async with fake_pool.acquire() as conn:

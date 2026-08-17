@@ -160,6 +160,22 @@ def test_status_context_returns_empty_context(client, fake_bus):
     assert data["ancestors"] == []
     assert data["descendants"] == []
 
+def test_status_context_walks_the_discussion_tree_excluding_the_status_itself(client, fake_bus):
+    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s"}),
+                   discussion_ancestors=AsyncMock(return_value=[{"url": "https://r/root"}]),
+                   discussion_of=AsyncMock(return_value=[{"url": "https://r/s"},
+                                                         {"url": "https://r/reply"}]))
+    make = AsyncMock(return_value=[])
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=storage)), \
+         patch("profed.components.api.c2s.shared.statuses.service.make_statuses", make):
+        response = client.get("/statuses/42/context")
+ 
+    assert response.status_code == 200
+    storage.discussion_ancestors.assert_awaited_once_with("https://r/s")
+    storage.discussion_of.assert_awaited_once_with("https://r/s")
+    assert make.await_args_list[1].args[0] == [{"url": "https://r/reply"}]
+
 
 def test_favourite_returns_404(client, fake_bus):
     response = client.post("/statuses/some-id/favourite")
