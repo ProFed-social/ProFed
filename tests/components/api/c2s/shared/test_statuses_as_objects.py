@@ -41,7 +41,7 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
 
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
 
-    assert fake_conn.execute.await_count == 9
+    assert fake_conn.execute.await_count == 12
     assert any("CREATE TABLE" in s for s in statements)
     assert any("jsonb_build_object('status', status, 'actor', actor_url)" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.resolve_content" in s and "CYCLE url SET is_cycle" in s
@@ -50,7 +50,15 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
                for s in statements)
     assert any("CREATE TYPE api.reblog_compression_kind AS ENUM" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION\n" in s and "api.compress_reblogs" in s for s in statements)
-    assert any("CREATE OR REPLACE FUNCTION api.thread_root" in s and "p.actor_url = c.actor_url" in s
+    assert any("CREATE OR REPLACE FUNCTION api.ancestor_chain" in s and
+               "NOT break_on_author OR p.actor_url = c.actor_url" in s
+               for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.find_root" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.thread_root" in s and
+               "api.find_root(start_url, max_depth, true)" in s
+               for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.discussion_root" in s and
+               "api.find_root(start_url, max_depth, false)" in s
                for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.content_url" in s for s in statements)
 

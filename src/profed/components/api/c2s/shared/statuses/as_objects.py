@@ -36,24 +36,61 @@ class _storage(BaseStorage):
                                   WHERE reblog_of_url IS NULL AND NOT is_cycle
                                   LIMIT 1
                               $$""")
-        await self.execute("""CREATE OR REPLACE FUNCTION api.thread_root(start_url TEXT, max_depth INT)
-                              RETURNS TEXT LANGUAGE sql STABLE AS $$
-                                  WITH RECURSIVE chain AS (
-                                      SELECT url, actor_url, status->>'in_reply_to_id' AS parent_url, 1 AS depth
-                                      FROM api.as_objects
-                                      WHERE url = start_url
-                                    UNION ALL
-                                      SELECT p.url, p.actor_url, p.status->>'in_reply_to_id', c.depth + 1
-                                      FROM api.as_objects p
-                                      JOIN chain c ON p.url = c.parent_url AND p.actor_url = c.actor_url
-                                      WHERE c.depth < max_depth
-                                  ) CYCLE url SET is_cycle USING path
-                                  SELECT url
-                                  FROM chain
-                                  WHERE NOT is_cycle
-                                  ORDER BY depth DESC
-                                  LIMIT 1
-                              $$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.ancestor_chain(start_url TEXT, max_depth INT, break_on_author BOOLEAN)
+            RETURNS TABLE (url TEXT, depth INT) LANGUAGE sql STABLE AS $$
+                WITH RECURSIVE chain AS (
+                        SELECT
+                            url,
+                            actor_url,
+                            status->>'in_reply_to_id' AS parent_url,
+                            1 AS depth
+                        FROM
+                            api.as_objects
+                        WHERE
+                            url = start_url
+                    UNION ALL
+                        SELECT
+                            p.url,
+                            p.actor_url,
+                            p.status->>'in_reply_to_id',
+                            c.depth + 1
+                        FROM
+                            api.as_objects AS p INNER JOIN
+                            chain AS c ON p.url = c.parent_url AND
+                                          (NOT break_on_author OR p.actor_url = c.actor_url)
+                        WHERE
+                            c.depth < max_depth
+                ) CYCLE url SET is_cycle USING path
+                SELECT
+                    url,
+                    depth
+                FROM
+                    chain
+                WHERE
+                    NOT is_cycle
+            $$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.find_root(start_url TEXT, max_depth INT, break_on_author BOOLEAN)
+            RETURNS TEXT LANGUAGE sql STABLE AS $$
+                SELECT
+                    url
+                FROM
+                    api.ancestor_chain(start_url, max_depth, break_on_author)
+                ORDER BY
+                    depth DESC
+                LIMIT 1
+            $$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.thread_root(start_url TEXT, max_depth INT)
+            RETURNS TEXT LANGUAGE sql STABLE AS $$
+                SELECT api.find_root(start_url, max_depth, true)
+            $$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.discussion_root(start_url TEXT, max_depth INT)
+            RETURNS TEXT LANGUAGE sql STABLE AS $$
+                SELECT api.find_root(start_url, max_depth, false)
+            $$""")
         await self.execute("""CREATE OR REPLACE FUNCTION api.content_url(start_url TEXT, max_depth INT)
                               RETURNS TEXT LANGUAGE sql STABLE AS $$
                                   WITH RECURSIVE chain AS (
