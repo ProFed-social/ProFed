@@ -45,12 +45,15 @@ class BaseStorage:
         async with self._pool.acquire() as conn:
             await conn.execute(sql, *args)
 
-    @wait_for_rebuild
-    async def fetch_one(self, sql: str, *args: Any) -> Optional[dict]:
+    async def write_row(self, sql: str, *args: Any) -> Optional[dict]:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(sql, *args)
-
+ 
         return dict(row) if row is not None else None
+
+    @wait_for_rebuild
+    async def fetch_one(self, sql: str, *args: Any) -> Optional[dict]:
+        return await self.write_row(sql, *args)
 
     @wait_for_rebuild
     async def fetch_all(self, sql: str, *args: Any) -> list[dict]:

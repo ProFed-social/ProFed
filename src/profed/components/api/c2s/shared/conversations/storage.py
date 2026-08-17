@@ -48,7 +48,7 @@ class _storage(BaseStorage):
                                          WHERE parent = $1 AND message_id = conversation_id)"""
 
         async def store_message() -> str:
-            row = await self.fetch_one("""INSERT INTO api.conversations
+            row = await self.write_row("""INSERT INTO api.conversations
                                                 (conversation_id, message_id, parent, message_time)
                                           VALUES (COALESCE((SELECT conversation_id
                                                             FROM api.conversations
@@ -74,7 +74,7 @@ class _storage(BaseStorage):
                                [sender, *recipients])
 
         async def merge(conversation_id: str) -> None:
-            merged = await self.fetch_one(f"""WITH consolidated AS (
+            merged = await self.write_row(f"""WITH consolidated AS (
                                                   INSERT INTO api.conversation_participants
                                                         (conversation_id, actor_url, begin_with, begin_time)
                                                   SELECT $2, actor_url, begin_with, begin_time
