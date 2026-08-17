@@ -125,7 +125,7 @@ class _storage(BaseStorage):
                         message_time,
                         max(message_time) OVER (PARTITION BY conversation_id) AS last_time
                     FROM
-                        api.conversations)
+                        api.conversations) AS timed
                 WHERE
                     message_time = last_time
                 GROUP BY
