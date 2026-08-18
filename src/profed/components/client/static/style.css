@@ -341,7 +341,7 @@ a:hover { text-decoration: underline; }
 .thread-body.expandable ~ .show-more { display: inline-block; }
 .thread-body.collapsable ~ .show-less { display: inline-block; }
 
-conversations-layout {
+.conversations-layout {
   --masthead-space: 6rem; /* space above the layout (masthead + column padding); refined when body becomes a flex column */
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
