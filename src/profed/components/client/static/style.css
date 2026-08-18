@@ -376,7 +376,30 @@ a:hover { text-decoration: underline; }
 .conversation-view { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; }
 .conversation-head { padding: .5rem .75rem; border-bottom: 1px solid var(--line); }
 .conversation-head .back { display: none; } /* desktop: both columns visible, no back link */
-.conversation-messages { padding: .75rem; }
+.conversation-messages { padding: .75rem; display: flex; flex-direction: column; }
+ 
+.msg { display: flex; gap: .5rem; align-items: flex-end; margin-top: .5rem; }
+.msg--run-cont { margin-top: .12rem; } /* consecutive messages of one author sit tighter */
+.msg--own { flex-direction: row-reverse; }
+ 
+.msg-avatar { flex: none; width: 36px; }
+.msg-avatar .avatar { width: 36px; height: 36px; }
+.msg-avatar .avatar-fallback { font-size: .8rem; }
+ 
+.msg-stack { display: flex; flex-direction: column; gap: .15rem; max-width: 72%; min-width: 0; }
+.msg-name { padding-inline: .25rem; font-size: .85rem; color: var(--muted); }
+ 
+.msg-bubble {
+  padding: .45rem .7rem;
+  border-radius: 16px;
+  background: var(--surface);
+  overflow-wrap: break-word;
+}
+.msg--other .msg-bubble { border-bottom-left-radius: 5px; }
+.msg--own .msg-bubble { background: var(--chip-bg); border-bottom-right-radius: 5px; }
+.msg-bubble p { margin: .3rem 0; }
+.msg-bubble :first-child { margin-top: 0; }
+.msg-bubble :last-child { margin-bottom: 0; }
  
 @media (max-width: 720px) {
   .conversations-layout { grid-template-columns: 1fr; height: auto; }

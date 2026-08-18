@@ -34,10 +34,13 @@ async def _messages(id: str, token: str):
 async def _view(request: Request, session, active_id, pane: str):
     conversations = await _get("/api/v1/conversations", session["token"]) or []
     active_id = active_id if active_id is not None else (conversations[0]["id"] if conversations else None)
+    messages = await _messages(active_id, session["token"]) if active_id is not None else []
+    for message in messages:
+        message["own"] = message["account"]["acct"] == session["username"]
     return HTMLResponse(environment().get_template("conversation_layout.html")
                         .render(conversations=conversations,
                                 active_id=active_id,
-                                messages=await _messages(active_id, session["token"]) if active_id is not None else [],
+                                messages=messages,
                                 pane=pane,
                                 **(await page_context(request, session))))
  
