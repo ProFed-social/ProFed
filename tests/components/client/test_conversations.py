@@ -64,6 +64,16 @@ def _conversation():
             "accounts": [{"username": "bob", "display_name": "Bob"}],
             "last_status": {"content": "<p>last message here</p>",
                             "created_at": "2026-07-15T10:00:00Z"}}
+
+
+def _api(monkeypatch, conversations_list, root=None, context=None):
+    async def get(path, **kwargs):
+        if path == "/api/v1/conversations":
+            return _resp(200, conversations_list)
+        if path.endswith("/context"):
+            return _resp(200, context if context is not None else {"ancestors": [], "descendants": []})
+        return _resp(200, root)
+    monkeypatch.setattr(conversations, "api_client", lambda: Mock(get=AsyncMock(side_effect=get)))
  
  
 async def test_conversation_list_redirects_an_anonymous_visitor_to_login(monkeypatch):
@@ -75,9 +85,8 @@ async def test_conversation_list_redirects_an_anonymous_visitor_to_login(monkeyp
  
 async def test_conversation_list_lists_the_users_conversations(monkeypatch):
     _login(monkeypatch)
-    monkeypatch.setattr(conversations, "api_client",
-                        lambda: Mock(get=AsyncMock(return_value=_resp(200, [_conversation()]))))
- 
+    _api(monkeypatch, [_conversation()], root=_status("42"))
+
     response = await _fetch(_app(monkeypatch), "/conversations")
  
     assert response.status_code == 200
@@ -89,8 +98,7 @@ async def test_conversation_list_lists_the_users_conversations(monkeypatch):
  
 async def test_conversation_list_without_conversations_says_so(monkeypatch):
     _login(monkeypatch)
-    monkeypatch.setattr(conversations, "api_client",
-                        lambda: Mock(get=AsyncMock(return_value=_resp(200, []))))
+    _api(monkeypatch, [])
  
     response = await _fetch(_app(monkeypatch), "/conversations")
  
@@ -103,9 +111,7 @@ async def test_conversation_shows_root_and_descendants_sorted_by_time(monkeypatc
     root = _status("10", "the root message", "2026-07-15T10:00:00Z")
     context = {"ancestors": [], "descendants": [_status("11", "a later reply", "2026-07-15T10:05:00Z")]}
  
-    async def get(path, **kwargs):
-        return _resp(200, root) if path == "/api/v1/statuses/42" else _resp(200, context)
-    monkeypatch.setattr(conversations, "api_client", lambda: Mock(get=AsyncMock(side_effect=get)))
+    _api(monkeypatch, [_conversation()], root=root, context=context)
  
     response = await _fetch(_app(monkeypatch), "/conversations/42")
  
@@ -113,4 +119,16 @@ async def test_conversation_shows_root_and_descendants_sorted_by_time(monkeypatc
     body = response.text
     assert "the root message" in body and "a later reply" in body
     assert body.index("the root message") < body.index("a later reply")
+
+
+async def test_conversation_list_opens_the_topmost_conversation(monkeypatch):
+    _login(monkeypatch)
+    _api(monkeypatch, [_conversation()], root=_status("42", "topmost body"))
+ 
+    response = await _fetch(_app(monkeypatch), "/conversations")
+ 
+    assert response.status_code == 200
+    body = response.text
+    assert "conversations-layout" in body
+    assert "topmost body" in body
 

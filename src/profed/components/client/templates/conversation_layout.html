@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Conversations — ProFed{% endblock %}
+{% block content %}
+<div class="conversations-layout conversations-layout--{{ pane }}">
+  {% include "conversation_list.html" %}
+  {% include "conversation.html" %}
+</div>
+{% endblock %}
+

@@ -20,26 +20,36 @@ async def _get(path: str, token: str):
         logger.warning("fetching %s failed: %s %s", path, response.status_code, response.text)
         return None
     return response.json()
+
+ 
+async def _messages(id: str, token: str):
+    root = await _get(f"/api/v1/statuses/{id}", token)
+    context = await _get(f"/api/v1/statuses/{id}/context", token) or {}
+    return sorted((message
+                   for message in [root, *context.get("descendants", [])]
+                   if message is not None),
+                  key=lambda message: message["created_at"])
  
  
+async def _view(request: Request, session, active_id, pane: str):
+    conversations = await _get("/api/v1/conversations", session["token"]) or []
+    active_id = active_id if active_id is not None else (conversations[0]["id"] if conversations else None)
+    return HTMLResponse(environment().get_template("conversation_layout.html")
+                        .render(conversations=conversations,
+                                active_id=active_id,
+                                messages=await _messages(active_id, session["token"]) if active_id is not None else [],
+                                pane=pane,
+                                **(await page_context(request, session))))
+ 
+  
 @router.get("/conversations", response_class=HTMLResponse)
 @requires_login
 async def conversation_list(request: Request, session):
-    return HTMLResponse(environment().get_template("conversation_list.html")
-                        .render(conversations=await _get("/api/v1/conversations", session["token"]) or [],
-                                **(await page_context(request, session))))
+    return await _view(request, session, None, "list")
  
  
 @router.get("/conversations/{id}", response_class=HTMLResponse)
 @requires_login
 async def conversation(request: Request, id: str, session):
-    root = await _get(f"/api/v1/statuses/{id}", session["token"])
-    context = await _get(f"/api/v1/statuses/{id}/context", session["token"]) or {}
-    messages = sorted((message
-                       for message in [root, *context.get("descendants", [])]
-                       if message is not None),
-                      key=lambda message: message["created_at"])
-    return HTMLResponse(environment().get_template("conversation.html")
-                        .render(messages=messages,
-                                **(await page_context(request, session))))
+    return await _view(request, session, id, "view")
 

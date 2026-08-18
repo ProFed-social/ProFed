@@ -1,0 +1,9 @@
+{% from "status.html" import status_entry %}
+<div id="conversation-messages" class="conversation-messages h-feed">
+  {% for message in messages %}
+  {{ status_entry(message, show_author=true) }}
+  {% else %}
+  <p class="empty">No messages in this conversation.</p>
+  {% endfor %}
+</div>
+

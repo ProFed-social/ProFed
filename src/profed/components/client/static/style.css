@@ -341,3 +341,48 @@ a:hover { text-decoration: underline; }
 .thread-body.expandable ~ .show-more { display: inline-block; }
 .thread-body.collapsable ~ .show-less { display: inline-block; }
 
+conversations-layout {
+  --masthead-space: 6rem; /* space above the layout (masthead + column padding); refined when body becomes a flex column */
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 1rem;
+  height: calc(100dvh - var(--masthead-space));
+}
+ 
+.conversations { overflow-y: auto; border-right: 1px solid var(--line); }
+.conversations-title { margin: 0; padding: .6rem .75rem; font-size: 1.1rem; }
+ 
+.conversation {
+  display: block;
+  padding: .6rem .75rem;
+  border-bottom: 1px solid var(--line);
+  color: CanvasText;
+  text-decoration: none;
+}
+.conversation:hover { background: var(--surface); }
+.conversation.active { background: var(--chip-bg); }
+.conversation-accounts { display: block; font-weight: 600; }
+.conversation.unread .conversation-accounts::after { content: " •"; color: var(--accent); }
+.conversation-preview {
+  display: block;
+  color: var(--muted);
+  font-size: .9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-time { color: var(--muted); font-size: .8rem; }
+ 
+.conversation-view { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; }
+.conversation-head { padding: .5rem .75rem; border-bottom: 1px solid var(--line); }
+.conversation-head .back { display: none; } /* desktop: both columns visible, no back link */
+.conversation-messages { padding: .75rem; }
+ 
+@media (max-width: 720px) {
+  .conversations-layout { grid-template-columns: 1fr; height: auto; }
+  .conversations { border-right: none; }
+  .conversations-layout--list .conversation-view { display: none; }
+  .conversations-layout--view .conversations { display: none; }
+  .conversation-head .back { display: inline; }
+}
+
