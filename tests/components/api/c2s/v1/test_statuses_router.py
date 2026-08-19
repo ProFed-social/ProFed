@@ -9,7 +9,7 @@ from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.auth import current_user
 from profed.models.mastodon import Account
-from profed.identity import account_id
+from profed.identity import account_id, heuristic_acct
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
@@ -138,11 +138,17 @@ def test_create_status_activity_has_context_and_to(client, fake_bus):
 
 def test_create_reply_sets_in_reply_to_and_direct_recipients(client, fake_bus):
     root = {"url": "https://remote.example/notes/root"}
+
+    async def by_actor_url(url):
+        return {"acct": "bob-canonical@elsewhere.example"} if url == BOB_URL else None
+
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
                AsyncMock(return_value=LOCAL_ACCOUNT)), \
          _store_returning(root), \
          patch("profed.components.api.c2s.shared.conversations.storage.storage",
-               AsyncMock(return_value=Mock(recipients_for=AsyncMock(return_value=[BOB_URL, CAROL_URL])))):
+               AsyncMock(return_value=Mock(recipients_for=AsyncMock(return_value=[BOB_URL, CAROL_URL])))), \
+         patch("profed.components.api.c2s.v1.statuses.router._known_accounts_storage",
+               AsyncMock(return_value=Mock(get_by_actor_url=AsyncMock(side_effect=by_actor_url)))):
         response = client.post("/statuses",
                                json={"status": "hi", "in_reply_to_id": "424242", "visibility": "direct"})
 
@@ -150,6 +156,9 @@ def test_create_reply_sets_in_reply_to_and_direct_recipients(client, fake_bus):
     obj = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
     assert obj["inReplyTo"] == "https://remote.example/notes/root"
     assert obj["to"] == [BOB_URL, CAROL_URL]
+    names = {t["href"]: t["name"] for t in obj["tag"]}
+    assert names[BOB_URL] == "@bob-canonical@elsewhere.example"
+    assert names[CAROL_URL] == "@" + heuristic_acct(CAROL_URL)
 
 
 def test_get_status_returns_404(client, fake_bus):

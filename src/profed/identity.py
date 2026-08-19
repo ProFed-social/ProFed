@@ -3,6 +3,7 @@
 
 import hashlib
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 from profed.core.config import config
 
 def domain() -> str:
@@ -25,6 +26,11 @@ def username_from_acct(acct: str) -> str:
     return acct.split("@", 1)[0]
 
 
+def heuristic_acct(actor_url: str) -> str:
+    parsed = urlparse(actor_url)
+    return parsed.path.rstrip("/").rsplit("/", 1)[-1] + "@" + parsed.netloc
+ 
+ 
 def account_id(acct: str) -> str:
     return str(int(hashlib.sha256(acct.encode()).hexdigest()[:15], 16))
 

@@ -33,6 +33,7 @@ async def test_known_accounts_projection_skipped_when_no_reader_is_active(monkey
     awaited = _record_initializers(monkeypatch)
     await c2s.init({}, ["v1_search",
                         "v1_accounts",
+                        "v1_statuses",
                         "v1_timelines",
                         "v2_search",
                         "v1_media",

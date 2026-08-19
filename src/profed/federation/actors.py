@@ -21,13 +21,13 @@ async def fetch_and_register_actor(actor_url: str, sign=None) -> Optional[dict]:
 
     acct = await lookup_acct(actor_url, sign)
     if acct is not None and not is_local(acct):
-        aid = int(compute_account_id(acct))
-        payload = {"acct": acct,
-                   "actor_url": actor_url,
-                   "actor_data": actor_data,
-                   "last_webfinger_at": datetime.now(timezone.utc).isoformat()}
         async with message_bus().topic("remote_actors").publish() as publish:
-            await publish(event_type="discovered", object_id=str(aid), payload=payload)
+            await publish(event_type="discovered",
+                          object_id=str(int(compute_account_id(acct))),
+                          payload={"acct": acct,
+                                   "actor_url": actor_url,
+                                   "actor_data": actor_data,
+                                   "last_webfinger_at": datetime.now(timezone.utc).isoformat()})
 
     return actor_data
 
