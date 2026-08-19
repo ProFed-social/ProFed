@@ -128,14 +128,14 @@ def _href(value) -> str | None:
                 return link["href"]
     return None
 
- 
+
 _PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
- 
- 
+
+
 def _as_list(value) -> list:
     return value if isinstance(value, list) else [] if value is None else [value]
- 
- 
+
+
 def _visibility(obj: dict, activity: dict, mentions: list[dict]) -> str:
     to = _as_list(obj.get("to")) or _as_list(activity.get("to"))
     cc = _as_list(obj.get("cc")) or _as_list(activity.get("cc"))
@@ -205,7 +205,7 @@ class Status(BaseModel):
         def get_obj(activity):
             o = activity.get("object", {})
             return {} if isinstance(o, str) else o
- 
+
         def create_status(cls, id, account, activity, obj):
             tag = obj.get("tag", [])
             mentions = mentions_from_tag(tag)
@@ -238,8 +238,8 @@ class Conversation(BaseModel):
     unread:      bool = False
     accounts:    list[Account] = []
     last_status: Status | None = None
- 
- 
+
+
 class MediaAttachmentMeta(BaseModel):
     width:  int | None = None
     height: int | None = None

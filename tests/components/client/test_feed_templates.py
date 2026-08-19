@@ -38,8 +38,8 @@ ACCOUNT = {"username": "alice",
 
 def _block(*parts):
     return {"parts": list(parts), "booster": None, "boosted": [], "cursor": "1"}
- 
- 
+
+
 def _parse_home(blocks):
     environment = build_environment(STANDARD_TEMPLATES, None)
     return mf2py.parse(doc=environment.get_template("home.html").render(blocks=blocks))

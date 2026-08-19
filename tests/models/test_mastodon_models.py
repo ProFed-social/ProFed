@@ -271,14 +271,14 @@ def test_from_activity_carries_in_reply_to_as_the_parent_url():
     activity = {"actor": "https://local/actors/alice",
                 "object": {"content": "a reply", "inReplyTo": "https://r.example/notes/7"}}
     status = Status.from_activity(activity, id="42")
- 
+
     assert status.in_reply_to_id == "https://r.example/notes/7"
 
 
 def test_from_activity_leaves_in_reply_to_none_for_a_top_level_post():
     activity = {"actor": "https://local/actors/alice", "object": {"content": "hi"}}
     status = Status.from_activity(activity, id="42")
- 
+
     assert status.in_reply_to_id is None
 
 

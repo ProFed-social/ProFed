@@ -48,7 +48,7 @@ class BaseStorage:
     async def write_row(self, sql: str, *args: Any) -> Optional[dict]:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(sql, *args)
- 
+
         return dict(row) if row is not None else None
 
     @wait_for_rebuild
@@ -61,14 +61,14 @@ class BaseStorage:
             rows = await conn.fetch(sql, *args)
 
         return [dict(row) for row in rows]
- 
+
     @wait_for_rebuild
     async def stream(self, sql: str, *args: Any):
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 async for row in conn.cursor(sql, *args):
                     yield dict(row)
- 
+
 
 async def init_pool(config: dict) -> asyncpg.Pool:
     return await fetch_pool(host=config["host"],

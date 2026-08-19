@@ -74,7 +74,7 @@ class _storage(BaseStorage):
                               ORDER BY ut.mastodon_id DESC""",
                            username,
                            max_depth)
- 
+
 
 _instance: _storage | None = None
 

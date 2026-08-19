@@ -31,15 +31,15 @@ LOCAL_ACCOUNT = Account(id="1",
                         url="https://example.com/actors/alice")
 
 NOTE_URL = "https://example.com/act/1"
- 
+
 BOB_URL = "https://remote.example/actors/bob"
- 
+
 CAROL_URL = "https://remote.example/actors/carol"
- 
+
 BOB = Account(id="999", username="bob", acct="bob@remote.example", display_name="Bob", url=BOB_URL)
- 
+
 CAROL = Account(id="777", username="carol", acct="carol@remote.example", display_name="Carol", url=CAROL_URL)
- 
+
 NOTE_STATUS = {"id": "424242",
                "created_at": "2026-01-01T00:00:00+00:00",
                "uri": NOTE_URL,
@@ -48,7 +48,7 @@ NOTE_STATUS = {"id": "424242",
                "reblog": None,
                "mentions": [],
                "tags": []}
- 
+
 BOOST_STATUS = {"id": "500",
                 "created_at": "2026-01-02T00:00:00+00:00",
                 "uri": "https://remote.example/carol/announce/1",
@@ -57,8 +57,8 @@ BOOST_STATUS = {"id": "500",
                 "reblog": None,
                 "mentions": [],
                 "tags": []}
- 
- 
+
+
 def _content_row():
     return {"mastodon_id": 424242,
             "url": NOTE_URL,
@@ -66,8 +66,8 @@ def _content_row():
             "reblog_of_url": None,
             "status": NOTE_STATUS,
             "content": {"status": NOTE_STATUS, "actor": BOB_URL}}
- 
- 
+
+
 def _boost_row():
     return {"mastodon_id": 500,
             "url": "https://remote.example/carol/announce/1",
@@ -75,17 +75,17 @@ def _boost_row():
             "reblog_of_url": NOTE_URL,
             "status": BOOST_STATUS,
             "content": {"status": NOTE_STATUS, "actor": BOB_URL}}
- 
- 
+
+
 def _store_returning(row):
     return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                  AsyncMock(return_value=Mock(get=AsyncMock(return_value=row))))
- 
- 
+
+
 def _patched_accounts(mapping):
     return patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
                  AsyncMock(return_value=mapping))
- 
+
 
 def test_create_status_publishes_activity(client, fake_bus):
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
@@ -135,7 +135,7 @@ def test_create_status_activity_has_context_and_to(client, fake_bus):
     assert activity["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
     assert activity["object"]["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
 
- 
+
 def test_create_reply_sets_in_reply_to_and_direct_recipients(client, fake_bus):
     root = {"url": "https://remote.example/notes/root"}
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
@@ -145,7 +145,7 @@ def test_create_reply_sets_in_reply_to_and_direct_recipients(client, fake_bus):
                AsyncMock(return_value=Mock(recipients_for=AsyncMock(return_value=[BOB_URL, CAROL_URL])))):
         response = client.post("/statuses",
                                json={"status": "hi", "in_reply_to_id": "424242", "visibility": "direct"})
- 
+
     assert response.status_code == 200
     obj = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
     assert obj["inReplyTo"] == "https://remote.example/notes/root"
@@ -186,7 +186,7 @@ def test_status_context_walks_the_discussion_tree_excluding_the_status_itself(cl
                AsyncMock(return_value=storage)), \
          patch("profed.components.api.c2s.shared.statuses.service.make_statuses", make):
         response = client.get("/statuses/42/context")
- 
+
     assert response.status_code == 200
     storage.discussion_ancestors.assert_awaited_once_with("https://r/s")
     storage.discussion_of.assert_awaited_once_with("https://r/s")
@@ -342,36 +342,36 @@ def test_create_status_response_sets_mentions(client, fake_bus):
 def test_get_status_returns_the_content_status(client):
     with _store_returning(_content_row()), _patched_accounts({BOB_URL: BOB}):
         response = client.get("/statuses/424242")
- 
+
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == "424242"
     assert data["content"] == "Hello!"
     assert data["account"]["username"] == "bob"
     assert data["reblog"] is None
- 
- 
+
+
 def test_get_status_nests_a_boost_as_a_reblog(client):
     with _store_returning(_boost_row()), _patched_accounts({BOB_URL: BOB, CAROL_URL: CAROL}):
         response = client.get("/statuses/500")
- 
+
     data = response.json()
     assert data["account"]["username"] == "carol"
     assert data["reblog"]["id"] == "424242"
     assert data["reblog"]["account"]["username"] == "bob"
- 
- 
+
+
 def test_get_status_404_for_an_unknown_id(client):
     with _store_returning(None):
         response = client.get("/statuses/999")
- 
+
     assert response.status_code == 404
- 
- 
+
+
 def test_get_status_404_when_the_boost_target_is_unresolvable(client):
     with _store_returning({**_boost_row(), "content": None}):
         response = client.get("/statuses/500")
- 
+
     assert response.status_code == 404
 
 

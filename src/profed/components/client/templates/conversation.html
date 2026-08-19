@@ -4,6 +4,10 @@
     <a class="back" href="/conversations">&#8592; Conversations</a>
   </header>
   {% include "conversation_messages.html" %}
+  <form class="conversation-compose" method="post" action="/conversations/{{ active_id }}/reply">
+    <input class="conversation-input" name="status" placeholder="Message…" autocomplete="off" required>
+    <button class="conversation-send" type="submit">Send</button>
+  </form>
   {% else %}
   <p class="empty">No conversations yet.</p>
   {% endif %}

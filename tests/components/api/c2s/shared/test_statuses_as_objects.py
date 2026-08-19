@@ -142,9 +142,9 @@ async def test_fetch_by_actor_resolves_filters_unresolved_and_paginates(fake_poo
 async def test_mastodon_ids_for_maps_urls_to_string_ids(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"url": "https://x/1", "mastodon_id": 11},
                                     {"url": "https://x/2", "mastodon_id": 22}]
- 
+
     result = await (await as_objects.storage()).mastodon_ids_for(["https://x/1", "https://x/2"])
- 
+
     sql, *args = fake_conn.fetch.await_args.args
     assert "mastodon_id" in sql
     assert "ANY($1" in sql
@@ -213,38 +213,38 @@ async def test_boosted_parts_returns_the_thread_urls_the_booster_boosted(fake_po
     assert args == ["https://r/x", ["https://r/a1", "https://r/a2", "https://r/a4"], 10]
     assert result == ["https://r/a2", "https://r/a4"]
 
- 
+
 @pytest.mark.asyncio
 async def test_discussion_of_walks_all_authors_via_break_flag(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"url": "https://r/root", "content": {"id": "1"}}]
- 
+
     await (await as_objects.storage()).discussion_of("https://r/root", max_depth=10)
- 
+
     sql, *args = fake_conn.fetch.await_args.args
     assert "WITH RECURSIVE thread" in sql
     assert "NOT $3::boolean OR c.actor_url = t.actor_url" in sql
     assert args == ["https://r/root", 10, False]
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_discussion_ancestors_joins_ancestor_chain_without_the_status_itself(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"url": "https://r/root", "content": {"id": "1"}}]
- 
+
     await (await as_objects.storage()).discussion_ancestors("https://r/leaf", max_depth=10)
- 
+
     sql, *args = fake_conn.fetch.await_args.args
     assert "api.ancestor_chain($1, $2, $3::boolean)" in sql
     assert "a.depth > 1" in sql
     assert "ORDER BY\n                a.depth DESC" in sql
     assert args == ["https://r/leaf", 10, False]
 
- 
+
 @pytest.mark.asyncio
 async def test_rows_for_urls_fetches_rows_for_a_url_list(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"url": "https://x/1", "content": {"id": "1"}}]
- 
+
     await (await as_objects.storage()).rows_for_urls(["https://x/1", "https://x/2"], 20)
- 
+
     sql, *args = fake_conn.fetch.await_args.args
     assert "api.resolve_content(url, $2)" in sql
     assert "WHERE url = ANY($1::text[])" in sql

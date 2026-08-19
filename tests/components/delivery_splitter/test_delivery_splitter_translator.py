@@ -90,7 +90,7 @@ def test_undo_target_is_object_object():
 def test_follow_target_of_dict_is_none():
     assert translator._follow_target({"object": {"type": "Note"}}) is None
 
- 
+
 @pytest.mark.asyncio
 async def test_directed_recipients_uses_lookup_acct():
     with patch.object(translator, "lookup_acct", AsyncMock(return_value="bob@remote.example")):

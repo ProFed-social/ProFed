@@ -50,8 +50,8 @@ def _status(content="hello world", acct="bob@remote.example"):
 
 def _block(status):
     return {"parts": [status], "booster": None, "boosted": [], "cursor": "1"}
- 
- 
+
+
 def _login(monkeypatch, username="christof", token="tok"):
     session = {"username": username, "acct": f"{username}@test.local", "token": token}
     monkeypatch.setattr(auth, "current_user_optional", AsyncMock(return_value=session))

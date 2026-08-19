@@ -342,7 +342,7 @@ a:hover { text-decoration: underline; }
 .thread-body.collapsable ~ .show-less { display: inline-block; }
 
 .conversations-layout {
-  --masthead-space: 6rem; /* space above the layout (masthead + column padding); refined when body becomes a flex column */
+  --masthead-space: 6rem;
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   gap: 1rem;
@@ -373,13 +373,13 @@ a:hover { text-decoration: underline; }
 }
 .conversation-time { color: var(--muted); font-size: .8rem; }
  
-.conversation-view { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; }
+.conversation-view { display: flex; flex-direction: column; min-width: 0; }
 .conversation-head { padding: .5rem .75rem; border-bottom: 1px solid var(--line); }
-.conversation-head .back { display: none; } /* desktop: both columns visible, no back link */
-.conversation-messages { padding: .75rem; display: flex; flex-direction: column; }
+.conversation-head .back { display: none; }
+.conversation-messages { padding: .75rem; display: flex; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; }
  
 .msg { display: flex; gap: .5rem; align-items: flex-end; margin-top: .5rem; }
-.msg--run-cont { margin-top: .12rem; } /* consecutive messages of one author sit tighter */
+.msg--run-cont { margin-top: .12rem; }
 .msg--own { flex-direction: row-reverse; }
  
 .msg-avatar { flex: none; width: 36px; }
@@ -400,6 +400,30 @@ a:hover { text-decoration: underline; }
 .msg-bubble p { margin: .3rem 0; }
 .msg-bubble :first-child { margin-top: 0; }
 .msg-bubble :last-child { margin-bottom: 0; }
+
+.conversation-compose {
+  display: flex;
+  gap: .5rem;
+  padding: .5rem .75rem;
+  border-top: 1px solid var(--line);
+}
+.conversation-input {
+  flex: 1;
+  min-width: 0;
+  padding: .5rem .75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: Canvas;
+  color: CanvasText;
+}
+.conversation-send {
+  padding: .5rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: Canvas;
+  cursor: pointer;
+}
  
 @media (max-width: 720px) {
   .conversations-layout { grid-template-columns: 1fr; height: auto; }

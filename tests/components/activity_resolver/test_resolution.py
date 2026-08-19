@@ -19,7 +19,7 @@ class FakeStorage:
 
     async def record_version(self, *a):
         self.calls.append(("record_version", a))
- 
+
     def rebuild_finished(self):
         self.calls.append(("rebuild_finished",))
 
@@ -81,9 +81,9 @@ async def test_a_missing_version_and_cache_end_parse_to_none(fake_storage):
     _, args = fake_storage.calls[0]
     assert args[3] is None
 
- 
+
 async def test_rebuild_unblocks_the_store_even_without_events(fake_bus, fake_storage):
     await resolution.rebuild()
- 
+
     assert ("rebuild_finished",) in fake_storage.calls
 

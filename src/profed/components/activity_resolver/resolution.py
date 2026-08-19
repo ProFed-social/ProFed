@@ -56,8 +56,8 @@ async def _tombstone(object_id, payload, emitted_at) -> None:
 
 async def _rebuild_finished() -> None:
     (await storage()).rebuild_finished()
- 
- 
+
+
 handle_events, rebuild, _ = build_projection(topic=resolution,
                                              init=noop,
                                              rebuild_finished=_rebuild_finished,

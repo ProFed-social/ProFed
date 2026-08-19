@@ -48,8 +48,8 @@ class StatusEventBase(BaseModel):
 
 class StatusEvent(StatusEventBase):
     username: str = Field(min_length=1)
- 
- 
+
+
 class TimelineEvent(StatusEventBase):
     username: str
 

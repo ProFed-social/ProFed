@@ -50,8 +50,8 @@ async def test_the_after_row_itself_is_not_re_emitted():
 
 async def test_limit_counts_blocks_and_stops_emission():
     assert await _triggers([_row(4, "d"), _row(3, "c"), _row(2, "b"), _row(1, "a")], None, 2) == [4, 3]
- 
- 
+
+
 async def test_stops_when_iterable_is_exhausted_below_limit():
     assert await _triggers([_row(2, "b"), _row(1, "a")], None, 20) == [2, 1]
 

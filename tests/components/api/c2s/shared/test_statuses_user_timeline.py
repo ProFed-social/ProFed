@@ -93,16 +93,16 @@ async def test_fetch_joins_resolves_filters_and_paginates(fake_pool, fake_conn):
 async def test_thread_roots_streams_rows_with_thread_root_and_booster(fake_pool):
     st = await user_timeline.storage()
     captured = {}
- 
+
     async def fake_stream(sql, *args):
         captured["sql"] = sql
         captured["args"] = args
         for row in [{"mastodon_id": 7, "root": "s1", "booster": None}]:
             yield row
- 
+
     st.stream = fake_stream
     rows = [row async for row in st.thread_roots("me", max_depth=10)]
- 
+
     assert "api.thread_root(api.content_url(o.url, $2), $2) AS root" in captured["sql"]
     assert "JOIN api.as_objects o ON o.url = ut.object_url" in captured["sql"]
     assert "WHERE ut.username = $1" in captured["sql"]

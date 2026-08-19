@@ -69,7 +69,7 @@ async def test_get_by_actor_url_returns_row(fake_pool):
                                       "account": ACCOUNT,
                                       "last_webfinger_at": NOW}
         result = await store.get_by_actor_url("https://remote.example/actors/bob")
- 
+
         sql = conn.fetchrow.await_args.args[0]
     assert "WHERE actor_url = $1" in sql
     assert result["actor_url"] == "https://remote.example/actors/bob"

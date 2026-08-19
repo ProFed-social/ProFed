@@ -36,7 +36,7 @@ def test_missing_username_is_rejected():
 
 def test_empty_username_is_accepted_for_fetched_objects():
     payload = validate_timeline_event("Create", {"username": "", "status_id": "https://remote/notes/1"})
- 
+
     assert payload is not None
 
 

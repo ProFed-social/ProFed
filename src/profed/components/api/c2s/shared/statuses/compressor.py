@@ -1,14 +1,14 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 import asyncio
 from .as_objects import storage
- 
+
 SLEEP_MIN = 1.0
 SLEEP_MAX = 60.0
 AGILITY = 50.0
 SAMPLE_SIZE = 100
- 
+
 
 class Compressor():
     def __init__(self, config):
@@ -25,7 +25,7 @@ class Compressor():
             changed = await (await storage()).compress_all(self.sample_size)
             await self.sleep_after_changed(changed)
 
- 
+
 def start(config: dict) -> None:
     asyncio.create_task(Compressor(config)(), name="c2s_statuses_compression")
 

@@ -170,7 +170,7 @@ def test_a_reply_reference_carries_its_note_as_referrer():
 
 def test_two_references_are_equal_regardless_of_the_carried_object():
     assert (AnnounceReference(url="https://x.example/b", embedded={"id": "https://x.example/b"}) == \
-            AnnounceReference(url="https://x.example/b")) 
+            AnnounceReference(url="https://x.example/b"))
 
 
 def test_a_boosted_reply_yields_both_targets():
