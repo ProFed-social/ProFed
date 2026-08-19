@@ -40,7 +40,12 @@ def _login(monkeypatch, username="christof", token="tok"):
     monkeypatch.setattr(auth, "current_user_optional", AsyncMock(return_value=session))
  
  
-def _status(id="1", content="hello", created_at="2026-07-15T10:00:00Z"):
+def _status(id="1",
+            content="hello",
+            created_at="2026-07-15T10:00:00Z",
+            acct="bob@remote.example",
+            username="bob",
+            display_name="Bob"):
     return {"id": id,
             "content": f"<p>{content}</p>",
             "created_at": created_at,
@@ -51,10 +56,10 @@ def _status(id="1", content="hello", created_at="2026-07-15T10:00:00Z"):
             "reblog": None,
             "uri": f"https://remote.example/{id}",
             "url": f"https://remote.example/{id}",
-            "account": {"url": "https://remote.example/@bob",
-                        "acct": "bob@remote.example",
-                        "username": "bob",
-                        "display_name": "Bob",
+            "account": {"url": f"https://remote.example/@{username}",
+                        "acct": acct,
+                        "username": username,
+                        "display_name": display_name,
                         "avatar": None}}
  
  
@@ -131,4 +136,28 @@ async def test_conversation_list_opens_the_topmost_conversation(monkeypatch):
     body = response.text
     assert "conversations-layout" in body
     assert "topmost body" in body
+
+
+async def test_conversation_marks_the_logged_in_users_own_messages(monkeypatch):
+    _login(monkeypatch)
+    root = _status("10", "from bob")
+    context = {"ancestors": [], "descendants": [_status("11", "from me", "2026-07-15T10:05:00Z",
+                                                        acct="christof", username="christof", display_name="Christof")]}
+    _api(monkeypatch, [_conversation()], root=root, context=context)
+ 
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+ 
+    assert "msg--own" in body
+    assert "msg--other" in body
+ 
+ 
+async def test_conversation_groups_consecutive_messages_of_one_author(monkeypatch):
+    _login(monkeypatch)
+    root = _status("10", "first", "2026-07-15T10:00:00Z")
+    context = {"ancestors": [], "descendants": [_status("11", "second", "2026-07-15T10:05:00Z")]}
+    _api(monkeypatch, [_conversation()], root=root, context=context)
+ 
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+ 
+    assert "msg--run-cont" in body
 

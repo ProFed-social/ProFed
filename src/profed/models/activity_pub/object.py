@@ -9,6 +9,7 @@ class Note(ActivityStreamsObject):
     attributedTo: str
     content: str
     summary: str | None = None
+    inReplyTo: str | None = None
     published: str
     to: list[str] = ["https://www.w3.org/ns/activitystreams#Public"]
     tag: list[dict] = []

@@ -135,6 +135,22 @@ def test_create_status_activity_has_context_and_to(client, fake_bus):
     assert activity["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
     assert activity["object"]["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
 
+ 
+def test_create_reply_sets_in_reply_to_and_direct_recipients(client, fake_bus):
+    root = {"url": "https://remote.example/notes/root"}
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         _store_returning(root), \
+         patch("profed.components.api.c2s.shared.conversations.storage.storage",
+               AsyncMock(return_value=Mock(recipients_for=AsyncMock(return_value=[BOB_URL, CAROL_URL])))):
+        response = client.post("/statuses",
+                               json={"status": "hi", "in_reply_to_id": "424242", "visibility": "direct"})
+ 
+    assert response.status_code == 200
+    obj = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
+    assert obj["inReplyTo"] == "https://remote.example/notes/root"
+    assert obj["to"] == [BOB_URL, CAROL_URL]
+
 
 def test_get_status_returns_404(client, fake_bus):
     response = client.get("/statuses/some-id")

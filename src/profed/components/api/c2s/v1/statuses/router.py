@@ -15,6 +15,7 @@ from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
 from profed.components.api.c2s.shared.statuses import as_objects, service
+from profed.components.api.c2s.shared.conversations import storage as conversations_storage
 from profed.sanitize import sanitize_html
 from profed import mentions
 
@@ -44,6 +45,7 @@ class StatusCreate(BaseModel):
     sensitive: bool = False
     spoiler_text: str = ""
     language: str | None = None
+    in_reply_to_id: str | None = None
 
 
 @router.post("/statuses")
@@ -57,11 +59,16 @@ async def create_status(body: StatusCreate,
         raise HTTPException(status_code=422, detail="status too long")
 
     actor_url  = actor_url_from_username(username)
+    in_reply_to = await (await as_objects.storage()).get(body.in_reply_to_id, 20) if body.in_reply_to_id else None
+    recipients = (await (await conversations_storage.storage()).recipients_for(in_reply_to["url"], actor_url)
+                  if in_reply_to else [])
     note = Note(id=f"{actor_url}/notes/{uuid.uuid4()}",
                 attributedTo=actor_url,
                 content=sanitize_html(body.status),
                 summary=sanitize_html(body.spoiler_text) or None,
-                published=datetime.now(timezone.utc).isoformat())
+                inReplyTo=in_reply_to["url"] if in_reply_to else None,
+                published=datetime.now(timezone.utc).isoformat(),
+                **({"to": recipients} if in_reply_to and body.visibility == "direct" else {}))
     activity = CreateActivity(id=f"{actor_url}#create/{uuid.uuid4()}",
                               actor=actor_url,
                               to=note.to,

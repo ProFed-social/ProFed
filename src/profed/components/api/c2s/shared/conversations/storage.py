@@ -104,6 +104,23 @@ class _storage(BaseStorage):
         await merge(conversation_id)
 
 
+    async def recipients_for(self, conversation_id: str, sender: str) -> List[str]:
+        rows = await self.fetch_all("""
+            SELECT
+                actor_url
+            FROM
+                api.conversation_participants
+            WHERE
+                conversation_id = $1 AND
+                actor_url <> $2
+            ORDER BY
+                begin_time,
+                actor_url""",
+                                    conversation_id,
+                                    sender)
+        return [row["actor_url"] for row in rows]
+
+
     async def conversations_of(self, actor_url: str) -> List[dict]:
         return await self.fetch_all("""
             SELECT
