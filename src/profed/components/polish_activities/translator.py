@@ -17,6 +17,16 @@ _resolve_one = mentions.resolver(lookup)
 _TRANSFORM_VERBS = {"Create", "Update"}
 
 
+def _merge_tag(existing, added):
+    added_hrefs = {mention["href"] for mention in added}
+    kept = [entry for entry in existing if not (isinstance(entry, dict) and entry.get("href") in added_hrefs)]
+    return kept + added
+ 
+ 
+def _merge_cc(existing, added):
+    return existing + [url for url in added if url not in existing]
+ 
+ 
 async def _forward(event_type: str, object_id: str, payload: dict, sequence_id: int) -> None:
     async with message_bus().topic("activities").publish() as publish:
         await publish(event_type=event_type,
@@ -33,7 +43,10 @@ async def _polish_and_forward(event_type: str, object_id: str, payload: dict, se
 
     def set_tag_and_cc(a, obj, tag, cc):
         if isinstance(obj, dict):
-            obj["tag"], obj["cc"] = tag, cc
+            obj["tag"] = _merge_tag(obj.get("tag") or [], tag)
+            obj["cc"] = _merge_cc(obj.get("cc") or [], cc)
+            cc = obj["cc"]
+
         return {**a, "cc": cc or None}
 
     async def resolve_and_linkify(a):

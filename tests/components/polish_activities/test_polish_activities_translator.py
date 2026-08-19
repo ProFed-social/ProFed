@@ -78,6 +78,25 @@ async def test_polish_linkifies_content_and_sets_tag_cc():
 
 
 @pytest.mark.asyncio
+async def test_polish_preserves_existing_tag_when_content_has_no_mentions():
+    payload = {"username": "alice",
+               "activity": {"type": "Create",
+                            "object": {"type": "Note",
+                                       "content": "just plain text",
+                                       "to": ["https://r.io/dave"],
+                                       "tag": [{"type": "Mention",
+                                                "href": "https://r.io/dave",
+                                                "name": "@dave@r.io"}]}}}
+    bus, published = _fake_bus()
+    with patch.object(mod, "message_bus", return_value=bus), \
+         patch.object(mod, "_resolve_one", mentions.resolver(_fake_lookup)):
+        await mod._polish_and_forward("Create", "x", payload, 1)
+ 
+    obj = published[0]["payload"]["activity"]["object"]
+    assert obj["tag"] == [{"type": "Mention", "href": "https://r.io/dave", "name": "@dave@r.io"}]
+
+
+@pytest.mark.asyncio
 async def test_polish_leaves_unresolved_mention_as_text():
     payload = {"username": "alice",
                "activity": {"type": "Create",
