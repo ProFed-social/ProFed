@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.models.mastodon import Status, placeholder_account
+from profed.models.mastodon import ReplyPreview, Status, placeholder_account
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.statuses import as_objects
 
@@ -10,9 +11,17 @@ def _make_status(row: dict, accounts: dict, replies: dict) -> Status:
     def account(accounts: dict, url: str):
         return accounts.get(url) or placeholder_account(url)
 
+    def reply(row, accounts):
+        parent = row.get("parent_content")
+        return (ReplyPreview(account=account(accounts, parent["actor"]),
+                             content=parent["status"].get("content", ""))
+                if parent else None)
+
     def content(row, accounts):
         status = row["content"]["status"]
-        return Status(**{**status, "in_reply_to_id": replies.get(status.get("in_reply_to_id"))},
+        return Status(**{**status,
+                         "in_reply_to_id": replies.get(status.get("in_reply_to_id")),
+                         "reply_to": reply(row, accounts)},
                       account=account(accounts, row["content"]["actor"]))
 
     return (content(row, accounts)
@@ -22,9 +31,14 @@ def _make_status(row: dict, accounts: dict, replies: dict) -> Status:
 
 
 async def make_statuses(rows: list[dict]) -> list[Status]:
+    def actor_urls(row: dict) -> list[str]:
+        parents = [row["parent_content"]["actor"]] if row.get("parent_content") else []
+        return [row["actor_url"], row["content"]["actor"], *parents]
+
+
     accounts = await cached_multiple(list({url
                                            for row in rows
-                                           for url in (row["actor_url"], row["content"]["actor"])}))
+                                           for url in actor_urls(row)}))
     reply_urls = list({url
                        for row in rows
                        if (url := row["content"]["status"].get("in_reply_to_id"))})

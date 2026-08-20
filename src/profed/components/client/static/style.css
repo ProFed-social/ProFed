@@ -439,6 +439,22 @@ a:hover { text-decoration: underline; }
 .msg-bubble :first-child { margin-top: 0; }
 .msg-bubble :last-child { margin-bottom: 0; }
 
+.msg-reply {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  min-width: 180px;
+  font-size: .78rem;
+  color: var(--muted);
+  padding: .1rem .4rem;
+  border-left: 2px solid var(--accent);
+}
+.msg--own .msg-reply { border-left: 0; border-right: 2px solid var(--accent); }
+.msg-reply .avatar { width: 18px; height: 18px; font-size: .55rem; flex: none; }
+.msg-reply-name { font-weight: 600; flex: none; }
+.msg-reply-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+
 .conversation-compose {
   display: flex;
   gap: .5rem;

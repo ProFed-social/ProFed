@@ -214,3 +214,37 @@ async def test_conversation_list_shows_an_avatar_collage_with_overflow_chip(monk
         assert name in body
 
 
+def _reply_msg(id, url, content, in_reply_to_id=None, reply_to=None):
+    return {"id": id,
+            "account": {"acct": url.rsplit("/", 1)[-1], "username": url.rsplit("/", 1)[-1],
+                        "display_name": url.rsplit("/", 1)[-1].title(), "url": url},
+            "content": f"<p>{content}</p>",
+            "in_reply_to_id": in_reply_to_id,
+            "reply_to": reply_to}
+
+
+async def test_conversation_view_omits_the_reply_marking_for_a_self_continuation(monkeypatch):
+    _login(monkeypatch)
+    preview = {"account": {"username": "bob", "display_name": "Bob", "url": "https://x/bob", "avatar": None},
+               "content": "<p>first</p>"}
+    messages = [_reply_msg("1", "https://x/bob", "first"),
+                _reply_msg("2", "https://x/bob", "second", in_reply_to_id="1", reply_to=preview)]
+    _api(monkeypatch, [_conversation()], messages=messages)
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert "msg-reply" not in body
+
+
+async def test_conversation_view_shows_the_reply_marking_across_authors(monkeypatch):
+    _login(monkeypatch)
+    preview = {"account": {"username": "bob", "display_name": "Bob", "url": "https://x/bob", "avatar": None},
+               "content": "<p>first</p>"}
+    messages = [_reply_msg("1", "https://x/bob", "first"),
+                _reply_msg("2", "https://x/alice", "second", in_reply_to_id="1", reply_to=preview)]
+    _api(monkeypatch, [_conversation()], messages=messages)
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert "msg-reply" in body
+

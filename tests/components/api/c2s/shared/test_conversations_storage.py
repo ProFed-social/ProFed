@@ -114,6 +114,8 @@ async def test_messages_of_returns_conversation_messages_ordered_by_time(fake_po
     query = fake_conn.fetch.await_args.args[0]
     assert "FROM\n                api.conversations" in query
     assert "ORDER BY" in query and "message_time" in query
+    assert "api.as_objects AS p" in query
+    assert "parent_content" in query
     assert fake_conn.fetch.await_args.args[1] == "c1"
     assert [row["message_id"] for row in result] == ["m1", "m2"]
 

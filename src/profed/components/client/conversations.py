@@ -24,16 +24,24 @@ async def _get(path: str, token: str):
     return response.json()
 
 
-async def _messages(id: str, token: str):
-    return await _get(f"/api/v1/conversations/{id}/messages", token) or []
+async def _messages(id: str, username: str, token: str):
+    messages = await _get(f"/api/v1/conversations/{id}/messages", token) or []
+    previous = None
+    for message in messages:
+        own_url = actor_url_from_username(username)
+        message["own"] = message["account"]["url"] == own_url
+        if message.get("reply_to"):
+            message["reply_to"]["own"] = message["reply_to"]["account"]["url"] == own_url
+        if previous and message.get("in_reply_to_id") == previous["id"] and message["account"]["url"] == previous["account"]["url"]:
+            message["reply_to"] = None
+        previous = message
+    return messages
 
 
 async def _view(request: Request, session, active_id, pane: str):
     conversations = await _get("/api/v1/conversations", session["token"]) or []
     active_id = active_id if active_id is not None else (conversations[0]["id"] if conversations else None)
-    messages = await _messages(active_id, session["token"]) if active_id is not None else []
-    for message in messages:
-        message["own"] = message["account"]["url"] == actor_url_from_username(session["username"])
+    messages = await _messages(active_id, session["username"], session["token"]) if active_id is not None else []
     return HTMLResponse(environment().get_template("conversation_layout.html").render(conversations=conversations,
                                                                                       active_id=active_id,
                                                                                       messages=messages,

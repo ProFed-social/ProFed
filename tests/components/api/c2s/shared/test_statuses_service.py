@@ -57,3 +57,30 @@ async def test_make_statuses_skips_the_lookup_for_a_top_level_post():
     assert result[0].in_reply_to_id is None
     store.mastodon_ids_for.assert_not_awaited()
 
+
+@pytest.mark.asyncio
+async def test_make_statuses_builds_a_reply_preview_from_the_parent_content():
+    row = {**_row({"id": "5"}),
+           "parent_content": {"status": {"content": "<p>original</p>"},
+                              "actor": "https://x/actors/bob"}}
+    store = AsyncMock(mastodon_ids_for=AsyncMock(return_value={}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([row])
+
+    assert result[0].reply_to is not None
+    assert result[0].reply_to.content == "<p>original</p>"
+    assert result[0].reply_to.account.url == "https://x/actors/bob"
+
+
+@pytest.mark.asyncio
+async def test_make_statuses_leaves_reply_to_none_without_parent_content():
+    store = AsyncMock(mastodon_ids_for=AsyncMock(return_value={}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([_row({"id": "5"})])
+
+    assert result[0].reply_to is None
+

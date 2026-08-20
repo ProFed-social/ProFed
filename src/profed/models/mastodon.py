@@ -172,11 +172,17 @@ def media_attachments_from_attachment(attachment: list) -> list[dict]:
     return [entry_of(item) for item in attachment if isinstance(item, dict) and _attachment_url(item)]
 
 
+class ReplyPreview(BaseModel):
+    account: Account
+    content: str
+
+
 class Status(BaseModel):
     id: str
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     in_reply_to_id: str | None = None
     in_reply_to_account_id: str | None = None
+    reply_to: ReplyPreview | None = None
     sensitive: bool = False
     spoiler_text: str = ""
     visibility: str = "public"

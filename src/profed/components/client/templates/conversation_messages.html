@@ -15,6 +15,17 @@
       {% if run_start and not message.own %}
       <span class="msg-name">{{ message.account.display_name or message.account.username }}</span>
       {% endif %}
+      {% if message.reply_to %}
+      <div class="msg-reply">
+        {% if message.reply_to.account.avatar %}
+        <img class="avatar" src="{{ message.reply_to.account.avatar }}" alt="">
+        {% else %}
+        <span class="avatar avatar-fallback">{{ (message.reply_to.account.display_name or message.reply_to.account.username)[:2] | upper }}</span>
+        {% endif %}
+        <span class="msg-reply-name">{% if message.reply_to.own %}You{% else %}{{ message.reply_to.account.display_name or message.reply_to.account.username }}{% endif %}</span>
+        <span class="msg-reply-text">{{ message.reply_to.content | striptags | truncate(160) }}</span>
+      </div>
+      {% endif %}
       <div class="msg-bubble">{{ message.content | sanitize | safe }}</div>
     </div>
   </div>

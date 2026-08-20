@@ -170,10 +170,14 @@ class _storage(BaseStorage):
                 o.actor_url,
                 o.reblog_of_url,
                 o.status,
-                jsonb_build_object('status', o.status, 'actor', o.actor_url) AS content
+                jsonb_build_object('status', o.status, 'actor', o.actor_url) AS content,
+                CASE WHEN c.parent = c.conversation_id OR p.url IS NULL THEN NULL
+                     ELSE jsonb_build_object('status', p.status, 'actor', p.actor_url)
+                END AS parent_content
             FROM
                 api.conversations AS c INNER JOIN
-                api.as_objects AS o ON o.url = c.message_id
+                api.as_objects AS o ON o.url = c.message_id LEFT JOIN
+                api.as_objects AS p ON c.parent = p.url
             WHERE
                 c.conversation_id = $1
             ORDER BY
