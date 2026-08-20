@@ -168,7 +168,8 @@ class _storage(BaseStorage):
                 o.status,
                 jsonb_build_object('status', o.status, 'actor', o.actor_url) AS content
             FROM
-                api.conversations
+                api.conversations AS c INNER JOIN
+                api.as_objects AS o ON o.url = c.message_id
             WHERE
                 c.conversation_id = $1
             ORDER BY
