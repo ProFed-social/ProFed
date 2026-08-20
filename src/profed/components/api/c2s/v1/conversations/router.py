@@ -46,3 +46,9 @@ async def get_conversations(claims: Annotated[dict, Depends(current_user)]):
                          last_status=last_status.get(row["last_message"]))
             for row in rows]
 
+ 
+@router.get("/conversations/{id}/messages")
+async def conversation_messages(id: str, claims: Annotated[dict, Depends(current_user)]):
+    conversation_id = await (await as_objects.storage()).url_for(id) or id
+    return await service.make_statuses(await (await conversations.storage()).messages_of(conversation_id))
+ 

@@ -77,13 +77,13 @@ def _conversation():
                             "created_at": "2026-07-15T10:00:00Z"}}
 
 
-def _api(monkeypatch, conversations_list, root=None, context=None):
+def _api(monkeypatch, conversations_list, messages=None):
     async def get(path, **kwargs):
         if path == "/api/v1/conversations":
             return _resp(200, conversations_list)
-        if path.endswith("/context"):
-            return _resp(200, context if context is not None else {"ancestors": [], "descendants": []})
-        return _resp(200, root)
+        if path.endswith("/messages"):
+            return _resp(200, messages if messages is not None else [])
+        return _resp(200, None)
     monkeypatch.setattr(conversations, "api_client", lambda: Mock(get=AsyncMock(side_effect=get)))
 
 
@@ -96,7 +96,7 @@ async def test_conversation_list_redirects_an_anonymous_visitor_to_login(monkeyp
 
 async def test_conversation_list_lists_the_users_conversations(monkeypatch):
     _login(monkeypatch)
-    _api(monkeypatch, [_conversation()], root=_status("42"))
+    _api(monkeypatch, [_conversation()], messages=[_status("42")])
 
     response = await _fetch(_app(monkeypatch), "/conversations")
 
@@ -119,10 +119,9 @@ async def test_conversation_list_without_conversations_says_so(monkeypatch):
 
 async def test_conversation_shows_root_and_descendants_sorted_by_time(monkeypatch):
     _login(monkeypatch)
-    root = _status("10", "the root message", "2026-07-15T10:00:00Z")
-    context = {"ancestors": [], "descendants": [_status("11", "a later reply", "2026-07-15T10:05:00Z")]}
-
-    _api(monkeypatch, [_conversation()], root=root, context=context)
+    messages = [_status("10", "the root message", "2026-07-15T10:00:00Z"),
+                _status("11", "a later reply", "2026-07-15T10:05:00Z")]
+    _api(monkeypatch, [_conversation()], messages=messages)
 
     response = await _fetch(_app(monkeypatch), "/conversations/42")
 
@@ -134,7 +133,7 @@ async def test_conversation_shows_root_and_descendants_sorted_by_time(monkeypatc
 
 async def test_conversation_list_opens_the_topmost_conversation(monkeypatch):
     _login(monkeypatch)
-    _api(monkeypatch, [_conversation()], root=_status("42", "topmost body"))
+    _api(monkeypatch, [_conversation()], messages=[_status("42", "topmost body")])
 
     response = await _fetch(_app(monkeypatch), "/conversations")
 
@@ -146,10 +145,10 @@ async def test_conversation_list_opens_the_topmost_conversation(monkeypatch):
 
 async def test_conversation_marks_the_logged_in_users_own_messages(monkeypatch):
     _login(monkeypatch)
-    root = _status("10", "from bob")
-    context = {"ancestors": [], "descendants": [_status("11", "from me", "2026-07-15T10:05:00Z",
-                                                        acct="christof", username="christof", display_name="Christof")]}
-    _api(monkeypatch, [_conversation()], root=root, context=context)
+    messages = [_status("10", "from bob"),
+                _status("11", "from me", "2026-07-15T10:05:00Z",
+                        acct="christof", username="christof", display_name="Christof")]
+    _api(monkeypatch, [_conversation()], messages=messages)
 
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
 
@@ -159,9 +158,9 @@ async def test_conversation_marks_the_logged_in_users_own_messages(monkeypatch):
 
 async def test_conversation_groups_consecutive_messages_of_one_author(monkeypatch):
     _login(monkeypatch)
-    root = _status("10", "first", "2026-07-15T10:00:00Z")
-    context = {"ancestors": [], "descendants": [_status("11", "second", "2026-07-15T10:05:00Z")]}
-    _api(monkeypatch, [_conversation()], root=root, context=context)
+    messages = [_status("10", "first", "2026-07-15T10:00:00Z"),
+                _status("11", "second", "2026-07-15T10:05:00Z")]
+    _api(monkeypatch, [_conversation()], messages=messages)
 
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
 

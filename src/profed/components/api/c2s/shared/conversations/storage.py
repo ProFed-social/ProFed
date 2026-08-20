@@ -161,14 +161,18 @@ class _storage(BaseStorage):
     async def messages_of(self, conversation_id: str) -> List[dict]:
         return await self.fetch_all("""
             SELECT
-                message_id,
-                message_time
+                o.mastodon_id,
+                o.url,
+                o.actor_url,
+                o.reblog_of_url,
+                o.status,
+                jsonb_build_object('status', o.status, 'actor', o.actor_url) AS content
             FROM
                 api.conversations
             WHERE
-                conversation_id = $1
+                c.conversation_id = $1
             ORDER BY
-                message_time""",
+                c.message_time""",
                                     conversation_id)
 
 

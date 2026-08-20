@@ -77,3 +77,24 @@ def test_conversations_empty_when_user_has_none(client):
     assert response.status_code == 200
     assert response.json() == []
 
+
+def test_conversation_messages_joins_the_conversation_with_the_objects(client):
+    objects = Mock(url_for=AsyncMock(return_value="https://r/root"))
+    convs = Mock(messages_of=AsyncMock(return_value=[{"url": "https://r/root"}, {"url": "https://r/m1"}]))
+    root_status = Status(id="1", account=BOB, created_at="2026-01-01T00:00:00+00:00",
+                         uri="https://r/root", url="https://r/root")
+    m1_status = Status(id="2", account=BOB, created_at="2026-01-01T00:01:00+00:00",
+                       uri="https://r/m1", url="https://r/m1")
+ 
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=objects)), \
+         patch("profed.components.api.c2s.shared.conversations.storage.storage",
+               AsyncMock(return_value=convs)), \
+         patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
+               AsyncMock(return_value=[root_status, m1_status])):
+        response = client.get("/conversations/42/messages")
+ 
+    assert response.status_code == 200
+    convs.messages_of.assert_awaited_once_with("https://r/root")
+    assert [s["url"] for s in response.json()] == ["https://r/root", "https://r/m1"]
+

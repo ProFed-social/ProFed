@@ -24,12 +24,7 @@ async def _get(path: str, token: str):
 
 
 async def _messages(id: str, token: str):
-    root = await _get(f"/api/v1/statuses/{id}", token)
-    context = await _get(f"/api/v1/statuses/{id}/context", token) or {}
-    return sorted((message
-                   for message in [root, *context.get("descendants", [])]
-                   if message is not None),
-                  key=lambda message: message["created_at"])
+    return await _get(f"/api/v1/conversations/{id}/messages", token) or []
 
 
 async def _view(request: Request, session, active_id, pane: str):
