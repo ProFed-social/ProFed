@@ -77,6 +77,35 @@ def test_conversations_empty_when_user_has_none(client):
     assert response.status_code == 200
     assert response.json() == []
 
+ 
+def test_conversations_uses_a_placeholder_for_unknown_participants(client):
+    conversations = Mock(conversations_of=AsyncMock(return_value=[
+        {"conversation_id": "https://r/root",
+         "accounts": ["https://remote.example/actors/bob", "https://other.example/users/zoe"],
+         "last_message": "https://r/m4"}]))
+    objects = Mock(rows_for_urls=AsyncMock(return_value=[{"url": "https://r/m4"}]),
+                   mastodon_ids_for=AsyncMock(return_value={"https://r/root": "42"}))
+ 
+    async def get_by_actor_url(actor):
+        return {"account": BOB.model_dump()} if actor == "https://remote.example/actors/bob" else None
+    accounts = Mock(get_by_actor_url=AsyncMock(side_effect=get_by_actor_url))
+ 
+    with patch("profed.components.api.c2s.v1.conversations.router.actor_url_from_username",
+               lambda username: f"https://local/actors/{username}"), \
+         patch("profed.components.api.c2s.shared.conversations.storage.storage",
+               AsyncMock(return_value=conversations)), \
+         patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=objects)), \
+         patch("profed.components.api.c2s.shared.known_accounts.storage.storage",
+               AsyncMock(return_value=accounts)), \
+         patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
+               AsyncMock(return_value=[LAST])):
+        response = client.get("/conversations")
+ 
+    assert response.status_code == 200
+    accounts_out = response.json()[0]["accounts"]
+    assert [a["username"] for a in accounts_out] == ["bob", "zoe"]
+
 
 def test_conversation_messages_joins_the_conversation_with_the_objects(client):
     objects = Mock(url_for=AsyncMock(return_value="https://r/root"))
