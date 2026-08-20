@@ -62,6 +62,7 @@ def test_actor_success(client, fake_storage):
     assert data["preferredUsername"] == "alice"
     assert data["type"] == "Person"
     assert data["id"] == "https://example.com/actors/alice"
+    assert data["url"] == "https://example.com/@alice"
 
 
 def test_actor_not_found(client, fake_storage):
