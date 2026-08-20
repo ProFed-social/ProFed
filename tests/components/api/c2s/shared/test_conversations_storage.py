@@ -95,7 +95,7 @@ async def test_conversations_of_queries_participants_by_actor(fake_pool, fake_co
 
     query = fake_conn.fetch.await_args.args[0]
     assert "api.conversation_participants" in query
-    assert "array_agg(other.actor_url)" in query
+    assert "array_agg(other.actor_url ORDER BY other.begin_time, other.actor_url)" in query
     assert fake_conn.fetch.await_args.args[1] == "https://s/alice"
     assert result == [{"conversation_id": "c1",
                        "accounts": ["https://s/bob"],

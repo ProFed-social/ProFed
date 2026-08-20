@@ -70,10 +70,10 @@ def _status(id="1",
                         "avatar": None}}
 
 
-def _conversation():
+def _conversation(accounts=None):
     return {"id": "42",
             "unread": True,
-            "accounts": [{"username": "bob", "display_name": "Bob"}],
+            "accounts": accounts or [{"username": "bob", "display_name": "Bob"}],
             "last_status": {"content": "<p>last message here</p>",
                             "created_at": "2026-07-15T10:00:00Z"}}
 
@@ -187,4 +187,30 @@ async def test_conversation_reply_posts_a_direct_reply_to_the_root(monkeypatch):
     assert posted["json"] == {"status": "hi", "in_reply_to_id": "42", "visibility": "direct"}
     assert response.status_code == 303
     assert response.headers["location"] == "/conversations/42"
+
+
+async def test_conversation_list_sizes_a_single_avatar_to_the_full_collage(monkeypatch):
+    _login(monkeypatch)
+    _api(monkeypatch, [_conversation()])
+ 
+    body = (await _fetch(_app(monkeypatch), "/conversations")).text
+ 
+    assert "conversation-avatars--1" in body
+ 
+ 
+async def test_conversation_list_shows_an_avatar_collage_with_overflow_chip(monkeypatch):
+    _login(monkeypatch)
+    accounts = [{"username": u, "display_name": u.title()}
+                for u in ["anna", "bob", "carla", "dan", "eve"]]
+    _api(monkeypatch, [_conversation(accounts=accounts)])
+ 
+    body = (await _fetch(_app(monkeypatch), "/conversations")).text
+ 
+    assert "conversation-avatars--3" in body
+    assert "conversation-avatar--more" in body
+    assert "+3" in body
+    assert "conversation-participants" in body
+    for name in ["Anna", "Bob", "Carla", "Dan", "Eve"]:
+        assert name in body
+
 

@@ -353,7 +353,9 @@ a:hover { text-decoration: underline; }
 .conversations-title { margin: 0; padding: .6rem .75rem; font-size: 1.1rem; }
  
 .conversation {
-  display: block;
+  display: flex;
+  gap: .65rem;
+  align-items: center;
   padding: .6rem .75rem;
   border-bottom: 1px solid var(--line);
   color: CanvasText;
@@ -361,7 +363,39 @@ a:hover { text-decoration: underline; }
 }
 .conversation:hover { background: var(--surface); }
 .conversation.active { background: var(--chip-bg); }
-.conversation-accounts { display: block; font-weight: 600; }
+ 
+.conversation-avatars { flex: none; display: flex; position: relative; width: 72px; }
+.conversation-avatar { border: 2px solid Canvas; border-radius: 50%; position: relative; box-sizing: border-box; }
+.conversation-avatar:nth-child(1) { z-index: 3; }
+.conversation-avatar:nth-child(2) { z-index: 2; }
+.conversation-avatar:nth-child(3) { z-index: 1; }
+.conversation-avatars--1 .conversation-avatar { width: 72px; height: 72px; font-size: 1.1rem; }
+.conversation-avatars--2 .conversation-avatar { width: 42px; height: 42px; font-size: .85rem; }
+.conversation-avatars--2 .conversation-avatar:not(:first-child) { margin-left: -12px; }
+.conversation-avatars--3 .conversation-avatar { width: 30px; height: 30px; font-size: .72rem; }
+.conversation-avatars--3 .conversation-avatar:not(:first-child) { margin-left: -9px; }
+.conversation-avatar--more { background: var(--chip-bg); color: var(--muted); font-weight: 600; }
+ 
+.conversation-participants {
+  display: none;
+  position: absolute;
+  top: calc(100% - .3rem);
+  left: 0;
+  z-index: 20;
+  background: Canvas;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+  padding: .4rem .55rem;
+  font-size: .82rem;
+  white-space: nowrap;
+}
+.conversation-avatars:hover .conversation-participants { display: block; }
+.conversation-participants span { display: block; padding: .1rem 0; }
+ 
+.conversation-body { min-width: 0; flex: 1; }
+.conversation-accounts { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .conversation.unread .conversation-accounts::after { content: " •"; color: var(--accent); }
 .conversation-preview {
   display: block;

@@ -1,14 +1,36 @@
 <section class="conversations">
   <h1 class="conversations-title">Conversations</h1>
   {% for conversation in conversations %}
+  {% set n = conversation.accounts | length %}
+  {% set shown = conversation.accounts[:2] if n > 3 else conversation.accounts[:3] %}
+  {% set slots = 3 if n > 3 else ([n, 1] | max) %}
   <a class="conversation{% if conversation.unread %} unread{% endif %}{% if conversation.id == active_id %} active{% endif %}" href="/conversations/{{ conversation.id }}">
-    <span class="conversation-accounts">
-      {% for account in conversation.accounts %}{{ account.display_name or account.username }}{% if not loop.last %}, {% endif %}{% else %}Conversation{% endfor %}
+    <span class="conversation-avatars conversation-avatars--{{ slots }}">
+      {% for account in shown %}
+      {% if account.avatar %}
+      <img class="avatar conversation-avatar" src="{{ account.avatar }}" alt="">
+      {% else %}
+      <span class="avatar avatar-fallback conversation-avatar">{{ (account.display_name or account.username)[:2] | upper }}</span>
+      {% endif %}
+      {% endfor %}
+      {% if n > 3 %}
+      <span class="avatar conversation-avatar conversation-avatar--more">+{{ n - 2 }}</span>
+      {% endif %}
+      {% if conversation.accounts %}
+      <span class="conversation-participants">
+        {% for account in conversation.accounts %}<span>{{ account.display_name or account.username }}</span>{% endfor %}
+      </span>
+      {% endif %}
     </span>
-    {% if conversation.last_status %}
-    <span class="conversation-preview">{{ conversation.last_status.content | striptags }}</span>
-    <time class="conversation-time" datetime="{{ conversation.last_status.created_at }}">{{ conversation.last_status.created_at[:10] }}</time>
-    {% endif %}
+    <span class="conversation-body">
+      <span class="conversation-accounts">
+        {% for account in conversation.accounts %}{{ account.display_name or account.username }}{% if not loop.last %}, {% endif %}{% else %}Conversation{% endfor %}
+      </span>
+      {% if conversation.last_status %}
+      <span class="conversation-preview">{{ conversation.last_status.content | striptags }}</span>
+      <time class="conversation-time" datetime="{{ conversation.last_status.created_at }}">{{ conversation.last_status.created_at[:10] }}</time>
+      {% endif %}
+    </span>
   </a>
   {% else %}
   <p class="empty">No conversations yet.</p>
