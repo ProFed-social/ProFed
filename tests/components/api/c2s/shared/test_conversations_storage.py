@@ -85,6 +85,7 @@ async def test_record_deletes_and_moves_conversations_when_something_merged(fake
     assert any("DELETE FROM api.conversation_participants" in s for s in statements)
     assert any("UPDATE api.conversations" in s for s in statements)
 
+
 @pytest.mark.asyncio
 async def test_conversations_of_queries_participants_by_actor(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"conversation_id": "c1",
