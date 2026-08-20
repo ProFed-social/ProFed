@@ -5,6 +5,7 @@
 from profed.models.activity_pub.activity_streams import ActivityStreamsObject, AnnounceReference, ReplyToReference
 from profed.models.activity_pub.object import Note
 from profed.models.activity_pub.person import Person
+from profed.identity import domain
 from profed.models import UserProfile, MediaReference
 
 
@@ -88,6 +89,13 @@ def test_person_from_user_without_avatar_has_no_icon():
 
     assert person.icon  is None
     assert person.image is None
+
+
+def test_person_from_user_url_points_to_the_html_profile():
+    person = Person.from_user(UserProfile(username="alice"))
+
+    assert person.url == f"https://{domain()}/@alice"
+    assert person.url != person.id
 
 
 def _note(**extra):

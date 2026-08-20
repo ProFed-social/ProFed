@@ -22,6 +22,10 @@ def actor_url_from_username(username: str) -> str:
     return f"https://{domain()}/actors/{username}"
 
 
+def profile_url_from_username(username: str) -> str:
+    return f"https://{domain()}/@{username}"
+
+
 def username_from_acct(acct: str) -> str:
     return acct.split("@", 1)[0]
 

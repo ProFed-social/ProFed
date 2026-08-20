@@ -3,7 +3,7 @@
 
 from typing import ClassVar
 
-from profed.identity import actor_url_from_username
+from profed.identity import actor_url_from_username, profile_url_from_username
 from profed.core.media_storage import media_storage
 from profed.models.resume import Resume
 from profed.models.user_profile import UserProfile
@@ -28,6 +28,7 @@ class Person(Actor):
               "resume": "profed:resume"}]
 
     type: str = "Person"
+    url: str | None = None
     name: str | None = None
     summary: str | None = None
     icon:  dict | None = None
@@ -42,6 +43,7 @@ class Person(Actor):
     def from_user(cls, profile: UserProfile, published: str | None = None) -> "Person":
         actor_url = actor_url_from_username(profile.username)
         return cls(id=actor_url,
+                   url=profile_url_from_username(profile.username),
                    preferredUsername=profile.username,
                    name=profile.name,
                    summary=profile.summary,
