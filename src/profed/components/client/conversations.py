@@ -10,6 +10,7 @@ from typing import Annotated
 from .api_client import api_client
 from .auth import page_context, requires_login
 from .templating import environment
+from profed.identity import actor_url_from_username
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,13 +33,13 @@ async def _view(request: Request, session, active_id, pane: str):
     active_id = active_id if active_id is not None else (conversations[0]["id"] if conversations else None)
     messages = await _messages(active_id, session["token"]) if active_id is not None else []
     for message in messages:
-        message["own"] = message["account"]["acct"] == session["username"]
-    return HTMLResponse(environment().get_template("conversation_layout.html")
-                        .render(conversations=conversations,
-                                active_id=active_id,
-                                messages=messages,
-                                pane=pane,
-                                **(await page_context(request, session))))
+        message["own"] = message["account"]["url"] == actor_url_from_username(session["username"])
+    return HTMLResponse(environment().get_template("conversation_layout.html").render(conversations=conversations,
+                                                                                      active_id=active_id,
+                                                                                      messages=messages,
+                                                                                      pane=pane,
+                                                                                      **(await page_context(request,
+                                                                                                            session))))
 
  
 @router.get("/conversations", response_class=HTMLResponse)

@@ -51,7 +51,8 @@ def _status(id="1",
             created_at="2026-07-15T10:00:00Z",
             acct="bob@remote.example",
             username="bob",
-            display_name="Bob"):
+            display_name="Bob",
+            account_url=None):
     return {"id": id,
             "content": f"<p>{content}</p>",
             "created_at": created_at,
@@ -62,7 +63,7 @@ def _status(id="1",
             "reblog": None,
             "uri": f"https://remote.example/{id}",
             "url": f"https://remote.example/{id}",
-            "account": {"url": f"https://remote.example/@{username}",
+            "account": {"url": account_url or f"https://remote.example/@{username}",
                         "acct": acct,
                         "username": username,
                         "display_name": display_name,
@@ -146,8 +147,13 @@ async def test_conversation_list_opens_the_topmost_conversation(monkeypatch):
 async def test_conversation_marks_the_logged_in_users_own_messages(monkeypatch):
     _login(monkeypatch)
     messages = [_status("10", "from bob"),
-                _status("11", "from me", "2026-07-15T10:05:00Z",
-                        acct="christof", username="christof", display_name="Christof")]
+                _status("11",
+                        "from me",
+                        "2026-07-15T10:05:00Z",
+                        acct="christof@example.com",
+                        username="christof",
+                        display_name="Christof",
+                        account_url="https://example.com/actors/christof")]
     _api(monkeypatch, [_conversation()], messages=messages)
 
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text

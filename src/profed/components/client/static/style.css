@@ -378,7 +378,7 @@ a:hover { text-decoration: underline; }
 .conversation-head .back { display: none; }
 .conversation-messages { padding: .75rem; display: flex; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; }
  
-.msg { display: flex; gap: .5rem; align-items: flex-end; margin-top: .5rem; }
+.msg { display: flex; gap: .5rem; align-items: flex-start; margin-top: .5rem; }
 .msg--run-cont { margin-top: .12rem; }
 .msg--own { flex-direction: row-reverse; }
  
