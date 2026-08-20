@@ -12,7 +12,8 @@ from profed.models.mastodon import (Account,
                                     Relationship,
                                     MediaAttachment,
                                     MediaAttachmentMeta,
-                                    MediaAttachmentMetadata)
+                                    MediaAttachmentMetadata,
+                                    placeholder_account)
 
 
 def test_account_minimal():
@@ -394,4 +395,10 @@ def test_from_activity_without_media_leaves_the_list_empty():
 
     assert Status.from_activity(activity, id="42").media_attachments == []
 
+
+def test_placeholder_account_uses_the_heuristic_acct():
+    account = placeholder_account("https://other.example/users/zoe")
+ 
+    assert account.acct == "zoe@other.example"
+    assert account.username == "zoe"
 

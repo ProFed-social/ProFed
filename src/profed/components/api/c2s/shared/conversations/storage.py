@@ -125,7 +125,10 @@ class _storage(BaseStorage):
         return await self.fetch_all("""
             SELECT
                 me.conversation_id,
-                array_agg(other.actor_url ORDER BY other.begin_time, other.actor_url) AS accounts,
+                array_agg(other.actor_url
+                          ORDER BY COALESCE(other.actor_url = root.actor_url, false) DESC,
+                                   other.begin_time,
+                                   other.actor_url) AS accounts,
                 last.message_id AS last_message
             FROM
                 api.conversation_participants AS me INNER JOIN
@@ -147,7 +150,8 @@ class _storage(BaseStorage):
                     message_time = last_time
                 GROUP BY
                     conversation_id,
-                    message_time) AS last ON last.conversation_id = me.conversation_id
+                    message_time) AS last ON last.conversation_id = me.conversation_id LEFT JOIN
+                api.as_objects AS root ON root.url = me.conversation_id
             WHERE
                 me.actor_url = $1
             GROUP BY

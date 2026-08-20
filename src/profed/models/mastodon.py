@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Any
 
 from .resume import Resume
-from profed.identity import account_id
+from profed.identity import account_id, heuristic_acct
 from profed.sanitize import sanitize_html
 
 
@@ -92,8 +92,10 @@ def mentions_from_tag(tag: list) -> list[dict]:
 
 
 def placeholder_account(actor_url: str) -> Account:
-    username = actor_url.rstrip("/").split("/")[-1]
-    return Account(id="0", username=username, acct=actor_url, display_name=username, url=actor_url)
+    acct = heuristic_acct(actor_url)
+    username = acct.split("@")[0]
+    return Account(id="0", username=username, acct=acct, display_name=username, url=actor_url)
+
 
 
 def tags_from_tag(tag: list) -> list[dict]:
