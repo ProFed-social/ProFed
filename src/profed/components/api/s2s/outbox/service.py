@@ -20,6 +20,5 @@ async def resolve_outbox(username: str) -> OrderedCollection:
  
 async def resolve_note(username: str, note_id: str) -> Optional[dict]:
     obx_storage = await storage()
-    return await obx_storage.by_object_url(username,
-                                           f"{actor_url_from_username(username)}/notes/{note_id}")
+    return await obx_storage.by_object_url(username, f"{actor_url_from_username(username)}/notes/{note_id}")
 
