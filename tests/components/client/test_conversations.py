@@ -180,13 +180,15 @@ async def test_conversation_reply_posts_a_direct_reply_to_the_root(monkeypatch):
     async def post(path, json=None, token=None):
         posted.update(path=path, json=json)
         return _resp(200, _status("99"))
-    monkeypatch.setattr(conversations, "api_client", lambda: Mock(post=AsyncMock(side_effect=post)))
+    monkeypatch.setattr(conversations, "api_client",
+                        lambda: Mock(post=AsyncMock(side_effect=post),
+                                     get=AsyncMock(return_value=_resp(200, []))))
 
     response = await _post(_app(monkeypatch), "/conversations/42/reply", {"status": "hi"})
 
     assert posted["json"] == {"status": "hi", "in_reply_to_id": "42", "visibility": "direct"}
-    assert response.status_code == 303
-    assert response.headers["location"] == "/conversations/42"
+    assert response.status_code == 200
+    assert "conversation-messages" in response.text
 
 
 async def test_conversation_list_sizes_a_single_avatar_to_the_full_collage(monkeypatch):
@@ -233,7 +235,7 @@ async def test_conversation_view_omits_the_reply_marking_for_a_self_continuation
 
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
 
-    assert "msg-reply" not in body
+    assert "msg-reply-name" not in body
 
 
 async def test_conversation_view_shows_the_reply_marking_across_authors(monkeypatch):
@@ -246,5 +248,33 @@ async def test_conversation_view_shows_the_reply_marking_across_authors(monkeypa
 
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
 
-    assert "msg-reply" in body
+
+    assert "msg-reply-name" in body
+
+
+async def test_conversation_reply_targets_an_explicit_message(monkeypatch):
+    _login(monkeypatch)
+    posted = {}
+
+    async def post(path, json=None, token=None):
+        posted.update(json=json)
+        return _resp(200, _status("99"))
+    monkeypatch.setattr(conversations, "api_client",
+                        lambda: Mock(post=AsyncMock(side_effect=post),
+                                     get=AsyncMock(return_value=_resp(200, []))))
+
+    await _post(_app(monkeypatch), "/conversations/42/reply",
+                {"status": "hi", "in_reply_to_id": "7"})
+
+    assert posted["json"]["in_reply_to_id"] == "7"
+
+
+async def test_conversation_view_renders_a_reply_button_with_the_message_id(monkeypatch):
+    _login(monkeypatch)
+    _api(monkeypatch, [_conversation()], messages=[_reply_msg("7", "https://x/bob", "hallo")])
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert "msg-reply-btn" in body
+    assert 'data-reply-id="7"' in body
 

@@ -4,7 +4,7 @@
 import logging
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from typing import Annotated
 
 from .api_client import api_client
@@ -64,14 +64,19 @@ async def conversation(request: Request, id: str, session):
 
 @router.post("/conversations/{id}/reply")
 @requires_login
-async def reply(request: Request, id: str, session, status: Annotated[str, Form()]):
+
+async def reply(request: Request,
+                id: str, session,
+                status: Annotated[str, Form()],
+                in_reply_to_id: Annotated[str, Form()] = ""):
     response = await api_client().post("/api/v1/statuses",
                                        json={"status": status,
-                                             "in_reply_to_id": id,
+                                             "in_reply_to_id": in_reply_to_id or id,
                                              "visibility": "direct"},
                                        token=session["token"])
     if response.status_code != 200:
         logger.warning("posting a reply failed: %s %s", response.status_code, response.text)
         raise HTTPException(status_code=response.status_code, detail="reply failed")
-    return RedirectResponse(f"/conversations/{id}", status_code=303)
+    messages = await _messages(id, session["username"], session["token"])
+    return HTMLResponse(environment().get_template("conversation_messages.html").render(messages=messages))
 
