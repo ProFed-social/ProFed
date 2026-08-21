@@ -26,11 +26,15 @@
         <span class="msg-reply-text">{{ message.reply_to.content | striptags | truncate(160) }}</span>
       </div>
       {% endif %}
-      <div class="msg-bubble">{{ message.content | sanitize | safe }}<button class="msg-reply-btn" type="button" title="Reply"
-             data-reply-id="{{ message.id }}"
-             data-reply-name="{% if message.own %}You{% else %}{{ message.account.display_name or message.account.username }}{% endif %}"
-             data-reply-text="{{ message.content | striptags | truncate(160) }}">&#8617;</button>
-      </div>
+      <div class="msg-bubble">{{ message.content | sanitize | safe }}<div class="msg-actions">
+        <button class="msg-action msg-reply-btn" type="button" title="Antworten"
+                data-reply-id="{{ message.id }}"
+                data-reply-name="{% if message.own %}You{% else %}{{ message.account.display_name or message.account.username }}{% endif %}"
+                data-reply-text="{{ message.content | striptags | truncate(160) }}">&#8617;</button>
+        <button class="msg-action" type="button" title="Reaktion" disabled>&#9825;</button>
+        <button class="msg-action" type="button" title="Lesezeichen" disabled><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+        <button class="msg-action" type="button" title="Mehr">&#8943;</button>
+      </div></div>
     </div>
   </div>
   {% else %}

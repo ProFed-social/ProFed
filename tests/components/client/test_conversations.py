@@ -277,4 +277,6 @@ async def test_conversation_view_renders_a_reply_button_with_the_message_id(monk
 
     assert "msg-reply-btn" in body
     assert 'data-reply-id="7"' in body
+    assert "msg-actions" in body
+    assert "disabled" in body
 
