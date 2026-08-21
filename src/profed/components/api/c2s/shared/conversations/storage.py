@@ -104,19 +104,20 @@ class _storage(BaseStorage):
         await merge(conversation_id)
 
 
-    async def recipients_for(self, conversation_id: str, sender: str) -> List[str]:
+    async def recipients_for(self, in_reply_to: str, sender: str) -> List[str]:
         rows = await self.fetch_all("""
             SELECT
-                actor_url
+                other.actor_url
             FROM
-                api.conversation_participants
+                api.conversations AS msg INNER JOIN
+                api.conversation_participants AS other ON other.conversation_id = msg.conversation_id
             WHERE
-                conversation_id = $1 AND
-                actor_url <> $2
+                msg.message_id = $1 AND
+                other.actor_url <> $2
             ORDER BY
-                begin_time,
-                actor_url""",
-                                    conversation_id,
+                other.begin_time,
+                other.actor_url""",
+                                    in_reply_to,
                                     sender)
         return [row["actor_url"] for row in rows]
 

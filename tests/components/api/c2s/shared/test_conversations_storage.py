@@ -119,3 +119,19 @@ async def test_messages_of_returns_conversation_messages_ordered_by_time(fake_po
     assert fake_conn.fetch.await_args.args[1] == "c1"
     assert [row["message_id"] for row in result] == ["m1", "m2"]
 
+
+@pytest.mark.asyncio
+async def test_recipients_for_resolves_the_conversation_from_the_replied_to_message(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"actor_url": "https://s/bob"},
+                                    {"actor_url": "https://s/carol"}]
+
+    result = await (await storage.storage()).recipients_for("https://s/m2", "https://s/alice")
+
+    query = fake_conn.fetch.await_args.args[0]
+    assert "api.conversations AS msg" in query
+    assert "other.conversation_id = msg.conversation_id" in query
+    assert "msg.message_id = $1" in query
+    assert fake_conn.fetch.await_args.args[1] == "https://s/m2"
+    assert fake_conn.fetch.await_args.args[2] == "https://s/alice"
+    assert result == ["https://s/bob", "https://s/carol"]
+
