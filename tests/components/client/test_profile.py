@@ -144,6 +144,21 @@ def test_status_fragment_author_block_is_optional():
     assert "Bob" not in template.render(status=status, show_author=False)
 
 
+def test_status_fragment_respond_button_carries_the_reply_target():
+    status = {"id": "55",
+              "content": "<p>hi there</p>",
+              "created_at": "2026-01-01T00:00:00+00:00",
+              "reblogs_count": 0,
+              "favourites_count": 0,
+              "account": {"display_name": "Bob", "username": "bob"}}
+
+    out = _ENV.get_template("status.html").render(status=status, show_author=True)
+
+    assert "reply-trigger" in out
+    assert 'data-reply-id="55"' in out
+    assert 'data-reply-name="Bob"' in out
+
+
 def test_masthead_nav_when_logged_in():
     out = _ENV.get_template("base.html").render(current_username="alice",
                                                 login_url="/login?next=%2F%40alice")

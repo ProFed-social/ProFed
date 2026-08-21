@@ -91,7 +91,7 @@ async def test_polish_preserves_existing_tag_when_content_has_no_mentions():
     with patch.object(mod, "message_bus", return_value=bus), \
          patch.object(mod, "_resolve_one", mentions.resolver(_fake_lookup)):
         await mod._polish_and_forward("Create", "x", payload, 1)
- 
+
     obj = published[0]["payload"]["activity"]["object"]
     assert obj["tag"] == [{"type": "Mention", "href": "https://r.io/dave", "name": "@dave@r.io"}]
 

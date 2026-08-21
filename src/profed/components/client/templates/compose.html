@@ -1,4 +1,11 @@
-<form class="compose" hx-post="/compose" hx-target=".posts" hx-swap="afterbegin" hx-on::after-request="if(event.detail.successful) this.reset()">
+<form class="compose" hx-post="/compose" hx-target=".posts" hx-swap="afterbegin">
+  <div class="compose-reply-target" hidden>
+    <span class="compose-reply-target-icon">&#8617;</span>
+    <span class="compose-reply-target-name"></span>
+    <span class="compose-reply-target-text"></span>
+    <button class="compose-reply-clear" type="button" title="Cancel">&times;</button>
+  </div>
+  <input type="hidden" name="in_reply_to_id" value="">
   <textarea name="status" rows="3" required placeholder="What are you working on?"></textarea>
   <button type="submit">Post</button>
 </form>

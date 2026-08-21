@@ -266,6 +266,20 @@ a:hover { text-decoration: underline; }
 
 .follow-button:disabled { opacity: 0.6; cursor: default; }
 
+.compose-reply-target:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .3rem .5rem;
+  background: var(--surface);
+  border-left: 2px solid var(--accent);
+  border-radius: 6px;
+  font-size: .85rem;
+  color: var(--muted);
+}
+.compose-reply-target-name { font-weight: 600; flex: none; }
+.compose-reply-target-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compose .compose-reply-clear { border: none; background: none; border-radius: 0; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 .2rem; }
 
 .compose { display: grid; gap: .6rem; padding: 1.1rem 0; border-bottom: 1px solid var(--line); }
 .compose textarea {

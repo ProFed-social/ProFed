@@ -194,20 +194,20 @@ async def test_conversation_reply_posts_a_direct_reply_to_the_root(monkeypatch):
 async def test_conversation_list_sizes_a_single_avatar_to_the_full_collage(monkeypatch):
     _login(monkeypatch)
     _api(monkeypatch, [_conversation()])
- 
+
     body = (await _fetch(_app(monkeypatch), "/conversations")).text
- 
+
     assert "conversation-avatars--1" in body
- 
- 
+
+
 async def test_conversation_list_shows_an_avatar_collage_with_overflow_chip(monkeypatch):
     _login(monkeypatch)
     accounts = [{"username": u, "display_name": u.title()}
                 for u in ["anna", "bob", "carla", "dan", "eve"]]
     _api(monkeypatch, [_conversation(accounts=accounts)])
- 
+
     body = (await _fetch(_app(monkeypatch), "/conversations")).text
- 
+
     assert "conversation-avatars--3" in body
     assert "conversation-avatar--more" in body
     assert "+3" in body

@@ -44,8 +44,8 @@ async def _mention(actor_url: str) -> dict:
     account = await (await _known_accounts_storage()).get_by_actor_url(actor_url)
     acct = account["acct"] if account else heuristic_acct(actor_url)
     return {"type": "Mention", "href": actor_url, "name": "@" + acct}
- 
- 
+
+
 class StatusCreate(BaseModel):
     status: str
     visibility: str = "public"
@@ -67,7 +67,7 @@ async def create_status(body: StatusCreate,
 
     async def make_note(actor_url, in_reply_to):
         recipients = (await (await conversations_storage.storage()).recipients_for(in_reply_to["url"], actor_url)
-                      if in_reply_to else
+                      if in_reply_to and body.visibility == "direct" else
                       [])
         return Note(id=f"{actor_url}/notes/{uuid.uuid4()}",
                     attributedTo=actor_url,
@@ -78,6 +78,8 @@ async def create_status(body: StatusCreate,
                     **({"to": recipients,
                         "tag": list(await asyncio.gather(*(_mention(recipient) for recipient in recipients)))}
                        if in_reply_to and body.visibility == "direct" else
+                       {"cc": [in_reply_to["actor_url"]], "tag": [await _mention(in_reply_to["actor_url"])]}
+                       if in_reply_to else
                        {}))
 
     async def make_note_and_create_activity(actor_url, in_reply_to):

@@ -21,12 +21,12 @@ def _merge_tag(existing, added):
     added_hrefs = {mention["href"] for mention in added}
     kept = [entry for entry in existing if not (isinstance(entry, dict) and entry.get("href") in added_hrefs)]
     return kept + added
- 
- 
+
+
 def _merge_cc(existing, added):
     return existing + [url for url in added if url not in existing]
- 
- 
+
+
 async def _forward(event_type: str, object_id: str, payload: dict, sequence_id: int) -> None:
     async with message_bus().topic("activities").publish() as publish:
         await publish(event_type=event_type,

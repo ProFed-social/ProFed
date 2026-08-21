@@ -49,7 +49,7 @@ async def _view(request: Request, session, active_id, pane: str):
                                                                                       **(await page_context(request,
                                                                                                             session))))
 
- 
+
 @router.get("/conversations", response_class=HTMLResponse)
 @requires_login
 async def conversation_list(request: Request, session):

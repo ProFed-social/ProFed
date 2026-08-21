@@ -161,6 +161,29 @@ def test_create_reply_sets_in_reply_to_and_direct_recipients(client, fake_bus):
     assert names[CAROL_URL] == "@" + heuristic_acct(CAROL_URL)
 
 
+def test_create_public_reply_mentions_the_parent_author(client, fake_bus):
+    root = {"url": "https://remote.example/notes/root", "actor_url": BOB_URL}
+
+    async def by_actor_url(url):
+        return {"acct": "bob-canonical@elsewhere.example"} if url == BOB_URL else None
+
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         _store_returning(root), \
+         patch("profed.components.api.c2s.v1.statuses.router._known_accounts_storage",
+               AsyncMock(return_value=Mock(get_by_actor_url=AsyncMock(side_effect=by_actor_url)))):
+        response = client.post("/statuses",
+                               json={"status": "hi", "in_reply_to_id": "424242", "visibility": "public"})
+
+    assert response.status_code == 200
+    obj = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
+    assert obj["inReplyTo"] == "https://remote.example/notes/root"
+    assert obj["cc"] == [BOB_URL]
+    assert obj["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
+    names = {t["href"]: t["name"] for t in obj["tag"]}
+    assert names[BOB_URL] == "@bob-canonical@elsewhere.example"
+
+
 def test_get_status_returns_404(client, fake_bus):
     response = client.get("/statuses/some-id")
 

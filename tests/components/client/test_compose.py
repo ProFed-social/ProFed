@@ -67,6 +67,18 @@ async def test_compose_posts_the_status_to_the_api(monkeypatch):
     assert client.post.call_args.kwargs["token"] == "tok"
 
 
+async def test_compose_includes_in_reply_to_id_when_replying(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
+    monkeypatch.setattr(compose, "api_client", lambda: client)
+
+    await _post(_app(monkeypatch), "/compose", {"status": "hi", "in_reply_to_id": "42"})
+
+    assert client.post.call_args.kwargs["json"] == {"status": "hi",
+                                                    "visibility": "public",
+                                                    "in_reply_to_id": "42"}
+
+
 async def test_compose_returns_the_new_status_as_a_fragment(monkeypatch):
     _login(monkeypatch)
     monkeypatch.setattr(compose, "api_client",

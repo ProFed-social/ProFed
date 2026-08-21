@@ -17,9 +17,13 @@ router = APIRouter()
 
 @router.post("/compose", response_class=HTMLResponse)
 @requires_login
-async def compose(request: Request, session, status: Annotated[str, Form()]):
+async def compose(request: Request, session,
+                  status: Annotated[str, Form()],
+                  in_reply_to_id: Annotated[str, Form()] = ""):
     response = await api_client().post("/api/v1/statuses",
-                                       json={"status": status, "visibility": "public"},
+                                       json={"status": status,
+                                             "visibility": "public",
+                                             **({"in_reply_to_id": in_reply_to_id} if in_reply_to_id else {})},
                                        token=session["token"])
     if response.status_code != 200:
         logger.warning("posting a status failed: %s %s", response.status_code, response.text)

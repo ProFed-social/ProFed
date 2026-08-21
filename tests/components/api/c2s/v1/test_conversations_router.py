@@ -77,7 +77,7 @@ def test_conversations_empty_when_user_has_none(client):
     assert response.status_code == 200
     assert response.json() == []
 
- 
+
 def test_conversations_uses_a_placeholder_for_unknown_participants(client):
     conversations = Mock(conversations_of=AsyncMock(return_value=[
         {"conversation_id": "https://r/root",
@@ -85,11 +85,11 @@ def test_conversations_uses_a_placeholder_for_unknown_participants(client):
          "last_message": "https://r/m4"}]))
     objects = Mock(rows_for_urls=AsyncMock(return_value=[{"url": "https://r/m4"}]),
                    mastodon_ids_for=AsyncMock(return_value={"https://r/root": "42"}))
- 
+
     async def get_by_actor_url(actor):
         return {"account": BOB.model_dump()} if actor == "https://remote.example/actors/bob" else None
     accounts = Mock(get_by_actor_url=AsyncMock(side_effect=get_by_actor_url))
- 
+
     with patch("profed.components.api.c2s.v1.conversations.router.actor_url_from_username",
                lambda username: f"https://local/actors/{username}"), \
          patch("profed.components.api.c2s.shared.conversations.storage.storage",
@@ -101,7 +101,7 @@ def test_conversations_uses_a_placeholder_for_unknown_participants(client):
          patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
                AsyncMock(return_value=[LAST])):
         response = client.get("/conversations")
- 
+
     assert response.status_code == 200
     accounts_out = response.json()[0]["accounts"]
     assert [a["username"] for a in accounts_out] == ["bob", "zoe"]
@@ -114,7 +114,7 @@ def test_conversation_messages_joins_the_conversation_with_the_objects(client):
                          uri="https://r/root", url="https://r/root")
     m1_status = Status(id="2", account=BOB, created_at="2026-01-01T00:01:00+00:00",
                        uri="https://r/m1", url="https://r/m1")
- 
+
     with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                AsyncMock(return_value=objects)), \
          patch("profed.components.api.c2s.shared.conversations.storage.storage",
@@ -122,7 +122,7 @@ def test_conversation_messages_joins_the_conversation_with_the_objects(client):
          patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
                AsyncMock(return_value=[root_status, m1_status])):
         response = client.get("/conversations/42/messages")
- 
+
     assert response.status_code == 200
     convs.messages_of.assert_awaited_once_with("https://r/root")
     assert [s["url"] for s in response.json()] == ["https://r/root", "https://r/m1"]

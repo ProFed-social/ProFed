@@ -398,7 +398,7 @@ def test_from_activity_without_media_leaves_the_list_empty():
 
 def test_placeholder_account_uses_the_heuristic_acct():
     account = placeholder_account("https://other.example/users/zoe")
- 
+
     assert account.acct == "zoe@other.example"
     assert account.username == "zoe"
 

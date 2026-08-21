@@ -201,7 +201,7 @@ class _storage(BaseStorage):
                                       WHERE mastodon_id = $1::numeric""",
                                    mastodon_id)
         return row["url"] if row else None
- 
+
     async def rows_for_urls(self, urls: list[str], max_depth: int) -> List[dict]:
         return await self.fetch_all("""SELECT mastodon_id, url, actor_url, reblog_of_url, status,
                                           api.resolve_content(url, $2) AS content
