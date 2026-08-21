@@ -478,18 +478,16 @@ a:hover { text-decoration: underline; }
   padding: .5rem .75rem;
   border-top: 1px solid var(--line);
 }
-.conversation-reply-target {
+.conversation-reply-target:not([hidden]) {
   display: flex;
   align-items: center;
   gap: .4rem;
   padding: .25rem .5rem;
   background: var(--surface);
   border-left: 2px solid var(--accent);
-  border-radius: 18px;
+  border-radius: 6px;
   font-size: .8rem;
   color: var(--muted);
-  font: inherit;
-  resize: none;
 }
 .conversation-reply-target-name { font-weight: 600; flex: none; }
 .conversation-reply-target-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -500,9 +498,11 @@ a:hover { text-decoration: underline; }
   min-width: 0;
   padding: .5rem .75rem;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 18px;
   background: Canvas;
   color: CanvasText;
+  font: inherit;
+  resize: none;
 }
 .conversation-send {
   padding: .5rem 1rem;
