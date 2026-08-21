@@ -111,3 +111,30 @@ async def test_outbox_storage_not_initialized():
     finally:
         outbox._instance = backup
 
+ 
+ 
+@pytest.mark.asyncio
+async def test_by_object_url_returns_the_note_object(fake_pool, fake_conn):
+    store = await outbox.storage()
+    note = {"type": "Note", "id": "https://example.com/actors/alice/notes/abc"}
+    fake_conn.fetchrow = AsyncMock(return_value={"object": note})
+ 
+    result = await store.by_object_url("alice", "https://example.com/actors/alice/notes/abc")
+ 
+    args = fake_conn.fetchrow.call_args[0]
+    assert "s2s_outbox" in args[0]
+    assert "activity->'object'->>'id' = $2" in args[0]
+    assert args[1] == "alice"
+    assert args[2] == "https://example.com/actors/alice/notes/abc"
+    assert result == note
+ 
+ 
+@pytest.mark.asyncio
+async def test_by_object_url_returns_none_when_missing(fake_pool, fake_conn):
+    store = await outbox.storage()
+    fake_conn.fetchrow = AsyncMock(return_value=None)
+ 
+    result = await store.by_object_url("alice", "https://example.com/actors/alice/notes/nope")
+ 
+    assert result is None
+

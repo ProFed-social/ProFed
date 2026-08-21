@@ -36,22 +36,17 @@ def client(cfg):
 def fake_resolve_outbox(monkeypatch):
     fake = AsyncMock()
 
-    monkeypatch.setattr(
-        "profed.components.api.s2s.outbox.router.resolve_outbox",
-        fake,
-    )
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.resolve_outbox", fake)
 
     return fake
 
 
 def test_outbox_success(client, fake_resolve_outbox):
-    fake_resolve_outbox.return_value = {
-        "@context": ["https://www.w3.org/ns/activitystreams"],
-        "id": "https://example.com/actors/alice/outbox",
-        "type": "OrderedCollection",
-        "totalItems": 0,
-        "orderedItems": [],
-    }
+    fake_resolve_outbox.return_value = {"@context": ["https://www.w3.org/ns/activitystreams"],
+                                        "id": "https://example.com/actors/alice/outbox",
+                                        "type": "OrderedCollection",
+                                        "totalItems": 0,
+                                        "orderedItems": []}
 
     response = client.get("/actors/alice/outbox")
 
@@ -65,4 +60,33 @@ def test_outbox_internal_error(client, fake_resolve_outbox):
     response = client.get("/actors/alice/outbox")
 
     assert response.status_code == 500
+
+ 
+@pytest.fixture
+def fake_resolve_note(monkeypatch):
+    fake = AsyncMock()
+ 
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.resolve_note", fake)
+ 
+    return fake
+ 
+ 
+def test_note_success(client, fake_resolve_note):
+    fake_resolve_note.return_value = {"@context": ["https://www.w3.org/ns/activitystreams"],
+                                      "id": "https://example.com/actors/alice/notes/abc",
+                                      "type": "Note",
+                                      "content": "hi"}
+                               
+    response = client.get("/actors/alice/notes/abc")
+ 
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/activity+json")
+ 
+ 
+def test_note_not_found(client, fake_resolve_note):
+    fake_resolve_note.return_value = None
+ 
+    response = client.get("/actors/alice/notes/abc")
+ 
+    assert response.status_code == 404
 
