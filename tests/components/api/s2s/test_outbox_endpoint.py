@@ -90,3 +90,17 @@ def test_note_not_found(client, fake_resolve_note):
  
     assert response.status_code == 404
 
+
+def test_note_gone_serves_the_tombstone(client, fake_resolve_note):
+    fake_resolve_note.return_value = {"@context": "https://www.w3.org/ns/activitystreams",
+                                      "id": "https://example.com/actors/alice/notes/abc",
+                                      "type": "Tombstone",
+                                      "deleted": "2026-08-24T10:00:00+00:00"}
+ 
+    response = client.get("/actors/alice/notes/abc")
+ 
+    assert response.status_code == 410
+    assert response.headers["content-type"].startswith("application/activity+json")
+    assert response.json()["type"] == "Tombstone"
+    assert response.json()["deleted"] == "2026-08-24T10:00:00+00:00"
+ 

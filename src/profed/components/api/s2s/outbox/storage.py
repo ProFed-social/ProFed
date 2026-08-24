@@ -25,17 +25,18 @@ class _storage(BaseStorage):
                            username,
                            activity)
 
-    async def by_object_url(self, username: str, url: str) -> Optional[dict]:
-        row = await self.fetch_one("""SELECT activity->'object' AS object
-                                      FROM api.s2s_outbox
-                                      WHERE username = $1
-                                        AND activity->'object'->>'id' = $2
-                                        AND activity->>'type' IN ('Create', 'Update')
-                                      ORDER BY created_at DESC
-                                      LIMIT 1""",
-                                   username,
-                                   url)
-        return row["object"] if row else None
+    async def latest_for_object(self, username: str, url: str) -> Optional[dict]:
+        return await self.fetch_one("""SELECT activity->>'type' AS type,
+                                              activity->'object' AS object,
+                                              created_at
+                                       FROM api.s2s_outbox
+                                       WHERE username = $1
+                                         AND COALESCE(activity->'object'->>'id', activity->>'object') = $2
+                                         AND activity->>'type' IN ('Create', 'Update', 'Delete')
+                                       ORDER BY created_at DESC
+                                       LIMIT 1""",
+                                    username,
+                                    url)
 
     async def fetch(self, username: str) -> List[dict]:
         rows = await self.fetch_all("""SELECT activity

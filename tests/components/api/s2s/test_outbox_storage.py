@@ -112,29 +112,30 @@ async def test_outbox_storage_not_initialized():
         outbox._instance = backup
 
  
- 
 @pytest.mark.asyncio
-async def test_by_object_url_returns_the_note_object(fake_pool, fake_conn):
+async def test_latest_for_object_returns_the_latest_content_activity(fake_pool, fake_conn):
     store = await outbox.storage()
     note = {"type": "Note", "id": "https://example.com/actors/alice/notes/abc"}
-    fake_conn.fetchrow = AsyncMock(return_value={"object": note})
+    fake_conn.fetchrow = AsyncMock(return_value={"type": "Create", "object": note, "created_at": None})
  
-    result = await store.by_object_url("alice", "https://example.com/actors/alice/notes/abc")
- 
+    result = await store.latest_for_object("alice", "https://example.com/actors/alice/notes/abc")
+
     args = fake_conn.fetchrow.call_args[0]
     assert "s2s_outbox" in args[0]
-    assert "activity->'object'->>'id' = $2" in args[0]
+    assert "COALESCE(activity->'object'->>'id', activity->>'object') = $2" in args[0]
+    assert "activity->>'type' IN ('Create', 'Update', 'Delete')" in args[0]
+    assert "ORDER BY created_at DESC" in args[0]
     assert args[1] == "alice"
     assert args[2] == "https://example.com/actors/alice/notes/abc"
-    assert result == note
- 
+    assert result["type"] == "Create"
+    assert result["object"] == note
  
 @pytest.mark.asyncio
-async def test_by_object_url_returns_none_when_missing(fake_pool, fake_conn):
+async def test_latest_for_object_returns_none_when_missing(fake_pool, fake_conn):
     store = await outbox.storage()
     fake_conn.fetchrow = AsyncMock(return_value=None)
- 
-    result = await store.by_object_url("alice", "https://example.com/actors/alice/notes/nope")
- 
+
+    result = await store.latest_for_object("alice", "https://example.com/actors/alice/notes/nope") 
+
     assert result is None
 

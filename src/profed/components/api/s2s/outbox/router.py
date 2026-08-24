@@ -24,5 +24,5 @@ async def note(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$"), note_id: str 
     resolved = await resolve_note(username, note_id)
     if resolved is None:
         raise HTTPException(status_code=404)
-    return resolved
-
+    return ActivityPubJSONResponse(content=resolved, status_code=410 if resolved["type"] == "Tombstone" else 200)
+ 
