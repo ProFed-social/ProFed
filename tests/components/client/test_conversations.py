@@ -294,7 +294,8 @@ async def test_conversation_offers_deleting_an_own_message(monkeypatch):
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
  
     assert 'hx-delete="/statuses/11"' in body
-    assert 'hx-target="closest .msg"' in body
+
+    assert 'hx-target="closest .entry"' in body
  
  
 async def test_conversation_omits_deleting_a_foreign_message(monkeypatch):

@@ -1,7 +1,7 @@
 <div id="conversation-messages" class="conversation-messages">
   {% for message in messages %}
   {% set run_start = loop.first or loop.previtem.account.acct != message.account.acct %}
-  <div class="msg {{ 'msg--own' if message.own else 'msg--other' }} {{ 'msg--run-start' if run_start else 'msg--run-cont' }}">
+  <div class="msg entry {{ 'msg--own' if message.own else 'msg--other' }} {{ 'msg--run-start' if run_start else 'msg--run-cont' }}">
     <div class="msg-avatar">
       {% if run_start %}
       {% if message.account.avatar %}
@@ -27,22 +27,22 @@
       </div>
       {% endif %}
       <div class="msg-bubble">{{ message.content | sanitize | safe }}<div class="msg-actions">
-        <button class="msg-action msg-reply-btn" type="button" title="Antworten"
+        <button class="msg-action msg-reply-btn" type="button" title="Reply"
                 data-reply-id="{{ message.id }}"
                 data-reply-name="{% if message.own %}You{% else %}{{ message.account.display_name or message.account.username }}{% endif %}"
                 data-reply-text="{{ message.content | striptags | truncate(160) }}">&#8617;</button>
-        <button class="msg-action" type="button" title="Reaktion" disabled>&#9825;</button>
-        <button class="msg-action" type="button" title="Lesezeichen" disabled><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+        <button class="msg-action" type="button" title="React" disabled>&#9825;</button>
+        <button class="msg-action" type="button" title="Bookmark" disabled><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
         <details class="action-menu">
-          <summary class="msg-action" title="Mehr" aria-label="Mehr">&#8943;</summary>
+          <summary class="msg-action" title="More" aria-label="More">&#8943;</summary>
           <ul class="action-menu-items">
-            <li><a class="action-menu-item" href="{{ message.url }}">Permalink</a></li>
+            <li><a class="u-url action-menu-item" href="{{ message.url }}">Permalink</a></li>
             {% if message.own %}
             <li><button type="button" class="action-menu-item destructive"
                         hx-delete="/statuses/{{ message.id }}"
-                        hx-target="closest .msg"
+                        hx-target="closest .entry"
                         hx-swap="delete"
-                        hx-confirm="Diese Nachricht löschen?">Löschen</button></li>
+                        hx-confirm="Delete this message?">Delete</button></li>
             {% endif %}
           </ul>
         </details>

@@ -2,7 +2,7 @@
 {% macro timeline_block(block, own_acct=None) %}
 {% set parts = block.parts %}
 {% set head = parts[0] %}
-<article class="h-entry status thread{% if parts|length > 1 %} multipart{% endif %}{% if block.booster %} boosted{% endif %}">
+<article class="h-entry status entry thread{% if parts|length > 1 %} multipart{% endif %}{% if block.booster %} boosted{% endif %}">
   {% if block.booster %}
   <p class="boost-head"><span class="boost-who">{{ block.booster.display_name or block.booster.username }}</span> shared</p>
   {% endif %}
@@ -30,13 +30,12 @@
   </header>
   <div class="thread-body not-expandable">
     {% for part in parts %}
-    <div class="thread-part{% if part.id in block.boosted %} boosted-part{% endif %}">
+    <div class="thread-part entry{% if part.id in block.boosted %} boosted-part{% endif %}">
       <div class="status-head meta-only">
         <span class="status-side">
           {{ visibility_icon(part) }}
-          <a class="u-url permalink" href="{{ part.url }}">
-            <time class="dt-published" datetime="{{ part.created_at }}">{{ part.created_at[:10] }}</time>
-          </a>
+          <time class="dt-published" datetime="{{ part.created_at }}"
+                title="{{ part.created_at | local_minutes }}">{{ part.created_at | relative_time }}</time>
         </span>
       </div>
       <div class="e-content part-content">{{ part.content | sanitize | safe }}</div>

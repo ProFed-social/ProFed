@@ -13,23 +13,23 @@
 {% endmacro %}
 {% macro status_actions(s, uid=true, author=true, own_acct=None) %}
 <footer class="actions">
-  <button type="button" class="action respond reply-trigger" title="Antworten" aria-label="Antworten"
+  <button type="button" class="action respond reply-trigger" title="Reply" aria-label="Reply"
           data-reply-id="{{ s.id }}"
           data-reply-name="{{ (s.account.display_name or s.account.username) if author and s.account else '' }}"
           data-reply-text="{{ s.content | striptags | truncate(160) }}">&#8617;</button>
-  <button type="button" class="action boost" title="Teilen" aria-label="Teilen">&#8634; <span class="count">{{ s.reblogs_count }}</span></button>
-  <button type="button" class="action like" title="Gefällt mir" aria-label="Gefällt mir">&#9825; <span class="count">{{ s.favourites_count }}</span></button>
-  <button type="button" class="action bookmark" title="Lesezeichen" aria-label="Lesezeichen"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+  <button type="button" class="action boost" title="Share" aria-label="Share">&#8634; <span class="count">{{ s.reblogs_count }}</span></button>
+  <button type="button" class="action like" title="Like" aria-label="Like">&#9825; <span class="count">{{ s.favourites_count }}</span></button>
+  <button type="button" class="action bookmark" title="Bookmark" aria-label="Bookmark"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>^
   <details class="action-menu">
-    <summary class="action menu" title="Mehr" aria-label="Mehr">&#8943;</summary>
+    <summary class="action menu" title="More" aria-label="More">&#8943;</summary>
     <ul class="action-menu-items">
-      <li><a class="action-menu-item" href="{{ s.url }}">Permalink</a></li>
+      <li><a class="u-url action-menu-item" href="{{ s.url }}">Permalink</a></li>
       {% if own_acct and s.account and s.account.acct == own_acct %}
       <li><button type="button" class="action-menu-item destructive"
                   hx-delete="/statuses/{{ s.id }}"
-                  hx-target="closest .status"
+                  hx-target="closest .entry"
                   hx-swap="delete"
-                  hx-confirm="Diesen Beitrag löschen?">Löschen</button></li>
+                  hx-confirm="Delete this post?">Delete</button></li>
       {% endif %}
     </ul>
   </details>
@@ -37,7 +37,7 @@
 </footer>
 {% endmacro %}
 {% macro status_entry(s, booster=None, show_author=true, own_acct=None) %}
-<article class="h-entry status">
+<article class="h-entry status entry">
   <header class="status-head{% if not show_author %} meta-only{% endif %}">
     {% if show_author %}
     <a class="p-author h-card author" rel="author" href="{{ s.account.url }}">
@@ -59,9 +59,8 @@
     {% endif %}
     <span class="status-side">
       {{ visibility_icon(s) }}
-      <a class="u-url permalink" href="{{ s.url }}">
-        <time class="dt-published" datetime="{{ s.created_at }}">{{ s.created_at[:10] }}</time>
-      </a>
+      <time class="dt-published" datetime="{{ s.created_at }}"
+            title="{{ s.created_at | local_minutes }}">{{ s.created_at | relative_time }}</time>
     </span>
   </header>
   <div class="e-content not-expandable">{{ s.content | sanitize | safe }}</div>

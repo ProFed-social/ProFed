@@ -124,3 +124,20 @@ async def test_home_does_not_touch_the_api_for_an_anonymous_visitor(monkeypatch)
 
     client.get.assert_not_awaited()
 
+
+async def test_home_targets_the_single_thread_part_when_deleting(monkeypatch):
+    _login(monkeypatch)
+    mine = _status("my own post", acct="christof@test.local")
+    block = {"parts": [mine, {**mine, "id": "2", "content": "and more"}],
+             "booster": None,
+             "boosted": [],
+             "cursor": "1"}
+    monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=_resp(200, [block]))))
+ 
+    body = (await _fetch(_app(monkeypatch), "/")).text
+ 
+    assert body.count('hx-target="closest .entry"') == 2
+    assert body.count('class="thread-part entry') == 2
+    assert 'hx-delete="/statuses/1"' in body
+    assert 'hx-delete="/statuses/2"' in body
+

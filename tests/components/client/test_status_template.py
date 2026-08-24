@@ -176,14 +176,14 @@ def test_the_menu_offers_deleting_an_own_status():
     rendered = _render(STATUS, current_acct="alice")
 
     assert 'hx-delete="/statuses/' in rendered
-    assert "Löschen" in rendered
+    assert ">Delete</button>" in rendered
 
 
 def test_the_menu_omits_deleting_a_foreign_status():
     rendered = _render(STATUS, current_acct="bob@remote.example")
 
     assert "hx-delete" not in rendered
-    assert "Löschen" not in rendered
+    assert ">Delete</button>" not in rendered
 
 
 def test_the_menu_omits_deleting_for_an_anonymous_visitor():
@@ -198,3 +198,21 @@ def test_the_menu_is_a_details_element_that_works_without_javascript():
     assert '<details class="action-menu">' in rendered
     assert '<summary class="action menu"' in rendered
 
+
+def test_the_timestamp_is_colloquial_and_carries_the_exact_time_as_a_tooltip():
+    rendered = _render(STATUS)
+ 
+    assert 'title="2026-01-01 10:00"' in rendered
+    assert 'datetime="2026-01-01T10:00:00.000Z"' in rendered
+    assert " ago" in rendered
+ 
+ 
+def test_the_timestamp_is_no_longer_a_link():
+    rendered = _render(STATUS)
+ 
+    assert "permalink" not in rendered
+ 
+ 
+def test_the_entry_url_comes_from_the_menu_permalink(entry):
+    assert entry["properties"]["url"] == ["https://example.com/@alice/1"]
+ 
