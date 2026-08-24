@@ -33,7 +33,19 @@
                 data-reply-text="{{ message.content | striptags | truncate(160) }}">&#8617;</button>
         <button class="msg-action" type="button" title="Reaktion" disabled>&#9825;</button>
         <button class="msg-action" type="button" title="Lesezeichen" disabled><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
-        <button class="msg-action" type="button" title="Mehr">&#8943;</button>
+        <details class="action-menu">
+          <summary class="msg-action" title="Mehr" aria-label="Mehr">&#8943;</summary>
+          <ul class="action-menu-items">
+            <li><a class="action-menu-item" href="{{ message.url }}">Permalink</a></li>
+            {% if message.own %}
+            <li><button type="button" class="action-menu-item destructive"
+                        hx-delete="/statuses/{{ message.id }}"
+                        hx-target="closest .msg"
+                        hx-swap="delete"
+                        hx-confirm="Diese Nachricht löschen?">Löschen</button></li>
+            {% endif %}
+          </ul>
+        </details>
       </div></div>
     </div>
   </div>
