@@ -137,9 +137,13 @@ async def delete_status(id: str,
         raise HTTPException(status_code=401, detail="invalid_token")
     actor_url = actor_url_from_username(username)
 
+    url = await (await as_objects.storage()).url_for_author(id, actor_url) if id.isdigit() else None
+    if url is None:
+        raise HTTPException(status_code=404, detail="status_not_found")
+ 
     activity = DeleteActivity(id=f"{actor_url}#delete/{id}",
                               actor=actor_url,
-                              object=id)
+                              object=url)
 
     async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Delete",

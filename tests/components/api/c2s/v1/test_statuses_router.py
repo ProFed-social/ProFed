@@ -9,7 +9,7 @@ from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.auth import current_user
 from profed.models.mastodon import Account
-from profed.identity import account_id, heuristic_acct
+from profed.identity import account_id, actor_url_from_username, heuristic_acct
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
@@ -190,15 +190,48 @@ def test_get_status_returns_404(client, fake_bus):
     assert response.status_code == 404
 
 
-def test_delete_status_publishes_delete_activity(client, fake_bus):
-    response = client.delete("/statuses/notes-123")
+def _store_resolving_author(url):
+    return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                 AsyncMock(return_value=Mock(url_for_author=AsyncMock(return_value=url))))
+ 
+ 
+def test_delete_status_publishes_delete_activity_for_the_note_url(client, fake_bus):
+    with _store_resolving_author(NOTE_URL):
+        response = client.delete("/statuses/424242")
 
     assert response.status_code == 200
     published = fake_bus.topic("raw_activities").published
     assert len(published) == 1
     assert published[0]["event_type"] == "Delete"
     assert published[0]["payload"]["username"] == "alice"
-
+    assert published[0]["payload"]["activity"]["object"] == NOTE_URL
+ 
+ 
+def test_delete_status_resolves_the_url_for_the_authenticated_author(client, fake_bus):
+    store = Mock(url_for_author=AsyncMock(return_value=NOTE_URL))
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        client.delete("/statuses/424242")
+ 
+    store.url_for_author.assert_awaited_once_with("424242", actor_url_from_username("alice"))
+ 
+ 
+def test_delete_status_returns_404_for_a_foreign_status(client, fake_bus):
+    with _store_resolving_author(None):
+        response = client.delete("/statuses/500")
+ 
+    assert response.status_code == 404
+    assert fake_bus.topic("raw_activities").published == []
+ 
+ 
+def test_delete_status_returns_404_for_a_non_numeric_id(client, fake_bus):
+    store = Mock(url_for_author=AsyncMock(return_value=NOTE_URL))
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        response = client.delete("/statuses/notes-123")
+ 
+    assert response.status_code == 404
+    store.url_for_author.assert_not_awaited()
+    assert fake_bus.topic("raw_activities").published == []
+ 
 
 def test_status_context_returns_empty_context(client, fake_bus):
     response = client.get("/statuses/some-id/context")
