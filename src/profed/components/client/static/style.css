@@ -237,12 +237,13 @@ a:hover { text-decoration: underline; }
 .actions .action .count { font-size: .8rem; }
 .actions .action svg { display: block; }
 .visibility svg { display: block; }
-.actions .action.menu { margin-left: auto; }
-.action-menu { position: relative; margin-left: auto; }
+.action-menu { position: relative; display: flex; align-items: center; margin-left: auto; }
 .action-menu > summary { list-style: none; }
 .action-menu > summary::-webkit-details-marker { display: none; }
+.msg-actions .action-menu { margin-left: 0; }
+.msg:has(.action-menu[open]) .msg-actions { opacity: 1; }
 .action-menu-items {
-  position: absolute; right: 0; z-index: 10; min-width: 11rem; margin: .25rem 0 0;
+  position: absolute; top: 100%; right: 0; z-index: 10; min-width: 11rem; margin: .25rem 0 0;
   padding: .25rem; list-style: none; border: 1px solid var(--line); border-radius: .5rem;
   background: Canvas; box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
 }
