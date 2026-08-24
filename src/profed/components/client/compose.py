@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from typing import Annotated
 
 from .api_client import api_client
-from .auth import requires_login
+from .auth import page_context, requires_login
 from .templating import environment
 
 logger = logging.getLogger(__name__)
@@ -29,5 +29,6 @@ async def compose(request: Request, session,
         logger.warning("posting a status failed: %s %s", response.status_code, response.text)
         raise HTTPException(status_code=response.status_code, detail="posting failed")
 
-    return HTMLResponse(environment().get_template("status.html").render(status=response.json()))
+    return HTMLResponse(environment().get_template("status.html").render(status=response.json(),
+                                                                         **(await page_context(request, session))))
 

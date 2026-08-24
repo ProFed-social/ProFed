@@ -1,5 +1,5 @@
 {% from "status.html" import visibility_icon, status_actions %}
-{% macro timeline_block(block) %}
+{% macro timeline_block(block, own_acct=None) %}
 {% set parts = block.parts %}
 {% set head = parts[0] %}
 <article class="h-entry status thread{% if parts|length > 1 %} multipart{% endif %}{% if block.booster %} boosted{% endif %}">
@@ -40,7 +40,7 @@
         </span>
       </div>
       <div class="e-content part-content">{{ part.content | sanitize | safe }}</div>
-      {{ status_actions(part, uid=false) }}
+      {{ status_actions(part, uid=false, own_acct=own_acct) }}
     </div>
     {% endfor %}
   </div>

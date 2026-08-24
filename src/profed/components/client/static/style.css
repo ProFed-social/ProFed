@@ -238,6 +238,20 @@ a:hover { text-decoration: underline; }
 .actions .action svg { display: block; }
 .visibility svg { display: block; }
 .actions .action.menu { margin-left: auto; }
+.action-menu { position: relative; margin-left: auto; }
+.action-menu > summary { list-style: none; }
+.action-menu > summary::-webkit-details-marker { display: none; }
+.action-menu-items {
+  position: absolute; right: 0; z-index: 10; min-width: 11rem; margin: .25rem 0 0;
+  padding: .25rem; list-style: none; border: 1px solid var(--line); border-radius: .5rem;
+  background: Canvas; box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
+}
+.action-menu-item {
+  display: block; width: 100%; padding: .4rem .6rem; border: 0; border-radius: .35rem;
+  background: none; color: CanvasText; font: inherit; text-align: left; text-decoration: none; cursor: pointer;
+}
+.action-menu-item:hover { background: color-mix(in srgb, CanvasText 8%, transparent); }
+.action-menu-item.destructive { color: var(--danger, #b3261e); }
 
 @media (max-width: 480px) {
   .identity { grid-template-columns: 1fr; }

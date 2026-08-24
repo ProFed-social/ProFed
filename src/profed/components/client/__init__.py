@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from . import api_client, profile, auth, settings, home, compose, conversations
+from . import api_client, profile, auth, settings, home, compose, conversations, statuses
 from profed.core.key_value_store import init_key_value_store
 
 
@@ -15,6 +15,7 @@ async def mount_endpoints(app, config):
     app.include_router(home.router)
     app.include_router(conversations.router)
     app.include_router(compose.router)
+    app.include_router(statuses.router)
     app.include_router(profile.router)
     app.include_router(auth.router)
     app.include_router(settings.router)

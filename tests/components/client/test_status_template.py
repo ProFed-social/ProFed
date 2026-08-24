@@ -171,3 +171,30 @@ def test_content_starts_collapsible_with_both_toggles():
     assert 'class="show-more"' in rendered
     assert 'class="show-less"' in rendered
 
+
+def test_the_menu_offers_deleting_an_own_status():
+    rendered = _render(STATUS, current_acct="alice")
+
+    assert 'hx-delete="/statuses/' in rendered
+    assert "Löschen" in rendered
+
+
+def test_the_menu_omits_deleting_a_foreign_status():
+    rendered = _render(STATUS, current_acct="bob@remote.example")
+
+    assert "hx-delete" not in rendered
+    assert "Löschen" not in rendered
+
+
+def test_the_menu_omits_deleting_for_an_anonymous_visitor():
+    rendered = _render(STATUS)
+
+    assert "hx-delete" not in rendered
+
+
+def test_the_menu_is_a_details_element_that_works_without_javascript():
+    rendered = _render(STATUS, current_acct="alice")
+
+    assert '<details class="action-menu">' in rendered
+    assert '<summary class="action menu"' in rendered
+

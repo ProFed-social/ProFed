@@ -4,7 +4,7 @@
 {% include "compose.html" %}
 <section class="h-feed posts">
   {% for block in blocks %}
-  {{ timeline_block(block) }}
+  {{ timeline_block(block, own_acct=current_acct) }}
   {% else %}
   <p class="empty">Your timeline is empty. Follow someone to see their posts here.</p>
   {% endfor %}

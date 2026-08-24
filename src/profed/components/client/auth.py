@@ -64,6 +64,7 @@ async def current_user(request: Request):
 async def page_context(request, session=None):
     session = session if session is not None else await current_user_optional(request)
     return {"current_username": (session or {}).get("username"),
+            "current_acct": (session or {}).get("acct"),
             "login_url": _login_url(request)}
 
 
