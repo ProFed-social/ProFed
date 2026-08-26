@@ -79,7 +79,8 @@ async def web_service():
 
 
 if __name__ == "__main__":
-    config.set_defaults({"profed": {"run": STANDARD_COMPONENTS}})
+    config.set_defaults({"profed": {"run": STANDARD_COMPONENTS,
+                                    "http_client_timeout": 5}})
     cfg = config()
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")

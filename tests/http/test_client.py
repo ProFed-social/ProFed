@@ -96,3 +96,14 @@ async def test_without_sign_uses_request_directly():
     client.build_request.assert_not_called()
     client.send.assert_not_called()
 
+
+@pytest.mark.asyncio
+async def test_uses_the_configured_timeout():
+    with patch("profed.http.client.httpx.AsyncClient") as mock_cls, \
+         patch("profed.http.client.config", return_value={"profed": {"http_client_timeout": 30}}):
+        mock_cls.return_value.__aenter__.return_value.request = \
+            AsyncMock(return_value=_mock_response())
+        await HttpClient().get("https://example.com/")
+ 
+    assert mock_cls.call_args.kwargs["timeout"] == 30
+
