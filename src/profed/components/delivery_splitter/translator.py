@@ -18,6 +18,8 @@ from .storage import storage
 
 logger = logging.getLogger(__name__)
 
+_PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
+
 
 def _follow_target(activity: dict) -> str | None:
     obj = activity.get("object")
@@ -65,8 +67,18 @@ async def _directed_recipients(target, activity: dict) -> set[str]:
     return {acct} if acct else set()
 
 
+def _audience(activity: dict) -> set[str]:
+    obj = activity.get("object")
+    return {url
+            for part in (activity, obj if isinstance(obj, dict) else {})
+            for key in ("to", "cc")
+            for url in (part.get(key) or [])}
+
+ 
 async def _followers_and_mentions(activity: dict, username: str, emitted_at) -> set[str]:
-    return (await recipients_at(acct_from_username(username), emitted_at) |
+    return ((await recipients_at(acct_from_username(username), emitted_at)
+             if _PUBLIC in _audience(activity) else
+             set()) |
             await _mentioned_accts(activity))
 
 

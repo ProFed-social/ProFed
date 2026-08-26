@@ -33,10 +33,17 @@ def fake_storage():
     storage_module._instance = backup
 
 
-def _payload():
+PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
+ 
+ 
+def _payload(to=None, cc=None, tag=None):
     return {"username": "alice",
             "activity": {"actor": "https://example.com/actors/alice",
-                         "object": {"id": "https://example.com/notes/1", "type": "Note"}}}
+                         "object": {"id": "https://example.com/notes/1",
+                                    "type": "Note",
+                                    "to": [PUBLIC] if to is None else to,
+                                    "cc": cc or [],
+                                    "tag": tag or []}}}
 
 
 @pytest.mark.asyncio
@@ -104,8 +111,10 @@ async def test_directed_recipients_uses_lookup_acct():
 async def test_create_recipients_uses_recipients_at():
     with patch.object(translator, "recipients_at", AsyncMock(return_value={"x@remote.example"})), \
          patch.object(translator, "acct_from_username", return_value="alice@example.com"):
-        result = await translator._create_recipients("https://example.com/notes/1", {}, "alice", AT)
-
+        result = await translator._create_recipients("https://example.com/notes/1",
+                                                     {"object": {"to": [PUBLIC]}},
+                                                     "alice",
+                                                     AT)
     assert result == {"x@remote.example"}
 
 
@@ -136,13 +145,7 @@ async def test_reject_queues_to_target_from_object_actor(fake_bus, fake_storage)
 
 
 def _payload_with_mention(mention_url="https://remote.example/actors/dave"):
-    return {"username": "alice",
-            "activity": {"actor": "https://example.com/actors/alice",
-                         "object": {"id": "https://example.com/notes/1",
-                                    "type": "Note",
-                                    "tag": [{"type": "Mention", "href": mention_url,
-                                             "name": "@dave@remote.example"}]}}}
-
+    return _payload(tag=[{"type": "Mention", "href": mention_url, "name": "@dave@remote.example"}])
 
 @pytest.mark.asyncio
 async def test_create_stores_recipients_under_the_object_url(fake_bus, fake_storage):
@@ -210,4 +213,86 @@ async def test_delete_drops_the_recipients_row(fake_bus, fake_storage):
         await translator._delete("Delete", "https://example.com/act/3", delete_payload, AT)
 
     assert "https://example.com/notes/1" not in fake_storage.recipients
+
+
+@pytest.mark.asyncio
+async def test_create_of_a_direct_note_reaches_only_the_mentioned(fake_bus, fake_storage):
+    payload = _payload(to=["https://remote.example/actors/dave"],
+                       tag=[{"type": "Mention",
+                             "href": "https://remote.example/actors/dave",
+                             "name": "@dave@remote.example"}])
+    with patch.object(translator, "recipients_at", AsyncMock(return_value={"bob@remote.example"})), \
+         patch.object(translator, "acct_from_username", return_value="alice@example.com"), \
+         patch.object(translator, "lookup_acct", AsyncMock(return_value="dave@remote.example")):
+        await translator._create("Create", "https://example.com/act/1", payload, AT)
+ 
+    queued = {p["object_id"].split("|", 1)[1] for p in fake_bus.topic("deliveries").published}
+    assert queued == {"dave@remote.example"}
+ 
+ 
+@pytest.mark.asyncio
+async def test_create_of_a_direct_note_does_not_query_the_followers(fake_bus, fake_storage):
+    with patch.object(translator, "recipients_at", AsyncMock(return_value=set())) as rec, \
+         patch.object(translator, "acct_from_username", return_value="alice@example.com"):
+        await translator._create("Create",
+                                 "https://example.com/act/1",
+                                 _payload(to=["https://remote.example/actors/dave"]),
+                                 AT)
+ 
+    rec.assert_not_awaited()
+ 
+ 
+@pytest.mark.asyncio
+async def test_create_of_an_unlisted_note_reaches_the_followers(fake_bus, fake_storage):
+    with patch.object(translator, "recipients_at", AsyncMock(return_value={"bob@remote.example"})), \
+         patch.object(translator, "acct_from_username", return_value="alice@example.com"):
+        await translator._create("Create",
+                                 "https://example.com/act/1",
+                                 _payload(to=[], cc=[PUBLIC]),
+                                 AT)
+ 
+    queued = {p["object_id"].split("|", 1)[1] for p in fake_bus.topic("deliveries").published}
+    assert queued == {"bob@remote.example"}
+ 
+ 
+@pytest.mark.asyncio
+async def test_create_reads_the_audience_from_the_activity_as_well(fake_bus, fake_storage):
+    payload = _payload(to=[])
+    payload["activity"]["to"] = [PUBLIC]
+    with patch.object(translator, "recipients_at", AsyncMock(return_value={"bob@remote.example"})), \
+         patch.object(translator, "acct_from_username", return_value="alice@example.com"):
+        await translator._create("Create", "https://example.com/act/1", payload, AT)
+ 
+    queued = {p["object_id"].split("|", 1)[1] for p in fake_bus.topic("deliveries").published}
+    assert queued == {"bob@remote.example"}
+ 
+ 
+@pytest.mark.asyncio
+async def test_update_of_a_direct_note_keeps_the_stored_recipients(fake_bus, fake_storage):
+    fake_storage.recipients["https://example.com/notes/1"] = {"dave@remote.example"}
+    with patch.object(translator, "recipients_at", AsyncMock(return_value={"bob@remote.example"})), \
+         patch.object(translator, "acct_from_username", return_value="alice@example.com"):
+        await translator._update("Update",
+                                 "https://example.com/act/2",
+                                 _payload(to=["https://remote.example/actors/dave"]),
+                                 AT)
+ 
+    queued = {p["object_id"].split("|", 1)[1] for p in fake_bus.topic("deliveries").published}
+    assert queued == {"dave@remote.example"}
+ 
+ 
+def test_audience_collects_to_and_cc_from_activity_and_object():
+    activity = {"to": ["https://a/1"],
+                "cc": ["https://a/2"],
+                "object": {"to": ["https://o/1"], "cc": ["https://o/2"]}}
+ 
+    assert translator._audience(activity) == {"https://a/1", "https://a/2", "https://o/1", "https://o/2"}
+ 
+ 
+def test_audience_of_an_activity_without_addressing_is_empty():
+    assert translator._audience({"object": {"id": "https://example.com/notes/1"}}) == set()
+ 
+ 
+def test_audience_survives_a_string_object():
+    assert translator._audience({"object": "https://example.com/notes/1"}) == set()
 
