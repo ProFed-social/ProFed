@@ -13,11 +13,15 @@ class Cfg:
     def __init__(self, tmp_path=None, files=None, argv=None, env=None):
         self.tmp_path = tmp_path
         self.files = files or []
-        raw.paths = []
-        raw.argv = argv or []
-        os.environ = env or {}
+        self.argv = argv or []
+        self.env = env or {}
 
     def __enter__(self):
+        self.saved = (os.environ, raw.paths, raw.argv, raw._raw, config._config, config._defaults)
+        os.environ = self.env
+        raw.paths = []
+        raw.argv = self.argv
+ 
         for name, content in self.files:
             f = self.tmp_path / name
             f.write_text(content)
@@ -28,6 +32,7 @@ class Cfg:
     def __exit__(self, exc_type, exc_val, exc_tb):
         for f in raw.paths:
             f.unlink()
+        os.environ, raw.paths, raw.argv, raw._raw, config._config, config._defaults = self.saved
 
 
 def test_simple_config_file(tmp_path):
@@ -71,9 +76,9 @@ def test_command_line_override_environment():
         assert config()["example"]["foo"] == "blub"
 
 
-def test_component_parser():
+def test_component_parser(monkeypatch):
     mod = ModuleType("profed.components.example.config")
-    sys.modules["profed.components.example.config"] = mod
+    monkeypatch.setitem(sys.modules, "profed.components.example.config", mod)
     exec("def parse(cfg):\n"
          "    cfg['foo'] = \"blub\"\n"
          "    return cfg\n",

@@ -32,6 +32,7 @@ def with_events(events):
             message_bus.message_bus().topic("person").messages = [
                     (n+1, et, oid, TS, p)
                     for n, (et, oid, p) in enumerate(events)]
+            projection.reset_last_seen(0)
             return await f(*args, **kwargs)
         return call
     return wrapper
