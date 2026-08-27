@@ -20,6 +20,7 @@ from profed.topics import (accounts_topic,
                            resolved_activities_topic,
                            statuses_topic,
                            timeline_topic,
+                           unknown_actors_topic,
                            users_topic)
 
 
@@ -42,6 +43,7 @@ resolution = resolution_topic.topic
 resolved_activities = resolved_activities_topic.topic
 statuses = statuses_topic.topic
 timeline = timeline_topic.topic
+unknown_actors = unknown_actors_topic.topic
 users = users_topic.topic
 
 
@@ -66,5 +68,6 @@ def names():
             resolved_activities["name"],
             statuses["name"],
             timeline["name"],
+            unknown_actors["name"],
             users["name"]]
 
