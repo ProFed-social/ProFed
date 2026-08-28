@@ -40,6 +40,7 @@ async def _request_if(test, result, callback, *args, **kwargs):
 async def _request_if_none(result, callback, *args, **kwargs):
     return await _request_if(result is None, result, callback, *args, **kwargs)
 
+
 def _is_fresh(row: dict, ttl: int) -> bool:
     if is_local(row.get("acct") or ""):
         return True

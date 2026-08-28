@@ -4,10 +4,6 @@
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
-from urllib.parse import urlparse, urlunparse, urlencode
-from profed.federation.objects import fetch_object
-from profed.http.client import HttpClient
-from profed.sanitize import sanitize_document, no_html_fields
 from .util import domain_of, host_of
 
 
@@ -51,35 +47,6 @@ class Resolution:
     actor: dict
     acct_aliases: list[str] = field(default_factory=list)
     url_aliases: list[str] = field(default_factory=list)
-
-
-def _resource(name: str) -> str:
-    return name if name.startswith("https://") else f"acct:{name.lstrip('@')}"
-
-
-def webfinger_url(name: str) -> str:
-    return urlunparse(("https",
-                       host_of(name) if name.startswith("https://") else domain_of(name),
-                       "/.well-known/webfinger",
-                       "",
-                       urlencode({"resource": _resource(name)}),
-                       ""))
-
-
-async def fetch_jrd(name: str, sign=None) -> Optional[dict]:
-    try:
-        return sanitize_document((await HttpClient().get(webfinger_url(name),
-                                                         headers={"Accept": "application/jrd+json"},
-                                                         sign=sign)).json(),
-                                 html_fields=no_html_fields)
-    except Exception as exc:
-        logger.warning("webfinger fetch failed for %s: %r", name, exc)
-        return None
-
-
-async def fetch_actor(url: str, sign=None) -> Optional[dict]:
-    actor = await fetch_object(url, sign)
-    return sanitize_document(actor) if actor is not None else None
 
 
 def _is_self_link(link) -> bool:
