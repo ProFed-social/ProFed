@@ -161,15 +161,15 @@ async def test_verify_inbox_request_requests_an_unknown_actor():
     mock_storage = AsyncMock()
     mock_storage.get_by_actor_url = AsyncMock(return_value=None)
     request_actor = AsyncMock()
- 
+
     with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
          patch("profed.components.api.s2s.inbox.service.request_actor", request_actor):
         from profed.components.api.s2s.inbox.service import verify_inbox_request
         await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
- 
+
     request_actor.assert_awaited_once_with("https://remote.example/users/bob")
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_verify_inbox_request_requests_the_actor_when_the_key_is_stale():
     _, private_pem = generate_key_pair()
@@ -183,16 +183,16 @@ async def test_verify_inbox_request_requests_the_actor_when_the_key_is_stale():
     mock_storage = AsyncMock()
     mock_storage.get_by_actor_url = AsyncMock(return_value={"public_key_pem": old_public_pem})
     request_actor = AsyncMock()
- 
+
     with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
          patch("profed.components.api.s2s.inbox.service.request_actor", request_actor):
         from profed.components.api.s2s.inbox.service import verify_inbox_request
         result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
- 
+
     assert result is False
     request_actor.assert_awaited_once_with("https://remote.example/users/bob")
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_valid_signature_requests_nothing():
     public_pem, private_pem = generate_key_pair()
@@ -205,12 +205,12 @@ async def test_a_valid_signature_requests_nothing():
     mock_storage = AsyncMock()
     mock_storage.get_by_actor_url = AsyncMock(return_value={"public_key_pem": public_pem})
     request_actor = AsyncMock()
- 
+
     with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
          patch("profed.components.api.s2s.inbox.service.request_actor", request_actor):
         from profed.components.api.s2s.inbox.service import verify_inbox_request
         result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
- 
+
     assert result is True
     request_actor.assert_not_awaited()
 

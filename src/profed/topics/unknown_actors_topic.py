@@ -2,12 +2,20 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import uuid
+from datetime import datetime, timezone
 from typing import Optional, Dict
 
 
 logger = logging.getLogger(__name__)
 
 _KNOWN_EVENTS = ("discovered_acct", "discovered_url")
+REQUEST_WINDOW = 3600
+
+
+def throttled_id(source: str, name: str, window: int = REQUEST_WINDOW) -> uuid.UUID:
+    return uuid.uuid5(uuid.NAMESPACE_URL,
+                      f"{source}#{name}#{int(datetime.now(timezone.utc).timestamp()) // window}")
 
 
 def _ignore(msg):

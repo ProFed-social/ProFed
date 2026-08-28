@@ -3,17 +3,13 @@
 
 import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 import profed.components.api.c2s.shared.known_accounts.storage as storage_module
-from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_id,
-                                                                     lookup_by_acct,
-                                                                     lookup_by_actor_url,
-                                                                     _do_webfinger_lookup)
+from profed.components.api.c2s.shared.known_accounts.service import lookup_by_acct, lookup_by_actor_url, lookup_by_id
 from profed.models.mastodon import Account
 from profed.components.api.c2s.shared.known_accounts import service
 
 
-NOW   = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
 FRESH = datetime.now(timezone.utc) - timedelta(hours=1)
 STALE = datetime.now(timezone.utc) - timedelta(days=30)
 
@@ -39,197 +35,202 @@ REMOTE_ROW = {"account_id": ACCOUNT_ID,
               "account": REMOTE_ACCOUNT.model_dump(),
               "last_webfinger_at": FRESH}
 
+STALE_REMOTE_ROW = {**REMOTE_ROW, "last_webfinger_at": STALE}
+
 
 @pytest.fixture
 def fake_storage():
     backup = storage_module._instance
     storage_module._instance = Mock()
-    storage_module._instance.get_by_id       = AsyncMock()
-    storage_module._instance.get_by_acct     = AsyncMock()
+    storage_module._instance.get_by_id = AsyncMock()
+    storage_module._instance.get_by_acct = AsyncMock()
     storage_module._instance.get_by_actor_url = AsyncMock()
     yield storage_module._instance
     storage_module._instance = backup
 
 
+def _requested(fake_bus):
+    return [(p["event_type"], p["object_id"]) for p in fake_bus.topic("unknown_actors").published]
+
+
 @pytest.mark.asyncio
-async def test_lookup_by_id_returns_fresh_row(fake_storage):
+async def test_lookup_by_id_returns_fresh_row(fake_bus, fake_storage):
     fake_storage.get_by_id.return_value = STORED_ROW
-    result = await lookup_by_id(ACCOUNT_ID)
 
-    assert result == ACCOUNT
+    assert await lookup_by_id(ACCOUNT_ID) == ACCOUNT
 
 
 @pytest.mark.asyncio
-async def test_lookup_by_id_returns_none_when_not_found(fake_storage):
+async def test_lookup_by_id_returns_none_when_not_found(fake_bus, fake_storage):
     fake_storage.get_by_id.return_value = None
-    result = await lookup_by_id(ACCOUNT_ID)
 
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_lookup_by_id_refreshes_stale_row(fake_storage):
-    stale_row = {**REMOTE_ROW, "last_webfinger_at": STALE}
-    fake_storage.get_by_id.return_value = stale_row
-    with patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
-               AsyncMock(return_value=REMOTE_ACCOUNT)) as mock_wf:
-        result = await lookup_by_id(ACCOUNT_ID)
-
-    mock_wf.assert_awaited_once_with(REMOTE_ACCT)
-    assert result == REMOTE_ACCOUNT
+    assert await lookup_by_id(ACCOUNT_ID) is None
 
 
 @pytest.mark.asyncio
-async def test_lookup_by_acct_returns_fresh_row(fake_storage):
+async def test_lookup_by_id_returns_a_stale_row_as_it_is(fake_bus, fake_storage):
+    fake_storage.get_by_id.return_value = STALE_REMOTE_ROW
+
+    assert await lookup_by_id(ACCOUNT_ID) == REMOTE_ACCOUNT
+
+
+@pytest.mark.asyncio
+async def test_lookup_by_id_requests_a_stale_acct(fake_bus, fake_storage):
+    fake_storage.get_by_id.return_value = STALE_REMOTE_ROW
+
+    await lookup_by_id(ACCOUNT_ID)
+
+    assert _requested(fake_bus) == [("discovered_acct", REMOTE_ACCT)]
+
+
+@pytest.mark.asyncio
+async def test_lookup_by_id_requests_nothing_for_a_fresh_row(fake_bus, fake_storage):
+    fake_storage.get_by_id.return_value = REMOTE_ROW
+
+    await lookup_by_id(ACCOUNT_ID)
+
+    assert _requested(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_lookup_by_acct_returns_fresh_row(fake_bus, fake_storage):
     fake_storage.get_by_acct.return_value = STORED_ROW
-    result = await lookup_by_acct(ACCT)
 
-    assert result == ACCOUNT
+    assert await lookup_by_acct(ACCT) == ACCOUNT
 
 
 @pytest.mark.asyncio
-async def test_lookup_by_acct_does_webfinger_when_not_found(fake_storage):
+async def test_lookup_by_acct_returns_none_when_unknown(fake_bus, fake_storage):
     fake_storage.get_by_acct.return_value = None
-    with patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
-               AsyncMock(return_value=ACCOUNT)) as mock_wf:
-        result = await lookup_by_acct(ACCT)
-    mock_wf.assert_awaited_once_with(ACCT)
 
-    assert result == ACCOUNT
+    assert await lookup_by_acct(REMOTE_ACCT) is None
 
 
 @pytest.mark.asyncio
-async def test_lookup_by_actor_url_returns_fresh_row(fake_storage):
+async def test_lookup_by_acct_requests_an_unknown_acct(fake_bus, fake_storage):
+    fake_storage.get_by_acct.return_value = None
+
+    await lookup_by_acct(REMOTE_ACCT)
+
+    assert _requested(fake_bus) == [("discovered_acct", REMOTE_ACCT)]
+
+
+@pytest.mark.asyncio
+async def test_lookup_by_acct_requests_a_stale_acct(fake_bus, fake_storage):
+    fake_storage.get_by_acct.return_value = STALE_REMOTE_ROW
+
+    await lookup_by_acct(REMOTE_ACCT)
+
+    assert _requested(fake_bus) == [("discovered_acct", REMOTE_ACCT)]
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_local_acct_is_not_requested(fake_bus, fake_storage):
+    fake_storage.get_by_acct.return_value = None
+
+    await lookup_by_acct(ACCT)
+
+    assert _requested(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_lookup_by_actor_url_returns_fresh_row(fake_bus, fake_storage):
     fake_storage.get_by_actor_url.return_value = STORED_ROW
-    result = await lookup_by_actor_url(ACTOR_URL)
 
-    assert result == ACCOUNT
-
-
-@pytest.mark.asyncio
-async def test_lookup_by_actor_url_does_webfinger_when_stale(fake_storage):
-    stale_row = {**REMOTE_ROW, "last_webfinger_at": STALE}
-    fake_storage.get_by_actor_url.return_value = stale_row
-    with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_acct",
-               AsyncMock(return_value=REMOTE_ACCT)), \
-         patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
-               AsyncMock(return_value=REMOTE_ACCOUNT)) as mock_wf:
-        await lookup_by_actor_url(REMOTE_ACTOR_URL)
-
-    mock_wf.assert_awaited_once_with(REMOTE_ACCT)
+    assert await lookup_by_actor_url(ACTOR_URL) == ACCOUNT
 
 
 @pytest.mark.asyncio
-async def test_lookup_by_actor_url_returns_stale_row_when_webfinger_fails(fake_storage):
-    stale_row = {**REMOTE_ROW, "last_webfinger_at": STALE}
-    fake_storage.get_by_actor_url.return_value = stale_row
-    with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_acct",
-               AsyncMock(return_value=None)):
-        result = await lookup_by_actor_url(REMOTE_ACTOR_URL)
+async def test_lookup_by_actor_url_returns_none_when_unknown(fake_bus, fake_storage):
+    fake_storage.get_by_actor_url.return_value = None
 
-    assert result == REMOTE_ACCOUNT
+    assert await lookup_by_actor_url(REMOTE_ACTOR_URL) is None
 
 
 @pytest.mark.asyncio
-async def test_lookup_by_id_treats_local_account_as_fresh(fake_storage):
-    stale_local = {**STORED_ROW, "last_webfinger_at": STALE}
-    fake_storage.get_by_id.return_value = stale_local
-    with patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
-               AsyncMock()) as mock_wf:
-        result = await lookup_by_id(ACCOUNT_ID)
+async def test_lookup_by_actor_url_requests_an_unknown_url(fake_bus, fake_storage):
+    fake_storage.get_by_actor_url.return_value = None
 
-    mock_wf.assert_not_awaited()
-    assert result == ACCOUNT
+    await lookup_by_actor_url(REMOTE_ACTOR_URL)
+
+    assert _requested(fake_bus) == [("discovered_url", REMOTE_ACTOR_URL)]
 
 
 @pytest.mark.asyncio
-async def test_webfinger_lookup_returns_none_for_local_acct():
-    with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_actor_url",
-               AsyncMock(return_value=ACTOR_URL)), \
-         patch("profed.components.api.c2s.shared.known_accounts.service.fetch_and_register_actor",
-               AsyncMock(return_value=ACTOR_DATA)):
-        result = await _do_webfinger_lookup(ACCT)
+async def test_lookup_by_actor_url_requests_a_stale_url(fake_bus, fake_storage):
+    fake_storage.get_by_actor_url.return_value = STALE_REMOTE_ROW
 
-    assert result is None
+    await lookup_by_actor_url(REMOTE_ACTOR_URL)
+
+    assert _requested(fake_bus) == [("discovered_url", REMOTE_ACTOR_URL)]
 
 
 @pytest.mark.asyncio
-async def test_webfinger_lookup_does_not_register_local_acct():
-    with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_actor_url",
-               AsyncMock(return_value=ACTOR_URL)), \
-         patch("profed.components.api.c2s.shared.known_accounts.service.fetch_and_register_actor",
-               AsyncMock()) as mock_register:
-        await _do_webfinger_lookup(ACCT)
+async def test_lookup_by_actor_url_returns_a_stale_row_as_it_is(fake_bus, fake_storage):
+    fake_storage.get_by_actor_url.return_value = STALE_REMOTE_ROW
 
-    mock_register.assert_not_awaited()
+    assert await lookup_by_actor_url(REMOTE_ACTOR_URL) == REMOTE_ACCOUNT
 
 
 @pytest.mark.asyncio
-async def test_webfinger_lookup_resolves_remote_acct():
-    with patch("profed.components.api.c2s.shared.known_accounts.service.lookup_actor_url",
-               AsyncMock(return_value=REMOTE_ACTOR_URL)), \
-         patch("profed.components.api.c2s.shared.known_accounts.service.fetch_and_register_actor",
-               AsyncMock(return_value=ACTOR_DATA)):
-        result = await _do_webfinger_lookup(REMOTE_ACCT)
+async def test_a_local_account_never_goes_stale(fake_bus, fake_storage):
+    fake_storage.get_by_id.return_value = {**STORED_ROW, "last_webfinger_at": STALE}
 
-    assert result == REMOTE_ACCOUNT
+    await lookup_by_id(ACCOUNT_ID)
 
-
-def test_signer_is_none_without_key():
-    with patch.object(service.instance_key, "signing_key", return_value=None):
-        assert service._signer() is None
-
-
-def test_signer_builds_make_sign_from_key():
-    with patch.object(service.instance_key, "signing_key", return_value=("kid", "pem")), \
-         patch.object(service, "make_sign") as make_sign:
-        service._signer()
-
-    make_sign.assert_called_once_with("kid", "pem")
+    assert _requested(fake_bus) == []
 
 
 @pytest.mark.asyncio
-async def test_webfinger_lookup_signs_federation_calls():
-    sign = object()
+async def test_the_same_name_is_requested_once_per_window(fake_bus, fake_storage):
+    fake_storage.get_by_acct.return_value = None
 
-    with patch.object(service, "_signer", return_value=sign), \
-         patch.object(service, "lookup_actor_url", AsyncMock(return_value="https://r.example/actor")) as lau, \
-         patch.object(service, "fetch_and_register_actor", AsyncMock(return_value=None)) as far, \
-         patch.object(service, "is_local", return_value=False):
-        await service._do_webfinger_lookup("bob@r.example")
+    await lookup_by_acct(REMOTE_ACCT)
+    await lookup_by_acct(REMOTE_ACCT)
 
-    lau.assert_awaited_once_with("bob@r.example", sign)
-    far.assert_awaited_once_with("https://r.example/actor", sign)
+    assert len(_requested(fake_bus)) == 1
+
+
+@pytest.mark.asyncio
+async def test_lookup_multiple_maps_urls_and_drops_missing(fake_bus, fake_storage):
+    async def _by_url(url):
+        return {ACTOR_URL: STORED_ROW}.get(url)
+
+    fake_storage.get_by_actor_url.side_effect = _by_url
+
+    assert await service.lookup_multiple([ACTOR_URL, REMOTE_ACTOR_URL]) == {ACTOR_URL: ACCOUNT}
 
 
 @pytest.mark.asyncio
 async def test_cached_by_actor_url_returns_account_from_row(fake_storage):
     fake_storage.get_by_actor_url.return_value = STORED_ROW
+
     assert await service.cached_by_actor_url(ACTOR_URL) == ACCOUNT
 
 
 @pytest.mark.asyncio
 async def test_cached_by_actor_url_returns_none_when_missing(fake_storage):
     fake_storage.get_by_actor_url.return_value = None
+
     assert await service.cached_by_actor_url(ACTOR_URL) is None
 
 
 @pytest.mark.asyncio
-async def test_cached_by_actor_url_ignores_staleness_without_webfinger(fake_storage):
-    fake_storage.get_by_actor_url.return_value = {**REMOTE_ROW, "last_webfinger_at": STALE}
-    with patch("profed.components.api.c2s.shared.known_accounts.service._do_webfinger_lookup",
-               AsyncMock()) as mock_wf:
-        result = await service.cached_by_actor_url(REMOTE_ACTOR_URL)
+async def test_cached_by_actor_url_ignores_staleness(fake_bus, fake_storage):
+    fake_storage.get_by_actor_url.return_value = STALE_REMOTE_ROW
+
+    result = await service.cached_by_actor_url(REMOTE_ACTOR_URL)
+
     assert result == REMOTE_ACCOUNT
-    mock_wf.assert_not_awaited()
+    assert _requested(fake_bus) == []
 
 
 @pytest.mark.asyncio
 async def test_cached_multiple_maps_urls_and_drops_missing(fake_storage):
     async def _by_url(url):
         return {ACTOR_URL: STORED_ROW}.get(url)
+
     fake_storage.get_by_actor_url.side_effect = _by_url
 
-    result = await service.cached_multiple([ACTOR_URL, REMOTE_ACTOR_URL])
-    assert result == {ACTOR_URL: ACCOUNT}
+    assert await service.cached_multiple([ACTOR_URL, REMOTE_ACTOR_URL]) == {ACTOR_URL: ACCOUNT}
 

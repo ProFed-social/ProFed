@@ -1,24 +1,15 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import uuid
-from datetime import datetime, timezone
 from pydantic import ValidationError
 from profed.core.message_bus import message_bus
 from profed.http.signatures import key_id_from_signature_header, verify_request
 from profed.sanitize import sanitize_document
 from profed.topics.incoming_activities_topic import publish_incoming
+from profed.topics.unknown_actors_topic import throttled_id
 from profed.models.activity_pub import IncomingActivity
 from profed.components.api.s2s.inbox.storage import storage
 from profed.components.api.s2s.inbox.public_keys_storage import storage as public_keys_storage
-
-
-REQUEST_WINDOW = 3600
-
-
-def _request_id(actor_url: str) -> uuid.UUID:
-    window = int(datetime.now(timezone.utc).timestamp()) // REQUEST_WINDOW
-    return uuid.uuid5(uuid.NAMESPACE_URL, f"inbox#{actor_url}#{window}")
 
 
 async def request_actor(actor_url: str) -> None:
@@ -26,7 +17,7 @@ async def request_actor(actor_url: str) -> None:
         await publish(event_type="discovered_url",
                       object_id=actor_url,
                       payload={},
-                      message_id=_request_id(actor_url))
+                      message_id=throttled_id("inbox", actor_url))
 
 
 async def _public_key_pem(actor_url: str) -> str | None:
@@ -39,7 +30,7 @@ async def verify_inbox_request(method: str,
                                headers: dict,
                                body: bytes) -> bool:
     actor_url = key_id_from_signature_header({k.lower(): v
-                                              for k, v in headers.items()}.get("signature", "")) 
+                                              for k, v in headers.items()}.get("signature", ""))
     if actor_url is None:
         return False
 

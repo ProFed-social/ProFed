@@ -92,34 +92,35 @@ async def test_an_unknown_actor_has_no_public_key():
 @pytest.mark.asyncio
 async def test_requesting_an_actor_reports_its_url(fake_bus):
     await service.request_actor("https://r.example/actor")
- 
+
     published = fake_bus.topic("unknown_actors").published
     assert [(p["event_type"], p["object_id"]) for p in published] == \
            [("discovered_url", "https://r.example/actor")]
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_the_same_actor_is_requested_once_per_window(fake_bus):
     await service.request_actor("https://r.example/actor")
     await service.request_actor("https://r.example/actor")
- 
+
     assert len(fake_bus.topic("unknown_actors").published) == 1
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_two_actors_are_requested_separately(fake_bus):
     await service.request_actor("https://r.example/one")
     await service.request_actor("https://r.example/two")
- 
+
     assert len(fake_bus.topic("unknown_actors").published) == 2
- 
- 
-def test_the_request_id_changes_with_the_window():
-    with patch.object(service, "REQUEST_WINDOW", 1):
-        first = service._request_id("https://r.example/actor")
- 
-    with patch.object(service, "REQUEST_WINDOW", 100000):
-        assert service._request_id("https://r.example/actor") != first
+
+
+@pytest.mark.asyncio
+async def test_a_second_actor_in_the_same_window_gets_its_own_id(fake_bus):
+    await service.request_actor("https://r.example/one")
+    await service.request_actor("https://r.example/two")
+    await service.request_actor("https://r.example/one")
+
+    assert len(fake_bus.topic("unknown_actors").published) == 2
 
 
 @pytest.mark.asyncio
