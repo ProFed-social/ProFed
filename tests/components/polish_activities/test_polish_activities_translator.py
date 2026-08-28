@@ -3,10 +3,35 @@
 
 import pytest
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 import profed.components.polish_activities.translator as mod
+from profed.components.polish_activities import storage as storage_module
 from profed import mentions
 from profed.core.message_bus.source_key import source_key
+
+
+NOW = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
+
+
+class FakeStorage:
+    def __init__(self):
+        self.held = []
+        self.released = []
+
+    async def hold(self, url, event_type, object_id, payload, emitted_at, accts):
+        self.held.append((url, event_type, object_id, payload, emitted_at, accts))
+
+    async def release(self, url):
+        self.released.append(url)
+
+
+@pytest.fixture(autouse=True)
+def store():
+    backup = storage_module._instance
+    storage_module._instance = FakeStorage()
+    yield storage_module._instance
+    storage_module._instance = backup
 
 
 PAYLOAD = {"username": "alice",
@@ -44,7 +69,7 @@ def _fake_bus():
 async def test_forward_publishes_to_activities_unchanged():
     bus, published = _fake_bus()
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._forward("Create", "https://local/notes/1", PAYLOAD, 7)
+        await mod._forward("Create", "https://local/notes/1", PAYLOAD, NOW, 7)
 
     assert bus.topic.call_args[0][0] == "activities"
     assert len(published) == 1
@@ -57,7 +82,7 @@ async def test_forward_publishes_to_activities_unchanged():
 async def test_forward_derives_message_id_from_raw_activities_sequence():
     bus, published = _fake_bus()
     with patch.object(mod, "message_bus", return_value=bus):
-        await mod._forward("Update", "https://local/notes/1", PAYLOAD, 42)
+        await mod._forward("Update", "https://local/notes/1", PAYLOAD, NOW, 42)
 
     assert published[0]["message_id"] == source_key("raw_activities").message_id(42)
 
@@ -67,7 +92,7 @@ async def test_polish_linkifies_content_and_sets_tag_cc():
     bus, published = _fake_bus()
     with patch.object(mod, "message_bus", return_value=bus), \
          patch.object(mod, "_resolve_one", mentions.resolver(_fake_lookup)):
-        await mod._polish_and_forward("Create", "https://local/notes/1", NOTE_PAYLOAD, 7)
+        await mod._polish_and_forward("Create", "https://local/notes/1", NOTE_PAYLOAD, NOW, 7)
 
     obj = published[0]["payload"]["activity"]["object"]
     assert 'href="https://r.io/dave"' in obj["content"]
@@ -90,7 +115,7 @@ async def test_polish_preserves_existing_tag_when_content_has_no_mentions():
     bus, published = _fake_bus()
     with patch.object(mod, "message_bus", return_value=bus), \
          patch.object(mod, "_resolve_one", mentions.resolver(_fake_lookup)):
-        await mod._polish_and_forward("Create", "x", payload, 1)
+        await mod._polish_and_forward("Create", "x", payload, NOW, 1)
 
     obj = published[0]["payload"]["activity"]["object"]
     assert obj["tag"] == [{"type": "Mention", "href": "https://r.io/dave", "name": "@dave@r.io"}]
@@ -104,7 +129,7 @@ async def test_polish_leaves_unresolved_mention_as_text():
     bus, published = _fake_bus()
     with patch.object(mod, "message_bus", return_value=bus), \
          patch.object(mod, "_resolve_one", mentions.resolver(_fake_lookup)):
-        await mod._polish_and_forward("Create", "x", payload, 1)
+        await mod._polish_and_forward("Create", "x", payload, NOW, 1)
 
     obj = published[0]["payload"]["activity"]["object"]
     assert obj["content"] == "hi @ghost@r.io"
@@ -134,4 +159,28 @@ async def test_non_content_activity_passed_through(fake_bus):
     assert len(fake_bus.topic("activities").published) == 1
     assert fake_bus.topic("activities").published[0]["event_type"] == "Follow"
     assert fake_bus.topic("activities").published[0]["payload"] == PAYLOAD
+
+
+
+@pytest.mark.asyncio
+async def test_a_known_acct_yields_its_actor_url():
+    with patch.object(mod, "storage", AsyncMock(return_value=SimpleNamespace(
+            url_for=AsyncMock(return_value="https://x/a")))):
+        assert await mod.lookup("a@x.org") == "https://x/a"
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_acct_yields_nothing():
+    with patch.object(mod, "storage", AsyncMock(return_value=SimpleNamespace(
+            url_for=AsyncMock(return_value=None)))):
+        assert await mod.lookup("ghost@x.org") is None
+
+
+@pytest.mark.asyncio
+async def test_the_lookup_asks_the_projection_for_the_acct():
+    store = SimpleNamespace(url_for=AsyncMock(return_value=None))
+    with patch.object(mod, "storage", AsyncMock(return_value=store)):
+        await mod.lookup("dave@r.io")
+
+    store.url_for.assert_awaited_once_with("dave@r.io")
 
