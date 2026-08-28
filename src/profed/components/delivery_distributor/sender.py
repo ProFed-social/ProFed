@@ -8,11 +8,12 @@ import logging
 import random
 import time
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 from typing import Optional
 
 from profed.http.client import HttpClient
+from profed.http.retry import due_at, exhausted, leased
 from profed.http.signatures import sign_request
 from profed.federation.webfinger import lookup_actor_url
 from profed.sanitize import sanitize_egress, sanitize_as_object
@@ -23,14 +24,9 @@ from .storage import storage
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 30.0
-LEASE = 120.0
 SLEEP_MIN = 10.0
 SLEEP_MAX = 30.0
 IDLE_LIMIT = 15
-INITIAL_RETRY = 300
-RETRY_MULTIPLIER = 2
-MAX_RETRY = 86400
-MAX_TOTAL = 172800
 INBOX_CACHE_TTL_MEAN = 3600.0
 INBOX_CACHE_TTL_JITTER = 0.10
 
@@ -94,31 +90,18 @@ async def _post_to_inbox(inbox_url: str, activity: dict) -> httpx.Response:
                                    raise_for_status=False)
 
 
-def _backoff(attempt: int) -> float:
-    initial = int(_config.get("initial_retry", INITIAL_RETRY))
-    mult = float(_config.get("retry_multiplier", RETRY_MULTIPLIER))
-    max_wait = int(_config.get("max_retry", MAX_RETRY))
-    return min(initial * (mult ** (attempt - 1)), max_wait)
-
-
 def _decide(head: dict, now: datetime) -> tuple:
     attempt = head["attempt"]
     if attempt == 0:
         return ("claim", 1)
 
-    first_at = head["first_attempt_at"]
-    max_total = int(_config.get("max_total", MAX_TOTAL))
-    if first_at is not None and (now - first_at).total_seconds() > max_total:
+    if exhausted(head["first_attempt_at"], now, _config):
         return ("give_up", attempt)
 
     if head["failed_at"] is not None:
-        due = head["failed_at"] + timedelta(seconds=_backoff(attempt))
-        return ("claim", attempt + 1) if now >= due else ("wait",)
-
-    lease = float(_config.get("lease", LEASE))
-    if head["attempt_at"] is not None and now < head["attempt_at"] + timedelta(seconds=lease):
-        return ("wait",)
-    return ("claim", attempt + 1)
+        return ("claim", attempt + 1) if now >= due_at(head["failed_at"], attempt, _config) else ("wait",)
+ 
+    return ("wait",) if leased(head["attempt_at"], now, _config) else ("claim", attempt + 1)
 
 
 async def _publish(event_type: str, activity_id: str, recipient: str,

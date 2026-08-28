@@ -10,14 +10,12 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from profed.core.message_bus import message_bus
 from profed.http.client import HttpClient
+from profed.http.retry import backoff
 from profed.topics.incoming_activities_topic import publish_incoming
 from .storage import storage
 
 REQUEST_TIMEOUT = 30.0
 LEASE = 120.0
-INITIAL_RETRY = 300
-RETRY_MULTIPLIER = 2
-MAX_RETRY = 86400
 MAX_TOTAL = 172800
 GRACE = 2 * MAX_TOTAL
 TOMBSTONE_THRESHOLD = 9
@@ -36,17 +34,10 @@ _started = False
 Reference = namedtuple("Reference", "referrer sought inherited sign")
 
 
-def _backoff(attempt: int) -> float:
-    initial = int(_config.get("initial_retry", INITIAL_RETRY))
-    mult = float(_config.get("retry_multiplier", RETRY_MULTIPLIER))
-    max_wait = int(_config.get("max_retry", MAX_RETRY))
-    return min(initial * (mult ** (attempt - 1)), max_wait)
-
-
 def _wait_window(row) -> float:
     return (float(_config.get("lease", LEASE))
             if row["state"] == "attempting" else
-            _backoff(row["attempt"])
+            backoff(row["attempt"], _config)
             if row["state"] in ("failed", "not_found") else
             0.0)
 

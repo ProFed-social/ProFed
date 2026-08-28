@@ -8,8 +8,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from profed.components.activity_resolver import fetcher
 from profed.components.activity_resolver import storage as storage_module
-from profed.components.activity_resolver.fetcher import (_backoff,
-                                                         _backfeed,
+from profed.components.activity_resolver.fetcher import (_backfeed,
                                                          _claim,
                                                          _decide,
                                                          _emit,
@@ -61,17 +60,6 @@ def reset_registry():
     fetcher._queues = {}
     fetcher._tasks = {}
     fetcher._started = False
-
-
-def test_backoff_starts_at_five_minutes_and_doubles():
-    assert _backoff(1) == 300
-    assert _backoff(2) == 600
-    assert _backoff(3) == 1200
-
-
-def test_backoff_is_capped_at_a_day():
-    assert _backoff(10) == 86400
-    assert _backoff(11) == 86400
 
 
 def test_no_row_claims_the_first_attempt():

@@ -18,6 +18,31 @@ _SELF_TYPES = ("application/activity+json",
                "application/ld+json;profile=\"https://www.w3.org/ns/activitystreams\"")
 
 
+class NeedsRequest(Exception):
+    def __init__(self, kind: str, name: str):
+        super().__init__(f"{kind} for {name} is not known yet")
+        self.kind = kind
+        self.name = name
+
+
+@dataclass
+class Known:
+    jrds: dict = field(default_factory=dict)
+    actors: dict = field(default_factory=dict)
+
+    def _shelf(self, kind: str) -> dict:
+        return self.jrds if kind == "jrd" else self.actors
+
+    def add(self, kind: str, name: str, document: Optional[dict]) -> None:
+        self._shelf(kind)[name] = document
+
+    def get(self, kind: str, name: str) -> Optional[dict]:
+        shelf = self._shelf(kind)
+        if name not in shelf:
+            raise NeedsRequest(kind, name)
+        return shelf[name]
+
+
 @dataclass
 class Resolution:
     acct: str
@@ -109,7 +134,7 @@ def canonical_url(jrd: Optional[dict]) -> Optional[str]:
     return min(links) if links else None
 
 
-async def _canonical_from_subject(acct: str, jrd: dict, sign, hops: int) -> tuple[str, dict, list[str]]:
+def _canonical_from_subject(acct: str, jrd: dict, known: Known, hops: int) -> tuple[str, dict, list[str]]:
     subject = subject_acct(jrd)
     if subject is None or subject == acct or hops <= 0:
         return acct, jrd, []
@@ -117,20 +142,20 @@ async def _canonical_from_subject(acct: str, jrd: dict, sign, hops: int) -> tupl
     if domain_of(subject) == domain_of(acct):
         return subject, jrd, [acct]
 
-    foreign = await fetch_jrd(subject, sign)
+    foreign = known.get("jrd", subject)
     if canonical_url(foreign) is None or canonical_url(foreign) != canonical_url(jrd):
         logger.warning("webfinger for %s claims foreign subject %s without backing it", acct, subject)
         return acct, jrd, []
 
-    canonical, final, aliases = await _canonical_from_subject(subject, foreign, sign, hops - 1)
+    canonical, final, aliases = _canonical_from_subject(subject, foreign, known, hops - 1)
     return canonical, final, [acct] + aliases
 
 
-async def _settled_actor(url: str, sign, hops: int) -> tuple[Optional[dict], list[str]]:
+def _settled_actor(url: str, known: Known, hops: int) -> tuple[Optional[dict], list[str]]:
     aliases: list[str] = []
 
     for _ in range(hops):
-        actor = await fetch_actor(url, sign)
+        actor = known.get("actor", url)
         if actor is None:
             return None, []
 
@@ -145,27 +170,27 @@ async def _settled_actor(url: str, sign, hops: int) -> tuple[Optional[dict], lis
     return None, []
 
 
-async def _from_acct(acct: str, sign, hops: int, url_aliases: list[str]) -> Optional[Resolution]:
-    jrd = await fetch_jrd(acct, sign)
+def _from_acct(acct: str, known: Known, hops: int, url_aliases: list[str]) -> Optional[Resolution]:
+    jrd = known.get("jrd", acct)
     if jrd is None:
         return None
 
-    canonical, jrd, acct_aliases = await _canonical_from_subject(acct, jrd, sign, hops)
+    canonical, jrd, acct_aliases = _canonical_from_subject(acct, jrd, known, hops)
     listed = canonical_url(jrd)
     if listed is None:
         return None
 
-    actor, followed = await _settled_actor(listed, sign, hops)
+    actor, followed = _settled_actor(listed, known, hops)
     if actor is None:
         return None
 
-    return await _confirmed(canonical, actor, jrd, sign, acct_aliases, url_aliases + followed)
+    return _confirmed(canonical, actor, jrd, known, acct_aliases, url_aliases + followed)
 
 
-async def _confirmed(acct, actor, jrd, sign, acct_aliases, url_aliases) -> Optional[Resolution]:
+def _confirmed(acct, actor, jrd, known, acct_aliases, url_aliases) -> Optional[Resolution]:
     url = actor["id"]
     candidate = candidate_acct(actor)
-    declared = await fetch_jrd(candidate, sign) if candidate and candidate != acct else None
+    declared = known.get("jrd", candidate) if candidate and candidate != acct else None
 
     if declared is not None and confirms(declared, url):
         return Resolution(candidate, url, actor, acct_aliases + [acct], url_aliases)
@@ -176,19 +201,19 @@ async def _confirmed(acct, actor, jrd, sign, acct_aliases, url_aliases) -> Optio
     return Resolution(acct, url, actor, acct_aliases, url_aliases) if confirms(jrd, url) else None
 
 
-async def resolve(entry: str, sign=None, hops: int = MAX_HOPS) -> Optional[Resolution]:
+def resolve(entry: str, known: Known, hops: int = MAX_HOPS) -> Optional[Resolution]:
     if not entry.startswith("https://"):
-        return await _from_acct(entry.lstrip("@"), sign, hops, [])
+        return _from_acct(entry.lstrip("@"), known, hops, [])
 
-    reverse = await fetch_jrd(entry, sign)
+    reverse = known.get("jrd", entry)
     acct = subject_acct(reverse)
     if acct is not None and domain_of(acct) == host_of(entry) and confirms(reverse, entry):
-        return await _from_acct(acct, sign, hops, [])
+        return _from_acct(acct, known, hops, [])
 
-    actor, followed = await _settled_actor(entry, sign, hops)
+    actor, followed = _settled_actor(entry, known, hops)
     candidate = candidate_acct(actor)
     if candidate is None:
         return None
 
-    return await _from_acct(candidate, sign, hops, followed)
+    return _from_acct(candidate, known, hops, followed)
 

@@ -62,3 +62,14 @@ class ResolutionEvent(BaseModel):
     attempt: int = 0
     not_found_count: int = 0
 
+
+class AccountResolutionEvent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    source: str = Field(min_length=1)
+    sequence_id: int
+    ordinal: Optional[int] = None
+    attempt: int = 0
+    kind: Optional[str] = None
+    name: Optional[str] = None
+    document: Optional[Dict] = None
+

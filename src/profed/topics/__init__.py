@@ -1,7 +1,8 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.topics import (accounts_topic,
+from profed.topics import (account_resolution_topic,
+                           accounts_topic,
                            activities_topic,
                            deliveries_topic,
                            followers_topic,
@@ -24,6 +25,7 @@ from profed.topics import (accounts_topic,
                            users_topic)
 
 
+account_resolution = account_resolution_topic.topic
 accounts = accounts_topic.topic
 activities = activities_topic.topic
 deliveries = deliveries_topic.topic
@@ -49,7 +51,8 @@ users = users_topic.topic
 
 
 def names():
-    return [accounts["name"],
+    return [account_resolution["name"],
+            accounts["name"],
             activities["name"],
             deliveries["name"],
             followers["name"],
