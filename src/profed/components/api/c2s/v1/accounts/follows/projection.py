@@ -3,7 +3,6 @@
 
 from profed.core.persistence.projections import build_projection
 from profed.topics import followers as followers_topic
-from profed.identity import account_id
 from .storage import storage
 
 
@@ -11,19 +10,13 @@ async def _init() -> None:
     await (await storage()).ensure_schema()
 
 
-def _edge(object_id: str) -> tuple[str, int, str, int]:
-    follower, following = object_id.split("|", 1)
-    return follower, int(account_id(follower)), following, int(account_id(following))
+def _edge(object_id: str) -> tuple[str, str]:
+    return object_id.split("|", 1)
 
 
 async def _upsert(object_id: str, payload: dict, state: str) -> None:
-    follower, follower_id, following, following_id = _edge(object_id)
-    await (await storage()).upsert(follower,
-                                   follower_id,
-                                   following,
-                                   following_id,
-                                   state,
-                                   payload.get("follow_activity_id"))
+    follower, following = _edge(object_id)
+    await (await storage()).upsert(follower, following, state, payload.get("follow_activity_id"))
 
 
 async def _requested(object_id: str, payload: dict) -> None:
@@ -35,7 +28,7 @@ async def _accepted(object_id: str, payload: dict) -> None:
 
 
 async def _removed(object_id: str, payload: dict) -> None:
-    follower, _, following, _ = _edge(object_id)
+    follower, following = _edge(object_id)
     await (await storage()).delete(follower, following)
 
 
@@ -43,12 +36,7 @@ async def _snapshot(item: dict) -> None:
     state = item.get("state", "accepted")
     if state not in ("requested", "accepted"):
         return
-    await (await storage()).upsert(item["follower"],
-                                   int(account_id(item["follower"])),
-                                   item["following"],
-                                   int(account_id(item["following"])),
-                                   state,
-                                   item.get("follow_activity_id"))
+    await (await storage()).upsert(item["follower"], item["following"], state, item.get("follow_activity_id"))
 
 
 async def _rebuild_finished() -> None:

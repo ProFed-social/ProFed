@@ -140,7 +140,7 @@ def test_follow_publishes_followers_requested(client):
     events = fake_bus.topic("followers").published
     assert len(events) == 1
     assert events[0]["event_type"] == "requested"
-    assert events[0]["object_id"] == "alice@example.com|bob@remote.example"
+    assert events[0]["object_id"] == "https://example.com/actors/alice|" + ROW["actor_url"]
     assert "follow_activity_id" in events[0]["payload"]
 
 
@@ -267,7 +267,7 @@ def test_authorize_publishes_accepted_and_federates(client):
     assert response.json()["followed_by"] is True
     followers = fake_bus.topic("followers").published
     assert followers[0]["event_type"] == "accepted"
-    assert followers[0]["object_id"] == "bob@remote.example|alice@example.com"
+    assert followers[0]["object_id"] == ROW["actor_url"] + "|https://example.com/actors/alice"
     assert fake_bus.topic("raw_activities").published[0]["event_type"] == "Accept"
 
 
@@ -360,7 +360,7 @@ def test_unfollow_publishes_followers_deleted(client):
     events = fake_bus.topic("followers").published
     assert len(events) == 1
     assert events[0]["event_type"] == "deleted"
-    assert events[0]["object_id"] == "alice@example.com|bob@remote.example"
+    assert events[0]["object_id"] == "https://example.com/actors/alice|" + ROW["actor_url"]
 
 def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
     fake_bus = FakeMessageBus()

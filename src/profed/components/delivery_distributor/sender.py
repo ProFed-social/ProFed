@@ -15,7 +15,6 @@ from typing import Optional
 from profed.http.client import HttpClient
 from profed.http.retry import due_at, exhausted, leased
 from profed.http.signatures import sign_request
-from profed.federation.webfinger import lookup_actor_url
 from profed.sanitize import sanitize_egress, sanitize_as_object
 from profed.core.message_bus import message_bus
 from .storage import storage
@@ -56,11 +55,6 @@ async def _fetch_inbox_url(actor_url: str) -> Optional[str]:
     except Exception:
         logger.warning("Failed to fetch actor %s", actor_url)
     return None
-
-
-async def _inbox_url_for(acct: str) -> Optional[str]:
-    actor_url = await lookup_actor_url(acct)
-    return await _fetch_inbox_url(actor_url) if actor_url else None
 
 
 async def _build_signed_headers(activity: dict, inbox_url: str, body: bytes) -> dict[str, str]:
@@ -119,7 +113,7 @@ async def _claim(activity_id: str, recipient: str, attempt: int) -> bool:
 
 
 async def _deliver(head: dict, recipient: str) -> bool:
-    inbox_url = await _inbox_url_for(recipient)
+    inbox_url = await _fetch_inbox_url(recipient)
     if inbox_url is None:
         return False
     try:

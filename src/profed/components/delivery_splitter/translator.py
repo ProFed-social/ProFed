@@ -9,8 +9,7 @@ from profed.core.persistence.projections import (build_projection,
                                                  with_event_type,
                                                  with_emitted_at)
 from profed.topics import activities
-from profed.identity import acct_from_username
-from profed.federation.webfinger import lookup_acct
+from profed.identity import actor_url_from_username
 from profed.util import noop
 from .projections import recipients_at
 from .storage import storage
@@ -46,25 +45,18 @@ def _inner_object_url(activity: dict) -> str | None:
             None)
 
 
-async def _mentioned_accts(activity: dict) -> set[str]:
+def _mentioned_actors(activity: dict) -> set[str]:
     obj = activity.get("object")
-    if not isinstance(obj, dict):
-        return set()
-
-    accts = {await lookup_acct(url)
-             for url in {tag["href"]
-                         for tag in obj.get("tag", [])
-                         if isinstance(tag, dict) and
-                            tag.get("type") == "Mention" and
-                            tag.get("href")}}
-
-    return {acct for acct in accts if acct}
+    return ({tag["href"]
+             for tag in obj.get("tag", [])
+             if isinstance(tag, dict) and tag.get("type") == "Mention" and tag.get("href")}
+            if isinstance(obj, dict) else
+            set())
 
 
-async def _directed_recipients(target, activity: dict) -> set[str]:
+def _directed_recipients(target, activity: dict) -> set[str]:
     actor_url = target(activity)
-    acct = await lookup_acct(actor_url) if actor_url else None
-    return {acct} if acct else set()
+    return {actor_url} if actor_url else set()
 
 
 def _audience(activity: dict) -> set[str]:
@@ -76,10 +68,10 @@ def _audience(activity: dict) -> set[str]:
 
 
 async def _followers_and_mentions(activity: dict, username: str, emitted_at) -> set[str]:
-    return ((await recipients_at(acct_from_username(username), emitted_at)
+    return ((await recipients_at(actor_url_from_username(username), emitted_at)
              if _PUBLIC in _audience(activity) else
              set()) |
-            await _mentioned_accts(activity))
+            _mentioned_actors(activity))
 
 
 async def _create_recipients(object_url: str, activity: dict, username: str, emitted_at) -> set[str]:
@@ -130,7 +122,7 @@ def _object_fan_out(collect_recipients, persist):
 def _directed_fan_out(target):
     async def _fan_out(event_type, object_id, payload, emitted_at) -> None:
         activity = {"id": object_id, "type": event_type, **payload["activity"]}
-        recipients = await _directed_recipients(target, activity)
+        recipients = _directed_recipients(target, activity)
 
         await _publish_deliveries(object_id, activity, payload["username"], recipients)
     return _fan_out

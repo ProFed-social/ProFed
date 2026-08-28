@@ -4,6 +4,11 @@
 from profed.core.persistence.base_storage import BaseStorage, init_pool
 
 
+_EDGE = """FROM api.follows AS f
+           JOIN api.known_accounts AS follower ON follower.actor_url = f.follower
+           JOIN api.known_accounts AS following ON following.actor_url = f.following"""
+
+
 class _Storage(BaseStorage):
     def __init__(self, pool):
         super().__init__(pool)
@@ -11,35 +16,23 @@ class _Storage(BaseStorage):
     async def ensure_schema(self) -> None:
         await self.execute("""CREATE TABLE IF NOT EXISTS
                               api.follows (follower TEXT NOT NULL,
-                                           follower_id BIGINT NOT NULL,
                                            following TEXT NOT NULL,
-                                           following_id BIGINT NOT NULL,
                                            state TEXT NOT NULL,
                                            follow_activity_id TEXT,
                                            PRIMARY KEY (follower, following))""")
 
-    async def upsert(self,
-                     follower: str,
-                     follower_id: int,
-                     following: str,
-                     following_id: int,
-                     state: str,
-                     follow_activity_id: str | None = None) -> None:
+    async def upsert(self, follower: str, following: str, state: str, follow_activity_id: str | None = None) -> None:
         await self.execute("""INSERT INTO api.follows (follower,
-                                                       follower_id,
                                                        following,
-                                                       following_id,
                                                        state,
                                                        follow_activity_id)
-                              VALUES ($1, $2, $3, $4, $5, $6)
+                              VALUES ($1, $2, $3, $4)
                               ON CONFLICT (follower, following) DO UPDATE
                                   SET state = EXCLUDED.state,
                                       follow_activity_id = COALESCE(EXCLUDED.follow_activity_id,
                                                                     api.follows.follow_activity_id)""",
                            follower,
-                           follower_id,
                            following,
-                           following_id,
                            state,
                            follow_activity_id)
 
@@ -50,52 +43,60 @@ class _Storage(BaseStorage):
                            following)
 
     async def get_followers(self, following: str) -> list[str]:
-        rows = await self.fetch_all("""SELECT follower
-                                       FROM api.follows
-                                       WHERE following = $1 AND state = 'accepted'""",
+        rows = await self.fetch_all(f"""SELECT follower.acct
+                                        {_EDGE}
+                                        WHERE following.acct = $1 AND f.state = 'accepted'""",
                                     following)
-        return [row["follower"] for row in rows]
+        return [row["acct"] for row in rows]
 
     async def get_following(self, follower: str) -> list[str]:
-        rows = await self.fetch_all("""SELECT following
-                                       FROM api.follows
-                                       WHERE follower = $1 AND state = 'accepted'""",
+        rows = await self.fetch_all(f"""SELECT following.acct
+                                        {_EDGE}
+                                        WHERE follower.acct = $1 AND f.state = 'accepted'""",
                                     follower)
-        return [row["following"] for row in rows]
+        return [row["acct"] for row in rows]
 
     async def count_followers(self, following: str) -> int:
-        row = await self.fetch_one("""SELECT COUNT(*) AS n
-                                      FROM api.follows
-                                      WHERE following = $1 AND state = 'accepted'""",
+        row = await self.fetch_one(f"""SELECT COUNT(*) AS n
+                                       {_EDGE}
+                                       WHERE following.acct = $1 AND f.state = 'accepted'""",
                                    following)
         return row["n"] if row else 0
 
     async def count_following(self, follower: str) -> int:
-        row = await self.fetch_one("""SELECT COUNT(*) AS n
-                                      FROM api.follows
-                                      WHERE follower = $1 AND state = 'accepted'""",
+        row = await self.fetch_one(f"""SELECT COUNT(*) AS n
+                                       {_EDGE}
+                                       WHERE follower.acct = $1 AND f.state = 'accepted'""",
                                    follower)
         return row["n"] if row else 0
 
     async def follow_requests(self, following: str) -> list[dict]:
-        return await self.fetch_all("""SELECT follower, follower_id, follow_activity_id
-                                       FROM api.follows
-                                       WHERE following = $1 AND state = 'requested'""",
+        return await self.fetch_all(f"""SELECT follower.acct AS follower,
+                                               follower.account_id AS follower_id,
+                                               f.follow_activity_id
+                                        {_EDGE}
+                                        WHERE following.acct = $1 AND f.state = 'requested'""",
                                     following)
 
     async def get(self, follower: str, following: str) -> dict | None:
-        return await self.fetch_one("""SELECT follower, follower_id, following, following_id,
-                                              state, follow_activity_id
-                                       FROM api.follows
-                                       WHERE follower = $1 AND following = $2""",
+        return await self.fetch_one(f"""SELECT follower.acct AS follower,
+                                               following.acct AS following,
+                                               f.state,
+                                               f.follow_activity_id
+                                        {_EDGE}
+                                        WHERE follower.acct = $1 AND following.acct = $2""",
                                     follower,
                                     following)
 
     async def relationships(self, acct: str, ids: list[int]) -> dict[int, dict]:
-        rows = await self.fetch_all("""SELECT follower, follower_id, following, following_id, state
-                                       FROM api.follows
-                                       WHERE (follower = $1 AND following_id = ANY($2))
-                                          OR (following = $1 AND follower_id = ANY($2))""",
+        rows = await self.fetch_all(f"""SELECT follower.acct AS follower,
+                                               follower.account_id AS follower_id,
+                                               following.acct AS following,
+                                               following.account_id AS following_id,
+                                               f.state
+                                        {_EDGE}
+                                        WHERE (follower.acct = $1 AND following.account_id = ANY($2))
+                                           OR (following.acct = $1 AND follower.account_id = ANY($2))""",
                                     acct,
                                     ids)
         result = {target: {"following": False,

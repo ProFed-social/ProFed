@@ -5,10 +5,8 @@ import logging
 from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.topics import incoming_activities
-from profed.identity import actor_url_from_username, acct_from_username
+from profed.identity import actor_url_from_username
 from profed.models.activity_pub import AcceptActivity, RejectActivity
-from profed.federation.webfinger import lookup_acct
-from .storage import storage
 
 logger = logging.getLogger(__name__)
 _source_key = source_key("incoming_activities")
@@ -26,18 +24,11 @@ async def _handle_accept(username: str, activity: dict, seq: int) -> None:
        follow_object.get("actor") != actor_url_from_username(username):
             return
 
-    account_id = await (await storage()).get_by_actor_url(accept.actor)
-    if account_id is None:
-        logger.warning("accept_handler: unknown actor %r", accept.actor)
-        return
-
-    following_acct = await lookup_acct(accept.actor)
-    if following_acct is not None:
-        async with message_bus().topic("followers").publish() as publish:
-            await publish(event_type="accepted",
-                          object_id=f"{acct_from_username(username)}|{following_acct}",
-                          payload={},
-                          message_id=_source_key.message_id(seq))
+    async with message_bus().topic("followers").publish() as publish:
+        await publish(event_type="accepted",
+                      object_id=f"{actor_url_from_username(username)}|{accept.actor}",
+                      payload={},
+                      message_id=_source_key.message_id(seq))
 
     logger.info("accept_handler: follow_accepted for %r -> %r", username, accept.actor)
 
@@ -54,14 +45,9 @@ async def _handle_reject(username: str, activity: dict, seq: int) -> None:
        follow_object.get("actor") != actor_url_from_username(username):
             return
 
-    following_acct = await lookup_acct(reject.actor)
-    if following_acct is None:
-        logger.warning("accept_handler: WebFinger lookup returned None for %r", reject.actor)
-        return
-
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type="rejected",
-                      object_id=f"{acct_from_username(username)}|{following_acct}",
+                      object_id=f"{actor_url_from_username(username)}|{reject.actor}",
                       payload={},
                       message_id=_source_key.message_id(seq))
 

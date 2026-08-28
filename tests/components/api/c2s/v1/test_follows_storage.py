@@ -49,8 +49,8 @@ async def test_relationships_defaults_unknown_target_to_false():
 @pytest.mark.asyncio
 async def test_get_followers_returns_accts():
     store = _Storage(None)
-    store.fetch_all = AsyncMock(return_value=[{"follower": "bob@remote.example"},
-                                              {"follower": "carol@remote.example"}])
+    store.fetch_all = AsyncMock(return_value=[{"acct": "bob@remote.example"},
+                                              {"acct": "carol@remote.example"}])
 
     assert await store.get_followers("alice@example.com") == ["bob@remote.example",
                                                               "carol@remote.example"]

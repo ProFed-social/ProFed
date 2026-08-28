@@ -120,7 +120,7 @@ async def follow(id: str,
 
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type="requested",
-                      object_id=f"{acct_from_username(username)}|{account.acct}",
+                      object_id=f"{actor_url_from_username(username)}|{account.url}",
                       payload={"follow_activity_id": follow_id})
 
     return {"id": account.id,
@@ -180,7 +180,7 @@ async def unfollow(id: str,
 
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type="deleted",
-                      object_id=f"{acct_from_username(username)}|{account.acct}",
+                      object_id=f"{actor_url_from_username(username)}|{account.url}",
                       payload={})
 
     return {"id": account.id,
@@ -313,12 +313,11 @@ async def _resolve_follow_request(id: str, claims: dict, decision: str) -> Relat
     if requester is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    me_acct = acct_from_username(username)
-    edge = await (await follows_storage()).get(requester.acct, me_acct)
+    edge = await (await follows_storage()).get(requester.acct, acct_from_username(username))
 
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type=decision,
-                      object_id=f"{requester.acct}|{me_acct}",
+                      object_id=f"{requester.url}|{actor_url_from_username(username)}",
                       payload={})
 
     await _federate_follow_response(username, requester, edge, decision)
