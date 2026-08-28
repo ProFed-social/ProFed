@@ -8,6 +8,7 @@ from urllib.parse import urlparse, urlunparse, urlencode
 from profed.federation.objects import fetch_object
 from profed.http.client import HttpClient
 from profed.sanitize import sanitize_document, no_html_fields
+from .util import domain_of, host_of
 
 
 logger = logging.getLogger(__name__)
@@ -50,14 +51,6 @@ class Resolution:
     actor: dict
     acct_aliases: list[str] = field(default_factory=list)
     url_aliases: list[str] = field(default_factory=list)
-
-
-def domain_of(acct: str) -> str:
-    return acct.rsplit("@", 1)[1] if "@" in acct else ""
-
-
-def host_of(url: str) -> str:
-    return urlparse(url).netloc
 
 
 def _resource(name: str) -> str:
