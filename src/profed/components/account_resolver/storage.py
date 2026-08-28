@@ -94,7 +94,7 @@ class _Storage(BaseStorage):
                                     sequence_id)
 
     async def unfinished(self) -> List[dict]:
-        return await self.fetch_all("""SELECT source, sequence_id, entry
+        return await self.fetch_all("""SELECT source, sequence_id, entry, emitted_at
                                        FROM account_resolver.process
                                        WHERE state NOT IN ('resolved', 'unresolved')
                                        ORDER BY source, sequence_id""")

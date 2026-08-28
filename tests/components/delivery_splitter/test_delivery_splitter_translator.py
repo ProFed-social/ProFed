@@ -34,8 +34,8 @@ def fake_storage():
 
 
 PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
- 
- 
+
+
 def _payload(to=None, cc=None, tag=None):
     return {"username": "alice",
             "activity": {"actor": "https://example.com/actors/alice",
@@ -225,11 +225,11 @@ async def test_create_of_a_direct_note_reaches_only_the_mentioned(fake_bus, fake
          patch.object(translator, "acct_from_username", return_value="alice@example.com"), \
          patch.object(translator, "lookup_acct", AsyncMock(return_value="dave@remote.example")):
         await translator._create("Create", "https://example.com/act/1", payload, AT)
- 
+
     queued = {p["object_id"].split("|", 1)[1] for p in fake_bus.topic("deliveries").published}
     assert queued == {"dave@remote.example"}
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_create_of_a_direct_note_does_not_query_the_followers(fake_bus, fake_storage):
     with patch.object(translator, "recipients_at", AsyncMock(return_value=set())) as rec, \
@@ -238,10 +238,10 @@ async def test_create_of_a_direct_note_does_not_query_the_followers(fake_bus, fa
                                  "https://example.com/act/1",
                                  _payload(to=["https://remote.example/actors/dave"]),
                                  AT)
- 
+
     rec.assert_not_awaited()
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_create_of_an_unlisted_note_reaches_the_followers(fake_bus, fake_storage):
     with patch.object(translator, "recipients_at", AsyncMock(return_value={"bob@remote.example"})), \
@@ -250,11 +250,11 @@ async def test_create_of_an_unlisted_note_reaches_the_followers(fake_bus, fake_s
                                  "https://example.com/act/1",
                                  _payload(to=[], cc=[PUBLIC]),
                                  AT)
- 
+
     queued = {p["object_id"].split("|", 1)[1] for p in fake_bus.topic("deliveries").published}
     assert queued == {"bob@remote.example"}
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_create_reads_the_audience_from_the_activity_as_well(fake_bus, fake_storage):
     payload = _payload(to=[])
@@ -262,11 +262,11 @@ async def test_create_reads_the_audience_from_the_activity_as_well(fake_bus, fak
     with patch.object(translator, "recipients_at", AsyncMock(return_value={"bob@remote.example"})), \
          patch.object(translator, "acct_from_username", return_value="alice@example.com"):
         await translator._create("Create", "https://example.com/act/1", payload, AT)
- 
+
     queued = {p["object_id"].split("|", 1)[1] for p in fake_bus.topic("deliveries").published}
     assert queued == {"bob@remote.example"}
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_update_of_a_direct_note_keeps_the_stored_recipients(fake_bus, fake_storage):
     fake_storage.recipients["https://example.com/notes/1"] = {"dave@remote.example"}
@@ -276,23 +276,23 @@ async def test_update_of_a_direct_note_keeps_the_stored_recipients(fake_bus, fak
                                  "https://example.com/act/2",
                                  _payload(to=["https://remote.example/actors/dave"]),
                                  AT)
- 
+
     queued = {p["object_id"].split("|", 1)[1] for p in fake_bus.topic("deliveries").published}
     assert queued == {"dave@remote.example"}
- 
- 
+
+
 def test_audience_collects_to_and_cc_from_activity_and_object():
     activity = {"to": ["https://a/1"],
                 "cc": ["https://a/2"],
                 "object": {"to": ["https://o/1"], "cc": ["https://o/2"]}}
- 
+
     assert translator._audience(activity) == {"https://a/1", "https://a/2", "https://o/1", "https://o/2"}
- 
- 
+
+
 def test_audience_of_an_activity_without_addressing_is_empty():
     assert translator._audience({"object": {"id": "https://example.com/notes/1"}}) == set()
- 
- 
+
+
 def test_audience_survives_a_string_object():
     assert translator._audience({"object": "https://example.com/notes/1"}) == set()
 

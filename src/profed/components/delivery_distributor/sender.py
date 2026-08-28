@@ -100,7 +100,7 @@ def _decide(head: dict, now: datetime) -> tuple:
 
     if head["failed_at"] is not None:
         return ("claim", attempt + 1) if now >= due_at(head["failed_at"], attempt, _config) else ("wait",)
- 
+
     return ("wait",) if leased(head["attempt_at"], now, _config) else ("claim", attempt + 1)
 
 

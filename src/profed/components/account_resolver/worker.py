@@ -59,7 +59,7 @@ async def _emit_process(state, source, sequence_id, entry) -> bool:
 async def _register(resolution, now) -> None:
     if is_local(resolution.acct):
         return
- 
+
     async with message_bus().topic("remote_actors").publish() as publish:
         await publish(event_type="discovered",
                       object_id=str(int(account_id(resolution.acct))),
@@ -71,9 +71,9 @@ async def _register(resolution, now) -> None:
                                "last_webfinger_at": now.isoformat()})
 
 
-async def _finish(state, source, sequence_id, entry) -> None:
+async def _finish(state, source, sequence_id, entry, event_time) -> None:
     await _emit_process(state, source, sequence_id, entry)
-    gate.done(entry)
+    gate.done(entry, event_time)
 
 
 async def _run_request(source, sequence_id, entry, kind, name, ordinal, attempt) -> None:
@@ -94,7 +94,7 @@ async def _advance(source, sequence_id, entry, now) -> None:
     if resolution is not None:
         await _register(resolution, now)
 
-    await _finish("resolved" if resolution is not None else "unresolved", source, sequence_id, entry)
+    await _finish("resolved" if resolution is not None else "unresolved", source, sequence_id, entry, now)
 
 
 async def _pursue(source, sequence_id, entry, need, rows, now) -> None:
@@ -102,7 +102,7 @@ async def _pursue(source, sequence_id, entry, need, rows, now) -> None:
     action, attempt = decision.decide(row, now, _config)
 
     if action == "give_up":
-        await _finish("unresolved", source, sequence_id, entry)
+        await _finish("unresolved", source, sequence_id, entry, now)
     elif action == "claim":
         await _run_request(source,
                            sequence_id,
@@ -121,6 +121,7 @@ async def step(key, queue) -> bool:
 
     process = await (await storage()).process(source, sequence_id)
     if process is not None and process["state"] in ("resolved", "unresolved"):
+        gate.done(process["entry"], process["emitted_at"])
         return False
 
     await _advance(source, sequence_id, entry or (process or {}).get("entry"), datetime.now(timezone.utc))

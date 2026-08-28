@@ -21,7 +21,7 @@ class Cfg:
         os.environ = self.env
         raw.paths = []
         raw.argv = self.argv
- 
+
         for name, content in self.files:
             f = self.tmp_path / name
             f.write_text(content)

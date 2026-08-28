@@ -46,6 +46,10 @@ def component():
     storage_module._instance = backup
 
 
+def _later(seconds):
+    return NOW + timedelta(seconds=seconds)
+
+
 def _row(kind, name, state, ordinal=1, attempt=1, document=None, age=0, first_age=0):
     return {"kind": kind,
             "ordinal": ordinal,
@@ -192,7 +196,7 @@ async def test_a_lost_claim_performs_no_request(fake_bus, component):
 
 @pytest.mark.asyncio
 async def test_a_finished_process_is_not_advanced(fake_bus, component):
-    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "resolved"}
+    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "resolved", "emitted_at": NOW}
 
     with _at(NOW):
         assert await worker.step(("unknown_actors", 7), _queue("alice@a.test")) is False
@@ -207,7 +211,7 @@ async def test_a_step_that_did_something_reports_work(fake_bus, component):
 
 @pytest.mark.asyncio
 async def test_the_entry_is_taken_from_the_stored_process_when_the_queue_is_empty(fake_bus, component):
-    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "attempting"}
+    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "attempting", "emitted_at": NOW}
 
     with _at(NOW), patch.object(worker.fetch, "perform", AsyncMock(return_value=("request_succeeded", JRD))):
         await worker.step(("unknown_actors", 7), _queue())
@@ -219,24 +223,24 @@ async def test_the_entry_is_taken_from_the_stored_process_when_the_queue_is_empt
 async def test_finishing_a_process_releases_the_gate(fake_bus, component):
     gate.init({"resolution_cache": timedelta(seconds=0)})
     component.rows = [_row("jrd", "alice@a.test", "request_not_found")]
-    gate.try_start("alice@a.test")
+    gate.try_start("alice@a.test", NOW)
 
     with _at(NOW):
         await worker.step(("unknown_actors", 7), _queue("alice@a.test"))
 
-    assert gate.try_start("alice@a.test") is True
+    assert gate.try_start("alice@a.test", _later(1)) is True
 
 
 @pytest.mark.asyncio
 async def test_an_unfinished_process_keeps_the_gate_closed(fake_bus, component):
     gate.init({"resolution_cache": timedelta(seconds=0)})
     component.rows = [_row("jrd", "alice@a.test", "attempting", age=10)]
-    gate.try_start("alice@a.test")
+    gate.try_start("alice@a.test", NOW)
 
     with _at(NOW):
         await worker.step(("unknown_actors", 7), _queue("alice@a.test"))
 
-    assert gate.try_start("alice@a.test") is False
+    assert gate.try_start("alice@a.test", _later(1)) is False
 
 
 @pytest.mark.asyncio
@@ -351,4 +355,17 @@ async def test_a_remote_account_is_registered(fake_bus, component):
         await worker.step(("unknown_actors", 7), _queue("alice@a.test"))
 
     assert len(_registered(fake_bus)) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_finished_process_releases_the_gate_on_a_later_visit(fake_bus, component):
+    gate.init({"resolution_cache": timedelta(seconds=0)})
+    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "resolved",
+                                                  "emitted_at": NOW}
+    gate.try_start("alice@a.test", NOW)
+
+    with _at(_later(10)):
+        await worker.step(("unknown_actors", 7), _queue("alice@a.test"))
+
+    assert gate.try_start("alice@a.test", _later(1)) is True
 

@@ -133,9 +133,9 @@ async def test_home_targets_the_single_thread_part_when_deleting(monkeypatch):
              "boosted": [],
              "cursor": "1"}
     monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=_resp(200, [block]))))
- 
+
     body = (await _fetch(_app(monkeypatch), "/")).text
- 
+
     assert body.count('hx-target="closest .entry"') == 2
     assert body.count('class="thread-part entry') == 2
     assert 'hx-delete="/statuses/1"' in body

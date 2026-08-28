@@ -80,14 +80,14 @@ async def test_a_later_attempt_does_not_erase_the_document(store, fake_conn):
 
     assert "COALESCE(excluded.document, " in fake_conn.execute.await_args.args[0]
 
- 
+
 @pytest.mark.asyncio
 async def test_a_later_attempt_keeps_the_first_attempt_time(store, fake_conn):
     await store.record_request("unknown_actors", 7, "jrd", 1, "request_failed", 2, "a@b", None, NOW)
- 
+
     sql = fake_conn.execute.await_args.args[0]
     assert "COALESCE(account_resolver.request.first_attempt_at," in sql
- 
+
 
 @pytest.mark.asyncio
 async def test_the_process_is_read_by_source_and_sequence(store, fake_conn):

@@ -140,7 +140,7 @@ async def delete_status(id: str,
     url = await (await as_objects.storage()).url_for_author(id, actor_url) if id.isdigit() else None
     if url is None:
         raise HTTPException(status_code=404, detail="status_not_found")
- 
+
     activity = DeleteActivity(id=f"{actor_url}#delete/{id}",
                               actor=actor_url,
                               object=url)

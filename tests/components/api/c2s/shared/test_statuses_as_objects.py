@@ -254,19 +254,19 @@ async def test_rows_for_urls_fetches_rows_for_a_url_list(fake_pool, fake_conn):
 @pytest.mark.asyncio
 async def test_url_for_author_returns_the_url_of_the_authors_own_object(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = {"url": "https://example.com/actors/alice/notes/1"}
- 
+
     result = await (await as_objects.storage()).url_for_author("424242", "https://example.com/actors/alice")
- 
+
     sql, *args = fake_conn.fetchrow.await_args.args
     assert "WHERE mastodon_id = $1::numeric" in sql
     assert "AND actor_url = $2" in sql
     assert args == ["424242", "https://example.com/actors/alice"]
     assert result == "https://example.com/actors/alice/notes/1"
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_url_for_author_returns_none_for_a_foreign_object(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = None
- 
+
     assert await (await as_objects.storage()).url_for_author("500", "https://example.com/actors/alice") is None
 

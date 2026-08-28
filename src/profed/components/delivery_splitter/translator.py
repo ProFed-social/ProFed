@@ -74,7 +74,7 @@ def _audience(activity: dict) -> set[str]:
             for key in ("to", "cc")
             for url in (part.get(key) or [])}
 
- 
+
 async def _followers_and_mentions(activity: dict, username: str, emitted_at) -> set[str]:
     return ((await recipients_at(acct_from_username(username), emitted_at)
              if _PUBLIC in _audience(activity) else

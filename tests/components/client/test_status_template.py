@@ -201,18 +201,18 @@ def test_the_menu_is_a_details_element_that_works_without_javascript():
 
 def test_the_timestamp_is_colloquial_and_carries_the_exact_time_as_a_tooltip():
     rendered = _render(STATUS)
- 
+
     assert 'title="2026-01-01 10:00"' in rendered
     assert 'datetime="2026-01-01T10:00:00.000Z"' in rendered
     assert " ago" in rendered
- 
- 
+
+
 def test_the_timestamp_is_no_longer_a_link():
     rendered = _render(STATUS)
- 
+
     assert "permalink" not in rendered
- 
- 
+
+
 def test_the_entry_url_comes_from_the_menu_permalink(entry):
     assert entry["properties"]["url"] == ["https://example.com/@alice/1"]
- 
+

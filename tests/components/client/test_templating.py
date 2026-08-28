@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from datetime import datetime, timedelta, timezone
- 
+
 import pytest
 from jinja2 import Environment
 
@@ -83,12 +83,12 @@ def test_build_environment_prefers_the_theme(tmp_path):
 
 
 NOW = datetime(2026, 8, 24, 20, 17, tzinfo=timezone.utc)
- 
- 
+
+
 def _ago(minutes):
     return (NOW - timedelta(minutes=minutes)).isoformat()
- 
- 
+
+
 @pytest.mark.parametrize("minutes, expected", [(0, "just now"),
                                                (1, "a minute ago"),
                                                (5, "5 minutes ago"),
@@ -103,37 +103,37 @@ def _ago(minutes):
                                                (1100000, "2 years ago")])
 def test_relative_time_renders_a_colloquial_distance(minutes, expected):
     assert templating.relative_time(_ago(minutes), NOW) == expected
- 
- 
+
+
 def test_relative_time_measures_against_now_by_default():
     assert templating.relative_time(datetime.now(timezone.utc).isoformat()) == "just now"
- 
- 
+
+
 def test_relative_time_assumes_utc_for_a_naive_timestamp():
     assert templating.relative_time("2026-08-24T20:12:00", NOW) == "5 minutes ago"
- 
- 
+
+
 def test_relative_time_survives_an_unparsable_timestamp():
     assert templating.relative_time("kein datum") == ""
- 
- 
+
+
 def test_local_minutes_drops_seconds_and_the_timezone():
     assert templating.local_minutes("2026-08-24T20:17:43+00:00") == "2026-08-24 20:17"
- 
- 
+
+
 def test_local_minutes_accepts_a_trailing_z():
     assert templating.local_minutes("2026-08-24T20:17:43Z") == "2026-08-24 20:17"
- 
- 
+
+
 def test_local_minutes_survives_an_unparsable_timestamp():
     assert templating.local_minutes(None) == ""
- 
- 
+
+
 def test_build_environment_registers_the_time_filters(tmp_path):
     standard = tmp_path / "standard"
     _write(standard, "a.html", "{{ t | relative_time }}|{{ t | local_minutes }}")
- 
+
     env = templating.build_environment(standard, None)
- 
+
     assert env.get_template("a.html").render(t="2026-08-24T20:17:43Z").endswith("|2026-08-24 20:17")
 

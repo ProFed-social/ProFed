@@ -290,20 +290,20 @@ async def test_conversation_offers_deleting_an_own_message(monkeypatch):
                    display_name="Christof",
                    account_url="https://example.com/actors/christof")
     _api(monkeypatch, [_conversation()], messages=[mine])
- 
+
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
- 
+
     assert 'hx-delete="/statuses/11"' in body
 
     assert 'hx-target="closest .entry"' in body
- 
- 
+
+
 async def test_conversation_omits_deleting_a_foreign_message(monkeypatch):
     _login(monkeypatch)
     _api(monkeypatch, [_conversation()], messages=[_status("10", "from bob")])
- 
+
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
- 
+
     assert "hx-delete" not in body
     assert "action-menu" in body
 

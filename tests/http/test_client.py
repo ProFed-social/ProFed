@@ -104,6 +104,6 @@ async def test_uses_the_configured_timeout():
         mock_cls.return_value.__aenter__.return_value.request = \
             AsyncMock(return_value=_mock_response())
         await HttpClient().get("https://example.com/")
- 
+
     assert mock_cls.call_args.kwargs["timeout"] == 30
 

@@ -17,18 +17,18 @@ async def resolve_outbox(username: str) -> OrderedCollection:
             if activities is not None else
             None)
 
- 
+
 def _tombstone(url: str, deleted_at) -> dict:
     return {"@context": "https://www.w3.org/ns/activitystreams",
             "id": url,
             "type": "Tombstone",
             "deleted": deleted_at.isoformat()}
 
- 
+
 async def resolve_note(username: str, note_id: str) -> Optional[dict]:
     url = f"{actor_url_from_username(username)}/notes/{note_id}"
     row = await (await storage()).latest_for_object(username, url)
- 
+
     return (None
             if row is None else
             _tombstone(url, row["created_at"])

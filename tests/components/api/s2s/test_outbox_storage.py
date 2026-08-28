@@ -111,13 +111,13 @@ async def test_outbox_storage_not_initialized():
     finally:
         outbox._instance = backup
 
- 
+
 @pytest.mark.asyncio
 async def test_latest_for_object_returns_the_latest_content_activity(fake_pool, fake_conn):
     store = await outbox.storage()
     note = {"type": "Note", "id": "https://example.com/actors/alice/notes/abc"}
     fake_conn.fetchrow = AsyncMock(return_value={"type": "Create", "object": note, "created_at": None})
- 
+
     result = await store.latest_for_object("alice", "https://example.com/actors/alice/notes/abc")
 
     args = fake_conn.fetchrow.call_args[0]
@@ -129,13 +129,13 @@ async def test_latest_for_object_returns_the_latest_content_activity(fake_pool, 
     assert args[2] == "https://example.com/actors/alice/notes/abc"
     assert result["type"] == "Create"
     assert result["object"] == note
- 
+
 @pytest.mark.asyncio
 async def test_latest_for_object_returns_none_when_missing(fake_pool, fake_conn):
     store = await outbox.storage()
     fake_conn.fetchrow = AsyncMock(return_value=None)
 
-    result = await store.latest_for_object("alice", "https://example.com/actors/alice/notes/nope") 
+    result = await store.latest_for_object("alice", "https://example.com/actors/alice/notes/nope")
 
     assert result is None
 
