@@ -27,7 +27,7 @@ def test_key_id_from_signature_header_missing_returns_none():
 
 def test_verify_request_accepts_valid_signature():
     public_pem, private_pem = generate_key_pair()
-    body    = b'{"type":"Follow"}'
+    body = b'{"type":"Follow"}'
 
     headers = sign_request("POST",
                             "https://local.example/actors/alice/inbox",
@@ -40,21 +40,30 @@ def test_verify_request_accepts_valid_signature():
 
 def test_verify_request_rejects_tampered_body():
     public_pem, private_pem = generate_key_pair()
-    body    = b'{"type":"Follow"}'
+    body = b'{"type":"Follow"}'
 
-    headers = sign_request("POST", "https://local.example/actors/alice/inbox",
-                            body, "https://remote.example/users/bob#main-key", private_pem)
+    headers = sign_request("POST",
+                           "https://local.example/actors/alice/inbox",
+                            body,
+                           "https://remote.example/users/bob#main-key",
+                           private_pem)
 
-    assert verify_request("POST", "/actors/alice/inbox", headers,
-                           b'{"type":"Undo"}', public_pem) is False
+    assert verify_request("POST",
+                          "/actors/alice/inbox",
+                          headers,
+                          b'{"type":"Undo"}',
+                          public_pem) is False
 
 
 def test_verify_request_rejects_wrong_key():
-    _, private_pem  = generate_key_pair()
+    _, private_pem = generate_key_pair()
     other_public, _ = generate_key_pair()
-    body    = b'{"type":"Follow"}'
-    headers = sign_request("POST", "https://local.example/actors/alice/inbox",
-                            body, "https://remote.example/users/bob#main-key", private_pem)
+    body = b'{"type":"Follow"}'
+    headers = sign_request("POST",
+                           "https://local.example/actors/alice/inbox",
+                            body,
+                           "https://remote.example/users/bob#main-key",
+                           private_pem)
 
     assert verify_request("POST", "/actors/alice/inbox", headers, body, other_public) is False
 
@@ -62,8 +71,11 @@ def test_verify_request_rejects_wrong_key():
 def test_verify_request_rejects_missing_signature_header():
     public_pem, _ = generate_key_pair()
 
-    assert verify_request("POST", "/actors/alice/inbox", {"host": "local.example"},
-                           b'{"type":"Follow"}', public_pem) is False
+    assert verify_request("POST",
+                          "/actors/alice/inbox",
+                          {"host": "local.example"},
+                          b'{"type":"Follow"}',
+                          public_pem) is False
 
 
 @pytest.fixture
@@ -101,9 +113,12 @@ def test_inbox_accepts_correctly_signed_request(client_with_mocks):
 @pytest.mark.asyncio
 async def test_verify_inbox_request_uses_projection_key():
     public_pem, private_pem = generate_key_pair()
-    body    = b'{"type":"Follow"}'
-    headers = sign_request("POST", "https://local.example/actors/alice/inbox",
-                            body, "https://remote.example/users/bob#main-key", private_pem)
+    body = b'{"type":"Follow"}'
+    headers = sign_request("POST",
+                           "https://local.example/actors/alice/inbox",
+                            body,
+                           "https://remote.example/users/bob#main-key",
+                           private_pem)
     mock_storage = AsyncMock()
     mock_storage.get_by_actor_url = AsyncMock(return_value={"public_key_pem": public_pem})
 
@@ -115,53 +130,87 @@ async def test_verify_inbox_request_uses_projection_key():
 
 
 @pytest.mark.asyncio
-async def test_verify_inbox_request_fetches_key_when_not_in_projection():
-    public_pem, private_pem = generate_key_pair()
-    body    = b'{"type":"Follow"}'
-    headers = sign_request("POST", "https://local.example/actors/alice/inbox",
-                            body, "https://remote.example/users/bob#main-key", private_pem)
-    mock_storage = AsyncMock()
-    mock_storage.get_by_actor_url = AsyncMock(return_value=None)
-
-    with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.s2s.inbox.service.fetch_and_register_actor", AsyncMock(return_value={"publicKey": {"publicKeyPem": public_pem}})):
-        from profed.components.api.s2s.inbox.service import verify_inbox_request
-        result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
-
-    assert result is True
-
-
-@pytest.mark.asyncio
-async def test_verify_inbox_request_retries_with_fresh_key_on_stale_projection():
-    public_pem, private_pem = generate_key_pair()
-    old_public_pem, _ = generate_key_pair()
-    body    = b'{"type":"Follow"}'
-    headers = sign_request("POST", "https://local.example/actors/alice/inbox",
-                            body, "https://remote.example/users/bob#main-key", private_pem)
-    mock_storage = AsyncMock()
-    mock_storage.get_by_actor_url = AsyncMock(return_value={"public_key_pem": old_public_pem})
-
-    with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.s2s.inbox.service.fetch_and_register_actor", AsyncMock(return_value={"publicKey": {"publicKeyPem": public_pem}})):
-        from profed.components.api.s2s.inbox.service import verify_inbox_request
-        result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
-
-    assert result is True
-
-
-@pytest.mark.asyncio
-async def test_verify_inbox_request_rejects_when_no_key_available():
+async def test_verify_inbox_request_rejects_an_unknown_actor():
     _, private_pem = generate_key_pair()
-    body    = b'{"type":"Follow"}'
-    headers = sign_request("POST", "https://local.example/actors/alice/inbox",
-                            body, "https://remote.example/users/bob#main-key", private_pem)
+    body = b'{"type":"Follow"}'
+    headers = sign_request("POST",
+                           "https://local.example/actors/alice/inbox",
+                           body,
+                           "https://remote.example/users/bob#main-key",
+                           private_pem)
     mock_storage = AsyncMock()
     mock_storage.get_by_actor_url = AsyncMock(return_value=None)
 
     with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
-         patch("profed.components.api.s2s.inbox.service.fetch_and_register_actor", AsyncMock(return_value=None)):
+         patch("profed.components.api.s2s.inbox.service.request_actor", AsyncMock()):
         from profed.components.api.s2s.inbox.service import verify_inbox_request
         result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
 
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_verify_inbox_request_requests_an_unknown_actor():
+    _, private_pem = generate_key_pair()
+    body = b'{"type":"Follow"}'
+    headers = sign_request("POST",
+                           "https://local.example/actors/alice/inbox",
+                           body,
+                           "https://remote.example/users/bob#main-key",
+                           private_pem)
+    mock_storage = AsyncMock()
+    mock_storage.get_by_actor_url = AsyncMock(return_value=None)
+    request_actor = AsyncMock()
+ 
+    with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
+         patch("profed.components.api.s2s.inbox.service.request_actor", request_actor):
+        from profed.components.api.s2s.inbox.service import verify_inbox_request
+        await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
+ 
+    request_actor.assert_awaited_once_with("https://remote.example/users/bob")
+ 
+ 
+@pytest.mark.asyncio
+async def test_verify_inbox_request_requests_the_actor_when_the_key_is_stale():
+    _, private_pem = generate_key_pair()
+    old_public_pem, _ = generate_key_pair()
+    body = b'{"type":"Follow"}'
+    headers = sign_request("POST",
+                           "https://local.example/actors/alice/inbox",
+                           body,
+                           "https://remote.example/users/bob#main-key",
+                           private_pem)
+    mock_storage = AsyncMock()
+    mock_storage.get_by_actor_url = AsyncMock(return_value={"public_key_pem": old_public_pem})
+    request_actor = AsyncMock()
+ 
+    with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
+         patch("profed.components.api.s2s.inbox.service.request_actor", request_actor):
+        from profed.components.api.s2s.inbox.service import verify_inbox_request
+        result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
+ 
+    assert result is False
+    request_actor.assert_awaited_once_with("https://remote.example/users/bob")
+ 
+ 
+@pytest.mark.asyncio
+async def test_a_valid_signature_requests_nothing():
+    public_pem, private_pem = generate_key_pair()
+    body = b'{"type":"Follow"}'
+    headers = sign_request("POST",
+                           "https://local.example/actors/alice/inbox",
+                           body,
+                           "https://remote.example/users/bob#main-key",
+                           private_pem)
+    mock_storage = AsyncMock()
+    mock_storage.get_by_actor_url = AsyncMock(return_value={"public_key_pem": public_pem})
+    request_actor = AsyncMock()
+ 
+    with patch("profed.components.api.s2s.inbox.service.public_keys_storage", AsyncMock(return_value=mock_storage)), \
+         patch("profed.components.api.s2s.inbox.service.request_actor", request_actor):
+        from profed.components.api.s2s.inbox.service import verify_inbox_request
+        result = await verify_inbox_request("POST", "/actors/alice/inbox", headers, body)
+ 
+    assert result is True
+    request_actor.assert_not_awaited()
 

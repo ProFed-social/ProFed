@@ -73,31 +73,53 @@ async def test_preserves_actor_and_ids_through_sanitisation(fake_bus, fake_stora
     assert published[0]["payload"]["activity"]["actor"] == CREATE_ACTIVITY["actor"]
 
 
-def test_signer_is_none_without_key():
-    with patch.object(service.instance_actor_projection, "signing_key", return_value=None):
-        assert service._signer() is None
+@pytest.mark.asyncio
+async def test_a_known_actor_yields_its_public_key():
+    store = Mock(get_by_actor_url=AsyncMock(return_value={"public_key_pem": "PEM"}))
 
-
-def test_signer_builds_make_sign_from_key():
-    with patch.object(service.instance_actor_projection, "signing_key", return_value=("kid", "pem")), \
-         patch.object(service, "make_sign") as make_sign:
-        service._signer()
-
-    make_sign.assert_called_once_with("kid", "pem")
+    with patch.object(service, "public_keys_storage", AsyncMock(return_value=store)):
+        assert await service._public_key_pem("https://r.example/actor") == "PEM"
 
 
 @pytest.mark.asyncio
-async def test_public_key_fetch_signs_federation_call():
-    sign = object()
+async def test_an_unknown_actor_has_no_public_key():
     store = Mock(get_by_actor_url=AsyncMock(return_value=None))
 
-    with patch.object(service, "_signer", return_value=sign), \
-         patch.object(service, "public_keys_storage", AsyncMock(return_value=store)), \
-         patch.object(service, "fetch_and_register_actor", AsyncMock(return_value=None)) as far:
-        await service._get_public_key_pem("https://r.example/actor")
+    with patch.object(service, "public_keys_storage", AsyncMock(return_value=store)):
+        assert await service._public_key_pem("https://r.example/actor") is None
 
-    far.assert_awaited_once_with("https://r.example/actor", sign)
 
+@pytest.mark.asyncio
+async def test_requesting_an_actor_reports_its_url(fake_bus):
+    await service.request_actor("https://r.example/actor")
+ 
+    published = fake_bus.topic("unknown_actors").published
+    assert [(p["event_type"], p["object_id"]) for p in published] == \
+           [("discovered_url", "https://r.example/actor")]
+ 
+ 
+@pytest.mark.asyncio
+async def test_the_same_actor_is_requested_once_per_window(fake_bus):
+    await service.request_actor("https://r.example/actor")
+    await service.request_actor("https://r.example/actor")
+ 
+    assert len(fake_bus.topic("unknown_actors").published) == 1
+ 
+ 
+@pytest.mark.asyncio
+async def test_two_actors_are_requested_separately(fake_bus):
+    await service.request_actor("https://r.example/one")
+    await service.request_actor("https://r.example/two")
+ 
+    assert len(fake_bus.topic("unknown_actors").published) == 2
+ 
+ 
+def test_the_request_id_changes_with_the_window():
+    with patch.object(service, "REQUEST_WINDOW", 1):
+        first = service._request_id("https://r.example/actor")
+ 
+    with patch.object(service, "REQUEST_WINDOW", 100000):
+        assert service._request_id("https://r.example/actor") != first
 
 
 @pytest.mark.asyncio

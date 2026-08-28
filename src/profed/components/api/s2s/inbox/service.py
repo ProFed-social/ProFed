@@ -1,56 +1,54 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import uuid
+from datetime import datetime, timezone
 from pydantic import ValidationError
-from profed.http.signatures import key_id_from_signature_header, make_sign, verify_request
-from profed.federation.actors import fetch_and_register_actor
+from profed.core.message_bus import message_bus
+from profed.http.signatures import key_id_from_signature_header, verify_request
 from profed.sanitize import sanitize_document
 from profed.topics.incoming_activities_topic import publish_incoming
 from profed.models.activity_pub import IncomingActivity
 from profed.components.api.s2s.inbox.storage import storage
 from profed.components.api.s2s.inbox.public_keys_storage import storage as public_keys_storage
-from profed.components.api.s2s.instance_actor import projection as instance_actor_projection
 
 
-def _signer():
-    key = instance_actor_projection.signing_key()
-    return make_sign(*key) if key else None
+REQUEST_WINDOW = 3600
 
 
-def _pem_from_actor(actor: dict | None) -> str | None:
-    return (actor.get("publicKey") or {}).get("publicKeyPem") if actor else None
+def _request_id(actor_url: str) -> uuid.UUID:
+    window = int(datetime.now(timezone.utc).timestamp()) // REQUEST_WINDOW
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"inbox#{actor_url}#{window}")
 
 
-async def _get_public_key_pem(actor_url: str) -> tuple[str | None, bool]:
+async def request_actor(actor_url: str) -> None:
+    async with message_bus().topic("unknown_actors").publish() as publish:
+        await publish(event_type="discovered_url",
+                      object_id=actor_url,
+                      payload={},
+                      message_id=_request_id(actor_url))
+
+
+async def _public_key_pem(actor_url: str) -> str | None:
     row = await (await public_keys_storage()).get_by_actor_url(actor_url)
-
-    return ((row["public_key_pem"], True)
-            if row is not None else
-            (_pem_from_actor(await fetch_and_register_actor(actor_url, _signer())), False))
+    return row["public_key_pem"] if row is not None else None
 
 
-async def verify_inbox_request(method:  str,
-                                path:   str,
-                                headers: dict,
-                                body:   bytes) -> bool:
+async def verify_inbox_request(method: str,
+                               path: str,
+                               headers: dict,
+                               body: bytes) -> bool:
     actor_url = key_id_from_signature_header({k.lower(): v
-                                              for k, v in headers.items()}.get("signature", ""))
+                                              for k, v in headers.items()}.get("signature", "")) 
     if actor_url is None:
         return False
 
-    public_key_pem, from_projection = await _get_public_key_pem(actor_url)
-    if public_key_pem is None:
-        return False
-    if verify_request(method, path, headers, body, public_key_pem):
-        return True
-    if not from_projection:
+    public_key_pem = await _public_key_pem(actor_url)
+    if public_key_pem is None or not verify_request(method, path, headers, body, public_key_pem):
+        await request_actor(actor_url)
         return False
 
-    public_key_pem = _pem_from_actor(await fetch_and_register_actor(actor_url, _signer()))
-    if public_key_pem is None:
-        return False
-
-    return verify_request(method, path, headers, body, public_key_pem)
+    return True
 
 
 async def accept_inbox_activity(username: str, activity: dict) -> bool:
