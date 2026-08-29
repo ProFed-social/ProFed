@@ -6,6 +6,8 @@ from profed.core.config.database import with_database_defaults
 
 
 def parse(cfg: dict, database: dict) -> dict:
-    return with_database_defaults(cfg | {"resolution_cache": timedelta(seconds=int(cfg.get("resolution_cache", 300)))},
+    return with_database_defaults(cfg |
+                                  {"resolution_cache": timedelta(seconds=int(cfg.get("resolution_cache", 300))),
+                                   "unresolved_cache": timedelta(seconds=int(cfg.get("unresolved_cache", 345600)))},
                                   database)
 

@@ -67,7 +67,7 @@ async def _register(resolution, now) -> None:
 
 async def _finish(state, source, sequence_id, entry, event_time) -> None:
     await _emit_process(state, source, sequence_id, entry)
-    gate.done(entry, event_time)
+    gate.done(entry, event_time, state)
 
 
 async def _run_request(source, sequence_id, entry, kind, name, ordinal, attempt) -> None:
@@ -115,7 +115,7 @@ async def step(key, queue) -> bool:
 
     process = await (await storage()).process(source, sequence_id)
     if process is not None and process["state"] in ("resolved", "unresolved"):
-        gate.done(process["entry"], process["emitted_at"])
+        gate.done(process["entry"], process["emitted_at"], process["state"])
         return False
 
     entry = entry or (process or {}).get("entry")

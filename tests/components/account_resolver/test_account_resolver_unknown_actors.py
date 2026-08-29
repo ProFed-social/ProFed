@@ -7,6 +7,7 @@ from profed.components.account_resolver import gate, unknown_actors
 from profed.components.account_resolver import storage as storage_module
 
 
+UNRESOLVED = timedelta(days=4)
 NOW = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
 
 
@@ -24,7 +25,7 @@ def component():
     backup_workers = unknown_actors._workers
     storage_module._instance = FakeStorage()
     unknown_actors._workers = _FakeWorkers()
-    gate.init({"resolution_cache": timedelta(seconds=300)})
+    gate.init({"resolution_cache": timedelta(seconds=300), "unresolved_cache": UNRESOLVED})
     yield storage_module._instance
     storage_module._instance = backup_storage
     unknown_actors._workers = backup_workers

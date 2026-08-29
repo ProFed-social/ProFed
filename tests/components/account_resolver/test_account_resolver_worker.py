@@ -13,13 +13,11 @@ from profed import identity
 from profed.identity import account_id
 
 
+UNRESOLVED = timedelta(days=4)
 NOW = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
-
 ALICE_URL = "https://a.test/actors/alice"
-
 JRD = {"subject": "acct:alice@a.test",
        "links": [{"rel": "self", "type": "application/activity+json", "href": ALICE_URL}]}
-
 ACTOR = {"id": ALICE_URL, "type": "Person", "preferredUsername": "alice"}
 
 
@@ -40,7 +38,7 @@ def component():
     backup = storage_module._instance
     storage_module._instance = FakeStorage()
     worker.configure({})
-    gate.init({"resolution_cache": timedelta(seconds=300)})
+    gate.init({"resolution_cache": timedelta(seconds=300), "unresolved_cache": UNRESOLVED})
     with patch.object(identity, "domain", lambda: "local.test"):
         yield storage_module._instance
     storage_module._instance = backup
@@ -220,20 +218,32 @@ async def test_the_entry_is_taken_from_the_stored_process_when_the_queue_is_empt
 
 
 @pytest.mark.asyncio
-async def test_finishing_a_process_releases_the_gate(fake_bus, component):
-    gate.init({"resolution_cache": timedelta(seconds=0)})
+async def test_an_unresolved_name_stays_blocked(fake_bus, component):
+    gate.init({"resolution_cache": timedelta(seconds=0), "unresolved_cache": UNRESOLVED})
     component.rows = [_row("jrd", "alice@a.test", "request_not_found")]
     gate.try_start("alice@a.test", NOW)
 
     with _at(NOW):
         await worker.step(("unknown_actors", 7), _queue("alice@a.test"))
 
-    assert gate.try_start("alice@a.test", _later(1)) is True
+    assert gate.try_start("alice@a.test", _later(1)) is False
+
+
+@pytest.mark.asyncio
+async def test_an_unresolved_name_is_free_again_after_its_time(fake_bus, component):
+    gate.init({"resolution_cache": timedelta(seconds=0), "unresolved_cache": timedelta(seconds=100)})
+    component.rows = [_row("jrd", "alice@a.test", "request_not_found")]
+    gate.try_start("alice@a.test", NOW)
+
+    with _at(NOW):
+        await worker.step(("unknown_actors", 7), _queue("alice@a.test"))
+
+    assert gate.try_start("alice@a.test", _later(101)) is True
 
 
 @pytest.mark.asyncio
 async def test_an_unfinished_process_keeps_the_gate_closed(fake_bus, component):
-    gate.init({"resolution_cache": timedelta(seconds=0)})
+    gate.init({"resolution_cache": timedelta(seconds=0), "unresolved_cache": UNRESOLVED})
     component.rows = [_row("jrd", "alice@a.test", "attempting", age=10)]
     gate.try_start("alice@a.test", NOW)
 
@@ -358,7 +368,7 @@ async def test_a_remote_account_is_registered(fake_bus, component):
 
 @pytest.mark.asyncio
 async def test_a_finished_process_releases_the_gate_on_a_later_visit(fake_bus, component):
-    gate.init({"resolution_cache": timedelta(seconds=0)})
+    gate.init({"resolution_cache": timedelta(seconds=0), "unresolved_cache": UNRESOLVED})
     component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "resolved",
                                                   "emitted_at": NOW}
     gate.try_start("alice@a.test", NOW)

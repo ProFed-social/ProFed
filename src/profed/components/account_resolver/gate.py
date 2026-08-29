@@ -1,34 +1,36 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def _make_gate():
-    current_names = {}
-    cache_time = None
+    valid_until = {}
+    lifetimes = {}
 
     def init(config: dict) -> None:
-        nonlocal cache_time
-        cache_time = config["resolution_cache"]
-        current_names.clear()
+        lifetimes.clear()
+        lifetimes.update({"resolved": config["resolution_cache"], "unresolved": config["unresolved_cache"]})
+        valid_until.clear()
 
-    def has_expired(resolved_at: datetime | None, event_time: datetime) -> bool:
-        return resolved_at is not None and resolved_at + cache_time < event_time
+    def has_expired(expires_at: datetime | None, event_time: datetime) -> bool:
+        return expires_at is not None and expires_at < event_time
 
     def try_start(name: str, event_time: datetime) -> bool:
-        if name in current_names and not has_expired(current_names[name], event_time):
+        if name in valid_until and not has_expired(valid_until[name], event_time):
             return False
 
-        current_names[name] = None
+        valid_until[name] = None
         return True
 
-    def done(name: str, event_time: datetime) -> None:
-        nonlocal current_names
-        current_names[name] = event_time
-        current_names = {known: resolved_at
-                         for known, resolved_at in current_names.items()
-                         if not has_expired(resolved_at, event_time)}
+    def lifetime(state: str) -> timedelta:
+        return lifetimes.get(state, lifetimes["resolved"])
+
+    def done(name: str, event_time: datetime, state: str = "resolved") -> None:
+        valid_until[name] = event_time + lifetime(state)
+        expired = [known for known, expires_at in valid_until.items() if has_expired(expires_at, event_time)]
+        for known in expired:
+            del valid_until[known]
 
     return init, has_expired, try_start, done
 
