@@ -4,5 +4,5 @@
 from profed.federation.instance_key import make_instance_key
 
 
-handle_events, rebuild, signing_key, signer = make_instance_key("account_resolver")
+handle_events, rebuild, signing_key, signer = make_instance_key("polish_activities")
 
