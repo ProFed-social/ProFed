@@ -139,6 +139,21 @@ a:hover { text-decoration: underline; }
 .note { margin: 1.25rem 0 0; }
 .note p { margin: .5rem 0; }
 
+.fields {
+  margin: 1.25rem 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .35rem 1rem;
+}
+.fields .field { display: contents; }
+.fields dt { color: var(--muted); }
+.fields dd { margin: 0; overflow-wrap: anywhere; }
+.fields .verified dd::after {
+  content: "\2713";
+  margin-left: .4rem;
+  color: var(--accent);
+}
+
 .resume h2,
 .posts h2 {
   margin: 2rem 0 .25rem;

@@ -137,3 +137,24 @@ def test_build_environment_registers_the_time_filters(tmp_path):
 
     assert env.get_template("a.html").render(t="2026-08-24T20:17:43Z").endswith("|2026-08-24 20:17")
 
+
+def test_a_https_url_becomes_a_rel_me_link():
+    assert templating.link_field("https://a.test/x") == '<a rel="me" href="https://a.test/x">https://a.test/x</a>'
+
+
+def test_a_http_url_becomes_a_rel_me_link():
+    assert templating.link_field("http://a.test/x") == '<a rel="me" href="http://a.test/x">http://a.test/x</a>'
+
+
+def test_plain_text_stays_plain():
+    assert templating.link_field("Hamburg") == "Hamburg"
+
+
+def test_markup_in_a_url_is_escaped():
+    linked = templating.link_field('https://a.test/"><script>x</script>')
+    assert "<script>" not in linked
+
+
+def test_markup_in_plain_text_is_sanitised():
+    assert "<script>" not in templating.link_field("<script>alert(1)</script>")
+

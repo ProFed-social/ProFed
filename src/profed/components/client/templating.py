@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from email.utils import format_datetime
 from pathlib import Path
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, select_autoescape
+from markupsafe import escape
 
 from profed.core.config import config
 from profed.sanitize import sanitize_html
@@ -68,10 +69,17 @@ def local_minutes(timestamp: str) -> str:
     return parsed.strftime("%Y-%m-%d %H:%M") if parsed else ""
 
 
+def link_field(value: str) -> str:
+    return (f'<a rel="me" href="{escape(value)}">{escape(value)}</a>'
+            if value.startswith("https://") or value.startswith("http://") else
+            sanitize_html(value))
+
+
 def build_environment(standard_dir, theme_dir):
     environment = Environment(loader=build_loader(standard_dir, theme_dir),
                               autoescape=select_autoescape(["html", "xml"]))
     environment.filters.update(sanitize=sanitize_html,
+                               link_field=link_field,
                                rfc822=rfc822,
                                relative_time=relative_time,
                                local_minutes=local_minutes)

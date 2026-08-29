@@ -20,5 +20,15 @@
     </div>
   </header>
   {% if account.note %}<div class="p-note note">{{ account.note | sanitize | safe }}</div>{% endif %}
+  {% if account.fields %}
+  <dl class="fields">
+    {% for field in account.fields %}
+    <div class="field{% if field.verified_at %} verified{% endif %}">
+      <dt>{{ field.name }}</dt>
+      <dd>{{ field.value | link_field | safe }}</dd>
+    </div>
+    {% endfor %}
+  </dl>
+  {% endif %}
 </div>
 
