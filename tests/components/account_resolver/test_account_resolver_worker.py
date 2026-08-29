@@ -247,8 +247,7 @@ async def test_an_unfinished_process_keeps_the_gate_closed(fake_bus, component):
 async def test_the_signer_comes_from_the_instance_key(fake_bus, component):
     perform = AsyncMock(return_value=("request_succeeded", JRD))
     with _at(NOW), \
-         patch.object(worker.instance_key, "signing_key", lambda: ("https://a.test/actor#main-key", "PEM")), \
-         patch.object(worker, "make_sign", lambda *args: "signer"), \
+         patch.object(worker.instance_key, "signer", lambda: "signer"), \
          patch.object(worker.fetch, "perform", perform):
         await worker.step(("unknown_actors", 7), _queue("alice@a.test"))
 
@@ -259,7 +258,7 @@ async def test_the_signer_comes_from_the_instance_key(fake_bus, component):
 async def test_without_an_instance_key_nothing_is_signed(fake_bus, component):
     perform = AsyncMock(return_value=("request_succeeded", JRD))
     with _at(NOW), \
-         patch.object(worker.instance_key, "signing_key", lambda: None), \
+         patch.object(worker.instance_key, "signer", lambda: None), \
          patch.object(worker.fetch, "perform", perform):
         await worker.step(("unknown_actors", 7), _queue("alice@a.test"))
 
@@ -374,6 +373,7 @@ async def test_a_finished_process_releases_the_gate_on_a_later_visit(fake_bus, c
 async def test_a_process_without_an_entry_does_nothing(fake_bus, component):
     with _at(NOW):
         assert await worker.step(("unknown_actors", 7), _queue()) is False
+
     assert _published(fake_bus) == []
 
 
@@ -382,6 +382,7 @@ async def test_a_second_visit_takes_the_entry_from_the_stored_process(fake_bus, 
     component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "attempting",
                                                   "emitted_at": NOW}
     component.rows = [_row("jrd", "alice@a.test", "attempting", age=10)]
+
     with _at(NOW):
         assert await worker.step(("unknown_actors", 7), _queue()) is True
 

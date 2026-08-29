@@ -4,7 +4,6 @@
 import logging
 from datetime import datetime, timezone
 from profed.core.message_bus import message_bus
-from profed.http.signatures import make_sign
 from profed.identity import account_id, is_local
 from profed.topics.account_resolution_topic import process_id, request_id
 from . import decision, fetch, gate, instance_key
@@ -21,11 +20,6 @@ _config: dict = {}
 def configure(config: dict) -> None:
     global _config
     _config = config
-
-
-def signer():
-    key = instance_key.signing_key()
-    return make_sign(*key) if key else None
 
 
 async def _publish(event_type: str, entry: str, payload: dict, message_id) -> bool:
@@ -78,7 +72,7 @@ async def _finish(state, source, sequence_id, entry, event_time) -> None:
 
 async def _run_request(source, sequence_id, entry, kind, name, ordinal, attempt) -> None:
     if await _emit_request("attempting", source, sequence_id, entry, kind, ordinal, attempt, name, None):
-        state, document = await fetch.perform(kind, name, signer())
+        state, document = await fetch.perform(kind, name, instance_key.signer())
         await _emit_request(state, source, sequence_id, entry, kind, ordinal, attempt, name, document)
 
 
@@ -127,6 +121,7 @@ async def step(key, queue) -> bool:
     entry = entry or (process or {}).get("entry")
     if entry is None:
         return False
+
     await _advance(source, sequence_id, entry, datetime.now(timezone.utc))
     return True
 

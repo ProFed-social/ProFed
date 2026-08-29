@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from pydantic import ValidationError
 from profed.core.message_bus import message_bus
 from profed.http.signatures import key_id_from_signature_header, verify_request
@@ -10,6 +11,9 @@ from profed.topics.unknown_actors_topic import throttled_id
 from profed.models.activity_pub import IncomingActivity
 from profed.components.api.s2s.inbox.storage import storage
 from profed.components.api.s2s.inbox.public_keys_storage import storage as public_keys_storage
+
+
+logger = logging.getLogger(__name__)
 
 
 async def request_actor(actor_url: str) -> None:
@@ -35,7 +39,13 @@ async def verify_inbox_request(method: str,
         return False
 
     public_key_pem = await _public_key_pem(actor_url)
-    if public_key_pem is None or not verify_request(method, path, headers, body, public_key_pem):
+    if public_key_pem is None:
+        logger.warning("inbox: no public key for %s, requesting resolution", actor_url)
+        await request_actor(actor_url)
+        return False
+
+    if not verify_request(method, path, headers, body, public_key_pem):
+        logger.warning("inbox: signature of %s does not match the stored key", actor_url)
         await request_actor(actor_url)
         return False
 

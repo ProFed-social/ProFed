@@ -8,7 +8,6 @@ from profed.core.persistence.projections import (build_projection,
                                                  with_event_type,
                                                  with_sequence_id)
 from profed.topics import incoming_activities
-from profed.http.signatures import make_sign
 from profed.components.activity_resolver import fetcher
 from profed.components.activity_resolver import instance_key
 from profed.federation.references import flatten_references
@@ -18,14 +17,9 @@ from profed.util import noop
 _SOURCE = source_key("incoming_activities")
 
 
-def _signer():
-    key = instance_key.signing_key()
-    return make_sign(*key) if key else None
-
-
 def _forwarder(should_resolve: bool):
     def _flatten(activity, object_id, event_type, emitted_at):
-        return flatten_references(activity, object_id, event_type, emitted_at, _signer(), fetcher.enqueue)
+        return flatten_references(activity, object_id, event_type, emitted_at, instance_key.signer(), fetcher.enqueue)
 
     def _keep(activity, object_id, event_type, emitted_at):
         return activity
