@@ -8,6 +8,7 @@ import asyncio
 from asyncpg import Pool, Connection, PostgresConnectionError
 import logging
 import os
+from . import notifications
 
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,6 @@ class GapTracker:
             self._gaps[:] = [(lo, hi) for lo, hi in self._gaps if hi > self._cutoff]
 
 
-
 def subscribe(pool: Pool,
               config: Dict[str, str],
               topic: str,
@@ -141,9 +141,6 @@ def subscribe(pool: Pool,
         wait = min_wait
         message_event = asyncio.Event()
 
-        def _on_message(conn, pid, channel, payload):
-            message_event.set()
-
         async def _audit(conn: Connection) -> None:
             window = tracker.count_received()
             if window is not None:
@@ -153,58 +150,55 @@ def subscribe(pool: Pool,
                     _fatal_corruption(topic, lo, hi, expected, actual)
             tracker.commit()
 
-        while True:
+        async def _poll() -> list:
+            nonlocal tracker, last_seen
             async with pool.acquire() as conn:
                 if tracker is None:
                     if caught_up is not None:
                         last_seen = CatchUpCursor(int(last_seen), caught_up, await _max_id(conn))
                     tracker = GapTracker(int(last_seen), gap_timeout)
 
-                listening = False
+
+                rows = await _fetch_new(conn, int(last_seen))
+                await _audit(conn)
+                return rows
+        try:
+            while True:
+                message_event.clear()
+                processed = False
+
                 try:
-                    while True:
-                        message_event.clear()
-                        processed = False
-
-                        threshold = datetime.now(timezone.utc) - gap_timeout
-                        for row in await _fetch_new(conn, int(last_seen)):
-                            rid = row["id"]
-                            if rid != int(last_seen) + 1:
-                                if _as_dt(row["emitted_at"]) >= threshold:
-                                    break
-                                tracker.accept_gap(int(last_seen) + 1, rid - 1)
-                            yield (rid,
-                                   row["event_type"],
-                                   row["object_id"],
-                                   row["emitted_at"],
-                                   row["payload"])
-                            tracker.received(rid, _as_dt(row["emitted_at"]))
-                            last_seen = _update_cursor(last_seen, rid)
-                            processed = True
-
-                        await _audit(conn)
-                        if processed:
-                            wait = min_wait
-                            continue
-
-                        if not listening:
-                            listening = True
-                            await conn.add_listener(channel, _on_message)
-
-                        try:
-                            await asyncio.wait_for(message_event.wait(), timeout=wait)
-                            wait = min_wait
-                        except asyncio.TimeoutError:
-                            wait = min(wait * 2, max_wait)
+                    rows = await _poll()
                 except (PostgresConnectionError, OSError) as exc:
-                    logger.warning("subscriber lost its connection, reconnecting: %r", exc)
+                    logger.warning("subscriber could not read %s, retrying: %r", topic, exc)
                     await asyncio.sleep(wait)
-                finally:
-                    if listening:
-                        try:
-                            await conn.remove_listener(channel, _on_message)
-                        except (PostgresConnectionError, OSError):
-                            pass
+                    continue
+                threshold = datetime.now(timezone.utc) - gap_timeout
+                for row in rows:
+                    rid = row["id"]
+                    if rid != int(last_seen) + 1:
+                        if _as_dt(row["emitted_at"]) >= threshold:
+                            break
+                        tracker.accept_gap(int(last_seen) + 1, rid - 1)
+                    yield (rid,
+                           row["event_type"],
+                           row["object_id"],
+                           row["emitted_at"],
+                           row["payload"])
+                    tracker.received(rid, _as_dt(row["emitted_at"]))
+                    last_seen = _update_cursor(last_seen, rid)
+                    processed = True
+                if processed:
+                    wait = min_wait
+                    continue
+                await notifications.listen(pool, channel, message_event)
+                try:
+                    await asyncio.wait_for(message_event.wait(), timeout=wait)
+                    wait = min_wait
+                except asyncio.TimeoutError:
+                    wait = min(wait * 2, max_wait)
+        finally:
+            await notifications.forget(channel, message_event)
 
     return read_messages(last_seen)
 

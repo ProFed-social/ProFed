@@ -10,6 +10,10 @@ class FakeConnection:
     def __init__(self, db):
         self._db = db
         self._listeners = {}
+        self._closed = False
+
+    def is_closed(self):
+        return self._closed
 
     class _Transaction:
         async def start(self):
@@ -145,6 +149,11 @@ class FakePool:
 class _FakeAcquireContext:
     def __init__(self, conn):
         self._conn = conn
+
+    def __await__(self):
+        async def _acquire():
+            return self._conn
+        return _acquire().__await__()
 
     async def __aenter__(self):
         return self._conn
