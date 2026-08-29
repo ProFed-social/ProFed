@@ -129,3 +129,12 @@ async def test_unfinished_skips_the_closed_processes(store, fake_conn):
     assert "WHERE state NOT IN ('resolved', 'unresolved')" in sql
     assert result[0]["entry"] == "bob@b.test"
 
+
+@pytest.mark.asyncio
+async def test_a_process_is_created_once_and_never_overwritten(store, fake_conn):
+    await store.ensure_process("unknown_actors", 7, "alice@a.test", NOW)
+    sql, *args = fake_conn.execute.await_args.args
+    assert "INSERT INTO account_resolver.process" in sql
+    assert "ON CONFLICT (source, sequence_id) DO NOTHING" in sql
+    assert args == ["unknown_actors", 7, "alice@a.test", NOW]
+

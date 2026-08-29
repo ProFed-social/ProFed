@@ -17,10 +17,14 @@ JRD = {"subject": "acct:alice@a.test"}
 class FakeStorage:
     def __init__(self):
         self.processes = []
+        self.ensured = []
         self.requests_recorded = []
 
     async def record_process(self, source, sequence_id, entry, state, emitted_at):
         self.processes.append((source, sequence_id, entry, state, emitted_at))
+
+    async def ensure_process(self, source, sequence_id, entry, emitted_at):
+        self.ensured.append((source, sequence_id, entry, emitted_at))
 
     async def record_request(self, source, sequence_id, kind, ordinal, state, attempt, name, document, emitted_at):
         self.requests_recorded.append((source, sequence_id, kind, ordinal, state, attempt, name, document))
@@ -65,6 +69,18 @@ async def test_a_failed_request_stores_no_document(fake_storage):
     await projection._record("request_failed", "alice@a.test", _payload(attempt=2, document=JRD), NOW)
 
     assert fake_storage.requests_recorded[0][7] is None
+
+
+@pytest.mark.asyncio
+async def test_a_request_makes_its_process_known(fake_storage):
+    await projection._record("attempting", "alice@a.test", _payload(attempt=1), NOW)
+    assert fake_storage.ensured == [("unknown_actors", 7, "alice@a.test", NOW)]
+
+
+@pytest.mark.asyncio
+async def test_a_process_event_does_not_ensure_the_process(fake_storage):
+    await projection._record("resolved", "alice@a.test", {"source": "unknown_actors", "sequence_id": 7}, NOW)
+    assert fake_storage.ensured == []
 
 
 @pytest.mark.asyncio

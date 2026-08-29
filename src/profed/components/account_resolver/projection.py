@@ -20,6 +20,7 @@ def _document(payload):
 
 
 async def _request(state, object_id, payload, emitted_at) -> None:
+    await (await storage()).ensure_process(payload["source"], payload["sequence_id"], object_id, emitted_at)
     await (await storage()).record_request(payload["source"],
                                            payload["sequence_id"],
                                            payload["kind"],

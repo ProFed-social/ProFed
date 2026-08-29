@@ -124,6 +124,9 @@ async def step(key, queue) -> bool:
         gate.done(process["entry"], process["emitted_at"])
         return False
 
-    await _advance(source, sequence_id, entry or (process or {}).get("entry"), datetime.now(timezone.utc))
+    entry = entry or (process or {}).get("entry")
+    if entry is None:
+        return False
+    await _advance(source, sequence_id, entry, datetime.now(timezone.utc))
     return True
 

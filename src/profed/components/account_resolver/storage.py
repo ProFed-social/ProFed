@@ -45,7 +45,25 @@ class _Storage(BaseStorage):
                            state,
                            emitted_at)
 
-    async def record_request(self, source, sequence_id, kind, ordinal, state, attempt, name, document,
+    async def ensure_process(self, source, sequence_id, entry, emitted_at) -> None:
+        await self.execute("""INSERT INTO account_resolver.process
+                                    (source, sequence_id, entry, state, emitted_at)
+                              VALUES ($1, $2, $3, 'attempting', $4)
+                              ON CONFLICT (source, sequence_id) DO NOTHING""",
+                           source,
+                           sequence_id,
+                           entry,
+                           emitted_at)
+
+    async def record_request(self,
+                             source,
+                             sequence_id,
+                             kind,
+                             ordinal,
+                             state,
+                             attempt,
+                             name,
+                             document,
                              emitted_at) -> None:
         await self.execute("""INSERT INTO account_resolver.request
                                     (source, sequence_id, kind, ordinal, state, attempt, name, document,
