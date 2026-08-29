@@ -76,26 +76,28 @@ async def _run_request(source, sequence_id, entry, kind, name, ordinal, attempt)
         await _emit_request(state, source, sequence_id, entry, kind, ordinal, attempt, name, document)
 
 
-async def _advance(source, sequence_id, entry, now) -> None:
+async def _advance(source, sequence_id, entry, now) -> float:
     rows = await (await storage()).requests(source, sequence_id)
 
     try:
         resolution = resolve(entry, known_from(rows), int(_config.get("max_hops", 6)))
     except NeedsRequest as need:
-        await _pursue(source, sequence_id, entry, need, rows, now)
-        return
+        return await _pursue(source, sequence_id, entry, need, rows, now)
 
     if resolution is not None:
         await _register(resolution, now)
 
     await _finish("resolved" if resolution is not None else "unresolved", source, sequence_id, entry, now)
+    return 0.0
 
 
-async def _pursue(source, sequence_id, entry, need, rows, now) -> None:
+async def _pursue(source, sequence_id, entry, need, rows, now) -> float:
     row = decision.row_for(rows, need.kind, need.name)
     action, attempt = decision.decide(row, now, _config)
 
-    if action == "give_up":
+    if action == "wait":
+        return decision.due_in(row, now, _config)
+    elif action == "give_up":
         await _finish("unresolved", source, sequence_id, entry, now)
     elif action == "claim":
         await _run_request(source,
@@ -105,6 +107,7 @@ async def _pursue(source, sequence_id, entry, need, rows, now) -> None:
                            need.name,
                            row["ordinal"] if row else decision.next_ordinal(rows, need.kind),
                            attempt)
+    return 0.0
 
 
 async def step(key, queue) -> bool:
@@ -116,12 +119,11 @@ async def step(key, queue) -> bool:
     process = await (await storage()).process(source, sequence_id)
     if process is not None and process["state"] in ("resolved", "unresolved"):
         gate.done(process["entry"], process["emitted_at"], process["state"])
-        return False
+        return None
 
     entry = entry or (process or {}).get("entry")
     if entry is None:
-        return False
+        return None
 
-    await _advance(source, sequence_id, entry, datetime.now(timezone.utc))
-    return True
+    return await _advance(source, sequence_id, entry, datetime.now(timezone.utc))
 

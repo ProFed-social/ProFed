@@ -3,10 +3,12 @@
 
 import asyncio
 import pytest
+from unittest.mock import patch
+from profed.core import workers as workers_module
 from profed.core.workers import KeyedWorkers
 
 
-async def _noop_sleep():
+async def _noop_sleep(seconds=None):
     await asyncio.sleep(0)
 
 
@@ -20,8 +22,8 @@ def _recorder(seen, busy_while=0):
         seen.append(key)
         if not queue.empty():
             queue.get_nowait()
-            return True
-        return len(seen) <= busy_while
+            return 0.0
+        return 0.0 if len(seen) <= busy_while else None
 
     return step
 
@@ -112,7 +114,7 @@ async def test_a_worker_that_finds_work_again_keeps_running():
 
     async def step(key, queue):
         calls.append(key)
-        return len(calls) != 2
+        return None if len(calls) == 2 else 0.0
 
     workers = KeyedWorkers(step, idle_limit=1, sleep=_noop_sleep)
     workers.start()
@@ -174,4 +176,76 @@ async def test_after_stop_a_submit_starts_nothing():
     workers.submit("a")
 
     assert workers._tasks == {}
+
+
+@pytest.mark.asyncio
+async def test_a_step_that_asks_for_a_delay_is_not_called_again_immediately():
+    calls = []
+    slept = []
+
+    async def step(key, queue):
+        calls.append(key)
+        await asyncio.sleep(0)
+        return 60.0
+
+    async def sleep(seconds=None):
+        slept.append(seconds)
+        await asyncio.sleep(0)
+
+    workers = KeyedWorkers(step, sleep=sleep)
+    workers.start()
+
+    workers.submit("a")
+    await _settle(10)
+    await workers.stop()
+
+    assert slept and all(seconds == 60.0 for seconds in slept)
+
+
+@pytest.mark.asyncio
+async def test_a_step_that_asks_to_continue_sleeps_the_default_window():
+    slept = []
+
+    async def step(key, queue):
+        await asyncio.sleep(0)
+        return 0.0
+
+    async def sleep(seconds=None):
+        slept.append(seconds)
+        await asyncio.sleep(0)
+
+    workers = KeyedWorkers(step, sleep=sleep)
+    workers.start()
+
+    workers.submit("a")
+    await _settle(10)
+    await workers.stop()
+
+    assert slept and all(seconds == 0.0 for seconds in slept)
+
+
+@pytest.mark.asyncio
+async def test_the_jittered_sleep_waits_at_least_the_asked_time():
+    waited = []
+
+    async def _record(seconds):
+        waited.append(seconds)
+
+    with patch.object(workers_module.asyncio, "sleep", _record):
+        await workers_module.jittered_sleep(100.0)
+
+    assert 100.0 <= waited[0] <= 110.0
+
+
+@pytest.mark.asyncio
+async def test_the_jittered_sleep_without_a_time_uses_the_default_window():
+    waited = []
+
+    async def _record(seconds):
+        waited.append(seconds)
+
+    with patch.object(workers_module.asyncio, "sleep", _record):
+        await workers_module.jittered_sleep()
+
+    assert workers_module.SLEEP_MIN <= waited[0] <= workers_module.SLEEP_MAX
 

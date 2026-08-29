@@ -9,12 +9,15 @@ import random
 logger = logging.getLogger(__name__)
 
 IDLE_LIMIT = 15
+JITTER = 0.1
 SLEEP_MIN = 10.0
 SLEEP_MAX = 30.0
 
 
-async def jittered_sleep(minimum: float = SLEEP_MIN, maximum: float = SLEEP_MAX) -> None:
-    await asyncio.sleep(random.uniform(minimum, maximum))
+async def jittered_sleep(seconds: float | None = None) -> None:
+    await asyncio.sleep(random.uniform(SLEEP_MIN, SLEEP_MAX)
+                        if seconds is None else
+                        seconds + random.uniform(0.0, min(max(seconds, 0.0) * JITTER, SLEEP_MAX)))
 
 
 class KeyedWorkers:
@@ -53,28 +56,29 @@ class KeyedWorkers:
         if self._tasks.get(key) is task:
             self._tasks.pop(key, None)
 
-    async def _work(self, key) -> bool:
+    async def _work(self, key) -> float | None:
         try:
-            return bool(await self._step(key, self.queue(key)))
+            return await self._step(key, self.queue(key))
         except Exception:
             logger.exception("%s:%s failed", self._name, key)
-            return True
+            return 0.0
 
     async def _run(self, key) -> None:
         idle = 0
 
         while True:
-            idle = 0 if await self._work(key) else idle + 1
+            due_in = await self._work(key)
+            idle = idle + 1 if due_in is None else 0
 
             if idle >= self._idle_limit:
                 self._tasks.pop(key, None)
                 await self._sleep()
-                if not await self._work(key):
+                if await self._work(key) is None:
                     return
                 self._tasks[key] = asyncio.current_task()
                 idle = 0
 
-            await self._sleep()
+            await self._sleep(due_in)
 
     async def stop(self) -> None:
         tasks = list(self._tasks.values())

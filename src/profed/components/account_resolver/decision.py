@@ -16,6 +16,10 @@ def wait_window(row, config: dict) -> float:
             0.0)
 
 
+def due_in(row, now, config: dict) -> float:
+    return max((row["emitted_at"] + timedelta(seconds=wait_window(row, config)) - now).total_seconds(), 0.0)
+
+
 def decide(row, now, config: dict) -> tuple:
     return (("claim", 1)
             if row is None else

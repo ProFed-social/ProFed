@@ -197,14 +197,23 @@ async def test_a_finished_process_is_not_advanced(fake_bus, component):
     component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "resolved", "emitted_at": NOW}
 
     with _at(NOW):
-        assert await worker.step(("unknown_actors", 7), _queue("alice@a.test")) is False
+        assert await worker.step(("unknown_actors", 7), _queue("alice@a.test")) is None
     assert _published(fake_bus) == []
 
 
 @pytest.mark.asyncio
-async def test_a_step_that_did_something_reports_work(fake_bus, component):
+async def test_a_step_that_did_something_asks_to_continue(fake_bus, component):
     with _at(NOW), patch.object(worker.fetch, "perform", AsyncMock(return_value=("request_succeeded", JRD))):
-        assert await worker.step(("unknown_actors", 7), _queue("alice@a.test")) is True
+        assert await worker.step(("unknown_actors", 7), _queue("alice@a.test")) == 0.0
+
+
+
+@pytest.mark.asyncio
+async def test_a_waiting_step_asks_for_the_time_until_the_retry(fake_bus, component):
+    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "attempting", "emitted_at": NOW}
+    component.rows = [_row("jrd", "alice@a.test", "request_failed", attempt=1, age=60)]
+    with _at(NOW):
+        assert await worker.step(("unknown_actors", 7), _queue()) == 240.0
 
 
 @pytest.mark.asyncio
@@ -346,7 +355,9 @@ async def test_a_local_account_is_not_registered_as_remote(fake_bus, component):
     jrd = {"subject": "acct:alice@local.test",
            "links": [{"rel": "self", "type": "application/activity+json", "href": local_url}]}
     component.rows = [_row("jrd", "alice@local.test", "request_succeeded", document=jrd),
-                      _row("actor", local_url, "request_succeeded",
+                      _row("actor",
+                           local_url,
+                           "request_succeeded",
                            document={"id": local_url, "type": "Person", "preferredUsername": "alice"})]
 
     with _at(NOW):
@@ -369,8 +380,7 @@ async def test_a_remote_account_is_registered(fake_bus, component):
 @pytest.mark.asyncio
 async def test_a_finished_process_releases_the_gate_on_a_later_visit(fake_bus, component):
     gate.init({"resolution_cache": timedelta(seconds=0), "unresolved_cache": UNRESOLVED})
-    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "resolved",
-                                                  "emitted_at": NOW}
+    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "resolved", "emitted_at": NOW}
     gate.try_start("alice@a.test", NOW)
 
     with _at(_later(10)):
@@ -382,17 +392,16 @@ async def test_a_finished_process_releases_the_gate_on_a_later_visit(fake_bus, c
 @pytest.mark.asyncio
 async def test_a_process_without_an_entry_does_nothing(fake_bus, component):
     with _at(NOW):
-        assert await worker.step(("unknown_actors", 7), _queue()) is False
+        assert await worker.step(("unknown_actors", 7), _queue()) is None
 
     assert _published(fake_bus) == []
 
 
 @pytest.mark.asyncio
 async def test_a_second_visit_takes_the_entry_from_the_stored_process(fake_bus, component):
-    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "attempting",
-                                                  "emitted_at": NOW}
+    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "attempting", "emitted_at": NOW}
     component.rows = [_row("jrd", "alice@a.test", "attempting", age=10)]
 
     with _at(NOW):
-        assert await worker.step(("unknown_actors", 7), _queue()) is True
+        assert await worker.step(("unknown_actors", 7), _queue()) is not None
 
