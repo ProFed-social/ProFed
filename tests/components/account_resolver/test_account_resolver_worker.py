@@ -369,3 +369,19 @@ async def test_a_finished_process_releases_the_gate_on_a_later_visit(fake_bus, c
 
     assert gate.try_start("alice@a.test", _later(1)) is True
 
+
+@pytest.mark.asyncio
+async def test_a_process_without_an_entry_does_nothing(fake_bus, component):
+    with _at(NOW):
+        assert await worker.step(("unknown_actors", 7), _queue()) is False
+    assert _published(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_a_second_visit_takes_the_entry_from_the_stored_process(fake_bus, component):
+    component.processes[("unknown_actors", 7)] = {"entry": "alice@a.test", "state": "attempting",
+                                                  "emitted_at": NOW}
+    component.rows = [_row("jrd", "alice@a.test", "attempting", age=10)]
+    with _at(NOW):
+        assert await worker.step(("unknown_actors", 7), _queue()) is True
+
