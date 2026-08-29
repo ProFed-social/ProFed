@@ -18,7 +18,9 @@ using_schemata = ["actor_extractor"]
 
 async def ActorExtractor(config: dict) -> None:
     await init_storage(config)
-    await (await _storage()).ensure_schema()
+    store = await _storage()
+    await store.ensure_schema()
+    store.rebuild_finished()
     await remote_actors_rebuild()
     await person_rebuild()
     logger.info("actor_extractor: projections rebuilt, tailing")

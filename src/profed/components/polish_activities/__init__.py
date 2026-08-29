@@ -16,7 +16,9 @@ using_schemata = ["polish_activities"]
 
 async def PolishActivities(config: dict) -> None:
     await init_storage(config)
-    await (await _storage()).ensure_schema()
+    store = await _storage()
+    await store.ensure_schema()
+    store.rebuild_finished()
     await asyncio.gather(instance_key_rebuild(), person_rebuild(), remote_actors_rebuild())
     logger.info("polish_activities: projections rebuilt, tailing")
 

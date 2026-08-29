@@ -20,7 +20,9 @@ async def AccountResolver(config: dict) -> None:
     gate.init(config)
 
     await init_storage(config)
-    await (await _storage()).ensure_schema()
+    store = await _storage()
+    await store.ensure_schema()
+    store.rebuild_finished()
     await asyncio.gather(instance_key.rebuild(), projection.rebuild())
 
     unknown_actors.workers().start()
