@@ -99,15 +99,15 @@ def _accounts(fake_bus):
 
 
 def _follower_edge(name):
-    return f"{name}@remote.example|{ALICE_ACCT}"
+    return f"https://remote.example/actors/{name}|{ALICE_ACTOR}"
 
 
 def _following_edge(name):
-    return f"{ALICE_ACCT}|{name}@remote.example"
+    return f"{ALICE_ACTOR}|https://remote.example/actors/{name}"
 
 
 def _local_follow_edge(name):
-    return f"{ALICE_ACCT}|{name}@example.com"
+    return f"{ALICE_ACTOR}|https://example.com/actors/{name}"
 
 
 def _status_create(note_id="https://example.com/notes/1"):
@@ -159,8 +159,8 @@ async def test_person_created_emits_account(fake_bus, fake_store, cfg):
 
 @pytest.mark.asyncio
 async def test_created_reflects_existing_follower_edges(fake_bus, fake_store, cfg):
-    await fake_store.add_edge("bob@remote.example", ALICE_ACCT)
-    await fake_store.add_edge("carol@remote.example", ALICE_ACCT)
+    await fake_store.add_edge("https://remote.example/actors/bob", ALICE_ACTOR)
+    await fake_store.add_edge("https://remote.example/actors/carol", ALICE_ACTOR)
     fake_bus.topic("person").messages = [_msg(5, "created", "alice", _actor())]
 
     await translator.handle_person_events()
@@ -170,8 +170,8 @@ async def test_created_reflects_existing_follower_edges(fake_bus, fake_store, cf
 
 @pytest.mark.asyncio
 async def test_created_reflects_existing_following_edges(fake_bus, fake_store, cfg):
-    await fake_store.add_edge(ALICE_ACCT, "bob@remote.example")
-    await fake_store.add_edge(ALICE_ACCT, "carol@remote.example")
+    await fake_store.add_edge(ALICE_ACTOR, "https://remote.example/actors/bob")
+    await fake_store.add_edge(ALICE_ACTOR, "https://remote.example/actors/carol")
     fake_bus.topic("person").messages = [_msg(5, "created", "alice", _actor())]
 
     await translator.handle_person_events()

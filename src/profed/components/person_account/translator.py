@@ -6,7 +6,7 @@ from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.core.persistence.projections import build_projection, with_sequence_id
 from profed.topics import person, followers, activities
-from profed.identity import acct_from_username, username_from_acct, domain
+from profed.identity import acct_from_username, is_local_actor_url, username_from_actor_url
 from profed.models.mastodon import Account
 from profed.util import noop
 from .storage import storage
@@ -34,7 +34,7 @@ async def _emit_account(event_type: str, username: str, person_actor: dict, sequ
     account = Account.from_actor(person_actor, acct=acct, url=person_actor["id"])
 
     store = await storage()
-    account.followers_count, account.following_count = await store.count_follows(acct)
+    account.followers_count, account.following_count = await store.count_follows(person_actor["id"])
     account.statuses_count = await store.count_statuses(username)
 
     await _publish(event_type,
@@ -68,21 +68,21 @@ async def _emit_count(event_type: str, username: str, count: int, source, sequen
     await _publish(event_type, username, {"count": count}, source.message_id(sequence_id))
 
 
-def _is_local(acct: str) -> bool:
-    return acct.rsplit("@", 1)[-1] == domain()
+def _is_local(actor_url: str) -> bool:
+    return is_local_actor_url(actor_url)
 
 
 async def _emit_edge_change(follower: str, following: str, sequence_id: int) -> None:
     store = await storage()
     if _is_local(following):
         await _emit_count("followers_changed",
-                          username_from_acct(following),
+                          username_from_actor_url(following),
                           await store.count_followers(following),
                           _FOLLOWERS_SOURCE,
                           sequence_id)
     if _is_local(follower):
         await _emit_count("following_changed",
-                          username_from_acct(follower),
+                          username_from_actor_url(follower),
                           await store.count_following(follower),
                           _FOLLOWING_SOURCE,
                           sequence_id)

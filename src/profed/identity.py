@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 from profed.core.config import config
 
+
 def domain() -> str:
     return config().get("web-server", {}).get("domain", "example.com")
 
@@ -28,6 +29,14 @@ def profile_url_from_username(username: str) -> str:
 
 def username_from_acct(acct: str) -> str:
     return acct.split("@", 1)[0]
+
+
+def is_local_actor_url(actor_url: str) -> bool:
+    return actor_url.startswith(f"https://{domain()}/actors/")
+
+
+def username_from_actor_url(actor_url: str) -> str:
+    return actor_url.rsplit("/", 1)[-1]
 
 
 def heuristic_acct(actor_url: str) -> str:
