@@ -100,14 +100,14 @@ def _diff_events(current, new_profile):
         return [("created",
                  dict(public_key_pem=public_pem,
                       private_key_pem=private_pem,
-                      **dict(optional_fields(("name", "summary")),
+                      **dict(optional_fields(("name", "summary", "fields")),
                              **optional_fields(("avatar", "header", "resume"),
                                                lambda a: a.model_dump()))))]
 
 
     text_diff = {field: value
                  for field, value in ((field, getattr(new_profile, field))
-                                      for field in ("name", "summary"))
+                                      for field in ("name", "summary", "fields"))
                  if value != getattr(current, field)}
 
     return (([("profile_edited", text_diff)] if text_diff else []) +

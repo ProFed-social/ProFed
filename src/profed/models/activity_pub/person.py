@@ -11,6 +11,12 @@ from profed.models.user_profile import UserProfile
 from .actor import Actor
 
 
+def _property_values(fields) -> list[dict]:
+    return [{"type": "PropertyValue", "name": field["name"], "value": field["value"]}
+            for field in fields
+            if isinstance(field, dict) and field.get("name") and field.get("value")]
+
+
 def _image_object(ref, variant):
     return ({"type": "Image",
              "url": media_storage().url_for(ref.media_id,
@@ -36,6 +42,7 @@ class Person(Actor):
     inbox: str
     outbox: str
     resume: Resume | None = None
+    attachment: list[dict] | None = None
     publicKey: dict | None = None
     published: str | None = None
 
@@ -48,6 +55,7 @@ class Person(Actor):
                    name=profile.name,
                    summary=profile.summary,
                    resume=profile.resume,
+                   attachment=_property_values(profile.fields) or None,
                    inbox=f"{actor_url}/inbox",
                    outbox=f"{actor_url}/outbox",
                    publicKey=(None

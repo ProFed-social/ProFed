@@ -20,6 +20,7 @@ def _ignore_snp(msg):
 def _validate_created(payload):
     unknown = set(payload) - {"name",
                               "summary",
+                              "fields",
                               "resume",
                               "avatar",
                               "header",

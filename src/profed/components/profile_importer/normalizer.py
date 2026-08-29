@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from urllib.parse import urlparse
 from typing import Any, Callable, Optional
 from profed.models import Resume, UserProfile
 from profed.sanitize import sanitize_html, strip_tags
@@ -131,6 +132,15 @@ def _linked_project_names(item, lookup) -> list:
             [])
 
 
+def _field_name(url: str, text: str | None) -> str:
+    return (text or "").strip() or urlparse(url).netloc or url
+
+
+def rel_me_fields(mf2_data: dict) -> list[dict]:
+    rel_urls = mf2_data.get("rel-urls", {})
+    return [{"name": _field_name(url, rel_urls.get(url, {}).get("text")), "value": url}
+            for url in mf2_data.get("rels", {}).get("me", [])]
+
 
 def normalize_mf2_to_profile(mf2_data: dict,
                              username_template: str = DEFAULT_USERNAME,
@@ -185,7 +195,8 @@ def normalize_mf2_to_profile(mf2_data: dict,
     return (UserProfile(username=username,
                         name=name,
                         summary=summary,
-                        resume=to_resume(h_resume)),
+                        resume=to_resume(h_resume),
+                        fields=rel_me_fields(mf2_data)),
             {"avatar": _to_url(_first(props.get("photo", []))) or
                        _to_url(_first(hcard_props.get("photo", []))),
              "header": _to_url(_first(props.get("featured",  []))) or

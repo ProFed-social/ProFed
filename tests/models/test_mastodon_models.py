@@ -402,3 +402,25 @@ def test_placeholder_account_uses_the_heuristic_acct():
     assert account.acct == "zoe@other.example"
     assert account.username == "zoe"
 
+
+def test_property_value_attachments_become_fields():
+    actor = {"type": "Person", "attachment": [{"type": "PropertyValue",
+                                               "name": "GitHub",
+                                               "value": "https://github.com/bob"}]}
+    account = Account.from_actor(actor, acct="bob@r.test", url="https://r.test/bob")
+    assert account.fields == [{"name": "GitHub", "value": "https://github.com/bob", "verified_at": None}]
+
+
+def test_an_actor_without_attachment_has_no_fields():
+    account = Account.from_actor({"type": "Person"}, acct="bob@r.test", url="https://r.test/bob")
+    assert account.fields == []
+
+
+def test_a_non_property_value_attachment_is_not_a_field():
+    actor = {"type": "Person", "attachment": [{"type": "Image",
+                                               "name": "Portrait",
+                                               "value": "https://r.test/pic.png"},
+                                              {"type": "PropertyValue", "name": "Site", "value": "https://b.test/"}]}
+    account = Account.from_actor(actor, acct="bob@r.test", url="https://r.test/bob")
+    assert [field["name"] for field in account.fields] == ["Site"]
+

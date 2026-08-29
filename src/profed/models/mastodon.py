@@ -62,6 +62,7 @@ class Account(BaseModel):
                    header_static=image,
                    locked=actor.get("manuallyApprovesFollowers", False),
                    bot=actor.get("type") == "Service",
+                   fields=property_value_fields(actor.get("attachment")),
                    resume=Resume.model_validate(resume) if resume else None,
                    **({"created_at": created} if created is not None else {}))
 
@@ -102,6 +103,13 @@ def tags_from_tag(tag: list) -> list[dict]:
     return [{"name": entry["name"].lstrip("#"), "url": entry.get("href", "")}
             for entry in tag
             if isinstance(entry, dict) and entry.get("type") == "Hashtag" and entry.get("name")]
+
+
+def property_value_fields(attachment) -> list[dict]:
+    return [{"name": item["name"], "value": item["value"], "verified_at": None}
+            for item in (attachment or [])
+            if isinstance(item, dict) and item.get("type") == "PropertyValue"
+            and item.get("name") and item.get("value")]
 
 
 def _attachment_type(entry: dict) -> str:
