@@ -90,5 +90,5 @@ async def step(key, queue) -> float | None:
     if known is not None and known["next_due_at"] > now:
         return None
 
-    return 0.0 if await check(profile_url, link_url, now) else float(_config.get("retry_wait", 300))
+    return None if await check(profile_url, link_url, now) else float(_config.get("retry_wait", 300))
 

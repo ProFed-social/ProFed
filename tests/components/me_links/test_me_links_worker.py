@@ -150,7 +150,19 @@ async def test_a_step_without_a_previous_check_looks_at_the_page(fake_bus, compo
 
     with patch.object(worker.fetch, "perform", _perform), \
          patch.object(worker.instance_key, "signer", lambda: None):
-        assert await worker.step((PROFILE, LINK), _queue()) == 0.0
+        await worker.step((PROFILE, LINK), _queue())
+
+    assert len(fake_bus.topic("me_links").published) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_finished_check_does_not_ask_to_come_back(fake_bus, component):
+    async def _perform(*args, **kwargs):
+        return _page("read", [PROFILE])
+
+    with patch.object(worker.fetch, "perform", _perform), \
+         patch.object(worker.instance_key, "signer", lambda: None):
+        assert await worker.step((PROFILE, LINK), _queue()) is None
 
 
 @pytest.mark.asyncio
