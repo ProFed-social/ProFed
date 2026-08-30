@@ -73,3 +73,11 @@ class AccountResolutionEvent(BaseModel):
     name: Optional[str] = None
     document: Optional[Dict] = None
 
+
+class MeLinkEvent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    checked_at: str = Field(min_length=1)
+    last_modified: Optional[str] = None
+    etag: Optional[str] = None
+    content_hash: Optional[str] = None
+

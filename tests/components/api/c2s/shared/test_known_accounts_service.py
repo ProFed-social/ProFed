@@ -234,3 +234,55 @@ async def test_cached_multiple_maps_urls_and_drops_missing(fake_storage):
 
     assert await service.cached_multiple([ACTOR_URL, REMOTE_ACTOR_URL]) == {ACTOR_URL: ACCOUNT}
 
+
+def _row_with_links(links):
+    return dict(STORED_ROW, me_links=links)
+
+
+def test_a_field_without_a_verification_stays_unverified():
+    account = service._account_from_row(_row_with_links({}))
+    assert [field["verified_at"] for field in account.fields] == [None for _ in account.fields]
+
+
+def test_a_verified_link_carries_its_check_time():
+    fields = [{"name": "GitHub", "value": "https://a.test/", "verified_at": None}]
+    row = dict(STORED_ROW,
+               account=dict(ACCOUNT.model_dump(), fields=fields),
+               me_links={"https://a.test/": {"state": "verified", "checked_at": "2026-08-30T12:00:00+00:00"}})
+
+    account = service._account_from_row(row)
+
+    assert account.fields[0]["verified_at"] == "2026-08-30T12:00:00+00:00"
+
+
+def test_an_unverified_link_has_no_check_time():
+    fields = [{"name": "GitHub", "value": "https://a.test/", "verified_at": None}]
+    row = dict(STORED_ROW,
+               account=dict(ACCOUNT.model_dump(), fields=fields),
+               me_links={"https://a.test/": {"state": "unverified", "checked_at": "2026-08-30T12:00:00+00:00"}})
+
+    assert service._account_from_row(row).fields[0]["verified_at"] is None
+
+
+def test_a_gone_link_is_not_shown_at_all():
+    fields = [{"name": "Weg", "value": "https://weg.test/", "verified_at": None},
+              {"name": "Da", "value": "https://a.test/", "verified_at": None}]
+    row = dict(STORED_ROW,
+               account=dict(ACCOUNT.model_dump(), fields=fields),
+               me_links={"https://weg.test/": {"state": "gone", "checked_at": "2026-08-30T12:00:00+00:00"}})
+
+    assert [field["name"] for field in service._account_from_row(row).fields] == ["Da"]
+
+
+def test_the_verifications_may_arrive_as_json_text():
+    fields = [{"name": "GitHub", "value": "https://a.test/", "verified_at": None}]
+    row = dict(STORED_ROW,
+               account=dict(ACCOUNT.model_dump(), fields=fields),
+               me_links='{"https://a.test/": {"state": "verified", "checked_at": "2026-08-30T12:00:00+00:00"}}')
+
+    assert service._account_from_row(row).fields[0]["verified_at"] == "2026-08-30T12:00:00+00:00"
+
+
+def test_an_account_without_verifications_can_still_be_read():
+    assert service._account_from_row(STORED_ROW) is not None
+

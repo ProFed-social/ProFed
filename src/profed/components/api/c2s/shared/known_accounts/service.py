@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from profed.core.message_bus import message_bus
@@ -60,8 +61,25 @@ def _ttl(config: dict | None) -> int:
                 WEBFINGER_CACHE_TTL))
 
 
+def _verified_at(entry: dict) -> str | None:
+    return entry.get("checked_at") if entry.get("state") == "verified" else None
+
+
+def _verified_fields(fields: list, links: dict) -> list:
+    return [dict(field, verified_at=_verified_at(links.get(field.get("value")) or {}))
+            for field in fields
+            if (links.get(field.get("value")) or {}).get("state") != "gone"]
+
+
+def _me_links(row: dict) -> dict:
+    known = row.get("me_links") or {}
+    return json.loads(known) if isinstance(known, str) else known
+
+
 def _account_from_row(row: dict) -> Account:
-    return Account.model_validate(row["account"])
+    account = Account.model_validate(row["account"])
+    account.fields = _verified_fields(account.fields, _me_links(row))
+    return account
 
 
 async def lookup_by_id(account_id: int, config: dict | None = None) -> Optional[Account]:

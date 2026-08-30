@@ -65,7 +65,10 @@ class _Storage(BaseStorage):
                                               acct,
                                               actor_url,
                                               account,
-                                              last_webfinger_at
+                                              last_webfinger_at,
+                                              (SELECT COALESCE(jsonb_object_agg(l.link_url, l.entry), '{}'::jsonb)
+                                               FROM api.me_link_entry AS l
+                                               WHERE l.profile_url = account->>'url') AS me_links
                                         FROM api.known_accounts
                                         WHERE account_id = $1""",
                                     account_id)
@@ -76,6 +79,9 @@ class _Storage(BaseStorage):
                                               actor_url,
                                               account,
                                               last_webfinger_at
+                                              (SELECT COALESCE(jsonb_object_agg(l.link_url, l.entry), '{}'::jsonb)
+                                               FROM api.me_link_entry AS l
+                                               WHERE l.profile_url = account->>'url') AS me_links
                                        FROM api.known_accounts
                                        WHERE acct = $1 OR acct_local = $1""",
                                     acct)
@@ -86,6 +92,9 @@ class _Storage(BaseStorage):
                                               actor_url,
                                               account,
                                               last_webfinger_at
+                                              (SELECT COALESCE(jsonb_object_agg(l.link_url, l.entry), '{}'::jsonb)
+                                               FROM api.me_link_entry AS l
+                                               WHERE l.profile_url = account->>'url') AS me_links
                                        FROM api.known_accounts
                                        WHERE actor_url = $1""",
                                     actor_url)

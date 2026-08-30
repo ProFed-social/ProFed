@@ -9,6 +9,7 @@ from profed.topics import (account_resolution_topic,
                            incoming_activities_topic,
                            instance_topic,
                            known_accounts_topic,
+                           me_links_topic,
                            media_topic,
                            oauth_apps_topic,
                            oauth_codes_topic,
@@ -33,6 +34,7 @@ followers = followers_topic.topic
 incoming_activities = incoming_activities_topic.topic
 instance = instance_topic.topic
 known_accounts = known_accounts_topic.topic
+me_links = me_links_topic.topic
 media = media_topic.topic
 oauth_apps = oauth_apps_topic.topic
 oauth_codes = oauth_codes_topic.topic
@@ -59,6 +61,7 @@ def names():
             incoming_activities["name"],
             instance["name"],
             known_accounts["name"],
+            me_links["name"],
             media["name"],
             oauth_apps["name"],
             oauth_codes["name"],
