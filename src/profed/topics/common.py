@@ -77,6 +77,7 @@ class AccountResolutionEvent(BaseModel):
 class MeLinkEvent(BaseModel):
     model_config = ConfigDict(extra="allow")
     checked_at: str = Field(min_length=1)
+    stable_since: str = Field(min_length=1)
     last_modified: Optional[str] = None
     etag: Optional[str] = None
     content_hash: Optional[str] = None

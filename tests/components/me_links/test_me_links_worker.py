@@ -94,7 +94,7 @@ async def test_an_unchanged_page_keeps_its_stability(fake_bus, component):
 
     await _check(_page("unchanged"), fake_bus, component)
 
-    assert (await component.verification(PROFILE, LINK))["stable_since"] == stable_since
+    assert fake_bus.topic("me_links").published[0]["payload"]["stable_since"] == stable_since.isoformat()
 
 
 @pytest.mark.asyncio
@@ -104,7 +104,7 @@ async def test_a_page_with_the_same_etag_keeps_its_stability(fake_bus, component
 
     await _check(_page("read", [PROFILE], etag='"abc"'), fake_bus, component)
 
-    assert (await component.verification(PROFILE, LINK))["stable_since"] == stable_since
+    assert fake_bus.topic("me_links").published[0]["payload"]["stable_since"] == stable_since.isoformat()
 
 
 @pytest.mark.asyncio
@@ -113,7 +113,7 @@ async def test_a_changed_page_starts_its_stability_anew(fake_bus, component):
 
     await _check(_page("read", [PROFILE], etag='"different"'), fake_bus, component)
 
-    assert (await component.verification(PROFILE, LINK))["stable_since"] == NOW
+    assert fake_bus.topic("me_links").published[0]["payload"]["stable_since"] == NOW.isoformat()
 
 
 @pytest.mark.asyncio
@@ -123,35 +123,24 @@ async def test_a_page_with_the_same_body_keeps_its_stability(fake_bus, component
 
     await _check(_page("read", [PROFILE], content_hash="hash"), fake_bus, component)
 
-    assert (await component.verification(PROFILE, LINK))["stable_since"] == stable_since
+    assert fake_bus.topic("me_links").published[0]["payload"]["stable_since"] == stable_since.isoformat()
 
 
 @pytest.mark.asyncio
-async def test_a_verification_is_stored(fake_bus, component):
+async def test_a_check_publishes_what_it_found(fake_bus, component):
     await _check(_page("read", [PROFILE], etag='"abc"'), fake_bus, component)
 
-    stored = await component.verification(PROFILE, LINK)
+    payload = fake_bus.topic("me_links").published[0]["payload"]
 
-    assert stored["state"] == "verified"
-    assert stored["etag"] == '"abc"'
+    assert payload["etag"] == '"abc"'
+    assert payload["checked_at"] == NOW.isoformat()
 
 
 @pytest.mark.asyncio
-async def test_a_check_stores_when_it_is_due_again(fake_bus, component):
+async def test_a_check_writes_nothing_itself(fake_bus, component):
     await _check(_page("read", [PROFILE]), fake_bus, component)
 
-    stored = await component.verification(PROFILE, LINK)
-
-    assert stored["next_due_at"] == NOW + timedelta(days=1)
-
-
-@pytest.mark.asyncio
-async def test_a_stable_page_is_due_later(fake_bus, component):
-    await _record(component, "verified", NOW - timedelta(days=60), NOW - timedelta(days=60), NOW, '"abc"', "hash")
-
-    await _check(_page("read", [PROFILE], etag='"abc"'), fake_bus, component)
-
-    assert (await component.verification(PROFILE, LINK))["next_due_at"] > NOW + timedelta(days=15)
+    assert await component.verification(PROFILE, LINK) is None
 
 
 @pytest.mark.asyncio

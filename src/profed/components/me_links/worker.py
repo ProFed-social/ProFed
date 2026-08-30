@@ -7,7 +7,6 @@ from profed.core.message_bus import message_bus
 from profed.core.workers import KeyedWorkers
 from profed.topics.me_links_topic import link_id
 from . import fetch, instance_key
-from .refresh import due_at
 from .storage import storage
 
 
@@ -44,24 +43,15 @@ def _stable_since(page, known: dict | None, now: datetime) -> datetime:
     return known["stable_since"] if (unchanged or same_body) else now
 
 
-async def _store_and_publish(profile_url, link_url, state, page, known, now) -> None:
+async def _publish_result(profile_url, link_url, state, page, known, now) -> None:
     stable_since = known["stable_since"] if page.state == "unchanged" else _stable_since(page, known, now)
-    last_modified = page.last_modified or (known or {}).get("last_modified")
-    fresh = {"checked_at": now, "stable_since": stable_since, "last_modified": last_modified}
-    await (await storage()).record_verification(profile_url,
-                                                link_url,
-                                                state,
-                                                now,
-                                                stable_since,
-                                                due_at(fresh, _config, now),
-                                                last_modified,
-                                                page.etag or (known or {}).get("etag"),
-                                                page.content_hash or (known or {}).get("content_hash"))
+
     await publish(state,
                   profile_url,
                   link_url,
                   {"checked_at": now.isoformat(),
-                   "last_modified": last_modified,
+                   "stable_since": stable_since.isoformat(),
+                   "last_modified": page.last_modified or (known or {}).get("last_modified"),
                    "etag": page.etag or (known or {}).get("etag"),
                    "content_hash": page.content_hash or (known or {}).get("content_hash")})
 
@@ -86,7 +76,7 @@ async def check(profile_url: str, link_url: str, now: datetime) -> bool:
     if state is None:
         return False
 
-    await _store_and_publish(profile_url, link_url, state, page, known, now)
+    await _publish_result(profile_url, link_url, state, page, known, now)
     return True
 
 

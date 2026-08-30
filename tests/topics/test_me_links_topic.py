@@ -7,7 +7,7 @@ from profed.topics.me_links_topic import (link_id,
                                           validate_me_links_snapshot_item)
 
 
-CHECKED = {"checked_at": "2026-08-30T10:00:00+00:00"}
+CHECKED = {"checked_at": "2026-08-30T10:00:00+00:00", "stable_since": "2026-08-29T10:00:00+00:00"}
 
 
 def test_a_verified_event_passes():
@@ -31,6 +31,10 @@ def test_an_unknown_verb_is_rejected():
 
 def test_a_check_without_a_time_is_rejected():
     assert validate_me_links_event("verified", {}) is None
+
+
+def test_a_check_without_a_stability_is_rejected():
+    assert validate_me_links_event("verified", {"checked_at": "2026-08-30T10:00:00+00:00"}) is None
 
 
 def test_the_freshness_headers_are_kept():
