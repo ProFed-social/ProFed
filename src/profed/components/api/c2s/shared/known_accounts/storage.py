@@ -78,7 +78,7 @@ class _Storage(BaseStorage):
                                               acct,
                                               actor_url,
                                               account,
-                                              last_webfinger_at
+                                              last_webfinger_at,
                                               (SELECT COALESCE(jsonb_object_agg(l.link_url, l.entry), '{}'::jsonb)
                                                FROM api.me_link_entry AS l
                                                WHERE l.profile_url = account->>'url') AS me_links
@@ -91,7 +91,7 @@ class _Storage(BaseStorage):
                                               acct,
                                               actor_url,
                                               account,
-                                              last_webfinger_at
+                                              last_webfinger_at,
                                               (SELECT COALESCE(jsonb_object_agg(l.link_url, l.entry), '{}'::jsonb)
                                                FROM api.me_link_entry AS l
                                                WHERE l.profile_url = account->>'url') AS me_links
