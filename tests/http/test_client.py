@@ -3,6 +3,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from profed.http import client as client_module
 from profed.http.client import HttpClient
 
 
@@ -106,4 +107,29 @@ async def test_uses_the_configured_timeout():
         await HttpClient().get("https://example.com/")
 
     assert mock_cls.call_args.kwargs["timeout"] == 30
+
+
+@pytest.mark.asyncio
+async def test_a_request_waits_for_its_host():
+    waited = []
+
+    async def _wait_for(host, interval):
+        waited.append((host, interval))
+
+    with patch("profed.http.client.httpx.AsyncClient") as mock, \
+         patch("profed.http.client.wait_for", _wait_for):
+        mock.return_value.__aenter__.return_value.request = AsyncMock(return_value=_mock_response())
+        await HttpClient().get("https://a.test/x")
+
+    assert waited[0][0] == "a.test"
+
+
+def test_the_interval_comes_from_the_configuration():
+    with patch("profed.http.client.config", lambda: {"profed": {"http_host_interval": 7}}):
+        assert client_module._host_interval() == 7.0
+
+
+def test_without_a_configured_interval_the_default_applies():
+    with patch("profed.http.client.config", lambda: {"profed": {}}):
+        assert client_module._host_interval() == client_module.DEFAULT_INTERVAL
 

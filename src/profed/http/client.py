@@ -4,11 +4,18 @@
 import httpx
 from profed.core.config import config
 from profed.http.guard import GuardTransport
+from profed.http.cooldown import DEFAULT_INTERVAL, wait_for
+
+
+def _host_interval() -> float:
+    return float(config().get("profed", {}).get("http_host_interval", DEFAULT_INTERVAL))
 
 
 class HttpClient:
     async def request(self, method, url, *, sign=None, raise_for_status=True, follow_redirects=True, **kwargs) \
             -> httpx.Response:
+        await wait_for(httpx.URL(url).host, _host_interval())
+
         async with httpx.AsyncClient(transport=GuardTransport(),
                                      follow_redirects=follow_redirects,
                                      timeout=config().get("profed", {}).get("http_client_timeout")) as client:

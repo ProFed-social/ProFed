@@ -27,6 +27,13 @@ def fake_media_storage():
     media_storage._instance = backup
 
 
+@pytest.fixture(autouse=True)
+def no_host_cooldown(monkeypatch):
+    from profed.http import client
+    async def _no_wait(host, interval):
+        return 0.0
+    monkeypatch.setattr(client, "wait_for", _no_wait)
+
 
 @pytest.fixture(autouse=True)
 def storages_ready_by_default(monkeypatch):
