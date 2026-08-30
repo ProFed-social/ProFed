@@ -28,9 +28,9 @@ def workers() -> KeyedWorkers:
     return _workers
 
 
-async def publish(event_type: str, profile_url: str, link_url: str, payload: dict) -> None:
+async def publish(event_type: str, actor_url: str, link_url: str, payload: dict) -> None:
     async with message_bus().topic("me_links").publish() as emit:
-        await emit(event_type=event_type, object_id=link_id(profile_url, link_url), payload=payload)
+        await emit(event_type=event_type, object_id=link_id(actor_url, link_url), payload=payload)
 
 
 def _stable_since(page, known: dict | None, now: datetime) -> datetime:
@@ -43,13 +43,14 @@ def _stable_since(page, known: dict | None, now: datetime) -> datetime:
     return known["stable_since"] if (unchanged or same_body) else now
 
 
-async def _publish_result(profile_url, link_url, state, page, known, now) -> None:
+async def _publish_result(actor_url, profile_url, link_url, state, page, known, now) -> None:
     stable_since = known["stable_since"] if page.state == "unchanged" else _stable_since(page, known, now)
 
     await publish(state,
-                  profile_url,
+                  actor_url,
                   link_url,
-                  {"checked_at": now.isoformat(),
+                  {"profile_url": profile_url,
+                   "checked_at": now.isoformat(),
                    "stable_since": stable_since.isoformat(),
                    "last_modified": page.last_modified or (known or {}).get("last_modified"),
                    "etag": page.etag or (known or {}).get("etag"),
@@ -68,27 +69,31 @@ def _state_of(page, known, profile_url: str) -> str | None:
             "unverified")
 
 
-async def check(profile_url: str, link_url: str, now: datetime) -> bool:
-    known = await (await storage()).verification(profile_url, link_url)
+async def check(actor_url: str, profile_url: str, link_url: str, now: datetime) -> bool:
+    known = await (await storage()).verification(actor_url, link_url)
     page = await fetch.perform(link_url, known, instance_key.signer())
     state = _state_of(page, known, profile_url)
 
     if state is None:
         return False
 
-    await _publish_result(profile_url, link_url, state, page, known, now)
+    await _publish_result(actor_url, profile_url, link_url, state, page, known, now)
     return True
 
 
 async def step(key, queue) -> float | None:
-    profile_url, link_url = key
+    actor_url, link_url = key
+    profile_url = None
     while not queue.empty():
-        queue.get_nowait()
+        profile_url = queue.get_nowait()
 
-    known = await (await storage()).verification(profile_url, link_url)
+    known = await (await storage()).verification(actor_url, link_url)
     now = datetime.now(timezone.utc)
     if known is not None and known["next_due_at"] > now:
         return None
 
-    return None if await check(profile_url, link_url, now) else float(_config.get("retry_wait", 300))
+    if profile_url is None:
+        return None
+
+    return None if await check(actor_url, profile_url, link_url, now) else float(_config.get("retry_wait", 300))
 

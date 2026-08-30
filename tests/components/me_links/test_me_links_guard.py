@@ -10,6 +10,7 @@ NOW = datetime(2026, 8, 30, 12, 0, tzinfo=timezone.utc)
 
 CONFIG = {"min_wait": timedelta(days=1), "max_wait": timedelta(days=30), "ramp": timedelta(days=90)}
 
+ACTOR = "https://p.test/users/alice"
 PROFILE = "https://p.test/@alice"
 LINK = "https://a.test/"
 
@@ -24,8 +25,8 @@ def _published(fake_bus):
 
 async def _verified(component, next_due_at, still_listed=True):
     if still_listed:
-        await component.replace_links(PROFILE, [LINK])
-    await component.record_verification(PROFILE,
+        await component.replace_links(ACTOR, PROFILE, [LINK])
+    await component.record_verification(ACTOR,
                                         LINK,
                                         "verified",
                                         NOW - timedelta(days=10),
@@ -38,10 +39,10 @@ async def _verified(component, next_due_at, still_listed=True):
 
 @pytest.mark.asyncio
 async def test_a_new_link_is_submitted(fake_bus, component):
-    await component.replace_links(PROFILE, [LINK])
+    await component.replace_links(ACTOR, PROFILE, [LINK])
 
     assert await guard.submit_unchecked() == 1
-    assert _submitted() == [(PROFILE, LINK)]
+    assert _submitted() == [(ACTOR, LINK)]
 
 
 @pytest.mark.asyncio
@@ -56,7 +57,7 @@ async def test_a_due_link_is_submitted_for_a_new_check(fake_bus, component):
     await _verified(component, NOW - timedelta(hours=1))
 
     assert await guard.visit_due(NOW) == 1
-    assert _submitted() == [(PROFILE, LINK)]
+    assert _submitted() == [(ACTOR, LINK)]
 
 
 @pytest.mark.asyncio
@@ -73,7 +74,7 @@ async def test_a_due_link_the_actor_dropped_is_deleted(fake_bus, component):
 
     await guard.visit_due(NOW)
 
-    assert _published(fake_bus) == [("deleted", f"{PROFILE}|{LINK}")]
+    assert _published(fake_bus) == [("deleted", f"{ACTOR}|{LINK}")]
 
 
 @pytest.mark.asyncio
@@ -82,7 +83,7 @@ async def test_a_deleted_link_is_forgotten(fake_bus, component):
 
     await guard.visit_due(NOW)
 
-    assert await component.verification(PROFILE, LINK) is None
+    assert await component.verification(ACTOR, LINK) is None
 
 
 @pytest.mark.asyncio
@@ -96,8 +97,8 @@ async def test_a_dropped_link_that_is_not_due_is_kept_for_now(fake_bus, componen
 
 @pytest.mark.asyncio
 async def test_a_sweep_covers_new_and_due_links(fake_bus, component):
-    await component.replace_links(PROFILE, [LINK, "https://b.test/"])
-    await component.record_verification(PROFILE,
+    await component.replace_links(ACTOR, PROFILE, [LINK, "https://b.test/"])
+    await component.record_verification(ACTOR,
                                         LINK,
                                         "verified",
                                         NOW - timedelta(days=10),
@@ -108,4 +109,13 @@ async def test_a_sweep_covers_new_and_due_links(fake_bus, component):
                                         None)
 
     assert await guard.sweep(CONFIG) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_submitted_link_carries_its_profile_url(fake_bus, component):
+    await component.replace_links(ACTOR, PROFILE, [LINK])
+
+    await guard.submit_unchecked()
+
+    assert worker.workers().items == [PROFILE]
 

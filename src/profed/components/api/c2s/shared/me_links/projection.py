@@ -11,15 +11,15 @@ from .storage import storage
 
 def _checked(state: str):
     async def _record(object_id: str, payload: dict) -> None:
-        profile_url, link_url = link_parts(object_id)
-        await (await storage()).upsert(profile_url, link_url, state, datetime.fromisoformat(payload["checked_at"]))
+        actor_url, link_url = link_parts(object_id)
+        await (await storage()).upsert(actor_url, link_url, state, datetime.fromisoformat(payload["checked_at"]))
 
     return _record
 
 
 async def _deleted(object_id: str, payload: dict) -> None:
-    profile_url, link_url = link_parts(object_id)
-    await (await storage()).delete(profile_url, link_url)
+    actor_url, link_url = link_parts(object_id)
+    await (await storage()).delete(actor_url, link_url)
 
 
 handle_events, rebuild, _ = build_projection(topic=topic,

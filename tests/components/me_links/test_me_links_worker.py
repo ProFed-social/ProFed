@@ -11,6 +11,7 @@ from profed.components.me_links.fetch import Page
 
 NOW = datetime(2026, 8, 30, 12, 0, tzinfo=timezone.utc)
 
+ACTOR = "https://p.test/users/alice"
 PROFILE = "https://p.test/@alice"
 LINK = "https://a.test/"
 
@@ -31,7 +32,7 @@ def _published(fake_bus):
 
 
 async def _record(component, state, checked_at, stable_since, next_due_at, etag=None, content_hash=None):
-    await component.record_verification(PROFILE,
+    await component.record_verification(ACTOR,
                                         LINK,
                                         state,
                                         checked_at,
@@ -48,28 +49,28 @@ async def _check(page, fake_bus, component, now=NOW):
 
     with patch.object(worker.fetch, "perform", _perform), \
          patch.object(worker.instance_key, "signer", lambda: None):
-        return await worker.check(PROFILE, LINK, now)
+        return await worker.check(ACTOR, PROFILE, LINK, now)
 
 
 @pytest.mark.asyncio
 async def test_a_page_pointing_back_verifies_the_link(fake_bus, component):
     await _check(_page("read", [PROFILE]), fake_bus, component)
 
-    assert _published(fake_bus) == [("verified", f"{PROFILE}|{LINK}")]
+    assert _published(fake_bus) == [("verified", f"{ACTOR}|{LINK}")]
 
 
 @pytest.mark.asyncio
 async def test_a_page_without_the_link_stays_unverified(fake_bus, component):
     await _check(_page("read", ["https://p.test/@bob"]), fake_bus, component)
 
-    assert _published(fake_bus) == [("unverified", f"{PROFILE}|{LINK}")]
+    assert _published(fake_bus) == [("unverified", f"{ACTOR}|{LINK}")]
 
 
 @pytest.mark.asyncio
 async def test_a_missing_page_is_gone(fake_bus, component):
     await _check(_page("gone"), fake_bus, component)
 
-    assert _published(fake_bus) == [("gone", f"{PROFILE}|{LINK}")]
+    assert _published(fake_bus) == [("gone", f"{ACTOR}|{LINK}")]
 
 
 @pytest.mark.asyncio
@@ -84,7 +85,7 @@ async def test_an_unchanged_page_keeps_the_previous_state(fake_bus, component):
 
     await _check(_page("unchanged"), fake_bus, component)
 
-    assert _published(fake_bus) == [("verified", f"{PROFILE}|{LINK}")]
+    assert _published(fake_bus) == [("verified", f"{ACTOR}|{LINK}")]
 
 
 @pytest.mark.asyncio
@@ -140,7 +141,7 @@ async def test_a_check_publishes_what_it_found(fake_bus, component):
 async def test_a_check_writes_nothing_itself(fake_bus, component):
     await _check(_page("read", [PROFILE]), fake_bus, component)
 
-    assert await component.verification(PROFILE, LINK) is None
+    assert await component.verification(ACTOR, LINK) is None
 
 
 @pytest.mark.asyncio
@@ -150,7 +151,7 @@ async def test_a_step_without_a_previous_check_looks_at_the_page(fake_bus, compo
 
     with patch.object(worker.fetch, "perform", _perform), \
          patch.object(worker.instance_key, "signer", lambda: None):
-        await worker.step((PROFILE, LINK), _queue())
+        await worker.step((ACTOR, LINK), _queue(PROFILE))
 
     assert len(fake_bus.topic("me_links").published) == 1
 
@@ -162,7 +163,7 @@ async def test_a_finished_check_does_not_ask_to_come_back(fake_bus, component):
 
     with patch.object(worker.fetch, "perform", _perform), \
          patch.object(worker.instance_key, "signer", lambda: None):
-        assert await worker.step((PROFILE, LINK), _queue()) is None
+        assert await worker.step((ACTOR, LINK), _queue(PROFILE)) is None
 
 
 @pytest.mark.asyncio
@@ -170,7 +171,7 @@ async def test_a_step_on_a_fresh_check_does_nothing(fake_bus, component):
     now = datetime.now(timezone.utc)
     await _record(component, "verified", now, now, now + timedelta(days=1))
 
-    assert await worker.step((PROFILE, LINK), _queue()) is None
+    assert await worker.step((ACTOR, LINK), _queue(PROFILE)) is None
 
 
 @pytest.mark.asyncio
@@ -180,5 +181,18 @@ async def test_a_failed_step_asks_to_come_back(fake_bus, component):
 
     with patch.object(worker.fetch, "perform", _perform), \
          patch.object(worker.instance_key, "signer", lambda: None):
-        assert await worker.step((PROFILE, LINK), _queue()) == 300.0
+        assert await worker.step((ACTOR, LINK), _queue(PROFILE)) == 300.0
+
+
+@pytest.mark.asyncio
+async def test_a_step_without_a_profile_url_does_nothing(fake_bus, component):
+    assert await worker.step((ACTOR, LINK), _queue()) is None
+    assert fake_bus.topic("me_links").published == []
+
+
+@pytest.mark.asyncio
+async def test_the_published_event_carries_the_profile_url(fake_bus, component):
+    await _check(_page("read", [PROFILE]), fake_bus, component)
+
+    assert fake_bus.topic("me_links").published[0]["payload"]["profile_url"] == PROFILE
 

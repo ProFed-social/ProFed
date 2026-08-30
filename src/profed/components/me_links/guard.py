@@ -15,20 +15,20 @@ logger = logging.getLogger(__name__)
 async def submit_unchecked() -> int:
     rows = await (await storage()).unchecked()
     for row in rows:
-        workers().submit((row["profile_url"], row["link_url"]), row["link_url"])
+        workers().submit((row["actor_url"], row["link_url"]), row["profile_url"])
     return len(rows)
 
 
 async def forget(row: dict) -> None:
-    await (await storage()).forget_verification(row["profile_url"], row["link_url"])
-    await publish("deleted", row["profile_url"], row["link_url"], {})
+    await (await storage()).forget_verification(row["actor_url"], row["link_url"])
+    await publish("deleted", row["actor_url"], row["link_url"], {})
 
 
 async def visit_due(now: datetime) -> int:
     due = await (await storage()).due(now)
     for row in due:
         if row["still_listed"]:
-            workers().submit((row["profile_url"], row["link_url"]), row["link_url"])
+            workers().submit((row["actor_url"], row["link_url"]), row["profile_url"])
         else:
             await forget(row)
     return len(due)

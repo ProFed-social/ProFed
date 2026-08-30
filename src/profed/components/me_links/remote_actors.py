@@ -15,7 +15,9 @@ def profile_url_of(actor: dict, fallback: str) -> str:
 
 async def _discovered(object_id: str, payload: dict) -> None:
     actor = payload.get("actor_data") or {}
-    await (await storage()).replace_links(profile_url_of(actor, payload["actor_url"]), link_urls(actor))
+    await (await storage()).replace_links(payload["actor_url"],
+                                          profile_url_of(actor, payload["actor_url"]),
+                                          link_urls(actor))
 
 
 handle_events, rebuild, _ = build_projection(topic=topic,

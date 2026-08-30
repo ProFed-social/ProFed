@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.persistence.projections import build_projection
-from profed.identity import profile_url_from_username
+from profed.identity import actor_url_from_username, profile_url_from_username
 from profed.topics import person as topic
 from profed.util import noop
 from .extract import link_urls
@@ -10,11 +10,13 @@ from .storage import storage
 
 
 async def _person_changed(object_id: str, payload: dict) -> None:
-    await (await storage()).replace_links(profile_url_from_username(object_id), link_urls(payload))
+    await (await storage()).replace_links(actor_url_from_username(object_id),
+                                          profile_url_from_username(object_id),
+                                          link_urls(payload))
 
 
 async def _person_deleted(object_id: str, payload: dict) -> None:
-    await (await storage()).forget_links(profile_url_from_username(object_id))
+    await (await storage()).forget_links(actor_url_from_username(object_id))
 
 
 person_handle_events, person_rebuild, _ = \

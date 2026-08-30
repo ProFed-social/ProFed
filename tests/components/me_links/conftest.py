@@ -13,43 +13,56 @@ CONFIG = {"min_wait": timedelta(days=1), "max_wait": timedelta(days=30), "ramp":
 class FakeStorage:
     def __init__(self):
         self.links = {}
+        self.profiles = {}
         self.verifications = {}
 
-    async def replace_links(self, profile_url, link_urls):
-        self.links[profile_url] = list(link_urls)
+    async def replace_links(self, actor_url, profile_url, link_urls):
+        self.links[actor_url] = list(link_urls)
+        self.profiles[actor_url] = profile_url
 
-    async def forget_links(self, profile_url):
-        self.links.pop(profile_url, None)
+    async def forget_links(self, actor_url):
+        self.links.pop(actor_url, None)
+        self.profiles.pop(actor_url, None)
 
-    async def links_of(self, profile_url):
-        return list(self.links.get(profile_url, []))
+    async def links_of(self, actor_url):
+        return list(self.links.get(actor_url, []))
 
-    async def record_verification(self, profile_url, link_url, state, checked_at, stable_since,
-                                  next_due_at, last_modified, etag, content_hash):
-        self.verifications[(profile_url, link_url)] = {"profile_url": profile_url,
-                                                       "link_url": link_url,
-                                                       "state": state,
-                                                       "checked_at": checked_at,
-                                                       "stable_since": stable_since,
-                                                       "next_due_at": next_due_at,
-                                                       "last_modified": last_modified,
-                                                       "etag": etag,
-                                                       "content_hash": content_hash}
+    async def record_verification(self,
+                                  actor_url,
+                                  link_url,
+                                  state,
+                                  checked_at,
+                                  stable_since,
+                                  next_due_at,
+                                  last_modified,
+                                  etag,
+                                  content_hash):
+        self.verifications[(actor_url, link_url)] = {"actor_url": actor_url,
+                                                     "link_url": link_url,
+                                                     "state": state,
+                                                     "checked_at": checked_at,
+                                                     "stable_since": stable_since,
+                                                     "next_due_at": next_due_at,
+                                                     "last_modified": last_modified,
+                                                     "etag": etag,
+                                                     "content_hash": content_hash}
 
-    async def forget_verification(self, profile_url, link_url):
-        self.verifications.pop((profile_url, link_url), None)
+    async def forget_verification(self, actor_url, link_url):
+        self.verifications.pop((actor_url, link_url), None)
 
-    async def verification(self, profile_url, link_url):
-        return self.verifications.get((profile_url, link_url))
+    async def verification(self, actor_url, link_url):
+        return self.verifications.get((actor_url, link_url))
 
     async def unchecked(self):
-        return [{"profile_url": profile_url, "link_url": link_url}
-                for profile_url, urls in self.links.items()
+        return [{"actor_url": actor_url, "profile_url": self.profiles.get(actor_url), "link_url": link_url}
+                for actor_url, urls in self.links.items()
                 for link_url in urls
-                if (profile_url, link_url) not in self.verifications]
+                if (actor_url, link_url) not in self.verifications]
 
     async def due(self, now):
-        return [dict(row, still_listed=row["link_url"] in self.links.get(row["profile_url"], []))
+        return [dict(row,
+                     profile_url=self.profiles.get(row["actor_url"]),
+                     still_listed=row["link_url"] in self.links.get(row["actor_url"], []))
                 for row in self.verifications.values()
                 if row["next_due_at"] <= now]
 
@@ -57,9 +70,11 @@ class FakeStorage:
 class FakeWorkers:
     def __init__(self):
         self.submitted = []
+        self.items = []
 
     def submit(self, key, item=None):
         self.submitted.append(key)
+        self.items.append(item)
 
     def start(self):
         return None

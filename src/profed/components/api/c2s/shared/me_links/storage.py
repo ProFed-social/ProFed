@@ -11,32 +11,32 @@ class _Storage(BaseStorage):
 
     async def ensure_schema(self) -> None:
         await self.execute("""CREATE TABLE IF NOT EXISTS
-                              api.me_links (profile_url TEXT        NOT NULL,
-                                            link_url    TEXT        NOT NULL,
-                                            state       TEXT        NOT NULL,
-                                            checked_at  TIMESTAMPTZ NOT NULL,
-                                            PRIMARY KEY (profile_url, link_url))""")
+                              api.me_links (actor_url  TEXT        NOT NULL,
+                                            link_url   TEXT        NOT NULL,
+                                            state      TEXT        NOT NULL,
+                                            checked_at TIMESTAMPTZ NOT NULL,
+                                            PRIMARY KEY (actor_url, link_url))""")
         await self.execute("""CREATE OR REPLACE VIEW api.me_link_entry AS
-                              SELECT profile_url,
+                              SELECT actor_url,
                                      link_url,
                                      jsonb_build_object('state', state, 'checked_at', checked_at) AS entry
                               FROM api.me_links""")
 
-    async def upsert(self, profile_url: str, link_url: str, state: str, checked_at) -> None:
-        await self.execute("""INSERT INTO api.me_links (profile_url, link_url, state, checked_at)
+    async def upsert(self, actor_url: str, link_url: str, state: str, checked_at) -> None:
+        await self.execute("""INSERT INTO api.me_links (actor_url, link_url, state, checked_at)
                               VALUES ($1, $2, $3, $4)
-                              ON CONFLICT (profile_url, link_url) DO UPDATE
+                              ON CONFLICT (actor_url, link_url) DO UPDATE
                                   SET state = EXCLUDED.state,
                                       checked_at = EXCLUDED.checked_at""",
-                           profile_url,
+                           actor_url,
                            link_url,
                            state,
                            checked_at)
 
-    async def delete(self, profile_url: str, link_url: str) -> None:
+    async def delete(self, actor_url: str, link_url: str) -> None:
         await self.execute("""DELETE FROM api.me_links
-                              WHERE profile_url = $1 AND link_url = $2""",
-                           profile_url,
+                              WHERE actor_url = $1 AND link_url = $2""",
+                           actor_url,
                            link_url)
 
 

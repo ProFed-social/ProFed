@@ -26,9 +26,9 @@ def _row(payload: dict) -> dict:
 
 def _checked(state: str):
     async def _record(object_id: str, payload: dict) -> None:
-        profile_url, link_url = link_parts(object_id)
+        actor_url, link_url = link_parts(object_id)
         row = _row(payload)
-        await (await storage()).record_verification(profile_url,
+        await (await storage()).record_verification(actor_url,
                                                     link_url,
                                                     state,
                                                     row["checked_at"],
@@ -42,8 +42,8 @@ def _checked(state: str):
 
 
 async def _deleted(object_id: str, payload: dict) -> None:
-    profile_url, link_url = link_parts(object_id)
-    await (await storage()).forget_verification(profile_url, link_url)
+    actor_url, link_url = link_parts(object_id)
+    await (await storage()).forget_verification(actor_url, link_url)
 
 
 HANDLERS = dict({state: _checked(state) for state in CHECK_STATES}, deleted=_deleted)

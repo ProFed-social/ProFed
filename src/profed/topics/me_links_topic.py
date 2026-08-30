@@ -10,8 +10,8 @@ CHECK_STATES = {"verified", "unverified", "gone"}
 ME_LINK_STATES = CHECK_STATES | {"deleted"}
 
 
-def link_id(profile_url: str, link_url: str) -> str:
-    return f"{profile_url}|{link_url}"
+def link_id(actor_url: str, link_url: str) -> str:
+    return f"{actor_url}|{link_url}"
 
 
 def link_parts(object_id: str) -> tuple[str, str]:

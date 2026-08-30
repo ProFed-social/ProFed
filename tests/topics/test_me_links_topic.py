@@ -7,7 +7,9 @@ from profed.topics.me_links_topic import (link_id,
                                           validate_me_links_snapshot_item)
 
 
-CHECKED = {"checked_at": "2026-08-30T10:00:00+00:00", "stable_since": "2026-08-29T10:00:00+00:00"}
+CHECKED = {"profile_url": "https://p.test/@alice",
+           "checked_at": "2026-08-30T10:00:00+00:00",
+           "stable_since": "2026-08-29T10:00:00+00:00"}
 
 
 def test_a_verified_event_passes():
@@ -37,6 +39,12 @@ def test_a_check_without_a_stability_is_rejected():
     assert validate_me_links_event("verified", {"checked_at": "2026-08-30T10:00:00+00:00"}) is None
 
 
+def test_a_check_without_a_stability_is_rejected():
+    incomplete = {"profile_url": "https://p.test/@alice", "checked_at": "2026-08-30T10:00:00+00:00"}
+
+    assert validate_me_links_event("verified", incomplete) is None
+
+
 def test_the_freshness_headers_are_kept():
     payload = dict(CHECKED, last_modified="Sat, 30 Aug 2026 08:00:00 GMT", etag='"abc"', content_hash="deadbeef")
 
@@ -64,7 +72,7 @@ def test_a_snapshot_item_without_a_time_is_rejected():
 
 
 def test_the_link_id_joins_both_urls():
-    assert link_id("https://a.test/@alice", "https://b.test/x") == "https://a.test/@alice|https://b.test/x"
+    assert link_id("https://a.test/users/alice", "https://b.test/x") == "https://a.test/users/alice|https://b.test/x"
 
 
 def test_the_link_id_can_be_taken_apart_again():
