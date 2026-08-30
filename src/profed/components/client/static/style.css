@@ -154,6 +154,8 @@ a:hover { text-decoration: underline; }
   color: var(--accent);
 }
 
+.fields .gone { display: none; }
+
 .resume h2,
 .posts h2 {
   margin: 2rem 0 .25rem;

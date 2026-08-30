@@ -65,10 +65,14 @@ def _verified_at(entry: dict) -> str | None:
     return entry.get("checked_at") if entry.get("state") == "verified" else None
 
 
+def _with_state(field: dict, entry: dict) -> dict:
+    return dict(field,
+                verified_at=_verified_at(entry),
+                **({"state": entry["state"]} if entry.get("state") else {}))
+
+
 def _verified_fields(fields: list, links: dict) -> list:
-    return [dict(field, verified_at=_verified_at(links.get(field.get("value")) or {}))
-            for field in fields
-            if (links.get(field.get("value")) or {}).get("state") != "gone"]
+    return [_with_state(field, links.get(field.get("value")) or {}) for field in fields]
 
 
 def _me_links(row: dict) -> dict:

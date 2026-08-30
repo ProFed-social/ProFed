@@ -264,14 +264,30 @@ def test_an_unverified_link_has_no_check_time():
     assert service._account_from_row(row).fields[0]["verified_at"] is None
 
 
-def test_a_gone_link_is_not_shown_at_all():
+def test_a_gone_link_is_still_delivered():
     fields = [{"name": "Weg", "value": "https://weg.test/", "verified_at": None},
               {"name": "Da", "value": "https://a.test/", "verified_at": None}]
     row = dict(STORED_ROW,
                account=dict(ACCOUNT.model_dump(), fields=fields),
                me_links={"https://weg.test/": {"state": "gone", "checked_at": "2026-08-30T12:00:00+00:00"}})
 
-    assert [field["name"] for field in service._account_from_row(row).fields] == ["Da"]
+    assert [field["name"] for field in service._account_from_row(row).fields] == ["Weg", "Da"]
+
+
+def test_a_gone_link_carries_its_state():
+    fields = [{"name": "Weg", "value": "https://weg.test/", "verified_at": None}]
+    row = dict(STORED_ROW,
+               account=dict(ACCOUNT.model_dump(), fields=fields),
+               me_links={"https://weg.test/": {"state": "gone", "checked_at": "2026-08-30T12:00:00+00:00"}})
+
+    assert service._account_from_row(row).fields[0]["state"] == "gone"
+
+
+def test_an_unchecked_link_carries_no_state():
+    fields = [{"name": "Neu", "value": "https://neu.test/", "verified_at": None}]
+    row = dict(STORED_ROW, account=dict(ACCOUNT.model_dump(), fields=fields), me_links={})
+
+    assert "state" not in service._account_from_row(row).fields[0]
 
 
 def test_the_verifications_may_arrive_as_json_text():

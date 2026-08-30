@@ -170,3 +170,21 @@ def test_every_field_gets_its_own_entry():
 
     assert html.count('class="field"') == 2
 
+
+def test_a_gone_field_is_marked():
+    html = _parse_card([{"name": "Weg", "value": "https://weg.test/", "verified_at": None, "state": "gone"}])
+
+    assert 'class="field gone"' in html
+
+
+def test_a_gone_field_keeps_its_rel_me_link():
+    html = _parse_card([{"name": "Weg", "value": "https://weg.test/", "verified_at": None, "state": "gone"}])
+
+    assert '<a rel="me" href="https://weg.test/">' in html
+
+
+def test_an_unverified_field_is_not_marked_as_gone():
+    html = _parse_card([{"name": "Da", "value": "https://a.test/", "verified_at": None, "state": "unverified"}])
+
+    assert "gone" not in html
+

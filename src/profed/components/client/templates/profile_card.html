@@ -23,7 +23,7 @@
   {% if account.fields %}
   <dl class="fields">
     {% for field in account.fields %}
-    <div class="field{% if field.verified_at %} verified{% endif %}">
+    <div class="field{% if field.verified_at %} verified{% endif %}{% if field.state == "gone" %} gone{% endif %}">
       <dt>{{ field.name }}</dt>
       <dd>{{ field.value | link_field | safe }}</dd>
     </div>
