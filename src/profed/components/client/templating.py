@@ -7,6 +7,7 @@ from jinja2 import ChoiceLoader, Environment, FileSystemLoader, select_autoescap
 from markupsafe import escape
 
 from profed.core.config import config
+from profed.identity import domain
 from profed.sanitize import sanitize_html
 
 
@@ -69,6 +70,11 @@ def local_minutes(timestamp: str) -> str:
     return parsed.strftime("%Y-%m-%d %H:%M") if parsed else ""
 
 
+def profile_href(account) -> str:
+    acct = (account or {}).get("acct")
+    return f"https://{domain()}/@{acct}" if acct else (account or {}).get("url", "")
+
+
 def link_field(value: str) -> str:
     return (f'<a rel="me" href="{escape(value)}">{escape(value)}</a>'
             if value.startswith("https://") or value.startswith("http://") else
@@ -80,6 +86,7 @@ def build_environment(standard_dir, theme_dir):
                               autoescape=select_autoescape(["html", "xml"]))
     environment.filters.update(sanitize=sanitize_html,
                                link_field=link_field,
+                               profile_href=profile_href,
                                rfc822=rfc822,
                                relative_time=relative_time,
                                local_minutes=local_minutes)

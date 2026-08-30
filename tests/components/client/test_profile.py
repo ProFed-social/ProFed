@@ -140,8 +140,25 @@ def test_status_fragment_author_block_is_optional():
 
     assert "Bob" in template.render(status=status)
     shown = template.render(status=status, show_author=True)
-    assert "@bob@remote.tld" in shown and "https://remote.tld/@bob" in shown
+    assert "@bob@remote.tld" in shown
     assert "Bob" not in template.render(status=status, show_author=False)
+
+
+def test_a_remote_author_links_to_the_local_profile():
+    status = {"content": "<p>x</p>",
+              "created_at": "2026-01-01T00:00:00+00:00",
+              "reblogs_count": 0,
+              "favourites_count": 0,
+              "account": {"display_name": "Bob",
+                          "username": "bob",
+                          "acct": "bob@remote.tld",
+                          "url": "https://remote.tld/@bob",
+                          "avatar": None}}
+
+    shown = _ENV.get_template("status.html").render(status=status, show_author=True)
+
+    assert 'href="https://example.com/@bob@remote.tld"' in shown
+    assert 'href="https://remote.tld/@bob"' not in shown
 
 
 def test_status_fragment_respond_button_carries_the_reply_target():

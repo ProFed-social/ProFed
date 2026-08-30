@@ -4,6 +4,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from unittest.mock import patch
 from jinja2 import Environment
 
 from profed.components.client import templating
@@ -157,4 +158,22 @@ def test_markup_in_a_url_is_escaped():
 
 def test_markup_in_plain_text_is_sanitised():
     assert "<script>" not in templating.link_field("<script>alert(1)</script>")
+
+
+def test_a_remote_account_links_to_the_local_profile():
+    with patch.object(templating, "domain", lambda: "p.test"):
+        assert templating.profile_href({"acct": "bob@r.test"}) == "https://p.test/@bob@r.test"
+
+
+def test_a_local_account_links_to_its_own_page():
+    with patch.object(templating, "domain", lambda: "p.test"):
+        assert templating.profile_href({"acct": "alice"}) == "https://p.test/@alice"
+
+
+def test_without_an_acct_the_given_url_is_kept():
+    assert templating.profile_href({"url": "https://r.test/users/bob"}) == "https://r.test/users/bob"
+
+
+def test_without_an_account_there_is_no_link():
+    assert templating.profile_href(None) == ""
 

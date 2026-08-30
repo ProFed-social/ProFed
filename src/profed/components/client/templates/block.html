@@ -10,7 +10,7 @@
   <p class="reply-head">responded to{% if head.mentions %} <span class="reply-who">@{{ head.mentions[0].acct }}</span>{% endif %}</p>
   {% endif %}
   <header class="status-head">
-    <a class="p-author h-card author" rel="author" href="{{ head.account.url }}">
+    <a class="p-author h-card author" rel="author" href="{{ head.account | profile_href }}">
       <span class="avatar-wrap">
         {% if head.account.avatar %}
         <img class="u-photo avatar" src="{{ head.account.avatar }}" alt="">

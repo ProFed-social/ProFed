@@ -40,7 +40,7 @@
 <article class="h-entry status entry">
   <header class="status-head{% if not show_author %} meta-only{% endif %}">
     {% if show_author %}
-    <a class="p-author h-card author" rel="author" href="{{ s.account.url }}">
+    <a class="p-author h-card author" rel="author" href="{{ s.account | profile_href }}">
       <span class="avatar-wrap">
         {% if s.account.avatar %}
         <img class="u-photo avatar" src="{{ s.account.avatar }}" alt="">
