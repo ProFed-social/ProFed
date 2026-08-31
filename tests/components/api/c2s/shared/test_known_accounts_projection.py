@@ -88,3 +88,21 @@ async def test_snapshot_stores_account(fake_storage):
     fake_storage.upsert.assert_awaited_once()
     assert fake_storage.upsert.call_args[0][0] == 123
 
+
+@pytest.mark.asyncio
+async def test_the_actor_url_comes_from_the_uri(fake_storage):
+    account = dict(ACCOUNT,
+                   uri="https://remote.example/users/bob",
+                   url="https://remote.example/@bob")
+
+    await _created("123", account)
+
+    assert fake_storage.upsert.call_args[0][2] == "https://remote.example/users/bob"
+
+
+@pytest.mark.asyncio
+async def test_an_account_without_a_uri_falls_back_to_its_url(fake_storage):
+    await _created("123", ACCOUNT)
+
+    assert fake_storage.upsert.call_args[0][2] == "https://remote.example/actors/bob"
+

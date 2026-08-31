@@ -14,7 +14,7 @@ async def _init() -> None:
 async def _store(account_id: int, account: dict) -> None:
     await (await storage()).upsert(account_id,
                                    account["acct"],
-                                   account["url"],
+                                   account.get("uri") or account["url"],
                                    account,
                                    datetime.now(timezone.utc))
 
