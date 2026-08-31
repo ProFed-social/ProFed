@@ -44,6 +44,16 @@ class RejectActivity(Activity):
     type: str = "Reject"
 
 
+class AnnounceActivity(Activity):
+    type: str = "Announce"
+
+
+class UndoAnnounceActivity(ActivityStreamsObject):
+    type: str = "Undo"
+    actor: ActorRef
+    object: AnnounceActivity
+
+
 class FollowActivity(ActivityStreamsObject):
     type: str = "Follow"
     actor: ActorRef

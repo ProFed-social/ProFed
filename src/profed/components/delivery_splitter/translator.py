@@ -83,6 +83,13 @@ async def _update_recipients(object_url: str, activity: dict, username: str, emi
             await _followers_and_mentions(activity, username, emitted_at))
 
 
+async def _announce_recipients(object_url: str, activity: dict, username: str, emitted_at) -> set[str]:
+    return (await _followers_and_mentions(activity, username, emitted_at) |
+            {url
+             for url in activity.get("cc") or []
+             if url != _PUBLIC and not url.endswith("/followers")})
+
+
 async def _delete_recipients(object_url: str, activity: dict, username: str, emitted_at) -> set[str]:
     return await (await storage()).get_recipients(object_url)
 
@@ -131,6 +138,7 @@ def _directed_fan_out(target):
 _create = _object_fan_out(_create_recipients, _store)
 _update = _object_fan_out(_update_recipients, _store)
 _delete = _object_fan_out(_delete_recipients, _forget)
+_announce = _object_fan_out(_announce_recipients, _store)
 _follow = _directed_fan_out(_follow_target)
 _accept = _directed_fan_out(_accept_target)
 _undo = _directed_fan_out(_undo_target)
@@ -145,6 +153,7 @@ handle_events, rebuild, _ = build_projection(topic=activities,
                                                               "Follow": _follow,
                                                               "Accept": _accept,
                                                               "Reject": _accept,
-                                                              "Undo": _undo},
+                                                              "Undo": _undo,
+                                                              "Announce": _announce},
                                              event_handler_signature=(with_event_type & with_emitted_at))
 

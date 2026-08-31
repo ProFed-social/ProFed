@@ -440,3 +440,70 @@ def test_get_status_404_when_the_boost_target_is_unresolvable(client):
     assert response.status_code == 404
 
 
+BOOSTED = {"mastodon_id": 424242,
+           "url": "https://remote.example/notes/7",
+           "actor_url": "https://remote.example/users/bob",
+           "reblog_of_url": None,
+           "status": {"id": "424242", "content": "<p>hello</p>"},
+           "content": {"status": {"id": "424242", "content": "<p>hello</p>"},
+                       "actor": "https://remote.example/users/bob"}}
+
+
+def _store_with_boosted():
+    return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                 AsyncMock(return_value=Mock(get=AsyncMock(return_value=BOOSTED),
+                                             mastodon_ids_for=AsyncMock(return_value={}))))
+
+
+def _reblog(client):
+    with _store_with_boosted(), patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
+                                      AsyncMock(return_value={})):
+        return client.post("/statuses/424242/reblog")
+
+
+def test_a_reblog_publishes_an_announce(client, fake_bus):
+    _reblog(client)
+
+    published = fake_bus.topic("raw_activities").published
+    assert [message["event_type"] for message in published] == ["Announce"]
+
+
+def test_the_announce_points_at_the_boosted_note(client, fake_bus):
+    _reblog(client)
+
+    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"] == BOOSTED["url"]
+
+
+def test_the_announce_is_public(client, fake_bus):
+    _reblog(client)
+    
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
+    assert activity["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
+
+
+def test_the_announce_reaches_the_author_and_the_followers(client, fake_bus):
+    _reblog(client)
+
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
+    assert set(activity["cc"]) == {f"{actor_url_from_username('alice')}/followers",
+                                   "https://remote.example/users/bob"}
+
+
+def test_an_unreblog_undoes_the_announce(client, fake_bus):
+    with _store_with_boosted(), patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
+                                      AsyncMock(return_value={})):
+        client.post("/statuses/424242/unreblog")
+
+    published = fake_bus.topic("raw_activities").published
+    assert [message["event_type"] for message in published] == ["Undo"]
+    assert published[0]["payload"]["activity"]["object"]["type"] == "Announce"
+
+
+def test_a_reblog_of_an_unknown_status_is_not_found(client, fake_bus):
+    store = Mock(get=AsyncMock(return_value=None))
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        response = client.post("/statuses/999/reblog")
+
+    assert response.status_code == 404
+    assert fake_bus.topic("raw_activities").published == []
+

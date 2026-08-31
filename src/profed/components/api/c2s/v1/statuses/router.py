@@ -9,7 +9,11 @@ from pydantic import BaseModel
 from typing import Annotated
 from profed.core.message_bus import message_bus
 from profed.identity import actor_url_from_username, heuristic_acct
-from profed.models.activity_pub import CreateActivity, DeleteActivity, Note
+from profed.models.activity_pub import (AnnounceActivity,
+                                        CreateActivity,
+                                        DeleteActivity,
+                                        Note,
+                                        UndoAnnounceActivity)
 from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
@@ -20,6 +24,7 @@ from profed.components.api.c2s.shared.conversations import storage as conversati
 from profed.sanitize import sanitize_html
 from profed import mentions
 
+_PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
 
 router = APIRouter()
 active = False
@@ -56,8 +61,7 @@ class StatusCreate(BaseModel):
 
 
 @router.post("/statuses")
-async def create_status(body: StatusCreate,
-                        claims: Annotated[dict, Depends(current_user)]):
+async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(current_user)]):
     username = claims.get("preferred_username") or claims.get("sub")
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
@@ -121,8 +125,7 @@ async def create_status(body: StatusCreate,
 
 
 @router.get("/statuses/{id}")
-async def get_status(id: str,
-                     claims: Annotated[dict, Depends(current_user)] = None):
+async def get_status(id: str, claims: Annotated[dict, Depends(current_user)] = None):
     row = await (await as_objects.storage()).get(id, 20) if id.isdigit() else None
     if row is None or row["content"] is None:
         raise HTTPException(status_code=404, detail="status_not_found")
@@ -130,8 +133,7 @@ async def get_status(id: str,
 
 
 @router.delete("/statuses/{id}")
-async def delete_status(id: str,
-                        claims: Annotated[dict, Depends(current_user)]):
+async def delete_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     username = claims.get("preferred_username") or claims.get("sub")
     if not username:
         raise HTTPException(status_code=401, detail="invalid_token")
@@ -169,8 +171,7 @@ async def status_context(id: str, claims: Annotated[dict, Depends(current_user)]
 
 
 @router.post("/statuses/{id}/favourite")
-async def favourite_status(id: str,
-                           claims: Annotated[dict, Depends(current_user)]):
+async def favourite_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 
@@ -180,69 +181,106 @@ async def unfavourite_status(id: str,
     raise HTTPException(status_code=404, detail="status_not_found")
 
 
+def _username(claims: dict) -> str:
+    username = claims.get("preferred_username") or claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="invalid_token")
+
+    return username
+
+
+async def _boosted_row(id: str) -> dict:
+    row = await (await as_objects.storage()).get(id, 20) if id.isdigit() else None
+    if row is None or row["content"] is None:
+        raise HTTPException(status_code=404, detail="status_not_found")
+
+    return row
+
+
+async def _publish_activity(event_type: str, username: str, activity) -> None:
+    async with message_bus().topic("raw_activities").publish() as publish:
+        await publish(event_type=event_type,
+                      object_id=activity.id,
+                      payload={"username": username,
+                               "activity": {key: value
+                                            for key, value in activity.model_dump(by_alias=True,
+                                                                                  exclude_none=True).items()
+                                            if key not in ("id", "type")}})
+
+
 @router.post("/statuses/{id}/reblog")
-async def reblog_status(id: str,
-                        claims: Annotated[dict, Depends(current_user)]):
-    raise HTTPException(status_code=404, detail="status_not_found")
+async def reblog_status(id: str, claims: Annotated[dict, Depends(current_user)]):
+    username = _username(claims)
+    row = await _boosted_row(id)
+    actor_url = actor_url_from_username(username)
+    activity = AnnounceActivity(id=f"{actor_url}#announce/{uuid.uuid4()}",
+                                actor=actor_url,
+                                object=row["url"],
+                                published=datetime.now(timezone.utc).isoformat(),
+                                to=[_PUBLIC],
+                                cc=[f"{actor_url}/followers", row["actor_url"]])
+    await _publish_activity("Announce", username, activity)
+    return (await service.make_statuses([row]))[0]
 
 
 @router.post("/statuses/{id}/unreblog")
-async def unreblog_status(id: str,
-                          claims: Annotated[dict, Depends(current_user)]):
-    raise HTTPException(status_code=404, detail="status_not_found")
+async def unreblog_status(id: str, claims: Annotated[dict, Depends(current_user)]):
+    username = _username(claims)
+    row = await _boosted_row(id)
+    actor_url = actor_url_from_username(username)
+    announce = AnnounceActivity(id=f"{actor_url}#announce/{uuid.uuid4()}",
+                                actor=actor_url,
+                                object=row["url"])
+    await _publish_activity("Undo",
+                            username,
+                            UndoAnnounceActivity(id=f"{actor_url}#undo/{uuid.uuid4()}",
+                                                 actor=actor_url,
+                                                 object=announce))
+    return (await service.make_statuses([row]))[0]
 
 
 @router.get("/statuses/{id}/favourited_by")
-async def favourited_by(id: str,
-                        claims: Annotated[dict, Depends(current_user)] = None):
+async def favourited_by(id: str, claims: Annotated[dict, Depends(current_user)] = None):
     return []
 
 
 @router.get("/statuses/{id}/reblogged_by")
-async def reblogged_by(id: str,
-                       claims: Annotated[dict, Depends(current_user)] = None):
+async def reblogged_by(id: str, claims: Annotated[dict, Depends(current_user)] = None):
     return []
 
 
 @router.post("/statuses/{id}/bookmark")
-async def bookmark_status(id: str,
-                          claims: Annotated[dict, Depends(current_user)]):
+async def bookmark_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 
 @router.post("/statuses/{id}/unbookmark")
-async def unbookmark_status(id: str,
-                            claims: Annotated[dict, Depends(current_user)]):
+async def unbookmark_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 
 @router.post("/statuses/{id}/pin")
-async def pin_status(id: str,
-                     claims: Annotated[dict, Depends(current_user)]):
+async def pin_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 
 @router.post("/statuses/{id}/unpin")
-async def unpin_status(id: str,
-                       claims: Annotated[dict, Depends(current_user)]):
+async def unpin_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 
 @router.put("/statuses/{id}")
-async def edit_status(id: str,
-                      claims: Annotated[dict, Depends(current_user)]):
+async def edit_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 
 @router.get("/statuses/{id}/history")
-async def status_history(id: str,
-                         claims: Annotated[dict, Depends(current_user)] = None):
+async def status_history(id: str, claims: Annotated[dict, Depends(current_user)] = None):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 
 @router.get("/statuses/{id}/source")
-async def status_source(id: str,
-                        claims: Annotated[dict, Depends(current_user)]):
+async def status_source(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 

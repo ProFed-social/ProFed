@@ -13,7 +13,9 @@ from .activity import (Activity,
                        AcceptActivity,
                        RejectActivity,
                        FollowActivity,
-                       UndoFollowActivity)
+                       UndoFollowActivity,
+                       AnnounceActivity,
+                       UndoAnnounceActivity)
 from .object import Note
 
 __all__ = ["ActivityStreamsObject",
@@ -22,6 +24,6 @@ __all__ = ["ActivityStreamsObject",
            "Application",
            "Activity", "IncomingActivity", "CreateActivity", "UpdateActivity", "DeleteActivity",
            "AcceptActivity", "RejectActivity", "FollowActivity", "UndoFollowActivity",
-
-           Note]
+           "AnnounceActivity", "UndoAnnounceActivity",
+           "Note"]
 
