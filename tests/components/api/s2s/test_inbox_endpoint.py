@@ -70,3 +70,38 @@ def test_inbox_invalid_username(client):
                            json={"type": "Follow"})
 
     assert response.status_code == 422
+
+
+ANNOUNCE = {"type": "Delete", "actor": "https://remote.example/actors/bob"}
+
+
+def test_the_instance_inbox_accepts_a_signed_activity(client, fake_accept_inbox_activity):
+    assert client.post("/actor/inbox", json=ANNOUNCE).status_code == 202
+
+
+def test_the_instance_inbox_passes_nothing_on(client, fake_accept_inbox_activity):
+    client.post("/actor/inbox", json=ANNOUNCE)
+
+    fake_accept_inbox_activity.assert_not_called()
+
+
+def test_the_instance_inbox_says_what_it_discarded(client, fake_accept_inbox_activity, caplog):
+    with caplog.at_level("INFO"):
+        client.post("/actor/inbox", json=ANNOUNCE)
+
+    assert any("Delete" in record.getMessage() for record in caplog.records)
+
+
+def test_the_instance_inbox_rejects_a_bad_signature(client, monkeypatch):
+    monkeypatch.setattr("profed.components.api.s2s.inbox.router.verify_inbox_request", AsyncMock(return_value=False))
+
+    assert client.post("/actor/inbox", json=ANNOUNCE).status_code == 401
+
+
+def test_the_instance_inbox_rejects_broken_json(client, fake_accept_inbox_activity):
+    response = client.post("/actor/inbox",
+                           content=b"{not json",
+                           headers={"content-type": "application/activity+json"})
+
+    assert response.status_code == 400
+
