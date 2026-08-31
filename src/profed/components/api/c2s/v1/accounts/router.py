@@ -120,7 +120,7 @@ async def follow(id: str,
 
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type="requested",
-                      object_id=f"{actor_url_from_username(username)}|{account.url}",
+                      object_id=f"{actor_url_from_username(username)}|{actor_url}",
                       payload={"follow_activity_id": follow_id})
 
     return {"id": account.id,
@@ -165,8 +165,9 @@ async def unfollow(id: str,
     edge = await (await follows_storage()).get(acct_from_username(username), account.acct)
     follow_id = ((edge or {}).get("follow_activity_id")
                  or f"{actor_url_from_username(username)}#follows/{account.id}")
-    actor_url  = actor_url_from_username(username)
-    undo_id    = f"{actor_url}#unfollows/{uuid.uuid4()}"
+    actor_url   = actor_url_from_username(username)
+    target_url  = account.uri or account.url
+    undo_id     = f"{actor_url}#unfollows/{uuid.uuid4()}"
 
     async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Undo",
@@ -176,11 +177,11 @@ async def unfollow(id: str,
                                             "object": {"id": follow_id,
                                                        "type": "Follow",
                                                        "actor": actor_url,
-                                                       "object": account.url}}})
+                                                       "object": target_url}}})
 
     async with message_bus().topic("followers").publish() as publish:
         await publish(event_type="deleted",
-                      object_id=f"{actor_url_from_username(username)}|{account.url}",
+                      object_id=f"{actor_url_from_username(username)}|{target_url}",
                       payload={})
 
     return {"id": account.id,
@@ -288,7 +289,7 @@ async def _federate_follow_response(username: str,
         return
 
     requester_url = requester.uri or requester.url
-    follow_id = (edge or {}).get("follow_activity_id") or f"{requester.uri or requester.url}#follows/unknown"
+    follow_id = (edge or {}).get("follow_activity_id") or f"{requester_url}#follows/unknown"
     follow = {"id": follow_id,
               "type": "Follow",
               "actor": requester_url,
