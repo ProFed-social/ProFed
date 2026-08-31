@@ -9,9 +9,10 @@ from profed.components.api.http import ActivityPubJSONResponse
 router = APIRouter()
 
 
-@router.get("/actors/{username}",
-            response_model=Person,
-            response_class=ActivityPubJSONResponse)
+@router.api_route("/actors/{username}",
+                  methods=["GET", "HEAD"],
+                  response_model=Person,
+                  response_class=ActivityPubJSONResponse)
 async def actor(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$")):
     actor = await resolve_actor(username)
     if actor is None:

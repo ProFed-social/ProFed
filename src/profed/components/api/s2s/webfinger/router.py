@@ -9,7 +9,7 @@ from profed.components.api.s2s.webfinger.service import (resolve_actor_url,
 router = APIRouter()
 
 
-@router.get("/.well-known/webfinger")
+@router.api_route("/.well-known/webfinger", methods=["GET", "HEAD"])
 async def webfinger(resource: str = Query(pattern=r"^(acct:[^@]+@[^@]+|https?://.+)$")):
     acct = (resource[len("acct:"):]
             if resource.startswith("acct:") else

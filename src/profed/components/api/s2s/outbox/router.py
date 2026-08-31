@@ -9,9 +9,10 @@ from profed.components.api.http import ActivityPubJSONResponse
 router = APIRouter()
 
 
-@router.get("/actors/{username}/outbox",
-            response_model=OrderedCollection,
-            response_class=ActivityPubJSONResponse)
+@router.api_route("/actors/{username}/outbox",
+                  methods=["GET", "HEAD"],
+                  response_model=OrderedCollection,
+                  response_class=ActivityPubJSONResponse)
 async def outbox(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$")):
     outbox = await resolve_outbox(username)
     if outbox is None:
@@ -19,7 +20,9 @@ async def outbox(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$")):
     return outbox
 
 
-@router.get("/actors/{username}/notes/{note_id}", response_class=ActivityPubJSONResponse)
+@router.api_route("/actors/{username}/notes/{note_id}",
+                  methods=["GET", "HEAD"],
+                  response_class=ActivityPubJSONResponse)
 async def note(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$"), note_id: str = Path(pattern=r"^[a-zA-Z0-9_-]+$")):
     resolved = await resolve_note(username, note_id)
     if resolved is None:

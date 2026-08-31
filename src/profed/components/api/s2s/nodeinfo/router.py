@@ -9,14 +9,14 @@ from profed.identity import domain
 router = APIRouter()
 
 
-@router.get("/.well-known/nodeinfo")
+@router.api_route("/.well-known/nodeinfo", methods=["GET", "HEAD"])
 async def well_known_nodeinfo():
     d = domain()
     return {"links": [{"rel": "http://nodeinfo.diaspora.software/ns/schema/2.0",
                         "href": f"https://{d}/nodeinfo/2.0"}]}
 
 
-@router.get("/nodeinfo/2.0")
+@router.api_route("/nodeinfo/2.0", methods=["GET", "HEAD"])
 async def nodeinfo():
     return JSONResponse(content={"version": "2.0",
                                  "software": {"name": "profed",
@@ -28,5 +28,4 @@ async def nodeinfo():
                                            "localPosts": 0},
                                  "openRegistrations": False},
                         media_type="application/json; profile=\"http://nodeinfo.diaspora.software/ns/schema/2.0#\"")
-
 

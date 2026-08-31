@@ -10,7 +10,7 @@ from profed.components.api.s2s.instance_actor.projection import current
 router = APIRouter()
 
 
-@router.get("/actor", response_model=Application, response_class=ActivityPubJSONResponse)
+@router.api_route("/actor", methods=["GET", "HEAD"], response_model=Application, response_class=ActivityPubJSONResponse)
 async def instance_actor():
     state = current()
     if not state:
