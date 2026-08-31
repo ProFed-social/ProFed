@@ -855,3 +855,32 @@ def test_account_statuses_are_looked_up_by_the_actor_url(anon_client):
 
     assert store.fetch_by_actor.call_args[0][0] == "https://remote.example/users/bob"
 
+
+def _remote_account():
+    return Account.from_actor(ROW["actor_data"],
+                              acct=ROW["acct"],
+                              uri="https://remote.example/users/bob",
+                              url="https://remote.example/@bob")
+
+
+def test_a_follow_edge_uses_the_actor_url(client, fake_bus):
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=_remote_account())), \
+             patch.object(message_bus, "_instance", fake_bus):
+            client.post("/accounts/123456/follow")
+
+    edges = [message["object_id"] for message in fake_bus.topic("followers").published]
+    assert edges == ["https://example.com/actors/alice|https://remote.example/users/bob"]
+
+
+def test_a_follow_activity_targets_the_actor_url(client, fake_bus):
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=_remote_account())), \
+             patch.object(message_bus, "_instance", fake_bus):
+            client.post("/accounts/123456/follow")
+
+    activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
+    assert activity["object"] == "https://remote.example/users/bob"
+
