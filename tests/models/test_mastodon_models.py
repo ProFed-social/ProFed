@@ -21,6 +21,7 @@ def test_account_minimal():
                 username="alice",
                 acct="alice@example.com",
                 display_name="Alice",
+                uri="https://example.com/actors/alice",
                 url="https://example.com/actors/alice")
     assert a.locked          is False
     assert a.bot             is False
@@ -35,6 +36,7 @@ def test_account_with_source():
                 username="alice",
                 acct="alice@example.com",
                 display_name="Alice",
+                uri="https://example.com/actors/alice",
                 url="https://example.com/actors/alice",
                 source={"privacy": "public",
                         "sensitive": False,
@@ -49,6 +51,7 @@ def test_account_with_avatar():
                 username="alice",
                 acct="alice@example.com",
                 display_name="Alice",
+                uri="https://example.com/actors/alice",
                 url="https://example.com/actors/alice",
                 avatar="https://example.com/avatar.png",
                 header="https://example.com/header.png")
@@ -96,6 +99,7 @@ def test_from_actor_maps_fields():
                               "icon":    {"url": "https://remote.example/avatar.png"},
                               "image":   {"url": "https://remote.example/header.png"}},
                              acct="bob@remote.example",
+                             uri="https://remote.example/actors/bob",
                              url="https://remote.example/actors/bob")
 
     assert acc.id            == account_id("bob@remote.example")
@@ -114,6 +118,7 @@ def test_from_actor_maps_fields():
 def test_from_actor_falls_back_to_username():
     acc = Account.from_actor({"type": "Person"},
                              acct="carol@other.example",
+                             uri="https://remote.example/actors/bob",
                              url="https://other.example/actors/carol")
 
     assert acc.display_name == "carol"
@@ -124,6 +129,7 @@ def test_from_actor_falls_back_to_username():
 def test_from_actor_handles_missing_actor():
     acc = Account.from_actor({},
                              acct="carol@other.example",
+                             uri="https://remote.example/actors/bob",
                              url="https://other.example/actors/carol")
 
     assert acc.display_name == "carol"
@@ -133,6 +139,7 @@ def test_from_actor_handles_missing_actor():
 def test_from_actor_sets_bot_for_service():
     acc = Account.from_actor({"type": "Service"},
                              acct="bot@example.com",
+                             uri="https://remote.example/actors/bob",
                              url="https://example.com/actors/bot")
 
     assert acc.bot is True
@@ -141,6 +148,7 @@ def test_from_actor_sets_bot_for_service():
 def test_from_actor_sets_locked_from_manually_approves():
     acc = Account.from_actor({"type": "Person", "manuallyApprovesFollowers": True},
                              acct="x@example.com",
+                             uri="https://remote.example/actors/bob",
                              url="https://example.com/actors/x")
 
     assert acc.locked is True
@@ -150,6 +158,7 @@ def test_from_actor_sets_created_at_from_datetime():
     created = datetime(2025, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
     acc = Account.from_actor({"type": "Person"},
                              acct="x@example.com",
+                             uri="https://remote.example/actors/bob",
                              url="https://example.com/actors/x",
                              created_at=created)
 
@@ -159,6 +168,7 @@ def test_from_actor_sets_created_at_from_datetime():
 def test_from_actor_uses_published_when_no_created_at():
     acc = Account.from_actor({"type": "Person", "published": "2020-05-05T00:00:00+00:00"},
                              acct="x@example.com",
+                             uri="https://remote.example/actors/bob",
                              url="https://example.com/actors/x")
 
     assert acc.created_at == "2020-05-05T00:00:00+00:00"
@@ -167,6 +177,7 @@ def test_from_actor_uses_published_when_no_created_at():
 def test_from_actor_created_at_overrides_published():
     acc = Account.from_actor({"type": "Person", "published": "2020-05-05T00:00:00+00:00"},
                              acct="x@example.com",
+                             uri="https://remote.example/actors/bob",
                              url="https://example.com/actors/x",
                              created_at="2021-06-06T00:00:00+00:00")
 
@@ -176,6 +187,7 @@ def test_from_actor_created_at_overrides_published():
 def test_from_actor_maps_resume():
     acc = Account.from_actor({"type": "Person", "resume": {"skills": [{"name": "Python"}]}},
                              acct="bob@remote.example",
+                             uri="https://remote.example/actors/bob",
                              url="https://remote.example/actors/bob")
 
     assert acc.resume is not None
@@ -185,6 +197,7 @@ def test_from_actor_maps_resume():
 def test_from_actor_without_resume_is_none():
     acc = Account.from_actor({"type": "Person"},
                              acct="bob@remote.example",
+                             uri="https://remote.example/actors/bob",
                              url="https://remote.example/actors/bob")
 
     assert acc.resume is None
@@ -194,6 +207,7 @@ def test_from_actor_sanitizes_note_from_summary():
     acc = Account.from_actor({"type":    "Person",
                               "summary": "<p>hi</p><script>alert(1)</script>"},
                              acct="mallory@remote.example",
+                             uri="https://remote.example/actors/bob",
                              url="https://remote.example/actors/mallory")
 
     assert acc.note == "<p>hi</p>"
@@ -203,6 +217,7 @@ def test_from_actor_preserves_resume():
     acc = Account.from_actor({"type": "Person",
                               "resume": {"skills": [{"name": "Python"}]}},
                              acct="bob@remote.example",
+                             uri="https://remote.example/actors/bob",
                              url="https://remote.example/actors/bob")
 
     assert acc.resume.skills == [{"name": "Python"}]
@@ -407,12 +422,15 @@ def test_property_value_attachments_become_fields():
     actor = {"type": "Person", "attachment": [{"type": "PropertyValue",
                                                "name": "GitHub",
                                                "value": "https://github.com/bob"}]}
-    account = Account.from_actor(actor, acct="bob@r.test", url="https://r.test/bob")
+    account = Account.from_actor(actor, acct="bob@r.test", uri="https://r.test/bob", url="https://r.test/bob")
     assert account.fields == [{"name": "GitHub", "value": "https://github.com/bob", "verified_at": None}]
 
 
 def test_an_actor_without_attachment_has_no_fields():
-    account = Account.from_actor({"type": "Person"}, acct="bob@r.test", url="https://r.test/bob")
+    account = Account.from_actor({"type": "Person"},
+                                 acct="bob@r.test",
+                                 uri="https://r.test/bob",
+                                 url="https://r.test/bob")
     assert account.fields == []
 
 
@@ -421,6 +439,6 @@ def test_a_non_property_value_attachment_is_not_a_field():
                                                "name": "Portrait",
                                                "value": "https://r.test/pic.png"},
                                               {"type": "PropertyValue", "name": "Site", "value": "https://b.test/"}]}
-    account = Account.from_actor(actor, acct="bob@r.test", url="https://r.test/bob")
+    account = Account.from_actor(actor, acct="bob@r.test", uri="https://r.test/bob", url="https://r.test/bob")
     assert [field["name"] for field in account.fields] == ["Site"]
 

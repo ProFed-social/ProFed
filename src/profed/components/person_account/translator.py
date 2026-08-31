@@ -31,7 +31,11 @@ async def _publish(event_type: str, object_id: str, payload: dict, message_id) -
 
 async def _emit_account(event_type: str, username: str, person_actor: dict, sequence_id: int) -> None:
     acct = acct_from_username(person_actor["preferredUsername"])
-    account = Account.from_actor(person_actor, acct=acct, url=person_actor["id"])
+    account = Account.from_actor(person_actor,
+                                 acct=acct,
+                                 uri=person_actor["id"],
+                                 url=person_actor.get("url") or person_actor["id"])
+
 
     store = await storage()
     account.followers_count, account.following_count = await store.count_follows(person_actor["id"])

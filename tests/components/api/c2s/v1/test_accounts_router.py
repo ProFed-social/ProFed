@@ -112,6 +112,7 @@ def test_follow_by_numeric_id_publishes_events(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch.object(message_bus, "_instance", fake_bus):
             response = client.post("/accounts/123456/follow")
@@ -133,6 +134,7 @@ def test_follow_publishes_followers_requested(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch.object(message_bus, "_instance", fake_bus):
             client.post("/accounts/123456/follow")
@@ -238,6 +240,7 @@ def test_follow_requests_returns_pending_accounts(client):
              patch("profed.components.api.c2s.v1.accounts.router.lookup_by_acct",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))):
             response = client.get("/follow_requests")
 
@@ -257,6 +260,7 @@ def test_authorize_publishes_accepted_and_federates(client):
         with patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    AsyncMock(return_value=follows)), \
@@ -281,6 +285,7 @@ def test_reject_publishes_rejected_and_federates(client):
         with patch("profed.components.api.c2s.v1.accounts.router.lookup_by_id",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    AsyncMock(return_value=follows)), \
@@ -301,6 +306,7 @@ def test_follow_publishes_follow_activity_id_consistently(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch.object(message_bus, "_instance", fake_bus):
             response = client.post("/accounts/123456/follow")
@@ -332,6 +338,7 @@ def test_unfollow_returns_relationship(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
@@ -351,6 +358,7 @@ def test_unfollow_publishes_followers_deleted(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
@@ -370,6 +378,7 @@ def test_unfollow_publishes_undo_follow_with_correct_follow_id(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    _mock_storage_with(FOLLOWING_WITH_ACTIVITY_ID)), \
@@ -398,6 +407,7 @@ def test_unfollow_without_follow_activity_id_uses_fallback_id(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW["actor_data"],
                                                              acct=ROW["acct"],
+                                                             uri=ROW["actor_url"],
                                                              url=ROW["actor_url"]))), \
              patch("profed.components.api.c2s.v1.accounts.router.follows_storage",
                    _mock_storage_with(following_no_id)), \
@@ -441,6 +451,7 @@ def test_lookup_returns_account(client):
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(return_value=Account.from_actor(ROW_FULL["actor_data"],
                                                          acct=ROW_FULL["acct"],
+                                                         uri=ROW_FULL["actor_url"],
                                                          url=ROW_FULL["actor_url"]))):
         response = client.get("/accounts/lookup?acct=bob@remote.example")
 
@@ -478,6 +489,7 @@ def test_lookup_local_account_includes_counts(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(LOCAL_ROW["actor_data"],
                                                              acct=LOCAL_ROW["acct"],
+                                                             uri=LOCAL_ROW["actor_url"],
                                                              url=LOCAL_ROW["actor_url"]))), \
              patch("profed.components.api.c2s.v1.accounts.router.user_statuses_storage",
                    _count_storage(3)), \
@@ -498,6 +510,7 @@ def test_lookup_remote_account_keeps_zero_counts(client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW_FULL["actor_data"],
                                                              acct=ROW_FULL["acct"],
+                                                             uri=ROW_FULL["actor_url"],
                                                              url=ROW_FULL["actor_url"]))):
             response = client.get("/accounts/lookup?acct=bob@remote.example")
 
@@ -520,6 +533,7 @@ def test_get_account_returns_account(client):
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(return_value=Account.from_actor(ROW_FULL["actor_data"],
                                                          acct=ROW_FULL["acct"],
+                                                         uri=ROW_FULL["actor_url"],
                                                          url=ROW_FULL["actor_url"]))):
         response = client.get("/accounts/123456")
 
@@ -541,9 +555,11 @@ def test_account_followers_returns_accounts(client):
 
     resolved = {"123456": Account.from_actor(ROW_FULL["actor_data"],
                                              acct=ROW_FULL["acct"],
+                                             uri=ROW_FULL["actor_url"],
                                              url=ROW_FULL["actor_url"]),
                 "alice@other.example": Account.from_actor(ROW_FOLLOWING["actor_data"],
                                                           acct=ROW_FOLLOWING["acct"],
+                                                          uri=ROW_FOLLOWING["actor_url"],
                                                           url=ROW_FOLLOWING["actor_url"])}
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(side_effect=lambda query, _config: resolved.get(query))), \
@@ -563,6 +579,7 @@ def test_account_followers_skips_unknown_followers(client):
 
     resolved = {"123456": Account.from_actor(ROW_FULL["actor_data"],
                                              acct=ROW_FULL["acct"],
+                                             uri=ROW_FULL["actor_url"],
                                              url=ROW_FULL["actor_url"])}
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(side_effect=lambda query, _config: resolved.get(query))), \
@@ -588,9 +605,11 @@ def test_account_following_returns_accounts_for_known_user(client):
 
     resolved = {"123456": Account.from_actor(ROW_FULL["actor_data"],
                                              acct=ROW_FULL["acct"],
+                                             uri=ROW_FULL["actor_url"],
                                              url=ROW_FULL["actor_url"]),
                 "alice@other.example": Account.from_actor(ROW_FOLLOWING["actor_data"],
                                                           acct=ROW_FOLLOWING["acct"],
+                                                          uri=ROW_FOLLOWING["actor_url"],
                                                           url=ROW_FOLLOWING["actor_url"])}
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(side_effect=lambda query, _config: resolved.get(query))), \
@@ -611,6 +630,7 @@ def test_account_following_skips_unresolvable_accounts(client):
 
     resolved = {"123456": Account.from_actor(ROW_FULL["actor_data"],
                                              acct=ROW_FULL["acct"],
+                                             uri=ROW_FULL["actor_url"],
                                              url=ROW_FULL["actor_url"])}
     with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                AsyncMock(side_effect=lambda query, _config: resolved.get(query))), \
@@ -740,6 +760,7 @@ def test_account_statuses_anonymous_returns_list(anon_client):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
                    AsyncMock(return_value=Account.from_actor(ROW_FULL["actor_data"],
                                                              acct=ROW_FULL["acct"],
+                                                             uri=ROW_FULL["actor_url"],
                                                              url=ROW_FULL["actor_url"]))), \
              patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                    AsyncMock(return_value=store)), \
@@ -760,7 +781,7 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
     mastodon_id = str(source_key("activities").message_id(42).int)
     status = Status.from_activity(activity, id=mastodon_id).model_dump(exclude={"account"})
     actor_url = ROW_FULL["actor_url"]
-    account = Account.from_actor(ROW_FULL["actor_data"], acct=ROW_FULL["acct"], url=actor_url)
+    account = Account.from_actor(ROW_FULL["actor_data"], acct=ROW_FULL["acct"], uri=actor_url, url=actor_url)
     row = {"mastodon_id": int(mastodon_id),
            "url": activity["object"]["id"],
            "actor_url": actor_url,

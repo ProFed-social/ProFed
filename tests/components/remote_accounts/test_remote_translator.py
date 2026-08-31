@@ -41,3 +41,41 @@ async def test_discovered_converts_actor_to_account_and_publishes_updated():
     assert account["username"] == "bob"
     assert "actor_data" not in account
 
+
+def test_an_actor_with_a_profile_page_uses_it():
+    assert mod.profile_url({"url": "https://r.test/@bob"}, "https://r.test/users/bob") == "https://r.test/@bob"
+
+
+def test_an_actor_without_a_profile_page_keeps_its_actor_url():
+    assert mod.profile_url({}, "https://r.test/users/bob") == "https://r.test/users/bob"
+
+
+def test_a_profile_page_that_is_no_url_is_ignored():
+    assert mod.profile_url({"url": {"href": "x"}}, "https://r.test/users/bob") == "https://r.test/users/bob"
+
+
+@pytest.mark.asyncio
+async def test_the_account_carries_the_profile_page():
+    bus, published = _fake_bus()
+    payload = {"acct": "bob@r.test",
+               "actor_url": "https://r.test/users/bob",
+               "actor_data": {"type": "Person", "url": "https://r.test/@bob"}}
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._discovered("bob@r.test", payload, 1)
+
+    assert published[0]["payload"]["url"] == "https://r.test/@bob"
+
+
+@pytest.mark.asyncio
+async def test_the_account_keeps_the_actor_url_as_uri():
+    bus, published = _fake_bus()
+    payload = {"acct": "bob@r.test",
+               "actor_url": "https://r.test/users/bob",
+               "actor_data": {"type": "Person", "url": "https://r.test/@bob"}}
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._discovered("bob@r.test", payload, 1)
+
+    assert published[0]["payload"]["uri"] == "https://r.test/users/bob"
+

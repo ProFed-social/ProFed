@@ -9,7 +9,12 @@
 
     <div class="identity">
       <h1 class="p-name">{{ account.display_name or account.username }}</h1>
-      <p class="acct"><a class="u-url" href="{{ account.url }}">@{{ account.acct }}</a></p>
+      <p class="acct">
+        <a class="u-url" href="{{ account.url }}">@{{ account.acct }}</a>
+        {% if "@" in account.acct %}
+        <a class="origin" href="{{ account.url }}" rel="noopener">view on {{ account.acct.split("@")[1] }}</a>
+        {% endif %}
+      </p>
       <p class="joined">Joined {{ account.created_at[:10] }}</p>
       <dl class="counts">
         <div><dt>{{ account.statuses_count }}</dt><dd>Posts</dd></div>

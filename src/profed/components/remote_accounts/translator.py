@@ -14,10 +14,17 @@ logger = logging.getLogger(__name__)
 _REMOTE_ACTORS_SOURCE = source_key("remote_actors")
 
 
+def profile_url(actor: dict, actor_url: str) -> str:
+    stated = actor.get("url")
+    return stated if isinstance(stated, str) and stated.startswith("http") else actor_url
+
+
 async def _discovered(object_id, payload, sequence_id) -> None:
-    account = Account.from_actor(payload.get("actor_data") or {},
+    actor = payload.get("actor_data") or {}
+    account = Account.from_actor(actor,
                                  acct=payload["acct"],
-                                 url=payload["actor_url"],
+                                 uri=payload["actor_url"],
+                                 url=profile_url(actor, payload["actor_url"]),
                                  created_at=payload.get("created_at"))
 
     async with message_bus().topic("known_accounts").publish() as publish:

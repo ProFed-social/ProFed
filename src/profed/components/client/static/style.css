@@ -125,6 +125,7 @@ a:hover { text-decoration: underline; }
 .identity .acct   { grid-column: 1; grid-row: 2; margin: 0; }
 .identity .acct a { color: var(--muted); }
 .identity .joined { grid-column: 2; grid-row: 2; margin: 0; justify-self: end; color: var(--muted); font-size: .85rem; }
+.identity .acct .origin { margin-left: .6rem; font-size: .85rem; color: var(--accent); }
 .counts {
   grid-column: 1 / -1; grid-row: 3;
   display: flex;

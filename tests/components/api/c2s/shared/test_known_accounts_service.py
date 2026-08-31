@@ -17,7 +17,7 @@ ACCT = "alice@example.com"
 ACTOR_URL = "https://example.com/actors/alice"
 ACCOUNT_ID = 1234
 ACTOR_DATA = {"type": "Person", "name": "Alice", "published": "2026-01-01T00:00:00+00:00"}
-ACCOUNT = Account.from_actor(ACTOR_DATA, acct=ACCT, url=ACTOR_URL)
+ACCOUNT = Account.from_actor(ACTOR_DATA, acct=ACCT, uri=ACTOR_URL, url=ACTOR_URL)
 
 STORED_ROW = {"account_id": ACCOUNT_ID,
               "acct": ACCT,
@@ -27,7 +27,7 @@ STORED_ROW = {"account_id": ACCOUNT_ID,
 
 REMOTE_ACCT = "mallory@remote.example"
 REMOTE_ACTOR_URL = "https://remote.example/actors/mallory"
-REMOTE_ACCOUNT = Account.from_actor(ACTOR_DATA, acct=REMOTE_ACCT, url=REMOTE_ACTOR_URL)
+REMOTE_ACCOUNT = Account.from_actor(ACTOR_DATA, acct=REMOTE_ACCT, uri=REMOTE_ACTOR_URL, url=REMOTE_ACTOR_URL)
 
 REMOTE_ROW = {"account_id": ACCOUNT_ID,
               "acct": REMOTE_ACCT,

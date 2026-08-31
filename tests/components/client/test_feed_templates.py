@@ -188,3 +188,25 @@ def test_an_unverified_field_is_not_marked_as_gone():
 
     assert "gone" not in html
 
+
+def _card_for(acct, url):
+    environment = build_environment(STANDARD_TEMPLATES, None)
+    return environment.get_template("profile.html").render(account=dict(ACCOUNT, acct=acct, url=url),
+                                                           statuses=[],
+                                                           handle=acct,
+                                                           relationship=None)
+
+
+def test_a_remote_profile_links_to_its_origin():
+    html = _card_for("bob@r.test", "https://r.test/users/bob")
+
+    assert 'class="origin" href="https://r.test/users/bob"' in html
+
+
+def test_the_origin_link_names_the_remote_host():
+    assert "view on r.test" in _card_for("bob@r.test", "https://r.test/users/bob")
+
+
+def test_a_local_profile_has_no_origin_link():
+    assert 'class="origin"' not in _card_for("alice", "https://example.com/actors/alice")
+

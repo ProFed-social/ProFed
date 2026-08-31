@@ -16,6 +16,7 @@ class Account(BaseModel):
     acct: str
     display_name: str
     note: str = ""
+    uri: str = ""
     url: str
     avatar: str | None = None
     avatar_static: str | None = None
@@ -37,6 +38,7 @@ class Account(BaseModel):
                    actor: dict,
                    *,
                    acct: str,
+                   uri: str,
                    url: str,
                    created_at=None) -> "Account":
         username = acct.split("@")[0]
@@ -55,6 +57,7 @@ class Account(BaseModel):
                    acct=acct,
                    display_name=actor.get("name") or username,
                    note=sanitize_html(actor.get("summary")) or "",
+                   uri=uri,
                    url=url,
                    avatar=icon,
                    avatar_static=icon,
