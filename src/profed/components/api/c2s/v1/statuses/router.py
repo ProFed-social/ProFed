@@ -197,6 +197,13 @@ async def _boosted_row(id: str) -> dict:
     return row
 
 
+def _boost_state(status: Status, *, reblogged: bool) -> Status:
+    status.reblogged = reblogged
+    status.reblogs_count = max(status.reblogs_count + (1 if reblogged else -1), 0)
+
+    return status
+
+
 async def _publish_activity(event_type: str, username: str, activity) -> None:
     async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type=event_type,
@@ -220,7 +227,7 @@ async def reblog_status(id: str, claims: Annotated[dict, Depends(current_user)])
                                 to=[_PUBLIC],
                                 cc=[f"{actor_url}/followers", row["actor_url"]])
     await _publish_activity("Announce", username, activity)
-    return (await service.make_statuses([row]))[0]
+    return _boost_state((await service.make_statuses([row]))[0], reblogged=True)
 
 
 @router.post("/statuses/{id}/unreblog")
@@ -236,7 +243,7 @@ async def unreblog_status(id: str, claims: Annotated[dict, Depends(current_user)
                             UndoAnnounceActivity(id=f"{actor_url}#undo/{uuid.uuid4()}",
                                                  actor=actor_url,
                                                  object=announce))
-    return (await service.make_statuses([row]))[0]
+    return _boost_state((await service.make_statuses([row]))[0], reblogged=False)
 
 
 @router.get("/statuses/{id}/favourited_by")

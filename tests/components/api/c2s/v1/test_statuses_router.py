@@ -507,3 +507,28 @@ def test_a_reblog_of_an_unknown_status_is_not_found(client, fake_bus):
     assert response.status_code == 404
     assert fake_bus.topic("raw_activities").published == []
 
+
+def test_a_reblog_reports_the_status_as_boosted(client, fake_bus):
+    assert _reblog(client).json()["reblogged"] is True
+
+
+def test_a_reblog_raises_the_count(client, fake_bus):
+    assert _reblog(client).json()["reblogs_count"] == 1
+
+
+def test_an_unreblog_reports_the_status_as_not_boosted(client, fake_bus):
+    with _store_with_boosted(), patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
+                                      AsyncMock(return_value={})):
+        response = client.post("/statuses/424242/unreblog")
+
+    assert response.json()["reblogged"] is False
+
+
+def test_the_count_never_drops_below_zero(client, fake_bus):
+    with _store_with_boosted(), patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
+                                      AsyncMock(return_value={})):
+        response = client.post("/statuses/424242/unreblog")
+
+    assert response.json()["reblogs_count"] == 0
+
+
