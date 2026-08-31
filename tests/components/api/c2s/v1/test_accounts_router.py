@@ -838,3 +838,20 @@ def test_verify_credentials_sanitises_note_but_keeps_source_raw(client):
     assert data["note"] == "<p>rendered</p>"
     assert data["source"]["note"] == "raw <b>markup</b> the user typed"
 
+
+def test_account_statuses_are_looked_up_by_the_actor_url(anon_client):
+    account = Account.from_actor(ROW_FULL["actor_data"],
+                                 acct=ROW_FULL["acct"],
+                                 uri="https://remote.example/users/bob",
+                                 url="https://remote.example/@bob")
+    store = AsyncMock(fetch_by_actor=AsyncMock(return_value=[]))
+
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=account)), \
+             patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                   AsyncMock(return_value=store)):
+            anon_client.get("/accounts/123456/statuses")
+
+    assert store.fetch_by_actor.call_args[0][0] == "https://remote.example/users/bob"
+

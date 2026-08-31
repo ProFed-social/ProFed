@@ -108,7 +108,7 @@ async def follow(id: str,
     if account is None:
         raise HTTPException(status_code=404, detail="account_not_found")
 
-    actor_url = account.url
+    actor_url = account.uri or account.url
     follow_id = f"{actor_url_from_username(username)}#follows/{uuid.uuid4()}"
 
     async with message_bus().topic("raw_activities").publish() as publish:
@@ -147,8 +147,8 @@ async def account_statuses(id: str,
     if account is None:
         raise HTTPException(status_code=404)
 
-    return await service.make_statuses(await (await as_objects.storage()).fetch_by_actor(account.url, limit=limit))
-
+    return await service.make_statuses(await (await as_objects.storage()).fetch_by_actor(account.uri or account.url,
+                                                                                         limit=limit))
 
 
 @router.post("/accounts/{id}/unfollow")
@@ -287,10 +287,11 @@ async def _federate_follow_response(username: str,
     if requester.acct.endswith("@" + instance_domain()):
         return
 
-    follow_id = (edge or {}).get("follow_activity_id") or f"{requester.url}#follows/unknown"
+    requester_url = requester.uri or requester.url
+    follow_id = (edge or {}).get("follow_activity_id") or f"{requester.uri or requester.url}#follows/unknown"
     follow = {"id": follow_id,
               "type": "Follow",
-              "actor": requester.url,
+              "actor": requester_url,
               "object": actor_url_from_username(username)}
     activity = AcceptActivity if decision == "accepted" else RejectActivity
     response = activity(id=f"{follow_id}#{decision}/",
