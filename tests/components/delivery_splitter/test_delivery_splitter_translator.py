@@ -81,6 +81,48 @@ async def test_create_without_recipients_publishes_nothing(fake_bus, fake_storag
 
     assert fake_bus.topic("deliveries").published == []
 
+def _undo_payload(inner_type, inner_object):
+    return {"username": "alice",
+            "activity": {"actor": "https://example.com/actors/alice",
+                         "object": {"id": "https://example.com/actors/alice#act/1",
+                                    "type": inner_type,
+                                    "actor": "https://example.com/actors/alice",
+                                    "object": inner_object}}}
+
+
+async def test_an_undone_boost_reaches_everyone_who_saw_it(fake_bus, fake_storage):
+    fake_storage.recipients["https://r.example/notes/7"] = {"https://r.example/bob", "https://r.example/carol"}
+
+    await translator._undo("Undo",
+                           "https://example.com/actors/alice#undo/1",
+                           _undo_payload("Announce", "https://r.example/notes/7"),
+                           AT)
+
+    published = fake_bus.topic("deliveries").published
+    assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob",
+                                                                             "https://r.example/carol"}
+
+
+async def test_an_undone_boost_forgets_its_recipients(fake_bus, fake_storage):
+    fake_storage.recipients["https://r.example/notes/7"] = {"https://r.example/bob"}
+
+    await translator._undo("Undo",
+                           "https://example.com/actors/alice#undo/1",
+                           _undo_payload("Announce", "https://r.example/notes/7"),
+                           AT)
+
+    assert "https://r.example/notes/7" not in fake_storage.recipients
+
+
+async def test_an_undone_follow_still_goes_to_its_target(fake_bus, fake_storage):
+    await translator._undo("Undo",
+                           "https://example.com/actors/alice#undo/1",
+                           _undo_payload("Follow", "https://r.example/bob"),
+                           AT)
+
+    published = fake_bus.topic("deliveries").published
+    assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob"}
+
 
 def test_follow_target_is_object_string():
     assert translator._follow_target({"object": "https://r.example/bob"}) == "https://r.example/bob"

@@ -94,6 +94,10 @@ async def _delete_recipients(object_url: str, activity: dict, username: str, emi
     return await (await storage()).get_recipients(object_url)
 
 
+async def _undo_announce_recipients(object_url: str, activity: dict, username: str, emitted_at) -> set[str]:
+    return await (await storage()).get_recipients(object_url)
+
+
 async def _store(object_url: str, recipients: set[str]) -> None:
     await (await storage()).put_recipients(object_url, recipients)
 
@@ -114,15 +118,25 @@ async def _publish_deliveries(object_id, activity, username, recipients) -> None
                               message_id=message_id)
 
 
-def _object_fan_out(collect_recipients, persist):
+def _object_fan_out(collect_recipients, persist, object_url_of=None):
+    locate = object_url_of or _inner_object_url
     async def _fan_out(event_type, object_id, payload, emitted_at) -> None:
         activity = {"id": object_id, "type": event_type, **payload["activity"]}
         username = payload["username"]
-        object_url = _inner_object_url(activity)
+        object_url = locate(activity)
         recipients = await collect_recipients(object_url, activity, username, emitted_at)
 
         await asyncio.gather(persist(object_url, recipients),
                              _publish_deliveries(object_id, activity, username, recipients))
+    return _fan_out
+
+
+def _undo_fan_out(by_inner_type, fallback):
+    async def _fan_out(event_type, object_id, payload, emitted_at) -> None:
+        inner = payload["activity"].get("object")
+        handler = (by_inner_type.get(inner.get("type"), fallback) if isinstance(inner, dict) else fallback)
+
+        await handler(event_type, object_id, payload, emitted_at)
     return _fan_out
 
 
@@ -141,7 +155,8 @@ _delete = _object_fan_out(_delete_recipients, _forget)
 _announce = _object_fan_out(_announce_recipients, _store)
 _follow = _directed_fan_out(_follow_target)
 _accept = _directed_fan_out(_accept_target)
-_undo = _directed_fan_out(_undo_target)
+_undo_announce = _object_fan_out(_undo_announce_recipients, _forget, object_url_of=_undo_target)
+_undo = _undo_fan_out({"Announce": _undo_announce}, _directed_fan_out(_undo_target))
 
 
 handle_events, rebuild, _ = build_projection(topic=activities,
