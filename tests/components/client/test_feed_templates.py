@@ -210,3 +210,26 @@ def test_the_origin_link_names_the_remote_host():
 def test_a_local_profile_has_no_origin_link():
     assert 'class="origin"' not in _card_for("alice", "https://example.com/actors/alice")
 
+
+
+def _boost_button(status):
+    return build_environment(STANDARD_TEMPLATES, None).get_template("boost_button.html").render(status=status)
+
+
+def test_an_unboosted_status_offers_to_boost():
+    html = _boost_button({"id": "42", "reblogs_count": 0, "reblogged": False})
+
+    assert 'hx-post="/statuses/42/reblog"' in html
+    assert "is-boosted" not in html
+
+
+def test_a_boosted_status_offers_to_take_it_back():
+    html = _boost_button({"id": "42", "reblogs_count": 1, "reblogged": True})
+
+    assert 'hx-post="/statuses/42/unreblog"' in html
+    assert "is-boosted" in html
+
+
+def test_the_boost_button_shows_the_count():
+    assert ">7<" in _boost_button({"id": "42", "reblogs_count": 7, "reblogged": False})
+

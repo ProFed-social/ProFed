@@ -253,6 +253,7 @@ a:hover { text-decoration: underline; }
 }
 .actions .action:hover { border-color: var(--line); color: CanvasText; }
 .actions .action .count { font-size: .8rem; }
+.actions .action.boost.is-boosted { color: var(--accent); }
 .actions .action svg { display: block; }
 .visibility svg { display: block; }
 .action-menu { position: relative; display: flex; align-items: center; margin-left: auto; }

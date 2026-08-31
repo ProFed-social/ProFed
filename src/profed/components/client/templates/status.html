@@ -17,7 +17,7 @@
           data-reply-id="{{ s.id }}"
           data-reply-name="{{ (s.account.display_name or s.account.username) if author and s.account else '' }}"
           data-reply-text="{{ s.content | striptags | truncate(160) }}">&#8617;</button>
-  <button type="button" class="action boost" title="Share" aria-label="Share">&#8634; <span class="count">{{ s.reblogs_count }}</span></button>
+  {% with status = s %}{% include "boost_button.html" %}{% endwith %}
   <button type="button" class="action like" title="Like" aria-label="Like">&#9825; <span class="count">{{ s.favourites_count }}</span></button>
   <button type="button" class="action bookmark" title="Bookmark" aria-label="Bookmark"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
   <details class="action-menu">

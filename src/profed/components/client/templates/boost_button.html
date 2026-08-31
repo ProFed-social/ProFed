@@ -1,0 +1,5 @@
+<button type="button" class="action boost{% if status.reblogged %} is-boosted{% endif %}"
+        title="Share" aria-label="Share"
+        hx-post="/statuses/{{ status.id }}/{% if status.reblogged %}unreblog{% else %}reblog{% endif %}"
+        hx-swap="outerHTML">&#8634; <span class="count">{{ status.reblogs_count }}</span></button>
+
