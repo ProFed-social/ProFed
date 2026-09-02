@@ -23,8 +23,8 @@ async def _account_from_handle(handle: str):
     return lookup.json()
 
 
-async def _account_statuses(account_id):
-    response = await api_client().get(f"/api/v1/accounts/{account_id}/statuses", params={"limit": 20})
+async def _account_statuses(account_id, token=None):
+    response = await api_client().get(f"/api/v1/accounts/{account_id}/statuses", params={"limit": 20}, token=token)
     if response.status_code != 200:
         logger.warning("fetching statuses for account %s failed: %s %s",
                        account_id, response.status_code, response.text)
@@ -67,7 +67,7 @@ async def profile(request: Request, handle: str):
                     None)
     return HTMLResponse(environment().get_template("profile.html").render(
         account=account,
-        statuses=await _account_statuses(account["id"]),
+        statuses=await _account_statuses(account["id"], (session or {}).get("token")),
         handle=handle,
         relationship=relationship,
         **(await page_context(request, session))))

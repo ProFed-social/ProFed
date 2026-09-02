@@ -90,3 +90,50 @@ def test_viewing_other_false_for_self():
 def test_viewing_other_false_when_not_logged_in():
     assert profile._viewing_other({"acct": "bob@remote.example"}, None) is False
 
+
+@pytest.mark.asyncio
+async def test_account_statuses_sends_the_viewers_token():
+    client = Mock(get=AsyncMock(return_value=_resp(200, [])))
+    with patch.object(profile, "api_client", return_value=client):
+        await profile._account_statuses("5", "tok")
+
+    assert client.get.call_args.kwargs["token"] == "tok"
+
+
+@pytest.mark.asyncio
+async def test_account_statuses_sends_no_token_without_a_session():
+    client = Mock(get=AsyncMock(return_value=_resp(200, [])))
+    with patch.object(profile, "api_client", return_value=client):
+        await profile._account_statuses("5")
+
+    assert client.get.call_args.kwargs["token"] is None
+
+
+@pytest.mark.asyncio
+async def test_the_profile_page_reads_the_statuses_as_the_logged_in_viewer():
+    statuses = AsyncMock(return_value=[])
+    with patch.object(profile, "_account_from_handle", AsyncMock(return_value={"id": "5", "acct": "bob@remote"})), \
+         patch.object(profile, "current_user_optional", AsyncMock(return_value={"token": "tok", "acct": "me@local"})), \
+         patch.object(profile, "_relationship", AsyncMock(return_value=None)), \
+         patch.object(profile, "page_context", AsyncMock(return_value={})), \
+         patch.object(profile, "environment",
+                      Mock(return_value=Mock(get_template=Mock(return_value=Mock(render=Mock(return_value="")))))), \
+         patch.object(profile, "_account_statuses", statuses):
+        await profile.profile(Mock(), "bob@remote")
+
+    assert statuses.await_args.args == ("5", "tok")
+
+
+@pytest.mark.asyncio
+async def test_the_profile_page_reads_the_statuses_anonymously_without_a_session():
+    statuses = AsyncMock(return_value=[])
+    with patch.object(profile, "_account_from_handle", AsyncMock(return_value={"id": "5", "acct": "bob@remote"})), \
+         patch.object(profile, "current_user_optional", AsyncMock(return_value=None)), \
+         patch.object(profile, "page_context", AsyncMock(return_value={})), \
+         patch.object(profile, "environment",
+                      Mock(return_value=Mock(get_template=Mock(return_value=Mock(render=Mock(return_value="")))))), \
+         patch.object(profile, "_account_statuses", statuses):
+        await profile.profile(Mock(), "bob@remote")
+
+    assert statuses.await_args.args == ("5", None)
+

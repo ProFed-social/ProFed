@@ -85,7 +85,7 @@ async def test_ensure_schema_creates_every_object_before_the_statement_using_it(
     for position, statement in enumerate(statements):
         for name in set(re.findall(r"api\.\w+", statement)) & set(created):
             assert created[name] <= position, f"{name} is used at {position} but created at {created[name]}"
-           
+          
 
 @pytest.mark.asyncio
 async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):
