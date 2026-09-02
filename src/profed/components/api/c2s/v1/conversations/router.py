@@ -35,7 +35,7 @@ async def get_conversations(claims: Annotated[dict, Depends(current_user)]):
     accounts = await known_accounts.storage()
     last_status = {status.url: status
                    for status in await service.make_statuses(
-                       await objects.rows_for_urls([row["last_message"] for row in rows], 20))}
+                       await objects.rows_for_urls([row["last_message"] for row in rows]))}
     roots = await objects.mastodon_ids_for([row["conversation_id"] for row in rows])
 
     async def accounts_of(actor_urls):

@@ -41,11 +41,9 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
 
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
 
-    assert fake_conn.execute.await_count == 12
+    assert fake_conn.execute.await_count == 19
     assert any("CREATE TABLE" in s for s in statements)
-    assert any("jsonb_build_object('status', status, 'actor', actor_url)" in s for s in statements)
-    assert any("CREATE OR REPLACE FUNCTION api.resolve_content" in s and "CYCLE url SET is_cycle" in s
-               for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.resolve_content(start_url TEXT)" in s for s in statements)
     assert any("CREATE OR REPLACE VIEW api.reblog_compression" in s and "LEAST(b.mastodon_id, c.mastodon_id)" in s
                for s in statements)
     assert any("CREATE TYPE api.reblog_compression_kind AS ENUM" in s for s in statements)
@@ -60,7 +58,82 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
     assert any("CREATE OR REPLACE FUNCTION api.discussion_root" in s and
                "api.find_root(start_url, max_depth, false)" in s
                for s in statements)
-    assert any("CREATE OR REPLACE FUNCTION api.content_url" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.content_url(start_url TEXT)" in s for s in statements)
+    assert any("CREATE TABLE IF NOT EXISTS api.boosts" in s and "PRIMARY KEY (announce_url)" in s
+               for s in statements)
+    assert any("CREATE TABLE IF NOT EXISTS api.boost_counts" in s and "PRIMARY KEY (object_url)" in s
+               for s in statements)
+    assert any("CREATE TYPE api.boost_row AS" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.record_boosts(entries api.boost_row[])" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.forget_boosts(announce_urls TEXT[])" in s for s in statements)
+
+
+@pytest.mark.asyncio
+async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+
+    statements = [call.args[0] for call in fake_conn.execute.await_args_list]
+
+    assert any("as_objects_reblog_of_idx" in s and "ON api.as_objects (reblog_of_url)" in s for s in statements)
+    assert any("boosts_object_actor_idx" in s and "ON api.boosts (object_url," in s for s in statements)
+    assert not any("boosts_object_actor_idx" in s and "UNIQUE" in s for s in statements)
+
+
+@pytest.mark.asyncio
+async def test_record_boosts_counts_an_actor_once_per_object(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+
+    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
+                if "CREATE OR REPLACE FUNCTION api.record_boosts" in s)
+
+    assert "ON CONFLICT (announce_url) DO NOTHING" in body
+    assert "SELECT DISTINCT" in body
+    assert "NOT EXISTS (SELECT 1" in body
+    assert "o.actor_url = i.actor_url" in body
+    assert "o.object_url = i.object_url" in body
+    assert "SET n_of_boosts = api.boost_counts.n_of_boosts + EXCLUDED.n_of_boosts" in body
+
+
+@pytest.mark.asyncio
+async def test_forget_boosts_decrements_only_when_the_actor_has_no_other_boost_left(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+
+    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
+                if "CREATE OR REPLACE FUNCTION api.forget_boosts" in s)
+
+    assert "DELETE FROM api.boosts" in body
+    assert "WHERE announce_url = ANY(announce_urls)" in body
+    assert "o.announce_url <> ALL(announce_urls)" in body
+    assert "SET n_of_boosts = GREATEST(c.n_of_boosts - g.n, 0)" in body
+
+
+def _function_body(statements, name):
+    return next(s for s in statements if f"CREATE OR REPLACE FUNCTION {name}(start_url TEXT)" in s)
+
+
+@pytest.mark.asyncio
+async def test_resolve_content_joins_a_single_hop_and_returns_the_content_url(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+
+    body = _function_body([call.args[0] for call in fake_conn.execute.await_args_list], "api.resolve_content")
+
+    assert "jsonb_build_object('status', t.status, 'actor', t.actor_url, 'url', t.url)" in body
+    assert "api.as_objects AS t ON t.url = COALESCE(o.reblog_of_url, o.url)" in body
+    assert "t.reblog_of_url IS NULL" in body
+    assert "RECURSIVE" not in body
+    assert "CYCLE" not in body
+
+
+@pytest.mark.asyncio
+async def test_content_url_joins_a_single_hop(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+
+    body = _function_body([call.args[0] for call in fake_conn.execute.await_args_list], "api.content_url")
+
+    assert "api.as_objects AS t ON t.url = COALESCE(o.reblog_of_url, o.url)" in body
+    assert "t.reblog_of_url IS NULL" in body
+    assert "RECURSIVE" not in body
+    assert "CYCLE" not in body
 
 
 @pytest.mark.asyncio
@@ -71,6 +144,25 @@ async def test_upsert_inserts_the_object(fake_pool, fake_conn):
     assert "INSERT INTO api.as_objects" in sql
     assert "ON CONFLICT (url) DO NOTHING" in sql
     assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, None]
+
+
+@pytest.mark.asyncio
+async def test_upsert_records_the_inserted_row_as_a_boost(fake_pool, fake_conn):
+    await (await as_objects.storage()).upsert("43", "https://r/boost", "https://r/carol", {"id": "43"}, "https://r/1")
+
+    sql = fake_conn.execute.await_args.args[0]
+    assert "RETURNING url, actor_url, reblog_of_url" in sql
+    assert "api.as_objects AS n ON n.url = i.reblog_of_url" in sql
+    assert "api.record_boosts(ARRAY(SELECT ROW(announce_url, actor_url, object_url)::api.boost_row" in sql
+
+
+@pytest.mark.asyncio
+async def test_upsert_records_the_boosts_that_were_waiting_for_the_inserted_row(fake_pool, fake_conn):
+    await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, None)
+
+    sql = fake_conn.execute.await_args.args[0]
+    assert "api.as_objects AS b ON b.reblog_of_url = i.url" in sql
+    assert "i.reblog_of_url IS NULL" in sql
 
 
 @pytest.mark.asyncio
@@ -102,6 +194,15 @@ async def test_delete_removes_the_object(fake_pool, fake_conn):
 
 
 @pytest.mark.asyncio
+async def test_delete_forgets_the_boost_of_the_removed_row(fake_pool, fake_conn):
+    await (await as_objects.storage()).delete("https://r/boost")
+
+    sql = fake_conn.execute.await_args.args[0]
+    assert "RETURNING url)" in sql
+    assert "api.forget_boosts(ARRAY(SELECT url FROM del))" in sql
+
+
+@pytest.mark.asyncio
 async def test_get_resolves_the_content_via_the_function(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = {"mastodon_id": 42,
                                        "url": "https://r/boost",
@@ -109,33 +210,33 @@ async def test_get_resolves_the_content_via_the_function(fake_pool, fake_conn):
                                        "status": {"id": "42"},
                                        "content": {"id": "1", "content": "ziel"}}
 
-    result = await (await as_objects.storage()).get("42", 20)
+    result = await (await as_objects.storage()).get("42")
 
     sql, *args = fake_conn.fetchrow.await_args.args
-    assert "api.resolve_content(url, $2)" in sql
-    assert args == ["42", 20]
+    assert "api.resolve_content(url)" in sql
+    assert args == ["42"]
     assert result["content"] == {"id": "1", "content": "ziel"}
 
 
 @pytest.mark.asyncio
 async def test_get_returns_none_when_absent(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = None
-    assert await (await as_objects.storage()).get("42", 20) is None
+    assert await (await as_objects.storage()).get("42") is None
 
 
 @pytest.mark.asyncio
 async def test_fetch_by_actor_resolves_filters_unresolved_and_paginates(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"mastodon_id": 43, "content": {"id": "x"}}]
 
-    result = await (await as_objects.storage()).fetch_by_actor("https://r/bob", limit=5, max_id="99", max_depth=10)
+    result = await (await as_objects.storage()).fetch_by_actor("https://r/bob", limit=5, max_id="99")
 
     sql, *args = fake_conn.fetch.await_args.args
     assert "CROSS JOIN LATERAL" in sql
-    assert "api.resolve_content(o.url, $5)" in sql
+    assert "api.resolve_content(o.url)" in sql
     assert "r.content IS NOT NULL" in sql
     assert "o.actor_url, o.reblog_of_url" in sql
     assert "ORDER BY o.mastodon_id DESC" in sql
-    assert args == ["https://r/bob", 5, "99", None, 10]
+    assert args == ["https://r/bob", 5, "99", None]
     assert [row["mastodon_id"] for row in result] == [43]
 
 
@@ -160,6 +261,20 @@ async def test_compress_chains_calls_the_function_for_heads_and_returns_the_coun
 
     assert "api.compress_reblogs('chain')" in fake_conn.fetchrow.await_args.args[0]
     assert result == 3
+
+
+@pytest.mark.asyncio
+async def test_compress_reblogs_records_the_boosts_it_just_made_direct(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+
+    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
+                if "api.compress_reblogs(kind" in s)
+
+    assert "RETURNING t.url, t.actor_url, p.newref" in body
+    assert "api.as_objects AS n ON n.url = u.newref" in body
+    assert "n.reblog_of_url IS NULL" in body
+    assert "api.record_boosts(" in body
+    assert "SELECT count(*)::int FROM upd, recorded" in body
 
 
 @pytest.mark.asyncio
@@ -192,7 +307,7 @@ async def test_thread_of_walks_same_author_replies_ordered_and_resolved(fake_poo
     assert "WITH RECURSIVE thread" in sql
     assert "c.status->>'in_reply_to_id' = t.url" in sql
     assert "c.actor_url = t.actor_url" in sql
-    assert "api.resolve_content(o.url, $2)" in sql
+    assert "api.resolve_content(o.url)" in sql
     assert "ORDER BY" in sql and "th.sortkey" in sql
     assert args == ["https://r/a1", 10, True]
     assert [row["url"] for row in result] == ["https://r/a1", "https://r/a2"]
@@ -203,14 +318,13 @@ async def test_boosted_parts_returns_the_thread_urls_the_booster_boosted(fake_po
     fake_conn.fetch.return_value = [{"boosted_part": "https://r/a2"}, {"boosted_part": "https://r/a4"}]
 
     result = await (await as_objects.storage()).boosted_parts("https://r/x",
-                                                              ["https://r/a1", "https://r/a2", "https://r/a4"],
-                                                              max_depth=10)
+                                                              ["https://r/a1", "https://r/a2", "https://r/a4"])
 
     sql, *args = fake_conn.fetch.await_args.args
-    assert "api.content_url(o.url, $3)" in sql
+    assert "api.content_url(o.url)" in sql
     assert "o.reblog_of_url IS NOT NULL" in sql
     assert "ANY($2::text[])" in sql
-    assert args == ["https://r/x", ["https://r/a1", "https://r/a2", "https://r/a4"], 10]
+    assert args == ["https://r/x", ["https://r/a1", "https://r/a2", "https://r/a4"]]
     assert result == ["https://r/a2", "https://r/a4"]
 
 
@@ -243,12 +357,12 @@ async def test_discussion_ancestors_joins_ancestor_chain_without_the_status_itse
 async def test_rows_for_urls_fetches_rows_for_a_url_list(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"url": "https://x/1", "content": {"id": "1"}}]
 
-    await (await as_objects.storage()).rows_for_urls(["https://x/1", "https://x/2"], 20)
+    await (await as_objects.storage()).rows_for_urls(["https://x/1", "https://x/2"])
 
     sql, *args = fake_conn.fetch.await_args.args
-    assert "api.resolve_content(url, $2)" in sql
+    assert "api.resolve_content(url)" in sql
     assert "WHERE url = ANY($1::text[])" in sql
-    assert args == [["https://x/1", "https://x/2"], 20]
+    assert args == [["https://x/1", "https://x/2"]]
 
 
 @pytest.mark.asyncio

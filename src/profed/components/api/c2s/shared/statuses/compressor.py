@@ -2,7 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
+import logging
 from .as_objects import storage
+
+logger = logging.getLogger(__name__)
 
 SLEEP_MIN = 1.0
 SLEEP_MAX = 60.0
@@ -17,13 +20,19 @@ class Compressor():
         self.sleep_max = float(config.get("sleep_max", SLEEP_MAX))
         self.agility = float(config.get("agility", AGILITY))
 
-    async def sleep_after_changed(self, changed: int) ->None:
+    async def sleep_after_changed(self, changed: int) -> None:
         await asyncio.sleep(self.sleep_min + (self.sleep_max - self.sleep_min) / (1 + changed / self.agility))
 
-    async def __call__(self) ->None:
+    async def step(self) -> int:
+        try:
+            return await (await storage()).compress_all(self.sample_size)
+        except Exception:
+            logger.exception("reblog compression failed")
+            return 0
+
+    async def __call__(self) -> None:
         while True:
-            changed = await (await storage()).compress_all(self.sample_size)
-            await self.sleep_after_changed(changed)
+            await self.sleep_after_changed(await self.step())
 
 
 def start(config: dict) -> None:

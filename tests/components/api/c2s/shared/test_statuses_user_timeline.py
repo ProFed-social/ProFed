@@ -77,15 +77,15 @@ async def test_fetch_joins_resolves_filters_and_paginates(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"mastodon_id": 102, "reblog_of_url": "x", "content": {"id": "100"}},
                                     {"mastodon_id": 100, "reblog_of_url": None, "content": {"id": "100"}}]
 
-    result = await (await user_timeline.storage()).fetch("alice", limit=5, max_id="999", max_depth=10)
+    result = await (await user_timeline.storage()).fetch("alice", limit=5, max_id="999")
 
     sql, *args = fake_conn.fetch.await_args.args
     assert "JOIN api.as_objects o ON o.url = ut.object_url" in sql
-    assert "api.resolve_content(o.url, $5)" in sql
+    assert "api.resolve_content(o.url)" in sql
     assert "r.content IS NOT NULL" in sql
     assert "o.actor_url, o.reblog_of_url" in sql
     assert "ORDER BY ut.mastodon_id DESC" in sql
-    assert args == ["alice", 5, "999", None, 10]
+    assert args == ["alice", 5, "999", None]
     assert [row["mastodon_id"] for row in result] == [102, 100]
 
 
@@ -103,7 +103,7 @@ async def test_thread_roots_streams_rows_with_thread_root_and_booster(fake_pool)
     st.stream = fake_stream
     rows = [row async for row in st.thread_roots("me", max_depth=10)]
 
-    assert "api.thread_root(api.content_url(o.url, $2), $2) AS root" in captured["sql"]
+    assert "api.thread_root(api.content_url(o.url), $2) AS root" in captured["sql"]
     assert "JOIN api.as_objects o ON o.url = ut.object_url" in captured["sql"]
     assert "WHERE ut.username = $1" in captured["sql"]
     assert "ORDER BY ut.mastodon_id DESC" in captured["sql"]

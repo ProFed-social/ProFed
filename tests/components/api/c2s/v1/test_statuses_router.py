@@ -476,7 +476,7 @@ def test_the_announce_points_at_the_boosted_note(client, fake_bus):
 
 def test_the_announce_is_public(client, fake_bus):
     _reblog(client)
-    
+   
     activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert activity["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
 

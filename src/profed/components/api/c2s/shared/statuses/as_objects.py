@@ -19,23 +19,18 @@ class _storage(BaseStorage):
                                      reblog_of_url TEXT,
                                      edited_at     TIMESTAMPTZ,
                                      PRIMARY KEY (url))""")
-        await self.execute("""CREATE OR REPLACE FUNCTION api.resolve_content(start_url TEXT, max_depth INT)
-                              RETURNS jsonb LANGUAGE sql STABLE AS $$
-                                  WITH RECURSIVE chain AS (
-                                      SELECT url, reblog_of_url, status, actor_url, 1 AS depth
-                                      FROM api.as_objects
-                                      WHERE url = start_url
-                                    UNION ALL
-                                      SELECT o.url, o.reblog_of_url, o.status, o.actor_url, c.depth + 1
-                                      FROM api.as_objects o
-                                      JOIN chain c ON o.url = c.reblog_of_url
-                                      WHERE c.depth < max_depth
-                                  ) CYCLE url SET is_cycle USING path
-                                  SELECT jsonb_build_object('status', status, 'actor', actor_url)
-                                  FROM chain
-                                  WHERE reblog_of_url IS NULL AND NOT is_cycle
-                                  LIMIT 1
-                              $$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.resolve_content(start_url TEXT)
+            RETURNS jsonb LANGUAGE sql STABLE AS $$
+                SELECT
+                    jsonb_build_object('status', t.status, 'actor', t.actor_url, 'url', t.url)
+                FROM
+                    api.as_objects AS o INNER JOIN
+                    api.as_objects AS t ON t.url = COALESCE(o.reblog_of_url, o.url)
+                WHERE
+                    o.url = start_url AND
+                    t.reblog_of_url IS NULL
+            $$""")
         await self.execute("""
             CREATE OR REPLACE FUNCTION api.ancestor_chain(start_url TEXT, max_depth INT, break_on_author BOOLEAN)
             RETURNS TABLE (url TEXT, depth INT) LANGUAGE sql STABLE AS $$
@@ -91,23 +86,18 @@ class _storage(BaseStorage):
             RETURNS TEXT LANGUAGE sql STABLE AS $$
                 SELECT api.find_root(start_url, max_depth, false)
             $$""")
-        await self.execute("""CREATE OR REPLACE FUNCTION api.content_url(start_url TEXT, max_depth INT)
-                              RETURNS TEXT LANGUAGE sql STABLE AS $$
-                                  WITH RECURSIVE chain AS (
-                                      SELECT url, reblog_of_url, 1 AS depth
-                                      FROM api.as_objects
-                                      WHERE url = start_url
-                                    UNION ALL
-                                      SELECT o.url, o.reblog_of_url, c.depth + 1
-                                      FROM api.as_objects o
-                                      JOIN chain c ON o.url = c.reblog_of_url
-                                      WHERE c.depth < max_depth
-                                  ) CYCLE url SET is_cycle USING path
-                                  SELECT url
-                                  FROM chain
-                                  WHERE reblog_of_url IS NULL AND NOT is_cycle
-                                  LIMIT 1
-                              $$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.content_url(start_url TEXT)
+            RETURNS TEXT LANGUAGE sql STABLE AS $$
+                SELECT
+                    t.url
+                FROM
+                    api.as_objects AS o INNER JOIN
+                    api.as_objects AS t ON t.url = COALESCE(o.reblog_of_url, o.url)
+                WHERE
+                    o.url = start_url AND
+                    t.reblog_of_url IS NULL
+            $$""")
         await self.execute("""CREATE OR REPLACE VIEW api.reblog_compression AS
                               SELECT w.a_url, w.b_url, w.newref, w.chain_start
                               FROM (SELECT a.url AS a_url,
@@ -147,8 +137,24 @@ class _storage(BaseStorage):
                                       FROM picked p
                                       WHERE (t.url = p.a_url OR t.url = p.b_url)
                                         AND t.reblog_of_url IS DISTINCT FROM p.newref
-                                      RETURNING 1)
-                                  SELECT count(*)::int FROM upd
+                                      RETURNING t.url, t.actor_url, p.newref),
+                                  candidate AS (
+                                      SELECT
+                                          u.url AS announce_url,
+                                          u.actor_url,
+                                          u.newref AS object_url
+                                      FROM
+                                          upd AS u INNER JOIN
+                                          api.as_objects AS n ON n.url = u.newref
+                                      WHERE
+                                          n.reblog_of_url IS NULL),
+                                  recorded AS (
+                                      SELECT api.record_boosts(
+                                                 ARRAY(SELECT ROW(announce_url,
+                                                                  actor_url,
+                                                                  object_url)::api.boost_row
+                                                       FROM candidate)))
+                                  SELECT count(*)::int FROM upd, recorded
                               $fn$""")
         await self.execute("""CREATE UNIQUE INDEX IF NOT EXISTS
                               as_objects_mastodon_idx
@@ -157,6 +163,96 @@ class _storage(BaseStorage):
                               as_objects_actor_mastodon_idx
                               ON api.as_objects (actor_url,
                                                  mastodon_id DESC)""")
+        await self.execute("""CREATE INDEX IF NOT EXISTS
+                              as_objects_reblog_of_idx
+                              ON api.as_objects (reblog_of_url)""")
+        await self.execute("""CREATE TABLE IF NOT EXISTS api.boosts
+                                  (announce_url TEXT NOT NULL,
+                                   actor_url    TEXT NOT NULL,
+                                   object_url   TEXT NOT NULL,
+                                   PRIMARY KEY (announce_url))""")
+        await self.execute("""CREATE INDEX IF NOT EXISTS
+                              boosts_object_actor_idx
+                              ON api.boosts (object_url,
+                                             actor_url)""")
+        await self.execute("""CREATE TABLE IF NOT EXISTS api.boost_counts
+                                  (object_url  TEXT NOT NULL,
+                                   n_of_boosts INTEGER NOT NULL,
+                                   PRIMARY KEY (object_url))""")
+        await self.execute("""DO $$ BEGIN
+                                  CREATE TYPE api.boost_row AS (announce_url TEXT,
+                                                                actor_url TEXT,
+                                                                object_url TEXT);
+                              EXCEPTION WHEN duplicate_object THEN NULL;
+                              END $$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.record_boosts(entries api.boost_row[])
+            RETURNS void LANGUAGE sql AS $fn$
+                WITH ins AS (
+                        INSERT INTO api.boosts (announce_url, actor_url, object_url)
+                        SELECT
+                            e.announce_url,
+                            e.actor_url,
+                            e.object_url
+                        FROM
+                            unnest(entries) AS e
+                        ON CONFLICT (announce_url) DO NOTHING
+                        RETURNING actor_url, object_url),
+                     fresh AS (
+                        SELECT DISTINCT
+                            i.actor_url,
+                            i.object_url
+                        FROM
+                            ins AS i
+                        WHERE
+                            NOT EXISTS (SELECT 1
+                                        FROM api.boosts AS o
+                                        WHERE o.actor_url = i.actor_url AND
+                                              o.object_url = i.object_url))
+                INSERT INTO api.boost_counts (object_url, n_of_boosts)
+                SELECT
+                    object_url,
+                    count(*)
+                FROM
+                    fresh
+                GROUP BY
+                    object_url
+                ON CONFLICT (object_url) DO UPDATE
+                    SET n_of_boosts = api.boost_counts.n_of_boosts + EXCLUDED.n_of_boosts
+            $fn$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.forget_boosts(announce_urls TEXT[])
+            RETURNS void LANGUAGE sql AS $fn$
+                WITH del AS (
+                        DELETE FROM api.boosts
+                        WHERE announce_url = ANY(announce_urls)
+                        RETURNING actor_url, object_url),
+                     gone AS (
+                        SELECT DISTINCT
+                            d.actor_url,
+                            d.object_url
+                        FROM
+                            del AS d
+                        WHERE
+                            NOT EXISTS (SELECT 1
+                                        FROM api.boosts AS o
+                                        WHERE o.actor_url = d.actor_url AND
+                                              o.object_url = d.object_url AND
+                                              o.announce_url <> ALL(announce_urls)))
+                UPDATE api.boost_counts AS c
+                SET n_of_boosts = GREATEST(c.n_of_boosts - g.n, 0)
+                FROM
+                    (SELECT
+                        object_url,
+                        count(*) AS n
+                    FROM
+                        gone
+                    GROUP BY
+                        object_url) AS g
+                WHERE
+                    c.object_url = g.object_url
+            $fn$""")
+
 
     async def upsert(self,
                      mastodon_id: str,
@@ -164,10 +260,35 @@ class _storage(BaseStorage):
                      actor_url: str,
                      status: dict,
                      reblog_of_url: Optional[str]) -> None:
-        await self.execute("""INSERT INTO api.as_objects
-                                  (mastodon_id, url, actor_url, status, reblog_of_url)
-                              VALUES ($1::numeric, $2, $3, $4, $5)
-                              ON CONFLICT (url) DO NOTHING""",
+        await self.execute("""
+            WITH ins AS (
+                    INSERT INTO api.as_objects
+                        (mastodon_id, url, actor_url, status, reblog_of_url)
+                    VALUES ($1::numeric, $2, $3, $4, $5)
+                    ON CONFLICT (url) DO NOTHING
+                    RETURNING url, actor_url, reblog_of_url),
+                 candidate AS (
+                    SELECT
+                        i.url AS announce_url,
+                        i.actor_url,
+                        i.reblog_of_url AS object_url
+                    FROM
+                        ins AS i INNER JOIN
+                        api.as_objects AS n ON n.url = i.reblog_of_url
+                    WHERE
+                        n.reblog_of_url IS NULL
+                  UNION ALL
+                    SELECT
+                        b.url,
+                        b.actor_url,
+                        b.reblog_of_url
+                    FROM
+                        ins AS i INNER JOIN
+                        api.as_objects AS b ON b.reblog_of_url = i.url
+                    WHERE
+                        i.reblog_of_url IS NULL)
+            SELECT api.record_boosts(ARRAY(SELECT ROW(announce_url, actor_url, object_url)::api.boost_row
+                                           FROM candidate))""",
                            mastodon_id,
                            url,
                            actor_url,
@@ -183,17 +304,20 @@ class _storage(BaseStorage):
                            edited_at)
 
     async def delete(self, url: str) -> None:
-        await self.execute("""DELETE FROM api.as_objects
-                              WHERE url = $1""",
+        await self.execute("""
+            WITH del AS (
+                    DELETE FROM api.as_objects
+                    WHERE url = $1
+                    RETURNING url)
+            SELECT api.forget_boosts(ARRAY(SELECT url FROM del))""",
                            url)
 
-    async def get(self, mastodon_id: str, max_depth: int) -> Optional[dict]:
+    async def get(self, mastodon_id: str) -> Optional[dict]:
         return await self.fetch_one("""SELECT mastodon_id, url, actor_url, reblog_of_url, status,
-                                          api.resolve_content(url, $2) AS content
+                                          api.resolve_content(url) AS content
                                        FROM api.as_objects
                                        WHERE mastodon_id = $1::numeric""",
-                                    mastodon_id,
-                                    max_depth)
+                                    mastodon_id)
 
     async def url_for(self, mastodon_id: str) -> Optional[str]:
         row = await self.fetch_one("""SELECT url
@@ -211,24 +335,22 @@ class _storage(BaseStorage):
                                    actor_url)
         return row["url"] if row else None
 
-    async def rows_for_urls(self, urls: list[str], max_depth: int) -> List[dict]:
+    async def rows_for_urls(self, urls: list[str]) -> List[dict]:
         return await self.fetch_all("""SELECT mastodon_id, url, actor_url, reblog_of_url, status,
-                                          api.resolve_content(url, $2) AS content
+                                          api.resolve_content(url) AS content
                                        FROM api.as_objects
                                        WHERE url = ANY($1::text[])""",
-                                    urls,
-                                    max_depth)
+                                    urls)
 
     async def fetch_by_actor(self,
                              actor_url: str,
                              limit: int = 20,
                              max_id: Optional[str] = None,
-                             since_id: Optional[str] = None,
-                             max_depth: int = 20) -> List[dict]:
+                             since_id: Optional[str] = None) -> List[dict]:
         return await self.fetch_all("""SELECT o.mastodon_id, o.url, o.actor_url, o.reblog_of_url, o.status, r.content
                                        FROM api.as_objects o
                                        CROSS JOIN LATERAL
-                                            (SELECT api.resolve_content(o.url, $5) AS content) r
+                                            (SELECT api.resolve_content(o.url) AS content) r
                                        WHERE o.actor_url = $1
                                          AND ($3::numeric IS NULL OR o.mastodon_id < $3::numeric)
                                          AND ($4::numeric IS NULL OR o.mastodon_id > $4::numeric)
@@ -238,8 +360,7 @@ class _storage(BaseStorage):
                                     actor_url,
                                     limit,
                                     max_id,
-                                    since_id,
-                                    max_depth)
+                                    since_id)
 
     async def mastodon_ids_for(self, urls: list[str]) -> dict:
         rows = await self.fetch_all("""SELECT url, mastodon_id
@@ -282,7 +403,7 @@ class _storage(BaseStorage):
             FROM
                 thread AS th INNER JOIN
                 api.as_objects AS o ON o.url = th.url CROSS JOIN LATERAL
-                (SELECT api.resolve_content(o.url, $2) AS content) AS r
+                (SELECT api.resolve_content(o.url) AS content) AS r
             WHERE
                 NOT th.is_cycle
             ORDER BY
@@ -309,7 +430,7 @@ class _storage(BaseStorage):
             FROM
                 api.ancestor_chain($1, $2, $3::boolean) AS a INNER JOIN
                 api.as_objects AS o ON o.url = a.url CROSS JOIN LATERAL
-                (SELECT api.resolve_content(o.url, $2) AS content) AS r
+                (SELECT api.resolve_content(o.url) AS content) AS r
             WHERE
                 a.depth > 1
             ORDER BY
@@ -324,15 +445,14 @@ class _storage(BaseStorage):
     async def discussion_ancestors(self, url: str, max_depth: int = 20) -> List[dict]:
         return await self.ancestors_of(url, max_depth, False)
 
-    async def boosted_parts(self, booster: str, part_urls: list[str], max_depth: int = 20) -> list[str]:
-        rows = await self.fetch_all("""SELECT api.content_url(o.url, $3) AS boosted_part
+    async def boosted_parts(self, booster: str, part_urls: list[str]) -> list[str]:
+        rows = await self.fetch_all("""SELECT api.content_url(o.url) AS boosted_part
                                        FROM api.as_objects o
                                        WHERE o.actor_url = $1
                                          AND o.reblog_of_url IS NOT NULL
-                                         AND api.content_url(o.url, $3) = ANY($2::text[])""",
+                                         AND api.content_url(o.url) = ANY($2::text[])""",
                                     booster,
-                                    part_urls,
-                                    max_depth)
+                                    part_urls)
         return [row["boosted_part"] for row in rows]
 
     async def compress_chains(self) -> int:

@@ -76,7 +76,7 @@ def test_note_success(client, fake_resolve_note):
                                       "id": "https://example.com/actors/alice/notes/abc",
                                       "type": "Note",
                                       "content": "hi"}
-                       
+                      
     response = client.get("/actors/alice/notes/abc")
 
     assert response.status_code == 200

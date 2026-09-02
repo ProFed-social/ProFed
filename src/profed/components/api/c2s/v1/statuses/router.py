@@ -97,9 +97,9 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
 
     note, activity = \
         await make_note_and_create_activity(actor_url=actor_url_from_username(username),
-                                            in_reply_to=await (await as_objects.storage()).get(body.in_reply_to_id, 20)
-                                                        if body.in_reply_to_id else
-                                                        None)
+                                            in_reply_to=(await (await as_objects.storage()).get(body.in_reply_to_id)
+                                                         if body.in_reply_to_id else
+                                                         None))
 
     async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Create",
@@ -126,7 +126,7 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
 
 @router.get("/statuses/{id}")
 async def get_status(id: str, claims: Annotated[dict, Depends(current_user)] = None):
-    row = await (await as_objects.storage()).get(id, 20) if id.isdigit() else None
+    row = await (await as_objects.storage()).get(id) if id.isdigit() else None
     if row is None or row["content"] is None:
         raise HTTPException(status_code=404, detail="status_not_found")
     return (await service.make_statuses([row]))[0]
@@ -160,7 +160,7 @@ async def status_context(id: str, claims: Annotated[dict, Depends(current_user)]
     if not id.isdigit():
         return StatusContext()
     storage = await as_objects.storage()
-    row = await storage.get(id, 20)
+    row = await storage.get(id)
     if row is None:
         return StatusContext()
 
@@ -190,7 +190,7 @@ def _username(claims: dict) -> str:
 
 
 async def _boosted_row(id: str) -> dict:
-    row = await (await as_objects.storage()).get(id, 20) if id.isdigit() else None
+    row = await (await as_objects.storage()).get(id) if id.isdigit() else None
     if row is None or row["content"] is None:
         raise HTTPException(status_code=404, detail="status_not_found")
 

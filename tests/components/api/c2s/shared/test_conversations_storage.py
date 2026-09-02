@@ -121,6 +121,17 @@ async def test_messages_of_returns_conversation_messages_ordered_by_time(fake_po
 
 
 @pytest.mark.asyncio
+async def test_messages_of_carries_the_content_url_in_both_content_objects(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await storage.storage()).messages_of("c1")
+
+    query = fake_conn.fetch.await_args.args[0]
+    assert "jsonb_build_object('status', o.status, 'actor', o.actor_url, 'url', o.url)" in query
+    assert "jsonb_build_object('status', p.status, 'actor', p.actor_url, 'url', p.url)" in query
+
+
+@pytest.mark.asyncio
 async def test_recipients_for_resolves_the_conversation_from_the_replied_to_message(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"actor_url": "https://s/bob"},
                                     {"actor_url": "https://s/carol"}]

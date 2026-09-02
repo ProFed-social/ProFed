@@ -58,3 +58,41 @@ async def test_the_loop_compresses_with_the_sample_size_then_sleeps_with_the_cha
     store.compress_all.assert_awaited_once_with(7)
     assert slept == [3]
 
+
+@pytest.mark.asyncio
+async def test_a_failing_pass_reports_no_changes_instead_of_raising():
+    store = Mock(compress_all=AsyncMock(side_effect=RuntimeError("boom")))
+
+    with patch.object(compressor, "storage", AsyncMock(return_value=store)):
+        assert await compressor.Compressor(TUNING).step() == 0
+
+
+@pytest.mark.asyncio
+async def test_a_failing_pass_is_logged_with_its_traceback():
+    store = Mock(compress_all=AsyncMock(side_effect=RuntimeError("boom")))
+
+    with patch.object(compressor, "storage", AsyncMock(return_value=store)), \
+         patch.object(compressor.logger, "exception") as reported:
+        await compressor.Compressor(TUNING).step()
+
+    reported.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_the_loop_keeps_running_after_a_failing_pass():
+    store = Mock(compress_all=AsyncMock(side_effect=[RuntimeError("boom"), 4]))
+    slept = []
+
+    async def stop(changed):
+        slept.append(changed)
+        if len(slept) == 2:
+            raise asyncio.CancelledError
+
+    instance = compressor.Compressor(TUNING)
+    with patch.object(compressor, "storage", AsyncMock(return_value=store)), \
+         patch.object(instance, "sleep_after_changed", stop):
+        with pytest.raises(asyncio.CancelledError):
+            await instance()
+
+    assert slept == [0, 4]
+
