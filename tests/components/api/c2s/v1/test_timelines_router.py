@@ -48,7 +48,7 @@ def _content_row():
             "actor_url": BOB_URL,
             "reblog_of_url": None,
             "status": STATUS,
-            "content": {"status": STATUS, "actor": BOB_URL}}
+            "content": {"status": STATUS, "actor": BOB_URL, "url": NOTE_URL}}
 
 
 def _boost_row():
@@ -57,7 +57,7 @@ def _boost_row():
             "actor_url": CAROL_URL,
             "reblog_of_url": NOTE_URL,
             "status": BOOST,
-            "content": {"status": STATUS, "actor": BOB_URL}}
+            "content": {"status": STATUS, "actor": BOB_URL, "url": NOTE_URL}}
 
 
 class FakeStorage:
@@ -70,6 +70,13 @@ class FakeStorage:
 def _patched_accounts(mapping):
     return patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
                  AsyncMock(return_value=mapping))
+
+
+@pytest.fixture(autouse=True)
+def no_boosts():
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=AsyncMock(boost_stats=AsyncMock(return_value={})))):
+        yield
 
 
 @pytest.fixture

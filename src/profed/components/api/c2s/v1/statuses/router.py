@@ -129,7 +129,7 @@ async def get_status(id: str, claims: Annotated[dict, Depends(current_user)] = N
     row = await (await as_objects.storage()).get(id) if id.isdigit() else None
     if row is None or row["content"] is None:
         raise HTTPException(status_code=404, detail="status_not_found")
-    return (await service.make_statuses([row]))[0]
+    return (await service.make_statuses([row], _viewer(claims)))[0]
 
 
 @router.delete("/statuses/{id}")
@@ -166,8 +166,8 @@ async def status_context(id: str, claims: Annotated[dict, Depends(current_user)]
 
     ancestors = await storage.discussion_ancestors(row["url"])
     descendants = [r for r in await storage.discussion_of(row["url"]) if r["url"] != row["url"]]
-    return StatusContext(ancestors=await service.make_statuses(ancestors),
-                         descendants=await service.make_statuses(descendants))
+    return StatusContext(ancestors=await service.make_statuses(ancestors, _viewer(claims)),
+                         descendants=await service.make_statuses(descendants, _viewer(claims)))
 
 
 @router.post("/statuses/{id}/favourite")
@@ -179,6 +179,10 @@ async def favourite_status(id: str, claims: Annotated[dict, Depends(current_user
 async def unfavourite_status(id: str,
                              claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="status_not_found")
+
+
+def _viewer(claims: dict | None) -> str | None:
+    return actor_url_from_username(_username(claims)) if claims else None
 
 
 def _username(claims: dict) -> str:
@@ -198,8 +202,13 @@ async def _boosted_row(id: str) -> dict:
 
 
 def _boost_state(status: Status, *, reblogged: bool) -> Status:
-    status.reblogged = reblogged
-    status.reblogs_count = max(status.reblogs_count + (1 if reblogged else -1), 0)
+    content = status.reblog or status
+    if content.reblogged != reblogged:
+        content.reblogged = reblogged
+        content.reblogs_count = max(content.reblogs_count + (1 if reblogged else -1), 0)
+
+    status.reblogged = content.reblogged
+    status.reblogs_count = content.reblogs_count
 
     return status
 
@@ -220,14 +229,16 @@ async def reblog_status(id: str, claims: Annotated[dict, Depends(current_user)])
     username = _username(claims)
     row = await _boosted_row(id)
     actor_url = actor_url_from_username(username)
-    activity = AnnounceActivity(id=f"{actor_url}#announce/{uuid.uuid4()}",
-                                actor=actor_url,
-                                object=row["url"],
-                                published=datetime.now(timezone.utc).isoformat(),
-                                to=[_PUBLIC],
-                                cc=[f"{actor_url}/followers", row["actor_url"]])
-    await _publish_activity("Announce", username, activity)
-    return _boost_state((await service.make_statuses([row]))[0], reblogged=True)
+    if await (await as_objects.storage()).boost_of(actor_url, row["content"]["url"]) is None:
+        await _publish_activity("Announce",
+                                username,
+                                AnnounceActivity(id=f"{actor_url}#announce/{uuid.uuid4()}",
+                                                 actor=actor_url,
+                                                 object=row["content"]["url"],
+                                                 published=datetime.now(timezone.utc).isoformat(),
+                                                 to=[_PUBLIC],
+                                                 cc=[f"{actor_url}/followers", row["content"]["actor"]]))
+    return _boost_state((await service.make_statuses([row], actor_url))[0], reblogged=True)
 
 
 @router.post("/statuses/{id}/unreblog")
@@ -235,15 +246,16 @@ async def unreblog_status(id: str, claims: Annotated[dict, Depends(current_user)
     username = _username(claims)
     row = await _boosted_row(id)
     actor_url = actor_url_from_username(username)
-    announce = AnnounceActivity(id=f"{actor_url}#announce/{uuid.uuid4()}",
-                                actor=actor_url,
-                                object=row["url"])
-    await _publish_activity("Undo",
-                            username,
-                            UndoAnnounceActivity(id=f"{actor_url}#undo/{uuid.uuid4()}",
-                                                 actor=actor_url,
-                                                 object=announce))
-    return _boost_state((await service.make_statuses([row]))[0], reblogged=False)
+    announce_url = await (await as_objects.storage()).boost_of(actor_url, row["content"]["url"])
+    if announce_url is not None:
+        await _publish_activity("Undo",
+                                username,
+                                UndoAnnounceActivity(id=f"{actor_url}#undo/{uuid.uuid4()}",
+                                                     actor=actor_url,
+                                                     object=AnnounceActivity(id=announce_url,
+                                                                             actor=actor_url,
+                                                                             object=row["content"]["url"])))
+    return _boost_state((await service.make_statuses([row], actor_url))[0], reblogged=False)
 
 
 @router.get("/statuses/{id}/favourited_by")

@@ -68,12 +68,12 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
     assert any("CREATE TYPE api.boost_row AS" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.record_boosts(entries api.boost_row[])" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.forget_boosts(announce_urls TEXT[])" in s for s in statements)
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_ensure_schema_creates_every_object_before_the_statement_using_it(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
- 
+
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
     created = {}
     for position, statement in enumerate(statements):
@@ -81,11 +81,11 @@ async def test_ensure_schema_creates_every_object_before_the_statement_using_it(
                                r"(?: IF NOT EXISTS)?\s+(api\.\w+)",
                                statement):
             created.setdefault(name, position)
- 
+
     for position, statement in enumerate(statements):
         for name in set(re.findall(r"api\.\w+", statement)) & set(created):
             assert created[name] <= position, f"{name} is used at {position} but created at {created[name]}"
-            
+           
 
 @pytest.mark.asyncio
 async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):
@@ -402,4 +402,40 @@ async def test_url_for_author_returns_none_for_a_foreign_object(fake_pool, fake_
     fake_conn.fetchrow.return_value = None
 
     assert await (await as_objects.storage()).url_for_author("500", "https://example.com/actors/alice") is None
+
+
+@pytest.mark.asyncio
+async def test_boost_of_looks_the_announce_up_by_object_and_actor(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = {"announce_url": "https://x/actors/me#announce/7"}
+
+    result = await (await as_objects.storage()).boost_of("https://x/actors/me", "https://x/notes/5")
+
+    sql, *args = fake_conn.fetchrow.await_args.args
+    assert "FROM\n                api.boosts" in sql
+    assert "object_url = $1" in sql
+    assert "actor_url = $2" in sql
+    assert args == ["https://x/notes/5", "https://x/actors/me"]
+    assert result == "https://x/actors/me#announce/7"
+
+
+@pytest.mark.asyncio
+async def test_boost_of_returns_none_when_the_actor_has_not_boosted(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = None
+
+    assert await (await as_objects.storage()).boost_of("https://x/actors/me", "https://x/notes/5") is None
+
+
+@pytest.mark.asyncio
+async def test_boost_stats_joins_counts_and_the_viewers_own_boost(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"object_url": "https://x/notes/5", "n_of_boosts": 3, "reblogged": True}]
+
+    result = await (await as_objects.storage()).boost_stats(["https://x/notes/5"], "https://x/actors/me")
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "unnest($1::text[]) AS u(object_url) LEFT JOIN" in sql
+    assert "api.boost_counts AS c ON c.object_url = u.object_url" in sql
+    assert "COALESCE(c.n_of_boosts, 0)" in sql
+    assert "b.actor_url = $2) AS reblogged" in sql
+    assert args == [["https://x/notes/5"], "https://x/actors/me"]
+    assert result["https://x/notes/5"]["n_of_boosts"] == 3
 

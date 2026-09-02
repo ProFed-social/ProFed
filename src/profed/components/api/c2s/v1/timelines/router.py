@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Annotated, Optional
 from profed.components.api.c2s.shared.statuses import user_timeline, service
 from profed.components.api.c2s.shared.auth import current_user
+from profed.identity import actor_url_from_username
 
 
 router = APIRouter()
@@ -21,11 +22,12 @@ async def home_timeline(claims: Annotated[dict, Depends(current_user)],
                         limit: int = Query(default=20, ge=1, le=40),
                         max_id: Optional[str] = Query(default=None),
                         since_id: Optional[str] = Query(default=None)):
-    rows = await (await user_timeline.storage()).fetch(claims.get("preferred_username") or claims.get("sub"),
+    username = claims.get("preferred_username") or claims.get("sub")
+    rows = await (await user_timeline.storage()).fetch(username,
                                                        limit=limit,
                                                        max_id=max_id,
                                                        since_id=since_id)
-    return await service.make_statuses(rows)
+    return await service.make_statuses(rows, actor_url_from_username(username))
 
 
 @router.get("/timelines/public")

@@ -6,11 +6,15 @@ from unittest.mock import AsyncMock, patch
 from profed.components.api.c2s.shared.statuses import service
 
 
-def _row(status, actor="https://x/actors/alice"):
+def _row(status, actor="https://x/actors/alice", url="https://x/notes/5"):
     return {"actor_url": actor,
             "reblog_of_url": None,
             "status": status,
-            "content": {"status": status, "actor": actor}}
+            "content": {"status": status, "actor": actor, "url": url}}
+
+
+def _store(**kwargs):
+    return AsyncMock(**{"boost_stats": AsyncMock(return_value={}), **kwargs})
 
 
 def _patches(store):
@@ -23,7 +27,7 @@ def _patches(store):
 @pytest.mark.asyncio
 async def test_make_statuses_resolves_in_reply_to_id_to_the_parent_mastodon_id():
     row = _row({"id": "5", "in_reply_to_id": "https://x/notes/1"})
-    store = AsyncMock(mastodon_ids_for=AsyncMock(return_value={"https://x/notes/1": "99"}))
+    store = _store(mastodon_ids_for=AsyncMock(return_value={"https://x/notes/1": "99"}))
     cached, storage = _patches(store)
 
     with cached, storage:
@@ -36,7 +40,7 @@ async def test_make_statuses_resolves_in_reply_to_id_to_the_parent_mastodon_id()
 @pytest.mark.asyncio
 async def test_make_statuses_leaves_in_reply_to_id_none_when_the_parent_is_unknown():
     row = _row({"id": "5", "in_reply_to_id": "https://x/unknown"})
-    store = AsyncMock(mastodon_ids_for=AsyncMock(return_value={}))
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}))
     cached, storage = _patches(store)
 
     with cached, storage:
@@ -48,7 +52,7 @@ async def test_make_statuses_leaves_in_reply_to_id_none_when_the_parent_is_unkno
 @pytest.mark.asyncio
 async def test_make_statuses_skips_the_lookup_for_a_top_level_post():
     row = _row({"id": "5", "in_reply_to_id": None})
-    store = AsyncMock(mastodon_ids_for=AsyncMock(return_value={}))
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}))
     cached, storage = _patches(store)
 
     with cached, storage:
@@ -63,7 +67,7 @@ async def test_make_statuses_builds_a_reply_preview_from_the_parent_content():
     row = {**_row({"id": "5"}),
            "parent_content": {"status": {"content": "<p>original</p>"},
                               "actor": "https://x/actors/bob"}}
-    store = AsyncMock(mastodon_ids_for=AsyncMock(return_value={}))
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}))
     cached, storage = _patches(store)
 
     with cached, storage:
@@ -76,11 +80,69 @@ async def test_make_statuses_builds_a_reply_preview_from_the_parent_content():
 
 @pytest.mark.asyncio
 async def test_make_statuses_leaves_reply_to_none_without_parent_content():
-    store = AsyncMock(mastodon_ids_for=AsyncMock(return_value={}))
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}))
     cached, storage = _patches(store)
 
     with cached, storage:
         result = await service.make_statuses([_row({"id": "5"})])
 
     assert result[0].reply_to is None
+
+
+@pytest.mark.asyncio
+async def test_make_statuses_reads_the_boost_count_for_the_content_url():
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}),
+                   boost_stats=AsyncMock(return_value={"https://x/notes/5": {"n_of_boosts": 3,
+                                                                             "reblogged": False}}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([_row({"id": "5"})])
+
+    assert result[0].reblogs_count == 3
+    store.boost_stats.assert_awaited_once_with(["https://x/notes/5"], None)
+
+
+@pytest.mark.asyncio
+async def test_make_statuses_marks_the_viewers_own_boost():
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}),
+                   boost_stats=AsyncMock(return_value={"https://x/notes/5": {"n_of_boosts": 1,
+                                                                             "reblogged": True}}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([_row({"id": "5"})], "https://x/actors/me")
+
+    assert result[0].reblogged is True
+    store.boost_stats.assert_awaited_once_with(["https://x/notes/5"], "https://x/actors/me")
+
+
+@pytest.mark.asyncio
+async def test_make_statuses_counts_an_unknown_content_url_as_zero():
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}), boost_stats=AsyncMock(return_value={}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([_row({"id": "5"})])
+
+    assert result[0].reblogs_count == 0
+    assert result[0].reblogged is False
+
+
+@pytest.mark.asyncio
+async def test_a_boost_wrapper_repeats_the_counts_of_the_boosted_status():
+    row = {**_row({"id": "9"}),
+           "reblog_of_url": "https://x/notes/5",
+           "status": {"id": "9"}}
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}),
+                   boost_stats=AsyncMock(return_value={"https://x/notes/5": {"n_of_boosts": 2,
+                                                                             "reblogged": True}}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([row], "https://x/actors/me")
+
+    assert result[0].reblog.reblogs_count == 2
+    assert result[0].reblogs_count == 2
+    assert result[0].reblogged is True
 

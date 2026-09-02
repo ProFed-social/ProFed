@@ -26,8 +26,8 @@ def init(config: dict) -> None:
 
 @router.get("/conversations")
 async def get_conversations(claims: Annotated[dict, Depends(current_user)]):
-    username = claims.get("preferred_username") or claims.get("sub")
-    rows = await (await conversations.storage()).conversations_of(actor_url_from_username(username))
+    viewer = actor_url_from_username(claims.get("preferred_username") or claims.get("sub"))
+    rows = await (await conversations.storage()).conversations_of(viewer)
     if not rows:
         return []
 
@@ -35,7 +35,7 @@ async def get_conversations(claims: Annotated[dict, Depends(current_user)]):
     accounts = await known_accounts.storage()
     last_status = {status.url: status
                    for status in await service.make_statuses(
-                       await objects.rows_for_urls([row["last_message"] for row in rows]))}
+                       await objects.rows_for_urls([row["last_message"] for row in rows]), viewer)}
     roots = await objects.mastodon_ids_for([row["conversation_id"] for row in rows])
 
     async def accounts_of(actor_urls):
@@ -52,6 +52,7 @@ async def get_conversations(claims: Annotated[dict, Depends(current_user)]):
 
 @router.get("/conversations/{id}/messages")
 async def conversation_messages(id: str, claims: Annotated[dict, Depends(current_user)]):
-    conversation_id = await (await as_objects.storage()).url_for(id) or id
-    return await service.make_statuses(await (await conversations.storage()).messages_of(conversation_id))
+    return await service.make_statuses(await (await conversations.storage()).messages_of(
+                                                                await (await as_objects.storage()).url_for(id) or id),
+                                       actor_url_from_username(claims.get("preferred_username") or claims.get("sub")))
 

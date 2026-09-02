@@ -193,28 +193,28 @@ UNDO_ANNOUNCE = {"username": "alice",
                                          "type": "Announce",
                                          "actor": "https://local/actors/alice",
                                          "object": "https://remote/notes/original"}}}
- 
+
 UNDO_FOLLOW = {"username": "alice",
                "activity": {"actor": "https://local/actors/alice",
                             "object": {"id": "https://local/actors/alice#follow/3",
                                        "type": "Follow",
                                        "actor": "https://local/actors/alice",
                                        "object": "https://remote/bob"}}}
- 
- 
+
+
 def test_is_announce_object_accepts_an_announce_activity():
     assert is_announce_object(UNDO_ANNOUNCE["activity"]["object"]) is True
- 
- 
+
+
 def test_is_announce_object_rejects_a_string_reference():
     assert is_announce_object("https://remote/notes/original") is False
- 
- 
+
+
 def test_undo_event_removes_the_boost_by_its_announce_id():
     assert undo_event("Undo", "https://local/actors/alice#undo/9", UNDO_ANNOUNCE) == \
         {"username": "alice", "status_id": "https://local/actors/alice#announce/7"}
- 
- 
+
+
 def test_undo_event_ignores_an_undone_follow():
     assert undo_event("Undo", "https://local/actors/alice#undo/9", UNDO_FOLLOW) is None
 

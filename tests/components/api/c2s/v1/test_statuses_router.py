@@ -65,7 +65,7 @@ def _content_row():
             "actor_url": BOB_URL,
             "reblog_of_url": None,
             "status": NOTE_STATUS,
-            "content": {"status": NOTE_STATUS, "actor": BOB_URL}}
+            "content": {"status": NOTE_STATUS, "actor": BOB_URL, "url": NOTE_URL}}
 
 
 def _boost_row():
@@ -74,12 +74,14 @@ def _boost_row():
             "actor_url": CAROL_URL,
             "reblog_of_url": NOTE_URL,
             "status": BOOST_STATUS,
-            "content": {"status": NOTE_STATUS, "actor": BOB_URL}}
+            "content": {"status": NOTE_STATUS, "actor": BOB_URL, "url": NOTE_URL}}
 
 
 def _store_returning(row):
     return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
-                 AsyncMock(return_value=Mock(get=AsyncMock(return_value=row))))
+                 AsyncMock(return_value=Mock(get=AsyncMock(return_value=row),
+                                             mastodon_ids_for=AsyncMock(return_value={}),
+                                             boost_stats=AsyncMock(return_value={}))))
 
 
 def _patched_accounts(mapping):
@@ -446,13 +448,16 @@ BOOSTED = {"mastodon_id": 424242,
            "reblog_of_url": None,
            "status": {"id": "424242", "content": "<p>hello</p>"},
            "content": {"status": {"id": "424242", "content": "<p>hello</p>"},
-                       "actor": "https://remote.example/users/bob"}}
+                       "actor": "https://remote.example/users/bob",
+                       "url": "https://remote.example/notes/7"}}
 
 
-def _store_with_boosted():
+def _store_with_boosted(boost_of=None, stats=None):
     return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                  AsyncMock(return_value=Mock(get=AsyncMock(return_value=BOOSTED),
-                                             mastodon_ids_for=AsyncMock(return_value={}))))
+                                             mastodon_ids_for=AsyncMock(return_value={}),
+                                             boost_of=AsyncMock(return_value=boost_of),
+                                             boost_stats=AsyncMock(return_value=stats or {}))))
 
 
 def _reblog(client):
@@ -471,12 +476,12 @@ def test_a_reblog_publishes_an_announce(client, fake_bus):
 def test_the_announce_points_at_the_boosted_note(client, fake_bus):
     _reblog(client)
 
-    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"] == BOOSTED["url"]
+    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"] == BOOSTED["content"]["url"]
 
 
 def test_the_announce_is_public(client, fake_bus):
     _reblog(client)
-  
+ 
     activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert activity["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
 
@@ -489,10 +494,21 @@ def test_the_announce_reaches_the_author_and_the_followers(client, fake_bus):
                                    "https://remote.example/users/bob"}
 
 
+BOOST_STATS = {"https://remote.example/notes/7": {"n_of_boosts": 4, "reblogged": True}}
+
+
+def _announce_url():
+    return f"{actor_url_from_username('alice')}#announce/7"
+
+
+def _unreblog(client, boost_of):
+    with _store_with_boosted(boost_of=boost_of), \
+         patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
+        return client.post("/statuses/424242/unreblog")
+
+
 def test_an_unreblog_undoes_the_announce(client, fake_bus):
-    with _store_with_boosted(), patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
-                                      AsyncMock(return_value={})):
-        client.post("/statuses/424242/unreblog")
+    _unreblog(client, _announce_url())
 
     published = fake_bus.topic("raw_activities").published
     assert [message["event_type"] for message in published] == ["Undo"]
@@ -525,10 +541,42 @@ def test_an_unreblog_reports_the_status_as_not_boosted(client, fake_bus):
 
 
 def test_the_count_never_drops_below_zero(client, fake_bus):
-    with _store_with_boosted(), patch("profed.components.api.c2s.shared.statuses.service.cached_multiple",
-                                      AsyncMock(return_value={})):
-        response = client.post("/statuses/424242/unreblog")
+    assert _unreblog(client, None).json()["reblogs_count"] == 0
 
-    assert response.json()["reblogs_count"] == 0
+
+def test_a_reblog_of_an_already_boosted_status_publishes_nothing(client, fake_bus):
+    with _store_with_boosted(boost_of=_announce_url()), \
+         patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
+        client.post("/statuses/424242/reblog")
+
+    assert fake_bus.topic("raw_activities").published == []
+
+
+def test_a_reblog_of_an_already_boosted_status_does_not_raise_the_count(client, fake_bus):
+    with _store_with_boosted(boost_of=_announce_url(), stats=BOOST_STATS), \
+         patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
+        response = client.post("/statuses/424242/reblog")
+
+    assert response.json()["reblogs_count"] == 4
+
+
+def test_the_undo_carries_the_original_announce_id(client, fake_bus):
+    _unreblog(client, _announce_url())
+
+    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["id"] == _announce_url()
+
+
+def test_an_unreblog_without_a_recorded_boost_publishes_nothing(client, fake_bus):
+    _unreblog(client, None)
+
+    assert fake_bus.topic("raw_activities").published == []
+
+
+def test_an_unreblog_lowers_the_recorded_count(client, fake_bus):
+    with _store_with_boosted(boost_of=_announce_url(), stats=BOOST_STATS), \
+         patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
+             response = client.post("/statuses/424242/unreblog")
+
+    assert response.json()["reblogs_count"] == 3
 
 

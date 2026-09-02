@@ -1,13 +1,12 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.models.mastodon import Status, placeholder_account
 from profed.models.mastodon import ReplyPreview, Status, placeholder_account
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.statuses import as_objects
 
 
-def _make_status(row: dict, accounts: dict, replies: dict) -> Status:
+def _make_status(row: dict, accounts: dict, replies: dict, boosts: dict) -> Status:
     def account(accounts: dict, url: str):
         return accounts.get(url) or placeholder_account(url)
 
@@ -19,22 +18,31 @@ def _make_status(row: dict, accounts: dict, replies: dict) -> Status:
 
     def content(row, accounts):
         status = row["content"]["status"]
+        stats = boosts.get(row["content"]["url"], {})
         return Status(**{**status,
                          "in_reply_to_id": replies.get(status.get("in_reply_to_id")),
-                         "reply_to": reply(row, accounts)},
+                         "reply_to": reply(row, accounts),
+                         "reblogs_count": stats.get("n_of_boosts", 0),
+                         "reblogged": stats.get("reblogged", False)},
                       account=account(accounts, row["content"]["actor"]))
+
+    def wrapper(row, accounts):
+        reblog = content(row, accounts)
+        return Status(**{**row["status"],
+                         "reblog": reblog,
+                         "reblogs_count": reblog.reblogs_count,
+                         "reblogged": reblog.reblogged},
+                      account=account(accounts, row["actor_url"]))
 
     return (content(row, accounts)
             if row["reblog_of_url"] is None
-            else Status(**{**row["status"], "reblog": content(row, accounts)},
-                        account=account(accounts, row["actor_url"])))
+            else wrapper(row, accounts))
 
 
-async def make_statuses(rows: list[dict]) -> list[Status]:
+async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Status]:
     def actor_urls(row: dict) -> list[str]:
         parents = [row["parent_content"]["actor"]] if row.get("parent_content") else []
         return [row["actor_url"], row["content"]["actor"], *parents]
-
 
     accounts = await cached_multiple(list({url
                                            for row in rows
@@ -43,5 +51,8 @@ async def make_statuses(rows: list[dict]) -> list[Status]:
                        for row in rows
                        if (url := row["content"]["status"].get("in_reply_to_id"))})
     replies = await (await as_objects.storage()).mastodon_ids_for(reply_urls) if reply_urls else {}
-    return [_make_status(row, accounts, replies) for row in rows]
+
+    boosts = await (await as_objects.storage()).boost_stats(list({row["content"]["url"] for row in rows}),
+                                                            viewer) if rows else {}
+    return [_make_status(row, accounts, replies, boosts) for row in rows]
 

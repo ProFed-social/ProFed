@@ -139,6 +139,12 @@ async def featured_tags(id: str):
     return []
 
 
+def _viewer(claims: dict | None) -> str | None:
+    return (actor_url_from_username(claims.get("preferred_username") or claims.get("sub"))
+            if claims else
+            None)
+
+
 @router.get("/accounts/{id}/statuses")
 async def account_statuses(id: str,
                            limit: int = Query(default=20, ge=1, le=40),
@@ -148,7 +154,8 @@ async def account_statuses(id: str,
         raise HTTPException(status_code=404)
 
     return await service.make_statuses(await (await as_objects.storage()).fetch_by_actor(account.uri or account.url,
-                                                                                         limit=limit))
+                                                                                         limit=limit),
+                                       _viewer(claims))
 
 
 @router.post("/accounts/{id}/unfollow")

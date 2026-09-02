@@ -361,6 +361,35 @@ class _storage(BaseStorage):
                                     max_id,
                                     since_id)
 
+    async def boost_of(self, actor_url: str, object_url: str) -> Optional[str]:
+        row = await self.fetch_one("""
+            SELECT
+                announce_url
+            FROM
+                api.boosts
+            WHERE
+                object_url = $1 AND
+                actor_url = $2""",
+                                   object_url,
+                                   actor_url)
+        return row["announce_url"] if row else None
+
+    async def boost_stats(self, object_urls: list[str], viewer: Optional[str]) -> dict:
+        rows = await self.fetch_all("""
+            SELECT
+                u.object_url,
+                COALESCE(c.n_of_boosts, 0) AS n_of_boosts,
+                EXISTS (SELECT 1
+                        FROM api.boosts AS b
+                        WHERE b.object_url = u.object_url AND
+                              b.actor_url = $2) AS reblogged
+            FROM
+                unnest($1::text[]) AS u(object_url) LEFT JOIN
+                api.boost_counts AS c ON c.object_url = u.object_url""",
+                                    object_urls,
+                                    viewer)
+        return {row["object_url"]: row for row in rows}
+
     async def mastodon_ids_for(self, urls: list[str]) -> dict:
         rows = await self.fetch_all("""SELECT url, mastodon_id
                                        FROM api.as_objects

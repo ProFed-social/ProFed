@@ -13,6 +13,11 @@ class _Status:
         self.id = id
 
 
+@pytest.fixture(autouse=True)
+def viewer_actor_url(monkeypatch):
+    monkeypatch.setattr(service, "actor_url_from_username", lambda username: f"https://x/actors/{username}")
+
+
 @pytest.mark.asyncio
 async def test_build_block_normal_post_has_no_booster_and_no_highlights(monkeypatch):
     part_rows = [{"url": "a1", "mastodon_id": 1}, {"url": "a2", "mastodon_id": 2}]
@@ -20,7 +25,7 @@ async def test_build_block_normal_post_has_no_booster_and_no_highlights(monkeypa
     monkeypatch.setattr(service.as_objects, "storage", AsyncMock(return_value=ao))
     monkeypatch.setattr(service, "make_statuses", AsyncMock(return_value=[_Status("1"), _Status("2")]))
 
-    block = await service._build_block({"root": "a1", "booster": None, "mastodon_id": 5})
+    block = await service._build_block({"root": "a1", "booster": None, "mastodon_id": 5}, "https://x/actors/me")
 
     ao.thread_of.assert_awaited_once_with("a1")
     ao.boosted_parts.assert_not_awaited()
@@ -40,7 +45,7 @@ async def test_build_block_boost_highlights_boosted_parts_and_sets_booster(monke
                         AsyncMock(return_value=[_Status("1"), _Status("2"), _Status("4")]))
     monkeypatch.setattr(service, "cached_multiple", AsyncMock(return_value={"X": "acct-X"}))
 
-    block = await service._build_block({"root": "a1", "booster": "X", "mastodon_id": 6})
+    block = await service._build_block({"root": "a1", "booster": "X", "mastodon_id": 6}, "https://x/actors/me")
 
     ao.boosted_parts.assert_awaited_once_with("X", ["a1", "a2", "a4"])
     assert block["boosted"] == {"2", "4"}
@@ -57,7 +62,9 @@ async def test_timeline_wires_thread_roots_through_grouping(monkeypatch):
 
     ut = SimpleNamespace(thread_roots=lambda username: rows(username))
     monkeypatch.setattr(service.user_timeline, "storage", AsyncMock(return_value=ut))
-    monkeypatch.setattr(service, "_build_block", AsyncMock(side_effect=lambda row: {"cursor": row["mastodon_id"]}))
+    monkeypatch.setattr(service,
+                        "_build_block",
+                        AsyncMock(side_effect=lambda row, viewer: {"cursor": row["mastodon_id"]}))
 
     blocks = await service.timeline("me", after=None, limit=20)
 
@@ -70,7 +77,7 @@ async def test_build_block_returns_none_when_the_thread_cannot_be_resolved(monke
     make = AsyncMock()
     monkeypatch.setattr(service, "make_statuses", make)
 
-    assert await service._build_block({"root": None, "booster": None, "mastodon_id": 5}) is None
+    assert await service._build_block({"root": None, "booster": None, "mastodon_id": 5}, "https://x/actors/me") is None
     ao.thread_of.assert_awaited_once_with(None)
     make.assert_not_awaited()
 
