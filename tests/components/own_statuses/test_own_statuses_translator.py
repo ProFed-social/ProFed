@@ -220,3 +220,42 @@ async def test_create_carries_the_actor_url_for_the_read_side_account_join():
 
     assert published[0]["payload"]["actor_url"] == "https://local/actors/alice"
 
+
+UNDO_ANNOUNCE_PAYLOAD = {"username": "alice",
+                         "activity": {"actor": "https://local/actors/alice",
+                                      "object": {"id": "https://local/actors/alice#announce/7",
+                                                 "type": "Announce",
+                                                 "actor": "https://local/actors/alice",
+                                                 "object": "https://remote/notes/original"}}}
+ 
+UNDO_FOLLOW_PAYLOAD = {"username": "alice",
+                       "activity": {"actor": "https://local/actors/alice",
+                                    "object": {"id": "https://local/actors/alice#follow/3",
+                                               "type": "Follow",
+                                               "actor": "https://local/actors/alice",
+                                               "object": "https://remote/bob"}}}
+ 
+ 
+@pytest.mark.asyncio
+async def test_undo_of_an_announce_publishes_a_delete_of_the_boost():
+    bus, published = _fake_bus()
+ 
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert_undo("Undo", "https://local/actors/alice#undo/9", UNDO_ANNOUNCE_PAYLOAD, EMITTED_AT, 11)
+ 
+    assert bus.topic.call_args[0][0] == "statuses"
+    assert len(published) == 1
+    assert published[0]["event_type"] == "Delete"
+    assert published[0]["payload"] == {"username": "alice",
+                                       "status_id": "https://local/actors/alice#announce/7"}
+ 
+ 
+@pytest.mark.asyncio
+async def test_undo_of_a_follow_publishes_nothing():
+    bus, published = _fake_bus()
+ 
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert_undo("Undo", "https://local/actors/alice#undo/9", UNDO_FOLLOW_PAYLOAD, EMITTED_AT, 11)
+ 
+    assert published == []
+

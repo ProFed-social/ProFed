@@ -43,6 +43,10 @@ def is_actor_object(obj) -> bool:
     return isinstance(obj, dict) and obj.get("type") in _ACTOR_TYPES
 
 
+def is_announce_object(obj) -> bool:
+    return isinstance(obj, dict) and obj.get("type") == "Announce"
+
+
 def object_key_of(event_type: str, object_id: str, activity: dict) -> str | None:
     return object_id if event_type == "Announce" else inner_object_id(activity.get("object"))
 
@@ -81,6 +85,12 @@ def delete_event(event_type: str, object_id: str, payload: dict) -> dict | None:
     return (None
             if object_key is None else
             {"username": payload["username"], "status_id": object_key})
+
+
+def undo_event(event_type: str, object_id: str, payload: dict) -> dict | None:
+    return (delete_event(event_type, object_id, payload)
+            if is_announce_object(payload["activity"].get("object")) else
+            None)
 
 
 topic = {"name": "statuses",

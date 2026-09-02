@@ -53,6 +53,7 @@ handle_events, rebuild, _ = \
                      on_message_type={"Create":   _forwarder(True),
                                       "Update":   _forwarder(True),
                                       "Announce": _forwarder(True),
-                                      "Delete":   _forwarder(False)},
+                                      "Delete":   _forwarder(False),
+                                      "Undo":     _forwarder(False)},
                      event_handler_signature=with_event_type & with_emitted_at & with_sequence_id)
 

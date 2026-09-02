@@ -5,7 +5,7 @@ from datetime import datetime
 from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.core.persistence.projections import build_projection, with_emitted_at, with_event_type, with_sequence_id
-from profed.topics.statuses_topic import STATUS_VERBS, delete_event, status_event
+from profed.topics.statuses_topic import delete_event, status_event, undo_event
 from profed.topics import activities
 from profed.util import noop
 
@@ -41,13 +41,24 @@ async def _convert_delete(event_type: str,
         await _publish(event_type, object_id, event, sequence_id)
 
 
+async def _convert_undo(event_type: str,
+                        object_id: str,
+                        payload: dict,
+                        emitted_at: datetime,
+                        sequence_id: int) -> None:
+    event = undo_event(event_type, object_id, payload)
+    if event is not None:
+        await _publish("Delete", object_id, event, sequence_id)
+
+
 handle_events, rebuild, _ = \
     build_projection(topic=activities,
                      init=noop,
                      on_snapshot_item=noop,
-                     on_message_type={verb: (_convert_delete
-                                             if verb == "Delete" else
-                                             _convert)
-                                      for verb in STATUS_VERBS},
+                     on_message_type={"Create":   _convert,
+                                      "Update":   _convert,
+                                      "Announce": _convert,
+                                      "Delete":   _convert_delete,
+                                      "Undo":     _convert_undo},
                      event_handler_signature=with_event_type & with_emitted_at & with_sequence_id)
 

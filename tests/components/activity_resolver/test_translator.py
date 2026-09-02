@@ -79,3 +79,20 @@ async def test_already_resolved_source_event_is_skipped(fake_bus):
     flatten.assert_not_called()
     assert len(topic.published) == before
 
+
+@pytest.mark.asyncio
+async def test_undo_passes_through_without_flattening(fake_bus):
+    payload = {"username": "alice",
+               "activity": {"actor": "https://remote.example/bob",
+                            "object": {"id": "https://remote.example/bob#announce/7",
+                                       "type": "Announce",
+                                       "actor": "https://remote.example/bob",
+                                       "object": "https://remote.example/notes/1"}}}
+ 
+    with patch.object(translator, "flatten_references", Mock()) as flatten:
+        await translator._forwarder(False)("Undo", "https://remote.example/act/3", payload, EMITTED, 8)
+ 
+    flatten.assert_not_called()
+    published = fake_bus.topic("resolved_activities").published
+    assert published[0]["payload"]["activity"]["object"]["type"] == "Announce"
+ 
