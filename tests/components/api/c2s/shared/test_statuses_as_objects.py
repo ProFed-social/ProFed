@@ -1,6 +1,8 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import re
+
 import pytest
 from unittest.mock import AsyncMock, Mock
 from profed.components.api.c2s.shared.statuses import as_objects
@@ -66,7 +68,24 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
     assert any("CREATE TYPE api.boost_row AS" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.record_boosts(entries api.boost_row[])" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.forget_boosts(announce_urls TEXT[])" in s for s in statements)
-
+ 
+ 
+@pytest.mark.asyncio
+async def test_ensure_schema_creates_every_object_before_the_statement_using_it(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+ 
+    statements = [call.args[0] for call in fake_conn.execute.await_args_list]
+    created = {}
+    for position, statement in enumerate(statements):
+        for name in re.findall(r"CREATE (?:OR REPLACE )?(?:UNIQUE )?(?:TABLE|VIEW|FUNCTION|TYPE)"
+                               r"(?: IF NOT EXISTS)?\s+(api\.\w+)",
+                               statement):
+            created.setdefault(name, position)
+ 
+    for position, statement in enumerate(statements):
+        for name in set(re.findall(r"api\.\w+", statement)) & set(created):
+            assert created[name] <= position, f"{name} is used at {position} but created at {created[name]}"
+            
 
 @pytest.mark.asyncio
 async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):

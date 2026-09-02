@@ -98,83 +98,11 @@ class _storage(BaseStorage):
                     o.url = start_url AND
                     t.reblog_of_url IS NULL
             $$""")
-        await self.execute("""CREATE OR REPLACE VIEW api.reblog_compression AS
-                              SELECT w.a_url, w.b_url, w.newref, w.chain_start
-                              FROM (SELECT a.url AS a_url,
-                                           b.url AS b_url,
-                                           COALESCE(CASE
-                                               WHEN c.reblog_of_url = a.url THEN
-                                                    CASE LEAST(a.mastodon_id, b.mastodon_id, c.mastodon_id)
-                                                         WHEN a.mastodon_id THEN a.url
-                                                         WHEN b.mastodon_id THEN b.url
-                                                         ELSE c.url END
-                                               WHEN c.reblog_of_url = b.url THEN
-                                                    CASE LEAST(b.mastodon_id, c.mastodon_id)
-                                                         WHEN b.mastodon_id THEN b.url
-                                                         ELSE c.url END
-                                               ELSE c.reblog_of_url END, c.url) AS newref,
-                                           NOT EXISTS (SELECT 1 FROM api.as_objects o
-                                                       WHERE o.reblog_of_url = a.url) AS chain_start
-                                    FROM api.as_objects a
-                                    JOIN api.as_objects b ON a.reblog_of_url = b.url
-                                    JOIN api.as_objects c ON b.reblog_of_url = c.url) w
-                              WHERE w.newref <> w.a_url AND w.newref <> w.b_url""")
-        await self.execute("""DO $$ BEGIN
-                                  CREATE TYPE api.reblog_compression_kind AS ENUM ('chain', 'cycle');
-                              EXCEPTION WHEN duplicate_object THEN NULL;
-                              END $$""")
-        await self.execute("""CREATE OR REPLACE FUNCTION
-                              api.compress_reblogs(kind api.reblog_compression_kind, sample int DEFAULT NULL)
-                              RETURNS int LANGUAGE sql AS $fn$
-                                  WITH picked AS (
-                                      SELECT a_url, b_url, newref
-                                      FROM api.reblog_compression
-                                      WHERE chain_start = (kind = 'chain')
-                                      ORDER BY CASE WHEN kind = 'chain' THEN 0 ELSE RANDOM() END
-                                      LIMIT sample),
-                                  upd AS (
-                                      UPDATE api.as_objects t SET reblog_of_url = p.newref
-                                      FROM picked p
-                                      WHERE (t.url = p.a_url OR t.url = p.b_url)
-                                        AND t.reblog_of_url IS DISTINCT FROM p.newref
-                                      RETURNING t.url, t.actor_url, p.newref),
-                                  candidate AS (
-                                      SELECT
-                                          u.url AS announce_url,
-                                          u.actor_url,
-                                          u.newref AS object_url
-                                      FROM
-                                          upd AS u INNER JOIN
-                                          api.as_objects AS n ON n.url = u.newref
-                                      WHERE
-                                          n.reblog_of_url IS NULL),
-                                  recorded AS (
-                                      SELECT api.record_boosts(
-                                                 ARRAY(SELECT ROW(announce_url,
-                                                                  actor_url,
-                                                                  object_url)::api.boost_row
-                                                       FROM candidate)))
-                                  SELECT count(*)::int FROM upd, recorded
-                              $fn$""")
-        await self.execute("""CREATE UNIQUE INDEX IF NOT EXISTS
-                              as_objects_mastodon_idx
-                              ON api.as_objects (mastodon_id)""")
-        await self.execute("""CREATE INDEX IF NOT EXISTS
-                              as_objects_actor_mastodon_idx
-                              ON api.as_objects (actor_url,
-                                                 mastodon_id DESC)""")
-        await self.execute("""CREATE INDEX IF NOT EXISTS
-                              as_objects_reblog_of_idx
-                              ON api.as_objects (reblog_of_url)""")
         await self.execute("""CREATE TABLE IF NOT EXISTS api.boosts
                                   (announce_url TEXT NOT NULL,
                                    actor_url    TEXT NOT NULL,
                                    object_url   TEXT NOT NULL,
                                    PRIMARY KEY (announce_url))""")
-        await self.execute("""CREATE INDEX IF NOT EXISTS
-                              boosts_object_actor_idx
-                              ON api.boosts (object_url,
-                                             actor_url)""")
         await self.execute("""CREATE TABLE IF NOT EXISTS api.boost_counts
                                   (object_url  TEXT NOT NULL,
                                    n_of_boosts INTEGER NOT NULL,
@@ -252,7 +180,78 @@ class _storage(BaseStorage):
                 WHERE
                     c.object_url = g.object_url
             $fn$""")
-
+        await self.execute("""CREATE OR REPLACE VIEW api.reblog_compression AS
+                              SELECT w.a_url, w.b_url, w.newref, w.chain_start
+                              FROM (SELECT a.url AS a_url,
+                                           b.url AS b_url,
+                                           COALESCE(CASE
+                                               WHEN c.reblog_of_url = a.url THEN
+                                                    CASE LEAST(a.mastodon_id, b.mastodon_id, c.mastodon_id)
+                                                         WHEN a.mastodon_id THEN a.url
+                                                         WHEN b.mastodon_id THEN b.url
+                                                         ELSE c.url END
+                                               WHEN c.reblog_of_url = b.url THEN
+                                                    CASE LEAST(b.mastodon_id, c.mastodon_id)
+                                                         WHEN b.mastodon_id THEN b.url
+                                                         ELSE c.url END
+                                               ELSE c.reblog_of_url END, c.url) AS newref,
+                                           NOT EXISTS (SELECT 1 FROM api.as_objects o
+                                                       WHERE o.reblog_of_url = a.url) AS chain_start
+                                    FROM api.as_objects a
+                                    JOIN api.as_objects b ON a.reblog_of_url = b.url
+                                    JOIN api.as_objects c ON b.reblog_of_url = c.url) w
+                              WHERE w.newref <> w.a_url AND w.newref <> w.b_url""")
+        await self.execute("""DO $$ BEGIN
+                                  CREATE TYPE api.reblog_compression_kind AS ENUM ('chain', 'cycle');
+                              EXCEPTION WHEN duplicate_object THEN NULL;
+                              END $$""")
+        await self.execute("""CREATE OR REPLACE FUNCTION
+                              api.compress_reblogs(kind api.reblog_compression_kind, sample int DEFAULT NULL)
+                              RETURNS int LANGUAGE sql AS $fn$
+                                  WITH picked AS (
+                                      SELECT a_url, b_url, newref
+                                      FROM api.reblog_compression
+                                      WHERE chain_start = (kind = 'chain')
+                                      ORDER BY CASE WHEN kind = 'chain' THEN 0 ELSE RANDOM() END
+                                      LIMIT sample),
+                                  upd AS (
+                                      UPDATE api.as_objects t SET reblog_of_url = p.newref
+                                      FROM picked p
+                                      WHERE (t.url = p.a_url OR t.url = p.b_url)
+                                        AND t.reblog_of_url IS DISTINCT FROM p.newref
+                                      RETURNING t.url, t.actor_url, p.newref),
+                                  candidate AS (
+                                      SELECT
+                                          u.url AS announce_url,
+                                          u.actor_url,
+                                          u.newref AS object_url
+                                      FROM
+                                          upd AS u INNER JOIN
+                                          api.as_objects AS n ON n.url = u.newref
+                                      WHERE
+                                          n.reblog_of_url IS NULL),
+                                  recorded AS (
+                                      SELECT api.record_boosts(
+                                                 ARRAY(SELECT ROW(announce_url,
+                                                                  actor_url,
+                                                                  object_url)::api.boost_row
+                                                       FROM candidate)))
+                                  SELECT count(*)::int FROM upd, recorded
+                              $fn$""")
+        await self.execute("""CREATE UNIQUE INDEX IF NOT EXISTS
+                              as_objects_mastodon_idx
+                              ON api.as_objects (mastodon_id)""")
+        await self.execute("""CREATE INDEX IF NOT EXISTS
+                              as_objects_actor_mastodon_idx
+                              ON api.as_objects (actor_url,
+                                                 mastodon_id DESC)""")
+        await self.execute("""CREATE INDEX IF NOT EXISTS
+                              as_objects_reblog_of_idx
+                              ON api.as_objects (reblog_of_url)""")
+        await self.execute("""CREATE INDEX IF NOT EXISTS
+                              boosts_object_actor_idx
+                              ON api.boosts (object_url,
+                                             actor_url)""")
 
     async def upsert(self,
                      mastodon_id: str,
