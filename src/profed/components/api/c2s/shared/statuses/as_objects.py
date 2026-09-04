@@ -182,6 +182,73 @@ class _storage(BaseStorage):
                 WHERE
                     c.object_url = g.object_url
             $fn$""")
+        await self.execute("""CREATE TABLE IF NOT EXISTS api.reactions
+                                  (reaction_url TEXT NOT NULL,
+                                   actor_url    TEXT NOT NULL,
+                                   object_url   TEXT NOT NULL,
+                                   emoji        TEXT NOT NULL,
+                                   PRIMARY KEY (reaction_url),
+                                   UNIQUE (actor_url, object_url, emoji))""")
+        await self.execute("""CREATE TABLE IF NOT EXISTS api.reaction_counts
+                                  (object_url      TEXT NOT NULL,
+                                   emoji           TEXT NOT NULL,
+                                   n_of_reactions  INTEGER NOT NULL,
+                                   PRIMARY KEY (object_url, emoji))""")
+        await self.execute("""DO $$ BEGIN
+                                  CREATE TYPE api.reaction_row AS (reaction_url TEXT,
+                                                                   actor_url TEXT,
+                                                                   object_url TEXT,
+                                                                   emoji TEXT);
+                              EXCEPTION WHEN duplicate_object THEN NULL;
+                              END $$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.record_reactions(entries api.reaction_row[])
+            RETURNS void LANGUAGE sql AS $fn$
+                WITH ins AS (
+                        INSERT INTO api.reactions (reaction_url, actor_url, object_url, emoji)
+                        SELECT
+                            e.reaction_url,
+                            e.actor_url,
+                            e.object_url,
+                            e.emoji
+                        FROM
+                            unnest(entries) AS e
+                        ON CONFLICT DO NOTHING
+                        RETURNING object_url, emoji)
+                INSERT INTO api.reaction_counts (object_url, emoji, n_of_reactions)
+                SELECT
+                    object_url,
+                    emoji,
+                    count(*)
+                FROM
+                    ins
+                GROUP BY
+                    object_url, emoji
+                ON CONFLICT (object_url, emoji) DO UPDATE
+                    SET n_of_reactions = api.reaction_counts.n_of_reactions + EXCLUDED.n_of_reactions
+            $fn$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.forget_reactions(reaction_urls TEXT[])
+            RETURNS void LANGUAGE sql AS $fn$
+                WITH del AS (
+                        DELETE FROM api.reactions
+                        WHERE reaction_url = ANY(reaction_urls)
+                        RETURNING object_url, emoji)
+                UPDATE api.reaction_counts AS c
+                SET n_of_reactions = GREATEST(c.n_of_reactions - g.n, 0)
+                FROM
+                    (SELECT
+                        object_url,
+                        emoji,
+                        count(*) AS n
+                    FROM
+                        del
+                    GROUP BY
+                        object_url, emoji) AS g
+                WHERE
+                    c.object_url = g.object_url AND
+                    c.emoji = g.emoji
+            $fn$""")
         await self.execute("""CREATE OR REPLACE VIEW api.reblog_compression AS
                               SELECT w.a_url, w.b_url, w.newref, w.chain_start
                               FROM (SELECT a.url AS a_url,
@@ -221,24 +288,33 @@ class _storage(BaseStorage):
                                       FROM picked p
                                       WHERE (t.url = p.a_url OR t.url = p.b_url)
                                         AND t.target_url IS DISTINCT FROM p.newref
-                                      RETURNING t.url, t.actor_url, t.kind, p.newref),
-                                  candidate AS (
+                                      RETURNING t.url, t.actor_url, t.kind, t.emoji, p.newref),
+                                  linked AS (
                                       SELECT
-                                          u.url AS announce_url,
+                                          u.url,
                                           u.actor_url,
+                                          u.kind,
+                                          u.emoji,
                                           u.newref AS object_url
                                       FROM
                                           upd AS u INNER JOIN
                                           api.as_objects AS n ON n.url = u.newref
                                       WHERE
-                                          u.kind = 'announce' AND
                                           n.kind = 'content'),
                                   recorded AS (
                                       SELECT api.record_boosts(
-                                                 ARRAY(SELECT ROW(announce_url,
+                                                 ARRAY(SELECT ROW(url,
                                                                   actor_url,
                                                                   object_url)::api.boost_row
-                                                       FROM candidate)))
+                                                       FROM linked
+                                                       WHERE kind = 'announce')),
+                                             api.record_reactions(
+                                                 ARRAY(SELECT ROW(url,
+                                                                  actor_url,
+                                                                  object_url,
+                                                                  emoji)::api.reaction_row
+                                                       FROM linked
+                                                       WHERE kind = 'like')))
                                   SELECT count(*)::int FROM upd, recorded
                               $fn$""")
         await self.execute("""CREATE UNIQUE INDEX IF NOT EXISTS
@@ -268,31 +344,39 @@ class _storage(BaseStorage):
                         (mastodon_id, url, actor_url, status, kind, target_url, emoji)
                     VALUES ($1::numeric, $2, $3, $4, $5, $6, $7)
                     ON CONFLICT (url) DO NOTHING
-                    RETURNING url, actor_url, kind, target_url),
-                 candidate AS (
+                    RETURNING url, actor_url, kind, target_url, emoji),
+                 linked AS (
                     SELECT
-                        i.url AS announce_url,
+                        i.url,
                         i.actor_url,
-                        i.target_url AS object_url
+                        i.kind,
+                        i.target_url AS object_url,
+                        i.emoji
                     FROM
                         ins AS i INNER JOIN
                         api.as_objects AS n ON n.url = i.target_url
                     WHERE
-                        i.kind = 'announce' AND
                         n.kind = 'content'
                   UNION ALL
                     SELECT
                         b.url,
                         b.actor_url,
-                        b.target_url
+                        b.kind,
+                        b.target_url,
+                        b.emoji
                     FROM
                         ins AS i INNER JOIN
                         api.as_objects AS b ON b.target_url = i.url
                     WHERE
-                        i.kind = 'content' AND
-                        b.kind = 'announce')
-            SELECT api.record_boosts(ARRAY(SELECT ROW(announce_url, actor_url, object_url)::api.boost_row
-                                           FROM candidate))""",
+                        i.kind = 'content'),
+                 recorded AS (
+                    SELECT api.record_boosts(ARRAY(SELECT ROW(url, actor_url, object_url)::api.boost_row
+                                                   FROM linked
+                                                   WHERE kind = 'announce')))
+            SELECT api.record_reactions(ARRAY(SELECT ROW(url, actor_url, object_url, emoji)::api.reaction_row
+                                              FROM linked
+                                              WHERE kind = 'like')),
+                   (SELECT count(*) FROM recorded)""",
                            mastodon_id,
                            url,
                            actor_url,
@@ -315,7 +399,10 @@ class _storage(BaseStorage):
                     DELETE FROM api.as_objects
                     WHERE url = $1
                     RETURNING url)
-            SELECT api.forget_boosts(ARRAY(SELECT url FROM del))""",
+            SELECT api.forget_boosts(u.urls),
+                   api.forget_reactions(u.urls)
+            FROM
+                (SELECT ARRAY(SELECT url FROM del) AS urls) AS u""",
                            url)
 
     async def get(self, mastodon_id: str) -> Optional[dict]:

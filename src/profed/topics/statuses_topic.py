@@ -17,6 +17,8 @@ STATUS_VERBS = {"Create",
 
 _KEYED_BY_ACTIVITY = {"Announce", "Like"}
 
+_UNDOABLE_TYPES = {"Announce", "Like", "EmojiReact"}
+
 _ACTOR_TYPES = {"Person",
                 "Service",
                 "Group",
@@ -46,8 +48,8 @@ def is_actor_object(obj) -> bool:
     return isinstance(obj, dict) and obj.get("type") in _ACTOR_TYPES
 
 
-def is_announce_object(obj) -> bool:
-    return isinstance(obj, dict) and obj.get("type") == "Announce"
+def is_undoable_object(obj) -> bool:
+    return isinstance(obj, dict) and obj.get("type") in _UNDOABLE_TYPES
 
 
 def object_key_of(event_type: str, object_id: str, activity: dict) -> str | None:
@@ -113,7 +115,7 @@ def delete_event(event_type: str, object_id: str, payload: dict) -> dict | None:
 
 def undo_event(event_type: str, object_id: str, payload: dict) -> dict | None:
     return (delete_event(event_type, object_id, payload)
-            if is_announce_object(payload["activity"].get("object")) else
+            if is_undoable_object(payload["activity"].get("object")) else
             None)
 
 
