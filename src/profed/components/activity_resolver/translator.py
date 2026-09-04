@@ -50,10 +50,12 @@ handle_events, rebuild, _ = \
     build_projection(topic=incoming_activities,
                      init=noop,
                      on_snapshot_item=noop,
-                     on_message_type={"Create":   _forwarder(True),
-                                      "Update":   _forwarder(True),
+                     on_message_type={"Create": _forwarder(True),
+                                      "Update": _forwarder(True),
                                       "Announce": _forwarder(True),
-                                      "Delete":   _forwarder(False),
-                                      "Undo":     _forwarder(False)},
+                                      "Like": _forwarder(True),
+                                      "EmojiReact": _forwarder(True),
+                                      "Delete": _forwarder(False),
+                                      "Undo": _forwarder(False)},
                      event_handler_signature=with_event_type & with_emitted_at & with_sequence_id)
 

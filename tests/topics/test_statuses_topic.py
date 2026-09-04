@@ -10,6 +10,8 @@ from profed.topics.statuses_topic import (delete_event,
                                           is_actor_object,
                                           is_announce_object,
                                           object_key_of,
+                                          reaction_emoji,
+                                          reaction_event,
                                           status_event,
                                           undo_event,
                                           validate_statuses_event,
@@ -37,7 +39,7 @@ def test_status_verbs_return_payload(verb):
     assert payload["username"] == "alice"
 
 
-@pytest.mark.parametrize("verb", ["Follow", "Accept", "Reject", "Undo", "Like", "Block", "Tick"])
+@pytest.mark.parametrize("verb", ["Follow", "Accept", "Reject", "Undo", "Block", "Tick"])
 def test_non_status_verbs_are_rejected(verb):
     assert validate_statuses_event(verb, VALID_PAYLOAD) is None
 
@@ -217,4 +219,73 @@ def test_undo_event_removes_the_boost_by_its_announce_id():
 
 def test_undo_event_ignores_an_undone_follow():
     assert undo_event("Undo", "https://local/actors/alice#undo/9", UNDO_FOLLOW) is None
+
+
+LIKE = {"username": "alice",
+        "activity": {"actor": "https://remote/bob",
+                     "object": "https://local/actors/alice/notes/1"}}
+
+EMOJI_REACT = {"username": "alice",
+               "activity": {"actor": "https://remote/bob",
+                            "content": "🎉",
+                            "object": "https://local/actors/alice/notes/1"}}
+
+MISSKEY_LIKE = {"username": "alice",
+                "activity": {"actor": "https://remote/bob",
+                             "_misskey_reaction": "🐶",
+                             "object": "https://local/actors/alice/notes/1"}}
+
+
+def test_object_key_of_a_like_is_the_activity_itself():
+    assert object_key_of("Like", "https://remote/bob#like/3", LIKE["activity"]) == "https://remote/bob#like/3"
+
+
+def test_reaction_emoji_reads_the_content_of_an_emoji_react():
+    assert reaction_emoji(EMOJI_REACT["activity"]) == "🎉"
+
+
+def test_reaction_emoji_reads_the_misskey_attribute():
+    assert reaction_emoji(MISSKEY_LIKE["activity"]) == "🐶"
+
+
+def test_reaction_emoji_is_empty_for_a_plain_like():
+    assert reaction_emoji(LIKE["activity"]) == ""
+
+
+def test_reaction_event_points_at_the_reacted_object():
+    event = reaction_event("EmojiReact", "https://remote/bob#react/3", EMOJI_REACT, EMITTED_AT, 7, False)
+
+    assert event["status_id"] == "https://remote/bob#react/3"
+    assert event["actor_url"] == "https://remote/bob"
+    assert event["reference"] == {"kind": "like",
+                                  "url": "https://local/actors/alice/notes/1",
+                                  "emoji": "🎉"}
+
+
+def test_reaction_event_carries_a_minimal_status_with_the_generated_id():
+    event = reaction_event("Like", "https://remote/bob#like/3", LIKE, EMITTED_AT, 7, False)
+
+    assert list(event["status"]) == ["id"]
+    assert event["status"]["id"]
+
+
+def test_reaction_event_ignores_a_reaction_without_an_object():
+    assert reaction_event("Like", "https://remote/bob#like/3",
+                          {"username": "alice", "activity": {"actor": "https://remote/bob"}},
+                          EMITTED_AT, 7, False) is None
+
+
+def test_reaction_event_ignores_a_reaction_to_an_actor():
+    payload = {"username": "alice",
+               "activity": {"actor": "https://remote/bob",
+                            "object": {"id": "https://remote/carol", "type": "Person"}}}
+
+    assert reaction_event("Like", "https://remote/bob#like/3", payload, EMITTED_AT, 7, False) is None
+
+
+def test_like_is_an_accepted_status_verb():
+    assert validate_statuses_event("Like", {"username": "alice",
+                                            "status_id": "https://remote/bob#like/3",
+                                            "actor_url": "https://remote/bob",
+                                            "status": {"id": "42"}}) is not None
 

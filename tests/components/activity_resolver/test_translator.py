@@ -96,3 +96,27 @@ async def test_undo_passes_through_without_flattening(fake_bus):
     published = fake_bus.topic("resolved_activities").published
     assert published[0]["payload"]["activity"]["object"]["type"] == "Announce"
 
+
+@pytest.mark.asyncio
+async def test_a_like_is_forwarded_and_its_target_is_resolved(fake_bus):
+    payload = _payload(obj="https://remote.example/notes/1")
+
+    with patch.object(translator, "flatten_references", Mock(return_value=payload["activity"])) as flatten:
+        await translator._forwarder(True)("Like", "https://remote.example/bob#like/3", payload, EMITTED, 9)
+
+    flatten.assert_called_once()
+    assert fake_bus.topic("resolved_activities").published[0]["event_type"] == "Like"
+
+
+@pytest.mark.asyncio
+async def test_an_emoji_react_is_forwarded_unchanged(fake_bus):
+    payload = _payload(obj="https://remote.example/notes/1")
+    payload["activity"]["content"] = "🎉"
+
+    with patch.object(translator, "flatten_references", Mock(return_value=payload["activity"])):
+        await translator._forwarder(True)("EmojiReact", "https://remote.example/bob#react/3", payload, EMITTED, 10)
+
+    published = fake_bus.topic("resolved_activities").published[0]
+    assert published["event_type"] == "EmojiReact"
+    assert published["payload"]["activity"]["content"] == "🎉"
+

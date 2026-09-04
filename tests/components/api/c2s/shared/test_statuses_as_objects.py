@@ -85,7 +85,7 @@ async def test_ensure_schema_creates_every_object_before_the_statement_using_it(
     for position, statement in enumerate(statements):
         for name in set(re.findall(r"api\.\w+", statement)) & set(created):
             assert created[name] <= position, f"{name} is used at {position} but created at {created[name]}"
-          
+      
 
 @pytest.mark.asyncio
 async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):
@@ -162,7 +162,7 @@ async def test_upsert_inserts_the_object(fake_pool, fake_conn):
     sql, *args = fake_conn.execute.await_args.args
     assert "INSERT INTO api.as_objects" in sql
     assert "ON CONFLICT (url) DO NOTHING" in sql
-    assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None]
+    assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None, None]
 
 
 @pytest.mark.asyncio
@@ -198,7 +198,7 @@ async def test_upsert_keeps_the_target_url(fake_pool, fake_conn):
                                               "announce",
                                               "https://r/1")
 
-    assert fake_conn.execute.await_args.args[5:] == ("announce", "https://r/1")
+    assert fake_conn.execute.await_args.args[5:] == ("announce", "https://r/1", None)
 
 
 @pytest.mark.asyncio
@@ -448,4 +448,34 @@ async def test_boost_stats_joins_counts_and_the_viewers_own_boost(fake_pool, fak
     assert "b.actor_url = $2) AS reblogged" in sql
     assert args == [["https://x/notes/5"], "https://x/actors/me"]
     assert result["https://x/notes/5"]["n_of_boosts"] == 3
+
+
+@pytest.mark.asyncio
+async def test_upsert_stores_the_emoji_of_a_reaction(fake_pool, fake_conn):
+    await (await as_objects.storage()).upsert("44",
+                                              "https://r/like",
+                                              "https://r/dave",
+                                              {"id": "44"},
+                                              "like",
+                                              "https://r/1",
+                                              "🎉")
+
+    sql, *args = fake_conn.execute.await_args.args
+    assert "(mastodon_id, url, actor_url, status, kind, target_url, emoji)" in sql
+    assert args[4:] == ["like", "https://r/1", "🎉"]
+
+
+@pytest.mark.asyncio
+async def test_upsert_does_not_record_a_reaction_as_a_boost(fake_pool, fake_conn):
+    await (await as_objects.storage()).upsert("44",
+                                              "https://r/like",
+                                              "https://r/dave",
+                                              {"id": "44"},
+                                              "like",
+                                              "https://r/1",
+                                              "🎉")
+
+    sql = fake_conn.execute.await_args.args[0]
+    assert "i.kind = 'announce'" in sql
+    assert "b.kind = 'announce'" in sql
 

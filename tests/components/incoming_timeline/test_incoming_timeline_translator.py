@@ -177,3 +177,50 @@ async def test_undo_of_a_follow_publishes_nothing():
 
     assert published == []
 
+
+REACT_PAYLOAD = {"username": "alice",
+                 "activity": {"actor": "https://remote/bob",
+                              "content": "🎉",
+                              "object": "https://local/actors/alice/notes/1"}}
+
+
+@pytest.mark.asyncio
+async def test_an_emoji_react_is_published_as_a_like():
+    bus, published = _fake_bus()
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert_reaction("EmojiReact", "https://remote/bob#react/3", REACT_PAYLOAD, EMITTED_AT, 12)
+
+    assert bus.topic.call_args[0][0] == "timeline"
+    assert published[0]["event_type"] == "Like"
+    assert published[0]["payload"]["reference"] == {"kind": "like",
+                                                    "url": "https://local/actors/alice/notes/1",
+                                                    "emoji": "🎉"}
+
+
+@pytest.mark.asyncio
+async def test_a_plain_like_is_published_without_an_emoji():
+    bus, published = _fake_bus()
+    payload = {"username": "alice",
+               "activity": {"actor": "https://remote/bob",
+                            "object": "https://local/actors/alice/notes/1"}}
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert_reaction("Like", "https://remote/bob#like/3", payload, EMITTED_AT, 12)
+
+    assert published[0]["event_type"] == "Like"
+    assert published[0]["payload"]["reference"]["emoji"] == ""
+
+
+@pytest.mark.asyncio
+async def test_a_reaction_to_an_actor_publishes_nothing():
+    bus, published = _fake_bus()
+    payload = {"username": "alice",
+               "activity": {"actor": "https://remote/bob",
+                            "object": {"id": "https://remote/carol", "type": "Person"}}}
+
+    with patch.object(mod, "message_bus", return_value=bus):
+        await mod._convert_reaction("Like", "https://remote/bob#like/3", payload, EMITTED_AT, 12)
+
+    assert published == []
+

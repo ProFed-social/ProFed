@@ -21,7 +21,7 @@ def test_timeline_verbs_return_payload(verb):
     assert payload["username"] == "alice"
 
 
-@pytest.mark.parametrize("verb", ["Follow", "Accept", "Reject", "Undo", "Like", "Block", "Tick"])
+@pytest.mark.parametrize("verb", ["Follow", "Accept", "Reject", "Undo", "Block", "Tick"])
 def test_non_timeline_verbs_are_rejected(verb):
     assert validate_timeline_event(verb, PAYLOAD) is None
 
@@ -53,4 +53,11 @@ def test_delete_without_status_is_accepted():
 
 def test_snapshot_items_are_not_supported():
     assert validate_timeline_snapshot_item({"username": "alice"}) is None
+
+
+def test_like_is_an_accepted_timeline_verb():
+    assert validate_timeline_event("Like", {"username": "alice",
+                                            "status_id": "https://remote/bob#like/3",
+                                            "actor_url": "https://remote/bob",
+                                            "status": {"id": "42"}}) is not None
 

@@ -5,7 +5,7 @@ from datetime import datetime
 from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.core.persistence.projections import build_projection, with_emitted_at, with_event_type, with_sequence_id
-from profed.topics.statuses_topic import delete_event, status_event, undo_event
+from profed.topics.statuses_topic import delete_event, reaction_event, status_event, undo_event
 from profed.topics import resolved_activities
 from profed.util import noop
 
@@ -41,6 +41,16 @@ async def _convert_delete(event_type: str,
         await _publish(event_type, object_id, event, sequence_id)
 
 
+async def _convert_reaction(event_type: str,
+                            object_id: str,
+                            payload: dict,
+                            emitted_at: datetime,
+                            sequence_id: int) -> None:
+    event = reaction_event(event_type, object_id, payload, emitted_at, sequence_id, own=False)
+    if event is not None:
+        await _publish("Like", object_id, event, sequence_id)
+
+
 async def _convert_undo(event_type: str,
                         object_id: str,
                         payload: dict,
@@ -55,10 +65,12 @@ handle_events, rebuild, _ = \
     build_projection(topic=resolved_activities,
                      init=noop,
                      on_snapshot_item=noop,
-                     on_message_type={"Create":   _convert,
-                                      "Update":   _convert,
+                     on_message_type={"Create": _convert,
+                                      "Update": _convert,
                                       "Announce": _convert,
-                                      "Delete":   _convert_delete,
-                                      "Undo":     _convert_undo},
+                                      "Delete": _convert_delete,
+                                      "Undo": _convert_undo,
+                                      "Like": _convert_reaction,
+                                      "EmojiReact": _convert_reaction},
                      event_handler_signature=with_event_type & with_emitted_at & with_sequence_id)
 

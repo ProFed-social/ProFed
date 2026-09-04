@@ -11,8 +11,13 @@ async def _init() -> None:
     await (await user_timeline.storage()).ensure_schema()
 
 
-def _edge(reference: dict | None) -> tuple[str, str | None]:
-    return (("announce", reference["url"]) if reference and reference["kind"] == "announce" else ("content", None))
+_EDGE_KINDS = {"announce", "like"}
+
+
+def _edge(reference: dict | None) -> tuple[str, str | None, str | None]:
+    return ((reference["kind"], reference["url"], reference.get("emoji"))
+            if reference and reference["kind"] in _EDGE_KINDS else
+            ("content", None, None))
 
 
 async def _store(username: str, url: str, actor_url: str, status: dict, reference: dict | None) -> None:

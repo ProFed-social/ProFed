@@ -74,7 +74,7 @@ def _payload(status=STATUS, username="alice", actor_url=ACTOR_URL, reference=Non
 async def test_create_upserts_the_content_object_and_adds_the_membership(fake_objects, fake_memberships):
     await projection._on_store("https://remote/activities/1", _payload())
 
-    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None)) in fake_objects.calls
+    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None, None)) in fake_objects.calls
     assert ("add", ("alice", NOTE_ID, "424242")) in fake_memberships.calls
 
 
@@ -85,7 +85,7 @@ async def test_announce_upserts_a_boost_pointing_at_its_target(fake_objects, fak
 
     await projection._on_store(announce, _payload(reference=reference, status_id=announce))
 
-    assert ("upsert", ("424242", announce, ACTOR_URL, STATUS, "announce", NOTE_ID)) in fake_objects.calls
+    assert ("upsert", ("424242", announce, ACTOR_URL, STATUS, "announce", NOTE_ID, None)) in fake_objects.calls
     assert ("add", ("alice", announce, "424242")) in fake_memberships.calls
 
 
@@ -95,7 +95,7 @@ async def test_a_reply_reference_is_not_a_reblog(fake_objects, fake_memberships)
 
     await projection._on_store("https://remote/activities/1", _payload(reference=reference))
 
-    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None)) in fake_objects.calls
+    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None, None)) in fake_objects.calls
 
 
 @pytest.mark.asyncio
@@ -104,7 +104,7 @@ async def test_update_upserts_then_updates_content_and_leaves_membership_alone(f
 
     await projection._on_update("https://remote/activities/2", _payload(status=edited))
 
-    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, edited, "content", None)) in fake_objects.calls
+    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, edited, "content", None, None)) in fake_objects.calls
     assert ("update_content", (NOTE_ID, edited, "2026-02-02T00:00:00.000Z")) in fake_objects.calls
     assert all(call[0] != "add" for call in fake_memberships.calls)
 
@@ -121,7 +121,7 @@ async def test_delete_removes_the_object_and_every_membership(fake_objects, fake
 async def test_snapshot_item_upserts_and_adds_the_membership(fake_objects, fake_memberships):
     await projection._apply_item(_payload())
 
-    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None)) in fake_objects.calls
+    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None, None)) in fake_objects.calls
     assert ("add", ("alice", NOTE_ID, "424242")) in fake_memberships.calls
 
 
@@ -129,7 +129,7 @@ async def test_snapshot_item_upserts_and_adds_the_membership(fake_objects, fake_
 async def test_snapshot_item_without_an_actor_url_stores_an_empty_one(fake_objects, fake_memberships):
     await projection._apply_item({"username": "alice", "status_id": NOTE_ID, "status": STATUS})
 
-    assert ("upsert", ("424242", NOTE_ID, "", STATUS, "content", None)) in fake_objects.calls
+    assert ("upsert", ("424242", NOTE_ID, "", STATUS, "content", None, None)) in fake_objects.calls
 
 
 @pytest.mark.asyncio
@@ -152,6 +152,26 @@ async def test_create_from_the_timeline_topic_reaches_both_storages(fake_bus, fa
 
     await projection.rebuild()
 
-    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None)) in fake_objects.calls
+    assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None, None)) in fake_objects.calls
     assert ("add", ("alice", NOTE_ID, "424242")) in fake_memberships.calls
+
+
+@pytest.mark.asyncio
+async def test_a_like_reference_becomes_a_reaction_edge(fake_objects, fake_memberships):
+    reference = {"kind": "like", "url": NOTE_ID, "emoji": "🎉"}
+    like = "https://remote/bob#react/3"
+
+    await projection._on_store(like, _payload(reference=reference, status_id=like))
+
+    assert ("upsert", ("424242", like, ACTOR_URL, STATUS, "like", NOTE_ID, "🎉")) in fake_objects.calls
+
+
+@pytest.mark.asyncio
+async def test_a_like_without_an_emoji_keeps_the_edge(fake_objects, fake_memberships):
+    reference = {"kind": "like", "url": NOTE_ID, "emoji": ""}
+    like = "https://remote/bob#like/3"
+
+    await projection._on_store(like, _payload(reference=reference, status_id=like))
+
+    assert ("upsert", ("424242", like, ACTOR_URL, STATUS, "like", NOTE_ID, "")) in fake_objects.calls
 

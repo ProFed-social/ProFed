@@ -71,3 +71,10 @@ async def test_publish_incoming_does_not_sanitize(fake_bus):
     published = fake_bus.topic("incoming_activities").published
     assert published[0]["payload"]["activity"]["content"] == "<script>x</script>"
 
+
+def test_emoji_react_is_a_known_verb():
+    assert validate_incoming_activities_event("EmojiReact",
+                                              {"username": "alice",
+                                               "activity": {"actor": "https://remote/bob",
+                                                            "object": "https://local/notes/1"}}) is not None
+

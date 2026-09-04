@@ -18,6 +18,7 @@ class _storage(BaseStorage):
                                      status        JSONB       NOT NULL,
                                      target_url    TEXT,
                                      kind          TEXT        NOT NULL,
+                                     emoji         TEXT,
                                      edited_at     TIMESTAMPTZ,
                                      PRIMARY KEY (url))""")
         await self.execute("""
@@ -259,12 +260,13 @@ class _storage(BaseStorage):
                      actor_url: str,
                      status: dict,
                      kind: str,
-                     target_url: Optional[str]) -> None:
+                     target_url: Optional[str],
+                     emoji: Optional[str] = None) -> None:
         await self.execute("""
             WITH ins AS (
                     INSERT INTO api.as_objects
-                        (mastodon_id, url, actor_url, status, kind, target_url)
-                    VALUES ($1::numeric, $2, $3, $4, $5, $6)
+                        (mastodon_id, url, actor_url, status, kind, target_url, emoji)
+                    VALUES ($1::numeric, $2, $3, $4, $5, $6, $7)
                     ON CONFLICT (url) DO NOTHING
                     RETURNING url, actor_url, kind, target_url),
                  candidate AS (
@@ -296,7 +298,8 @@ class _storage(BaseStorage):
                            actor_url,
                            status,
                            kind,
-                           target_url)
+                           target_url,
+                           emoji)
 
     async def update_content(self, url: str, status: dict, edited_at: Optional[str]) -> None:
         await self.execute("""UPDATE api.as_objects

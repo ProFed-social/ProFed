@@ -12,7 +12,10 @@ from profed.topics.common import StatusEvent, validate_payload, validate_verb
 STATUS_VERBS = {"Create",
                 "Update",
                 "Delete",
-                "Announce"}
+                "Announce",
+                "Like"}
+
+_KEYED_BY_ACTIVITY = {"Announce", "Like"}
 
 _ACTOR_TYPES = {"Person",
                 "Service",
@@ -48,7 +51,11 @@ def is_announce_object(obj) -> bool:
 
 
 def object_key_of(event_type: str, object_id: str, activity: dict) -> str | None:
-    return object_id if event_type == "Announce" else inner_object_id(activity.get("object"))
+    return object_id if event_type in _KEYED_BY_ACTIVITY else inner_object_id(activity.get("object"))
+
+
+def reaction_emoji(activity: dict) -> str:
+    return activity.get("content") or activity.get("_misskey_reaction") or ""
 
 
 def reference_of(event_type: str, activity: dict) -> dict | None:
@@ -78,6 +85,23 @@ def status_event(event_type: str,
             "status": Status.from_activity(activity,
                                            id=status_id(emitted_at,
                                                         sequence_id, own=own)).model_dump(exclude={"account"})}
+
+
+def reaction_event(event_type: str,
+                   object_id: str,
+                   payload: dict,
+                   emitted_at: datetime,
+                   sequence_id: int,
+                   own: bool) -> dict | None:
+    activity = {"id": object_id, "type": event_type, **payload["activity"]}
+    target = inner_object_id(activity.get("object"))
+    return (None
+            if target is None or is_actor_object(activity.get("object")) else
+            {"username": payload["username"],
+             "status_id": object_id,
+             "actor_url": activity.get("actor", ""),
+             "reference": {"kind": "like", "url": target, "emoji": reaction_emoji(activity)},
+             "status": {"id": status_id(emitted_at, sequence_id, own=own)}})
 
 
 def delete_event(event_type: str, object_id: str, payload: dict) -> dict | None:
