@@ -11,12 +11,12 @@ async def _init() -> None:
     await (await user_timeline.storage()).ensure_schema()
 
 
-def _reblog_of(reference: dict | None) -> str | None:
-    return reference["url"] if reference and reference["kind"] == "announce" else None
+def _edge(reference: dict | None) -> tuple[str, str | None]:
+    return (("announce", reference["url"]) if reference and reference["kind"] == "announce" else ("content", None))
 
 
 async def _store(username: str, url: str, actor_url: str, status: dict, reference: dict | None) -> None:
-    await (await as_objects.storage()).upsert(status["id"], url, actor_url, status, _reblog_of(reference))
+    await (await as_objects.storage()).upsert(status["id"], url, actor_url, status, *_edge(reference))
     await (await user_timeline.storage()).add(username, url, status["id"])
 
 
@@ -44,7 +44,7 @@ async def _on_update(object_id: str, payload: dict) -> None:
                                               url,
                                               payload.get("actor_url", ""),
                                               status,
-                                              _reblog_of(payload.get("reference")))
+                                              *_edge(payload.get("reference")))
     await (await as_objects.storage()).update_content(url, status, status.get("edited_at"))
 
 

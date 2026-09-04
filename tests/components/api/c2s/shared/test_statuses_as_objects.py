@@ -93,7 +93,7 @@ async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):
 
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
 
-    assert any("as_objects_reblog_of_idx" in s and "ON api.as_objects (reblog_of_url)" in s for s in statements)
+    assert any("as_objects_target_idx" in s and "ON api.as_objects (target_url)" in s for s in statements)
     assert any("boosts_object_actor_idx" in s and "ON api.boosts (object_url," in s for s in statements)
     assert not any("boosts_object_actor_idx" in s and "UNIQUE" in s for s in statements)
 
@@ -137,8 +137,8 @@ async def test_resolve_content_joins_a_single_hop_and_returns_the_content_url(fa
     body = _function_body([call.args[0] for call in fake_conn.execute.await_args_list], "api.resolve_content")
 
     assert "jsonb_build_object('status', t.status, 'actor', t.actor_url, 'url', t.url)" in body
-    assert "api.as_objects AS t ON t.url = COALESCE(o.reblog_of_url, o.url)" in body
-    assert "t.reblog_of_url IS NULL" in body
+    assert "api.as_objects AS t ON t.url = COALESCE(o.target_url, o.url)" in body
+    assert "t.kind = 'content'" in body
     assert "RECURSIVE" not in body
     assert "CYCLE" not in body
 
@@ -149,46 +149,56 @@ async def test_content_url_joins_a_single_hop(fake_pool, fake_conn):
 
     body = _function_body([call.args[0] for call in fake_conn.execute.await_args_list], "api.content_url")
 
-    assert "api.as_objects AS t ON t.url = COALESCE(o.reblog_of_url, o.url)" in body
-    assert "t.reblog_of_url IS NULL" in body
+    assert "api.as_objects AS t ON t.url = COALESCE(o.target_url, o.url)" in body
+    assert "t.kind = 'content'" in body
     assert "RECURSIVE" not in body
     assert "CYCLE" not in body
 
 
 @pytest.mark.asyncio
 async def test_upsert_inserts_the_object(fake_pool, fake_conn):
-    await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, None)
+    await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None)
 
     sql, *args = fake_conn.execute.await_args.args
     assert "INSERT INTO api.as_objects" in sql
     assert "ON CONFLICT (url) DO NOTHING" in sql
-    assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, None]
+    assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None]
 
 
 @pytest.mark.asyncio
 async def test_upsert_records_the_inserted_row_as_a_boost(fake_pool, fake_conn):
-    await (await as_objects.storage()).upsert("43", "https://r/boost", "https://r/carol", {"id": "43"}, "https://r/1")
+    await (await as_objects.storage()).upsert("43",
+                                              "https://r/boost",
+                                              "https://r/carol",
+                                              {"id": "43"},
+                                              "announce",
+                                              "https://r/1")
 
     sql = fake_conn.execute.await_args.args[0]
-    assert "RETURNING url, actor_url, reblog_of_url" in sql
-    assert "api.as_objects AS n ON n.url = i.reblog_of_url" in sql
+    assert "RETURNING url, actor_url, kind, target_url" in sql
+    assert "api.as_objects AS n ON n.url = i.target_url" in sql
     assert "api.record_boosts(ARRAY(SELECT ROW(announce_url, actor_url, object_url)::api.boost_row" in sql
 
 
 @pytest.mark.asyncio
 async def test_upsert_records_the_boosts_that_were_waiting_for_the_inserted_row(fake_pool, fake_conn):
-    await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, None)
+    await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None)
 
     sql = fake_conn.execute.await_args.args[0]
-    assert "api.as_objects AS b ON b.reblog_of_url = i.url" in sql
-    assert "i.reblog_of_url IS NULL" in sql
+    assert "api.as_objects AS b ON b.target_url = i.url" in sql
+    assert "i.kind = 'content'" in sql
 
 
 @pytest.mark.asyncio
-async def test_upsert_keeps_the_reblog_of_url(fake_pool, fake_conn):
-    await (await as_objects.storage()).upsert("43", "https://r/boost", "https://r/carol", {"id": "43"}, "https://r/1")
+async def test_upsert_keeps_the_target_url(fake_pool, fake_conn):
+    await (await as_objects.storage()).upsert("43",
+                                              "https://r/boost",
+                                              "https://r/carol",
+                                              {"id": "43"},
+                                              "announce",
+                                              "https://r/1")
 
-    assert fake_conn.execute.await_args.args[5] == "https://r/1"
+    assert fake_conn.execute.await_args.args[5:] == ("announce", "https://r/1")
 
 
 @pytest.mark.asyncio
@@ -225,7 +235,7 @@ async def test_delete_forgets_the_boost_of_the_removed_row(fake_pool, fake_conn)
 async def test_get_resolves_the_content_via_the_function(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = {"mastodon_id": 42,
                                        "url": "https://r/boost",
-                                       "reblog_of_url": "https://r/1",
+                                       "kind": "announce",
                                        "status": {"id": "42"},
                                        "content": {"id": "1", "content": "ziel"}}
 
@@ -253,7 +263,7 @@ async def test_fetch_by_actor_resolves_filters_unresolved_and_paginates(fake_poo
     assert "CROSS JOIN LATERAL" in sql
     assert "api.resolve_content(o.url)" in sql
     assert "r.content IS NOT NULL" in sql
-    assert "o.actor_url, o.reblog_of_url" in sql
+    assert "o.actor_url, o.kind" in sql
     assert "ORDER BY o.mastodon_id DESC" in sql
     assert args == ["https://r/bob", 5, "99", None]
     assert [row["mastodon_id"] for row in result] == [43]
@@ -289,9 +299,9 @@ async def test_compress_reblogs_records_the_boosts_it_just_made_direct(fake_pool
     body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
                 if "api.compress_reblogs(kind" in s)
 
-    assert "RETURNING t.url, t.actor_url, p.newref" in body
+    assert "RETURNING t.url, t.actor_url, t.kind, p.newref" in body
     assert "api.as_objects AS n ON n.url = u.newref" in body
-    assert "n.reblog_of_url IS NULL" in body
+    assert "n.kind = 'content'" in body
     assert "api.record_boosts(" in body
     assert "SELECT count(*)::int FROM upd, recorded" in body
 
@@ -341,7 +351,7 @@ async def test_boosted_parts_returns_the_thread_urls_the_booster_boosted(fake_po
 
     sql, *args = fake_conn.fetch.await_args.args
     assert "api.content_url(o.url)" in sql
-    assert "o.reblog_of_url IS NOT NULL" in sql
+    assert "o.kind = 'announce'" in sql
     assert "ANY($2::text[])" in sql
     assert args == ["https://r/x", ["https://r/a1", "https://r/a2", "https://r/a4"]]
     assert result == ["https://r/a2", "https://r/a4"]

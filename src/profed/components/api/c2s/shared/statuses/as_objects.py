@@ -16,7 +16,8 @@ class _storage(BaseStorage):
                                      url           TEXT        NOT NULL,
                                      actor_url     TEXT        NOT NULL,
                                      status        JSONB       NOT NULL,
-                                     reblog_of_url TEXT,
+                                     target_url    TEXT,
+                                     kind          TEXT        NOT NULL,
                                      edited_at     TIMESTAMPTZ,
                                      PRIMARY KEY (url))""")
         await self.execute("""
@@ -26,10 +27,10 @@ class _storage(BaseStorage):
                     jsonb_build_object('status', t.status, 'actor', t.actor_url, 'url', t.url)
                 FROM
                     api.as_objects AS o INNER JOIN
-                    api.as_objects AS t ON t.url = COALESCE(o.reblog_of_url, o.url)
+                    api.as_objects AS t ON t.url = COALESCE(o.target_url, o.url)
                 WHERE
                     o.url = start_url AND
-                    t.reblog_of_url IS NULL
+                    t.kind = 'content'
             $$""")
         await self.execute("""
             CREATE OR REPLACE FUNCTION api.ancestor_chain(start_url TEXT, max_depth INT, break_on_author BOOLEAN)
@@ -93,10 +94,10 @@ class _storage(BaseStorage):
                     t.url
                 FROM
                     api.as_objects AS o INNER JOIN
-                    api.as_objects AS t ON t.url = COALESCE(o.reblog_of_url, o.url)
+                    api.as_objects AS t ON t.url = COALESCE(o.target_url, o.url)
                 WHERE
                     o.url = start_url AND
-                    t.reblog_of_url IS NULL
+                    t.kind = 'content'
             $$""")
         await self.execute("""CREATE TABLE IF NOT EXISTS api.boosts
                                   (announce_url TEXT NOT NULL,
@@ -185,21 +186,21 @@ class _storage(BaseStorage):
                               FROM (SELECT a.url AS a_url,
                                            b.url AS b_url,
                                            COALESCE(CASE
-                                               WHEN c.reblog_of_url = a.url THEN
+                                               WHEN c.target_url = a.url THEN
                                                     CASE LEAST(a.mastodon_id, b.mastodon_id, c.mastodon_id)
                                                          WHEN a.mastodon_id THEN a.url
                                                          WHEN b.mastodon_id THEN b.url
                                                          ELSE c.url END
-                                               WHEN c.reblog_of_url = b.url THEN
+                                               WHEN c.target_url = b.url THEN
                                                     CASE LEAST(b.mastodon_id, c.mastodon_id)
                                                          WHEN b.mastodon_id THEN b.url
                                                          ELSE c.url END
-                                               ELSE c.reblog_of_url END, c.url) AS newref,
+                                               ELSE c.target_url END, c.url) AS newref,
                                            NOT EXISTS (SELECT 1 FROM api.as_objects o
-                                                       WHERE o.reblog_of_url = a.url) AS chain_start
+                                                       WHERE o.target_url = a.url) AS chain_start
                                     FROM api.as_objects a
-                                    JOIN api.as_objects b ON a.reblog_of_url = b.url
-                                    JOIN api.as_objects c ON b.reblog_of_url = c.url) w
+                                    JOIN api.as_objects b ON a.target_url = b.url
+                                    JOIN api.as_objects c ON b.target_url = c.url) w
                               WHERE w.newref <> w.a_url AND w.newref <> w.b_url""")
         await self.execute("""DO $$ BEGIN
                                   CREATE TYPE api.reblog_compression_kind AS ENUM ('chain', 'cycle');
@@ -215,11 +216,11 @@ class _storage(BaseStorage):
                                       ORDER BY CASE WHEN kind = 'chain' THEN 0 ELSE RANDOM() END
                                       LIMIT sample),
                                   upd AS (
-                                      UPDATE api.as_objects t SET reblog_of_url = p.newref
+                                      UPDATE api.as_objects t SET target_url = p.newref
                                       FROM picked p
                                       WHERE (t.url = p.a_url OR t.url = p.b_url)
-                                        AND t.reblog_of_url IS DISTINCT FROM p.newref
-                                      RETURNING t.url, t.actor_url, p.newref),
+                                        AND t.target_url IS DISTINCT FROM p.newref
+                                      RETURNING t.url, t.actor_url, t.kind, p.newref),
                                   candidate AS (
                                       SELECT
                                           u.url AS announce_url,
@@ -229,7 +230,8 @@ class _storage(BaseStorage):
                                           upd AS u INNER JOIN
                                           api.as_objects AS n ON n.url = u.newref
                                       WHERE
-                                          n.reblog_of_url IS NULL),
+                                          u.kind = 'announce' AND
+                                          n.kind = 'content'),
                                   recorded AS (
                                       SELECT api.record_boosts(
                                                  ARRAY(SELECT ROW(announce_url,
@@ -243,56 +245,58 @@ class _storage(BaseStorage):
                               ON api.as_objects (mastodon_id)""")
         await self.execute("""CREATE INDEX IF NOT EXISTS
                               as_objects_actor_mastodon_idx
-                              ON api.as_objects (actor_url,
-                                                 mastodon_id DESC)""")
+                              ON api.as_objects (actor_url, mastodon_id DESC)""")
         await self.execute("""CREATE INDEX IF NOT EXISTS
-                              as_objects_reblog_of_idx
-                              ON api.as_objects (reblog_of_url)""")
+                              as_objects_target_idx
+                              ON api.as_objects (target_url)""")
         await self.execute("""CREATE INDEX IF NOT EXISTS
                               boosts_object_actor_idx
-                              ON api.boosts (object_url,
-                                             actor_url)""")
+                              ON api.boosts (object_url, actor_url)""")
 
     async def upsert(self,
                      mastodon_id: str,
                      url: str,
                      actor_url: str,
                      status: dict,
-                     reblog_of_url: Optional[str]) -> None:
+                     kind: str,
+                     target_url: Optional[str]) -> None:
         await self.execute("""
             WITH ins AS (
                     INSERT INTO api.as_objects
-                        (mastodon_id, url, actor_url, status, reblog_of_url)
-                    VALUES ($1::numeric, $2, $3, $4, $5)
+                        (mastodon_id, url, actor_url, status, kind, target_url)
+                    VALUES ($1::numeric, $2, $3, $4, $5, $6)
                     ON CONFLICT (url) DO NOTHING
-                    RETURNING url, actor_url, reblog_of_url),
+                    RETURNING url, actor_url, kind, target_url),
                  candidate AS (
                     SELECT
                         i.url AS announce_url,
                         i.actor_url,
-                        i.reblog_of_url AS object_url
+                        i.target_url AS object_url
                     FROM
                         ins AS i INNER JOIN
-                        api.as_objects AS n ON n.url = i.reblog_of_url
+                        api.as_objects AS n ON n.url = i.target_url
                     WHERE
-                        n.reblog_of_url IS NULL
+                        i.kind = 'announce' AND
+                        n.kind = 'content'
                   UNION ALL
                     SELECT
                         b.url,
                         b.actor_url,
-                        b.reblog_of_url
+                        b.target_url
                     FROM
                         ins AS i INNER JOIN
-                        api.as_objects AS b ON b.reblog_of_url = i.url
+                        api.as_objects AS b ON b.target_url = i.url
                     WHERE
-                        i.reblog_of_url IS NULL)
+                        i.kind = 'content' AND
+                        b.kind = 'announce')
             SELECT api.record_boosts(ARRAY(SELECT ROW(announce_url, actor_url, object_url)::api.boost_row
                                            FROM candidate))""",
                            mastodon_id,
                            url,
                            actor_url,
                            status,
-                           reblog_of_url)
+                           kind,
+                           target_url)
 
     async def update_content(self, url: str, status: dict, edited_at: Optional[str]) -> None:
         await self.execute("""UPDATE api.as_objects
@@ -312,8 +316,12 @@ class _storage(BaseStorage):
                            url)
 
     async def get(self, mastodon_id: str) -> Optional[dict]:
-        return await self.fetch_one("""SELECT mastodon_id, url, actor_url, reblog_of_url, status,
-                                          api.resolve_content(url) AS content
+        return await self.fetch_one("""SELECT mastodon_id,
+                                              url,
+                                              actor_url,
+                                              kind,
+                                              status,
+                                              api.resolve_content(url) AS content
                                        FROM api.as_objects
                                        WHERE mastodon_id = $1::numeric""",
                                     mastodon_id)
@@ -335,8 +343,12 @@ class _storage(BaseStorage):
         return row["url"] if row else None
 
     async def rows_for_urls(self, urls: list[str]) -> List[dict]:
-        return await self.fetch_all("""SELECT mastodon_id, url, actor_url, reblog_of_url, status,
-                                          api.resolve_content(url) AS content
+        return await self.fetch_all("""SELECT mastodon_id,
+                                              url,
+                                              actor_url,
+                                              kind,
+                                              status,
+                                              api.resolve_content(url) AS content
                                        FROM api.as_objects
                                        WHERE url = ANY($1::text[])""",
                                     urls)
@@ -346,11 +358,12 @@ class _storage(BaseStorage):
                              limit: int = 20,
                              max_id: Optional[str] = None,
                              since_id: Optional[str] = None) -> List[dict]:
-        return await self.fetch_all("""SELECT o.mastodon_id, o.url, o.actor_url, o.reblog_of_url, o.status, r.content
+        return await self.fetch_all("""SELECT o.mastodon_id, o.url, o.actor_url, o.kind, o.status, r.content
                                        FROM api.as_objects o
                                        CROSS JOIN LATERAL
                                             (SELECT api.resolve_content(o.url) AS content) r
                                        WHERE o.actor_url = $1
+                                         AND o.kind IN ('content', 'announce')
                                          AND ($3::numeric IS NULL OR o.mastodon_id < $3::numeric)
                                          AND ($4::numeric IS NULL OR o.mastodon_id > $4::numeric)
                                          AND r.content IS NOT NULL
@@ -425,7 +438,7 @@ class _storage(BaseStorage):
                 o.mastodon_id,
                 o.url,
                 o.actor_url,
-                o.reblog_of_url,
+                o.kind,
                 o.status,
                 r.content
             FROM
@@ -452,7 +465,7 @@ class _storage(BaseStorage):
                 o.mastodon_id,
                 o.url,
                 o.actor_url,
-                o.reblog_of_url,
+                o.kind,
                 o.status,
                 r.content
             FROM
@@ -477,7 +490,7 @@ class _storage(BaseStorage):
         rows = await self.fetch_all("""SELECT api.content_url(o.url) AS boosted_part
                                        FROM api.as_objects o
                                        WHERE o.actor_url = $1
-                                         AND o.reblog_of_url IS NOT NULL
+                                         AND o.kind = 'announce'
                                          AND api.content_url(o.url) = ANY($2::text[])""",
                                     booster,
                                     part_urls)

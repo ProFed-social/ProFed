@@ -63,7 +63,7 @@ def _content_row():
     return {"mastodon_id": 424242,
             "url": NOTE_URL,
             "actor_url": BOB_URL,
-            "reblog_of_url": None,
+            "kind": "content",
             "status": NOTE_STATUS,
             "content": {"status": NOTE_STATUS, "actor": BOB_URL, "url": NOTE_URL}}
 
@@ -72,7 +72,7 @@ def _boost_row():
     return {"mastodon_id": 500,
             "url": "https://remote.example/carol/announce/1",
             "actor_url": CAROL_URL,
-            "reblog_of_url": NOTE_URL,
+            "kind": "announce",
             "status": BOOST_STATUS,
             "content": {"status": NOTE_STATUS, "actor": BOB_URL, "url": NOTE_URL}}
 
@@ -445,7 +445,7 @@ def test_get_status_404_when_the_boost_target_is_unresolvable(client):
 BOOSTED = {"mastodon_id": 424242,
            "url": "https://remote.example/notes/7",
            "actor_url": "https://remote.example/users/bob",
-           "reblog_of_url": None,
+           "kind": "content",
            "status": {"id": "424242", "content": "<p>hello</p>"},
            "content": {"status": {"id": "424242", "content": "<p>hello</p>"},
                        "actor": "https://remote.example/users/bob",

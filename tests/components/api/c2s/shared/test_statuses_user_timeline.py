@@ -74,8 +74,8 @@ async def test_remove_object_deletes_the_entry_for_every_user(fake_pool, fake_co
 
 @pytest.mark.asyncio
 async def test_fetch_joins_resolves_filters_and_paginates(fake_pool, fake_conn):
-    fake_conn.fetch.return_value = [{"mastodon_id": 102, "reblog_of_url": "x", "content": {"id": "100"}},
-                                    {"mastodon_id": 100, "reblog_of_url": None, "content": {"id": "100"}}]
+    fake_conn.fetch.return_value = [{"mastodon_id": 102, "kind": "announce", "content": {"id": "100"}},
+                                    {"mastodon_id": 100, "kind": "content", "content": {"id": "100"}}]
 
     result = await (await user_timeline.storage()).fetch("alice", limit=5, max_id="999")
 
@@ -83,7 +83,7 @@ async def test_fetch_joins_resolves_filters_and_paginates(fake_pool, fake_conn):
     assert "JOIN api.as_objects o ON o.url = ut.object_url" in sql
     assert "api.resolve_content(o.url)" in sql
     assert "r.content IS NOT NULL" in sql
-    assert "o.actor_url, o.reblog_of_url" in sql
+    assert "o.actor_url, o.kind" in sql
     assert "ORDER BY ut.mastodon_id DESC" in sql
     assert args == ["alice", 5, "999", None]
     assert [row["mastodon_id"] for row in result] == [102, 100]

@@ -169,7 +169,7 @@ class _storage(BaseStorage):
                 o.mastodon_id,
                 o.url,
                 o.actor_url,
-                o.reblog_of_url,
+                o.kind,
                 o.status,
                 jsonb_build_object('status', o.status, 'actor', o.actor_url, 'url', o.url) AS content,
                 CASE WHEN c.parent = c.conversation_id OR p.url IS NULL THEN NULL

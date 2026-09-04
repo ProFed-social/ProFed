@@ -46,7 +46,7 @@ def _content_row():
     return {"mastodon_id": 424242,
             "url": NOTE_URL,
             "actor_url": BOB_URL,
-            "reblog_of_url": None,
+            "kind": "content",
             "status": STATUS,
             "content": {"status": STATUS, "actor": BOB_URL, "url": NOTE_URL}}
 
@@ -55,7 +55,7 @@ def _boost_row():
     return {"mastodon_id": 500,
             "url": BOOST_URL,
             "actor_url": CAROL_URL,
-            "reblog_of_url": NOTE_URL,
+            "kind": "announce",
             "status": BOOST,
             "content": {"status": STATUS, "actor": BOB_URL, "url": NOTE_URL}}
 

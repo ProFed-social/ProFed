@@ -8,7 +8,7 @@ from profed.components.api.c2s.shared.statuses import service
 
 def _row(status, actor="https://x/actors/alice", url="https://x/notes/5"):
     return {"actor_url": actor,
-            "reblog_of_url": None,
+            "kind": "content",
             "status": status,
             "content": {"status": status, "actor": actor, "url": url}}
 
@@ -132,7 +132,7 @@ async def test_make_statuses_counts_an_unknown_content_url_as_zero():
 @pytest.mark.asyncio
 async def test_a_boost_wrapper_repeats_the_counts_of_the_boosted_status():
     row = {**_row({"id": "9"}),
-           "reblog_of_url": "https://x/notes/5",
+           "kind": "announce",
            "status": {"id": "9"}}
     store = _store(mastodon_ids_for=AsyncMock(return_value={}),
                    boost_stats=AsyncMock(return_value={"https://x/notes/5": {"n_of_boosts": 2,

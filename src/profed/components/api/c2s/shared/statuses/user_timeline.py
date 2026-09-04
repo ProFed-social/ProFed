@@ -46,7 +46,7 @@ class _storage(BaseStorage):
                     limit: int = 20,
                     max_id: Optional[str] = None,
                     since_id: Optional[str] = None) -> List[dict]:
-        return await self.fetch_all("""SELECT ut.mastodon_id, o.url, o.actor_url, o.reblog_of_url, o.status, r.content
+        return await self.fetch_all("""SELECT ut.mastodon_id, o.url, o.actor_url, o.kind, o.status, r.content
                                        FROM api.user_timeline ut
                                        JOIN api.as_objects o ON o.url = ut.object_url
                                        CROSS JOIN LATERAL
@@ -65,7 +65,7 @@ class _storage(BaseStorage):
     def thread_roots(self, username: str, max_depth: int = 20):
         return self.stream("""SELECT ut.mastodon_id,
                                      api.thread_root(api.content_url(o.url), $2) AS root,
-                                     CASE WHEN o.reblog_of_url IS NOT NULL THEN o.actor_url END AS booster
+                                     CASE WHEN o.kind = 'announce' THEN o.actor_url END AS booster
                               FROM api.user_timeline ut
                               JOIN api.as_objects o ON o.url = ut.object_url
                               WHERE ut.username = $1

@@ -34,9 +34,9 @@ def _make_status(row: dict, accounts: dict, replies: dict, boosts: dict) -> Stat
                          "reblogged": reblog.reblogged},
                       account=account(accounts, row["actor_url"]))
 
-    return (content(row, accounts)
-            if row["reblog_of_url"] is None
-            else wrapper(row, accounts))
+    return (wrapper(row, accounts)
+            if row["kind"] == "announce"
+            else content(row, accounts))
 
 
 async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Status]:
