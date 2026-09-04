@@ -175,3 +175,53 @@ async def test_a_like_without_an_emoji_keeps_the_edge(fake_objects, fake_members
 
     assert ("upsert", ("424242", like, ACTOR_URL, STATUS, "like", NOTE_ID, "")) in fake_objects.calls
 
+
+@pytest.mark.asyncio
+async def test_a_like_reference_becomes_a_reaction_edge(fake_objects, fake_memberships):
+    reference = {"kind": "like", "url": NOTE_ID, "emoji": "🎉"}
+    like = "https://remote/bob#react/3"
+
+    await projection._on_store(like, _payload(reference=reference, status_id=like))
+
+    assert ("upsert", ("424242", like, ACTOR_URL, STATUS, "like", NOTE_ID, "🎉")) in fake_objects.calls
+
+
+@pytest.mark.asyncio
+async def test_a_like_without_an_emoji_keeps_the_edge(fake_objects, fake_memberships):
+    reference = {"kind": "like", "url": NOTE_ID, "emoji": ""}
+    like = "https://remote/bob#like/3"
+
+    await projection._on_store(like, _payload(reference=reference, status_id=like))
+
+    assert ("upsert", ("424242", like, ACTOR_URL, STATUS, "like", NOTE_ID, "")) in fake_objects.calls
+
+
+@pytest.mark.asyncio
+async def test_a_like_from_the_timeline_topic_reaches_the_objects(fake_bus, fake_objects, fake_memberships):
+    like = "https://remote/bob#react/3"
+    fake_bus.topic("timeline").messages = [(1,
+                                            "Like",
+                                            like,
+                                            datetime.now(timezone.utc),
+                                            _payload(reference={"kind": "like", "url": NOTE_ID, "emoji": "🎉"},
+                                                     status_id=like))]
+
+    await projection.rebuild()
+
+    assert ("upsert", ("424242", like, ACTOR_URL, STATUS, "like", NOTE_ID, "🎉")) in fake_objects.calls
+
+
+@pytest.mark.asyncio
+async def test_a_like_is_not_added_to_a_user_timeline(fake_bus, fake_objects, fake_memberships):
+    like = "https://remote/bob#react/3"
+    fake_bus.topic("timeline").messages = [(1,
+                                            "Like",
+                                            like,
+                                            datetime.now(timezone.utc),
+                                            _payload(reference={"kind": "like", "url": NOTE_ID, "emoji": "🎉"},
+                                                     status_id=like))]
+
+    await projection.rebuild()
+
+    assert all(call[0] != "add" for call in fake_memberships.calls)
+

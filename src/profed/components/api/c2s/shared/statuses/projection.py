@@ -53,6 +53,15 @@ async def _on_update(object_id: str, payload: dict) -> None:
     await (await as_objects.storage()).update_content(url, status, status.get("edited_at"))
 
 
+async def _on_react(object_id: str, payload: dict) -> None:
+    status = payload["status"]
+    await (await as_objects.storage()).upsert(status["id"],
+                                              payload["status_id"],
+                                              payload.get("actor_url", ""),
+                                              status,
+                                              *_edge(payload.get("reference")))
+
+
 async def _on_delete(object_id: str, payload: dict) -> None:
     url = payload["status_id"]
     await (await as_objects.storage()).delete(url)
@@ -72,5 +81,6 @@ handle_events, rebuild, _ = \
                      on_message_type={"Create": _on_store,
                                       "Update": _on_update,
                                       "Delete": _on_delete,
-                                      "Announce": _on_store})
+                                      "Announce": _on_store,
+                                      "Like": _on_react})
 
