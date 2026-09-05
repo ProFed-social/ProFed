@@ -18,6 +18,7 @@ from profed.components.api.c2s.shared.statuses import as_objects as statuses_obj
 from profed.components.api.c2s.shared.statuses import user_timeline as statuses_memberships
 from profed.components.api.c2s.shared.statuses import projection as statuses_projection
 from profed.components.api.c2s.shared.statuses import compressor as statuses_compressor
+from profed.components.api.c2s.shared.statuses import sweeper as statuses_sweeper
 from profed.components.api.c2s.shared.conversations import storage as conversations_storage
 from profed.components.api.c2s.shared.conversations import projection as conversations_projection
 from . import oauth
@@ -36,9 +37,9 @@ def _projection_initializer(storages, projection, handle_events, name):
     return _init
 
 
-def _compressor_initializer(compressor):
+def _background_task_initializer(task, config_key):
     async def _init(config: dict):
-        compressor.start(config.get("compression", {}))
+        task.start({k[len(config_key)+1:]: v for k, v in config.items() if k.startswith(config_key)})
     return _init
 
 
@@ -79,7 +80,9 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       conversations_projection.handle_events,
                                                       "c2s_conversations")),
                              (["v1_timelines", "v1_statuses", "v1_accounts", "profed_timeline"],
-                              _compressor_initializer(statuses_compressor)),
+                              _background_task_initializer(statuses_compressor, "compression")),
+                             (["v1_timelines", "v1_statuses", "v1_accounts", "profed_timeline"],
+                              _background_task_initializer(statuses_sweeper, "sweeping")),
                              (["v1_media", "v2_media"],
                               _media_projection_initializer(media_db_storage,
                                                             media_projection,

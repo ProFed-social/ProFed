@@ -211,12 +211,12 @@ def test_is_undoable_object_accepts_an_announce_activity():
 def test_is_undoable_object_accepts_a_like_and_an_emoji_react():
     assert is_undoable_object({"id": "https://remote/bob#like/3", "type": "Like"}) is True
     assert is_undoable_object({"id": "https://remote/bob#react/3", "type": "EmojiReact"}) is True
- 
- 
+
+
 def test_is_undoable_object_rejects_a_follow():
     assert is_undoable_object(UNDO_FOLLOW["activity"]["object"]) is False
- 
- 
+
+
 def test_is_undoable_object_rejects_a_string_reference():
     assert is_undoable_object("https://remote/notes/original") is False
 
@@ -305,8 +305,8 @@ UNDO_LIKE = {"username": "alice",
                                      "type": "Like",
                                      "actor": "https://remote/bob",
                                      "object": "https://local/actors/alice/notes/1"}}}
- 
- 
+
+
 def test_undo_event_removes_the_reaction_by_its_activity_id():
     assert undo_event("Undo", "https://remote/bob#undo/9", UNDO_LIKE) == \
         {"username": "alice", "status_id": "https://remote/bob#like/3"}

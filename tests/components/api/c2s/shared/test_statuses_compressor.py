@@ -1,98 +1,75 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import asyncio
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from profed.components.api.c2s.shared.statuses import compressor
+from _fakes import background_task_driver as driver
 
 
-TUNING = {"sleep_min": 1.0, "sleep_max": 61.0, "agility": 50.0, "sample_size": 7}
-
-
-async def _slept_for(changed):
-    with patch("asyncio.sleep", AsyncMock()) as slept:
-        await compressor.Compressor(TUNING).sleep_after_changed(changed)
-    return slept.await_args.args[0]
-
-
-def test_construction_falls_back_to_the_module_defaults():
-    instance = compressor.Compressor({})
-
-    assert instance.sample_size == compressor.SAMPLE_SIZE
-    assert instance.sleep_min == compressor.SLEEP_MIN
-    assert instance.sleep_max == compressor.SLEEP_MAX
-    assert instance.agility == compressor.AGILITY
+TUNING = {"sample_size": 7, "sleep_min": 1.0, "sleep_max": 5.0, "agility": 2.0}
 
 
 @pytest.mark.asyncio
-async def test_idle_waits_the_maximum():
-    assert await _slept_for(0) == 61.0
-
-
-@pytest.mark.asyncio
-async def test_at_agility_the_wait_is_the_midpoint():
-    assert await _slept_for(50) == 31.0
-
-
-@pytest.mark.asyncio
-async def test_a_busy_pass_approaches_the_minimum():
-    assert await _slept_for(50_000) < 2.0
-
-
-@pytest.mark.asyncio
-async def test_the_loop_compresses_with_the_sample_size_then_sleeps_with_the_change_count():
+async def test_a_pass_compresses_with_the_configured_sample_size():
     store = Mock(compress_all=AsyncMock(return_value=3))
-    slept = []
+    run, _unused = driver(compressor, TUNING, store)
 
-    async def stop(changed):
-        slept.append(changed)
-        raise asyncio.CancelledError
-
-    instance = compressor.Compressor(TUNING)
-    with patch.object(compressor, "storage", AsyncMock(return_value=store)), \
-         patch.object(instance, "sleep_after_changed", stop):
-        with pytest.raises(asyncio.CancelledError):
-            await instance()
+    await run()
 
     store.compress_all.assert_awaited_once_with(7)
-    assert slept == [3]
 
 
 @pytest.mark.asyncio
-async def test_a_failing_pass_reports_no_changes_instead_of_raising():
-    store = Mock(compress_all=AsyncMock(side_effect=RuntimeError("boom")))
+async def test_an_idle_pass_waits_the_configured_maximum():
+    store = Mock(compress_all=AsyncMock(return_value=0))
+    run, slept = driver(compressor, TUNING, store)
 
-    with patch.object(compressor, "storage", AsyncMock(return_value=store)):
-        assert await compressor.Compressor(TUNING).step() == 0
+    await run()
+
+    assert slept == [5.0]
 
 
 @pytest.mark.asyncio
-async def test_a_failing_pass_is_logged_with_its_traceback():
-    store = Mock(compress_all=AsyncMock(side_effect=RuntimeError("boom")))
+async def test_at_the_agility_the_wait_is_the_midpoint():
+    store = Mock(compress_all=AsyncMock(return_value=2))
+    run, slept = driver(compressor, TUNING, store)
 
-    with patch.object(compressor, "storage", AsyncMock(return_value=store)), \
-         patch.object(compressor.logger, "exception") as reported:
-        await compressor.Compressor(TUNING).step()
+    await run()
+
+    assert slept == [3.0]
+
+
+@pytest.mark.asyncio
+async def test_a_busy_pass_approaches_the_configured_minimum():
+    store = Mock(compress_all=AsyncMock(return_value=100000))
+    run, slept = driver(compressor, TUNING, store)
+
+    await run()
+
+    assert slept[0] == pytest.approx(1.0, abs=0.01)
+
+
+@pytest.mark.asyncio
+async def test_a_failing_pass_is_logged_and_counted_as_idle():
+    store = Mock(compress_all=AsyncMock(side_effect=RuntimeError("boom")))
+    run, slept = driver(compressor, TUNING, store)
+
+    with patch.object(compressor.logger, "exception") as reported:
+        await run()
 
     reported.assert_called_once()
+    assert slept == [5.0]
 
 
 @pytest.mark.asyncio
 async def test_the_loop_keeps_running_after_a_failing_pass():
-    store = Mock(compress_all=AsyncMock(side_effect=[RuntimeError("boom"), 4]))
-    slept = []
+    store = Mock(compress_all=AsyncMock(side_effect=[RuntimeError("boom"), 100000]))
+    run, slept = driver(compressor, TUNING, store, stop_after=2)
 
-    async def stop(changed):
-        slept.append(changed)
-        if len(slept) == 2:
-            raise asyncio.CancelledError
+    with patch.object(compressor.logger, "exception"):
+        await run()
 
-    instance = compressor.Compressor(TUNING)
-    with patch.object(compressor, "storage", AsyncMock(return_value=store)), \
-         patch.object(instance, "sleep_after_changed", stop):
-        with pytest.raises(asyncio.CancelledError):
-            await instance()
-
-    assert slept == [0, 4]
+    assert len(slept) == 2
+    assert slept[1] < slept[0]
 

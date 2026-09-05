@@ -327,6 +327,9 @@ class _storage(BaseStorage):
                               as_objects_target_idx
                               ON api.as_objects (target_url)""")
         await self.execute("""CREATE INDEX IF NOT EXISTS
+                              reactions_object_actor_idx
+                              ON api.reactions (object_url, actor_url)""")
+        await self.execute("""CREATE INDEX IF NOT EXISTS
                               boosts_object_actor_idx
                               ON api.boosts (object_url, actor_url)""")
 
@@ -404,6 +407,21 @@ class _storage(BaseStorage):
             FROM
                 (SELECT ARRAY(SELECT url FROM del) AS urls) AS u""",
                            url)
+
+    async def sweep_orphans(self) -> int:
+        return sum([await self._sweep_orphans_from(table)
+                    for table in ("api.boosts", "api.boost_counts", "api.reactions", "api.reaction_counts")])
+
+    async def _sweep_orphans_from(self, table: str) -> int:
+        row = await self.fetch_one(f"""
+            WITH del AS (
+                    DELETE FROM {table} AS c
+                    WHERE NOT EXISTS (SELECT 1
+                                      FROM api.as_objects AS o
+                                      WHERE o.url = c.object_url)
+                    RETURNING 1)
+            SELECT count(*)::int AS swept FROM del""")
+        return row["swept"]
 
     async def get(self, mastodon_id: str) -> Optional[dict]:
         return await self.fetch_one("""SELECT mastodon_id,

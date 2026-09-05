@@ -16,3 +16,4 @@ __all__ = ["FakeLastSnapshot",
            "FakeMediaStorage",
            "FakeKeyValueStorage"]
 
+from .background_task import background_task_driver

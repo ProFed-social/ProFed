@@ -43,7 +43,7 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
 
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
 
-    assert fake_conn.execute.await_count == 24
+    assert fake_conn.execute.await_count == 25
     assert any("CREATE TABLE" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.resolve_content(start_url TEXT)" in s for s in statements)
     assert any("CREATE OR REPLACE VIEW api.reblog_compression" in s and "LEAST(b.mastodon_id, c.mastodon_id)" in s
@@ -85,7 +85,7 @@ async def test_ensure_schema_creates_every_object_before_the_statement_using_it(
     for position, statement in enumerate(statements):
         for name in set(re.findall(r"api\.\w+", statement)) & set(created):
             assert created[name] <= position, f"{name} is used at {position} but created at {created[name]}"
-     
+ 
 
 @pytest.mark.asyncio
 async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):
@@ -489,9 +489,9 @@ async def test_upsert_records_a_reaction_and_not_a_boost(fake_pool, fake_conn):
 @pytest.mark.asyncio
 async def test_ensure_schema_creates_the_reaction_tables_and_functions(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
- 
+
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
- 
+
     assert any("CREATE TABLE IF NOT EXISTS api.reactions" in s and "PRIMARY KEY (reaction_url)" in s
                for s in statements)
     assert any("CREATE TABLE IF NOT EXISTS api.reaction_counts" in s and "PRIMARY KEY (object_url, emoji)" in s
@@ -500,39 +500,74 @@ async def test_ensure_schema_creates_the_reaction_tables_and_functions(fake_pool
     assert any("CREATE OR REPLACE FUNCTION api.record_reactions(entries api.reaction_row[])" in s
                for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.forget_reactions(reaction_urls TEXT[])" in s for s in statements)
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_the_same_actor_cannot_react_twice_with_the_same_emoji(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
- 
+
     body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
                 if "CREATE TABLE IF NOT EXISTS api.reactions" in s)
- 
+
     assert "UNIQUE (actor_url, object_url, emoji)" in body
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_record_reactions_counts_per_object_and_emoji(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
- 
+
     body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
                 if "CREATE OR REPLACE FUNCTION api.record_reactions" in s)
- 
+
     assert "ON CONFLICT DO NOTHING" in body
     assert "GROUP BY\n                    object_url, emoji" in body
     assert "SET n_of_reactions = api.reaction_counts.n_of_reactions + EXCLUDED.n_of_reactions" in body
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_forget_reactions_lowers_the_count_of_the_removed_emoji(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
- 
+
     body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
                 if "CREATE OR REPLACE FUNCTION api.forget_reactions" in s)
- 
+
     assert "DELETE FROM api.reactions" in body
     assert "WHERE reaction_url = ANY(reaction_urls)" in body
     assert "SET n_of_reactions = GREATEST(c.n_of_reactions - g.n, 0)" in body
     assert "c.emoji = g.emoji" in body
+
+
+@pytest.mark.asyncio
+async def test_ensure_schema_indexes_the_reaction_lookups(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+
+    statements = [call.args[0] for call in fake_conn.execute.await_args_list]
+
+    assert any("reactions_object_actor_idx" in s and "ON api.reactions (object_url," in s for s in statements)
+
+
+@pytest.mark.asyncio
+async def test_sweep_orphans_removes_counters_whose_object_is_gone(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = {"swept": 2}
+
+    result = await (await as_objects.storage()).sweep_orphans()
+
+    sql, *args = fake_conn.fetchrow.await_args.args
+    assert "NOT EXISTS (SELECT 1" in sql
+    assert "FROM api.as_objects AS o" in sql
+    assert "WHERE o.url = c.object_url" in sql
+    assert args == []
+    assert result == 8
+
+
+@pytest.mark.asyncio
+async def test_sweep_orphans_clears_all_four_counter_tables(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = {"swept": 0}
+
+    await (await as_objects.storage()).sweep_orphans()
+
+    swept = [call.args[0] for call in fake_conn.fetchrow.await_args_list]
+
+    for table in ("api.boosts", "api.boost_counts", "api.reactions", "api.reaction_counts"):
+        assert any(f"DELETE FROM {table} AS c" in sql for sql in swept)
 

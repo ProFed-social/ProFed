@@ -14,6 +14,8 @@ def _record_initializers(monkeypatch):
         return _init
 
     monkeypatch.setattr(c2s, "_projection_initializer", _fake_initializer)
+    monkeypatch.setattr(c2s.statuses_compressor, "start", lambda config: None)
+    monkeypatch.setattr(c2s.statuses_sweeper, "start", lambda config: None)
     monkeypatch.setattr(c2s, "init_media_storage", AsyncMock())
     monkeypatch.setattr(c2s.oauth, "init", AsyncMock())
     monkeypatch.setattr(c2s.v1, "init", AsyncMock())

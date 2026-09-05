@@ -7,34 +7,26 @@ from .as_objects import storage
 
 logger = logging.getLogger(__name__)
 
-SLEEP_MIN = 1.0
-SLEEP_MAX = 60.0
-AGILITY = 50.0
-SAMPLE_SIZE = 100
 
+def start(config: dict) -> None:
+    sample_size = config["sample_size"]
+    sleep_min = config["sleep_min"]
+    sleep_max = config["sleep_max"]
+    agility = config["agility"]
 
-class Compressor():
-    def __init__(self, config):
-        self.sample_size = int(config.get("sample_size", SAMPLE_SIZE))
-        self.sleep_min = float(config.get("sleep_min", SLEEP_MIN))
-        self.sleep_max = float(config.get("sleep_max", SLEEP_MAX))
-        self.agility = float(config.get("agility", AGILITY))
+    async def sleep_after_changed(changed: int) -> None:
+        await asyncio.sleep(sleep_min + (sleep_max - sleep_min) / (1 + changed / agility))
 
-    async def sleep_after_changed(self, changed: int) -> None:
-        await asyncio.sleep(self.sleep_min + (self.sleep_max - self.sleep_min) / (1 + changed / self.agility))
-
-    async def step(self) -> int:
+    async def compress() -> int:
         try:
-            return await (await storage()).compress_all(self.sample_size)
+            return await (await storage()).compress_all(sample_size)
         except Exception:
             logger.exception("reblog compression failed")
             return 0
 
-    async def __call__(self) -> None:
+    async def watch() -> None:
         while True:
-            await self.sleep_after_changed(await self.step())
+            await sleep_after_changed(await compress())
 
-
-def start(config: dict) -> None:
-    asyncio.create_task(Compressor(config)(), name="c2s_statuses_compression")
+    asyncio.create_task(watch(), name="c2s_statuses_compression")
 

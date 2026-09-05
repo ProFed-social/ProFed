@@ -32,3 +32,22 @@ def test_component_db_overrides_database_section():
     assert result["database"] == "other"
     assert result["user"] == "u"
 
+
+def test_background_task_tuning_gets_numeric_defaults():
+    result = parse({}, {})
+
+    assert result["sweeping_sleep_min"] == 60.0
+    assert result["sweeping_sleep_max"] == 3600.0
+    assert result["sweeping_agility"] == 500.0
+    assert result["compression_sample_size"] == 100
+    assert result["compression_sleep_min"] == 1.0
+    assert result["compression_sleep_max"] == 60.0
+    assert result["compression_agility"] == 50.0
+
+
+def test_background_task_tuning_converts_configured_values():
+    result = parse({"sweeping_sleep_min": "5", "compression_sample_size": "7"}, {})
+
+    assert result["sweeping_sleep_min"] == 5.0
+    assert result["compression_sample_size"] == 7
+
