@@ -254,7 +254,10 @@ a:hover { text-decoration: underline; }
 .actions .action:hover { border-color: var(--line); color: CanvasText; }
 .actions .action .count { font-size: .8rem; }
 .actions .action.boost.is-boosted { color: var(--accent); }
-.actions .action.like.is-liked { color: var(--accent); }
+.actions .action.reaction.is-reacted { color: var(--accent); }
+.reaction-area { display: flex; align-items: center; }
+.reaction-choices { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; padding: .15rem .25rem; border: 1px solid var(--line); border-radius: 999px; }
+.reaction-choices .action { padding: 0 .15rem; }
 .actions .action svg { display: block; }
 .visibility svg { display: block; }
 .action-menu { position: relative; display: flex; align-items: center; margin-left: auto; }

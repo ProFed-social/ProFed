@@ -1,0 +1,10 @@
+{% set mine = (status.pleroma or {}).get("emoji_reactions", []) | selectattr("me") | list %}
+<span class="reaction-area" id="reactions-{{ status.id }}">
+  <button type="button" class="action reaction{% if mine %} is-reacted{% endif %}"
+          title="{{ breakdown_title(status) }}" aria-label="React"
+          hx-get="/statuses/{{ status.id }}/reactions/choices"
+          hx-target="#reactions-{{ status.id }}"
+          hx-swap="outerHTML">{% if mine %}{{ mine[0].name }}{% else %}&#9825;{% endif %}
+    <span class="count">{{ status.favourites_count }}</span></button>
+</span>
+

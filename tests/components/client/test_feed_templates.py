@@ -238,21 +238,22 @@ def _render_home(blocks):
     return build_environment(STANDARD_TEMPLATES, None).get_template("home.html").render(blocks=blocks)
 
 
-def test_the_timeline_entries_carry_a_like_button():
-    rendered = _render_home([_block(STATUS)])
-
-    assert 'hx-post="/statuses/1/favourite"' in rendered
-
-
-def test_a_liked_entry_offers_to_take_the_like_back():
-    rendered = _render_home([_block({**STATUS, "favourited": True, "favourites_count": 2})])
-
-    assert 'hx-post="/statuses/1/unfavourite"' in rendered
-    assert "is-liked" in rendered
-
-
 def test_the_timeline_entries_carry_a_boost_button():
     rendered = _render_home([_block(STATUS)])
 
     assert 'hx-post="/statuses/1/reblog"' in rendered
+
+
+def test_the_timeline_entries_carry_a_reaction_button():
+    rendered = _render_home([_block(STATUS)])
+
+    assert 'hx-get="/statuses/1/reactions/choices"' in rendered
+
+
+def test_an_own_reaction_replaces_the_heart_in_the_timeline():
+    status = {**STATUS, "pleroma": {"emoji_reactions": [{"name": "🎉", "count": 3, "me": True}]}}
+    rendered = _render_home([_block(status)])
+ 
+    assert 'hx-swap="outerHTML">🎉' in rendered
+    assert "is-reacted" in rendered
 

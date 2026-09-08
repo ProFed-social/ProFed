@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -46,14 +47,53 @@ async def unreblog(request: Request, session, id: str):
     return await _status_action(id, "unreblog", session["token"], "boost_button.html")
 
 
-@router.post("/statuses/{id}/favourite", response_class=HTMLResponse)
+def _render(template: str, status: dict) -> str:
+    return environment().get_template(template).render(status=status)
+ 
+ 
+def _button(status: dict) -> str:
+    return _render("reaction_button.html", status)
+ 
+ 
+async def _status_json(id: str, token: str) -> dict:
+    response = await api_client().get(f"/api/v1/statuses/{id}", token=token)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="status not found")
+ 
+    return response.json()
+ 
+ 
+@router.get("/statuses/{id}/reactions", response_class=HTMLResponse)
 @requires_login
-async def favourite(request: Request, session, id: str):
-    return await _status_action(id, "favourite", session["token"], "like_button.html")
+async def reactions(request: Request, session, id: str):
+    return HTMLResponse(_button(await _status_json(id, session["token"])))
 
 
-@router.post("/statuses/{id}/unfavourite", response_class=HTMLResponse)
+@router.get("/statuses/{id}/reactions/choices", response_class=HTMLResponse)
 @requires_login
-async def unfavourite(request: Request, session, id: str):
-    return await _status_action(id, "unfavourite", session["token"], "like_button.html")
+async def reaction_choices(request: Request, session, id: str):
+    return HTMLResponse(_render("reaction_choices.html", await _status_json(id, session["token"])))
+ 
+ 
+async def _reaction_action(id: str, method: str, emoji: str, token: str) -> HTMLResponse:
+    response = await api_client().request(method,
+                                          f"/api/v1/pleroma/statuses/{id}/reactions/{quote(emoji)}",
+                                          token=token)
+    if response.status_code != 200:
+        logger.warning("reaction failed: %s %s", response.status_code, response.text)
+        raise HTTPException(status_code=response.status_code, detail="reaction failed")
+ 
+    return HTMLResponse(_button(response.json()))
+ 
+ 
+@router.post("/statuses/{id}/react/{emoji}", response_class=HTMLResponse)
+@requires_login
+async def react(request: Request, session, id: str, emoji: str):
+    return await _reaction_action(id, "PUT", emoji, session["token"])
+ 
+ 
+@router.post("/statuses/{id}/unreact/{emoji}", response_class=HTMLResponse)
+@requires_login
+async def unreact(request: Request, session, id: str, emoji: str):
+    return await _reaction_action(id, "DELETE", emoji, session["token"])
 

@@ -81,6 +81,12 @@ def link_field(value: str) -> str:
             sanitize_html(value))
 
 
+def breakdown_title(status) -> str:
+    reactions = (status.get("pleroma") if isinstance(status, dict) else getattr(status, "pleroma", None)) or {}
+    return ", ".join(f"{entry['name']} {entry['count']}"
+                     for entry in reactions.get("emoji_reactions", [])) or "React"
+
+
 def build_environment(standard_dir, theme_dir):
     environment = Environment(loader=build_loader(standard_dir, theme_dir),
                               autoescape=select_autoescape(["html", "xml"]))
@@ -90,6 +96,7 @@ def build_environment(standard_dir, theme_dir):
                                rfc822=rfc822,
                                relative_time=relative_time,
                                local_minutes=local_minutes)
+    environment.globals.update(breakdown_title=breakdown_title)
     return environment
 
 

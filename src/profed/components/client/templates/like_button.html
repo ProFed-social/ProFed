@@ -1,5 +1,0 @@
-<button type="button" class="action like{% if status.favourited %} is-liked{% endif %}"
-        title="Like" aria-label="Like"
-        hx-post="/statuses/{{ status.id }}/{% if status.favourited %}unfavourite{% else %}favourite{% endif %}"
-        hx-swap="outerHTML">{% if status.favourited %}&#9829;{% else %}&#9825;{% endif %} <span class="count">{{ status.favourites_count }}</span></button>
-
