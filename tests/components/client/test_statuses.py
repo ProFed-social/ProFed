@@ -10,8 +10,8 @@ import pytest
 
 from profed.components.client import auth, statuses
 from profed.components.client.templating import STANDARD_TEMPLATES, build_environment
- 
- 
+
+
 @pytest.fixture(autouse=True)
 def templates(monkeypatch):
     environment = build_environment(STANDARD_TEMPLATES, None)
@@ -202,45 +202,45 @@ async def test_the_button_carries_the_breakdown_as_its_title(monkeypatch):
     reactions = [{"name": "🎉", "count": 2, "me": True}, {"name": "🐶", "count": 1, "me": False}]
     monkeypatch.setattr(statuses, "api_client",
                         lambda: Mock(request=AsyncMock(return_value=_status_resp(reactions, count=3))))
- 
+
     response = await _post(_app(), "/statuses/42/react/%F0%9F%8E%89")
- 
+
     assert 'title="🎉 2, 🐶 1"' in response.text
- 
- 
+
+
 async def test_the_choices_are_loaded_on_demand(monkeypatch):
     _login(monkeypatch)
     client = Mock(get=AsyncMock(return_value=_status_resp([])))
     monkeypatch.setattr(statuses, "api_client", lambda: client)
 
     response = await _get(_app(), "/statuses/42/reactions/choices")
- 
+
     client.get.assert_awaited_once_with("/api/v1/statuses/42", token="tok")
     assert "/statuses/42/react/" in response.text
- 
- 
+
+
 async def test_the_choices_mark_the_own_emoji_for_removal(monkeypatch):
     _login(monkeypatch)
     reactions = [{"name": "🎉", "count": 1, "me": True}]
     monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp(reactions, 1))))
- 
+
     response = await _get(_app(), "/statuses/42/reactions/choices")
- 
+
     assert "/statuses/42/unreact/" in response.text
- 
- 
+
+
 async def test_closing_the_choices_returns_the_button(monkeypatch):
     _login(monkeypatch)
     monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp([]))))
- 
+
     response = await _get(_app(), "/statuses/42/reactions")
- 
+
     assert "reactions/choices" in response.text
- 
- 
+
+
 async def test_a_failing_reaction_is_reported(monkeypatch):
     _login(monkeypatch)
     monkeypatch.setattr(statuses, "api_client", lambda: Mock(request=AsyncMock(return_value=_resp(404))))
- 
+
     assert (await _post(_app(), "/statuses/42/react/%F0%9F%8E%89")).status_code == 404
 

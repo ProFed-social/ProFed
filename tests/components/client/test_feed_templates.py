@@ -253,7 +253,7 @@ def test_the_timeline_entries_carry_a_reaction_button():
 def test_an_own_reaction_replaces_the_heart_in_the_timeline():
     status = {**STATUS, "pleroma": {"emoji_reactions": [{"name": "🎉", "count": 3, "me": True}]}}
     rendered = _render_home([_block(status)])
- 
+
     assert 'hx-swap="outerHTML">🎉' in rendered
     assert "is-reacted" in rendered
 

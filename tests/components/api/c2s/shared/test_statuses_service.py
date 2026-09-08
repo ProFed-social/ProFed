@@ -16,10 +16,10 @@ class Cfg:
                            for k, v in d.items()]
         os.environ = {k: v for k, v in os.environ.items()
                       if not k.startswith("PROFED_")}
- 
+
     def __enter__(self):
         profed_config.reset()
- 
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
             raise exc_val
@@ -216,93 +216,93 @@ async def test_a_boost_wrapper_repeats_the_reaction_counts():
 
 def _counted(emoji, count, reacted=False):
     return {"object_url": "https://x/notes/5", "emoji": emoji, "n_of_reactions": count, "reacted": reacted}
- 
- 
+
+
 def test_emoji_reactions_are_sorted_by_count_then_by_emoji():
     result = service._emoji_reactions([_counted("🐶", 1), _counted("🎉", 3), _counted("🍀", 1)], "❤️")
- 
+
     assert [entry["name"] for entry in result] == ["🎉", "🍀", "🐶"]
- 
- 
+
+
 def test_an_emojiless_reaction_is_counted_as_the_default_emoji():
     result = service._emoji_reactions([_counted("", 2)], "❤️")
- 
+
     assert result == [{"name": "❤️", "count": 2, "me": False}]
- 
- 
+
+
 def test_an_emojiless_reaction_is_merged_into_an_explicit_default():
     result = service._emoji_reactions([_counted("", 2), _counted("❤️", 3, reacted=True)], "❤️")
- 
+
     assert result == [{"name": "❤️", "count": 5, "me": True}]
- 
- 
+
+
 def test_the_own_flag_survives_the_merge_from_either_side():
     result = service._emoji_reactions([_counted("", 1, reacted=True), _counted("❤️", 1)], "❤️")
- 
+
     assert result[0]["me"] is True
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_make_statuses_carries_the_breakdown_under_pleroma():
     store = _store(mastodon_ids_for=AsyncMock(return_value={}),
                    reaction_breakdown=AsyncMock(return_value={"https://x/notes/5": [_counted("🎉", 2, True)]}))
     cached, storage = _patches(store)
- 
+
     with cached, storage, Cfg({"profed": {"run": "api"}, "api": {"default_reaction_emoji": "❤️"}}):
         result = await service.make_statuses([_row({"id": "5"})], "https://x/actors/me")
- 
+
     assert result[0].pleroma["emoji_reactions"] == [{"name": "🎉", "count": 2, "me": True}]
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_status_without_reactions_carries_an_empty_breakdown():
     cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
- 
+
     with cached, storage:
         result = await service.make_statuses([_row({"id": "5"})])
- 
+
     assert result[0].pleroma["emoji_reactions"] == []
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_local_status_is_marked_as_local():
     cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
- 
+
     with cached, storage, patch.object(service, "is_local_actor_url", lambda url: True):
         result = await service.make_statuses([_row({"id": "5"})])
- 
+
     assert result[0].pleroma["local"] is True
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_remote_status_is_not_marked_as_local():
     cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
- 
+
     with cached, storage, patch.object(service, "is_local_actor_url", lambda url: False):
         result = await service.make_statuses([_row({"id": "5"})])
- 
+
     assert result[0].pleroma["local"] is False
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_top_level_post_has_no_replied_acct():
     cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
- 
+
     with cached, storage, patch.object(service, "is_local_actor_url", lambda url: True):
         result = await service.make_statuses([_row({"id": "5"})])
- 
+
     assert result[0].pleroma["in_reply_to_account_acct"] is None
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_reply_carries_the_acct_of_the_replied_account():
     row = {**_row({"id": "5"}),
            "parent_content": {"status": {"content": "<p>original</p>"},
                               "actor": "https://x/actors/bob"}}
     cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
- 
+
     with cached, storage, patch.object(service, "is_local_actor_url", lambda url: True):
         result = await service.make_statuses([row])
- 
+
     assert result[0].pleroma["in_reply_to_account_acct"] == result[0].reply_to.account.acct
 
