@@ -482,6 +482,37 @@ class _storage(BaseStorage):
                                     max_id,
                                     since_id)
 
+    async def reaction_of(self, actor_url: str, object_url: str) -> Optional[str]:
+        row = await self.fetch_one("""
+            SELECT
+                reaction_url
+            FROM
+                api.reactions
+            WHERE
+                object_url = $1 AND
+                actor_url = $2""",
+                                   object_url,
+                                   actor_url)
+        return row["reaction_url"] if row else None
+
+    async def reaction_stats(self, object_urls: list[str], viewer: Optional[str]) -> dict:
+        rows = await self.fetch_all("""
+            SELECT
+                u.object_url,
+                COALESCE(SUM(c.n_of_reactions), 0)::int AS n_of_reactions,
+                EXISTS (SELECT 1
+                        FROM api.reactions AS r
+                        WHERE r.object_url = u.object_url AND
+                              r.actor_url = $2) AS reacted
+            FROM
+                unnest($1::text[]) AS u(object_url) LEFT JOIN
+                api.reaction_counts AS c ON c.object_url = u.object_url
+            GROUP BY
+                u.object_url""",
+                                    object_urls,
+                                    viewer)
+        return {row["object_url"]: row for row in rows}
+
     async def boost_of(self, actor_url: str, object_url: str) -> Optional[str]:
         row = await self.fetch_one("""
             SELECT

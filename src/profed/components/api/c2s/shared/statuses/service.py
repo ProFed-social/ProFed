@@ -6,7 +6,7 @@ from profed.components.api.c2s.shared.known_accounts.service import cached_multi
 from profed.components.api.c2s.shared.statuses import as_objects
 
 
-def _make_status(row: dict, accounts: dict, replies: dict, boosts: dict) -> Status:
+def _make_status(row: dict, accounts: dict, replies: dict, boosts: dict, reactions: dict) -> Status:
     def account(accounts: dict, url: str):
         return accounts.get(url) or placeholder_account(url)
 
@@ -19,11 +19,14 @@ def _make_status(row: dict, accounts: dict, replies: dict, boosts: dict) -> Stat
     def content(row, accounts):
         status = row["content"]["status"]
         stats = boosts.get(row["content"]["url"], {})
+        reaction = reactions.get(row["content"]["url"], {})
         return Status(**{**status,
                          "in_reply_to_id": replies.get(status.get("in_reply_to_id")),
                          "reply_to": reply(row, accounts),
                          "reblogs_count": stats.get("n_of_boosts", 0),
-                         "reblogged": stats.get("reblogged", False)},
+                         "reblogged": stats.get("reblogged", False),
+                         "favourites_count": reaction.get("n_of_reactions", 0),
+                         "favourited": reaction.get("reacted", False)},
                       account=account(accounts, row["content"]["actor"]))
 
     def wrapper(row, accounts):
@@ -31,7 +34,9 @@ def _make_status(row: dict, accounts: dict, replies: dict, boosts: dict) -> Stat
         return Status(**{**row["status"],
                          "reblog": reblog,
                          "reblogs_count": reblog.reblogs_count,
-                         "reblogged": reblog.reblogged},
+                         "reblogged": reblog.reblogged,
+                         "favourites_count": reblog.favourites_count,
+                         "favourited": reblog.favourited},
                       account=account(accounts, row["actor_url"]))
 
     return (wrapper(row, accounts)
@@ -52,7 +57,9 @@ async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Sta
                        if (url := row["content"]["status"].get("in_reply_to_id"))})
     replies = await (await as_objects.storage()).mastodon_ids_for(reply_urls) if reply_urls else {}
 
-    boosts = await (await as_objects.storage()).boost_stats(list({row["content"]["url"] for row in rows}),
-                                                            viewer) if rows else {}
-    return [_make_status(row, accounts, replies, boosts) for row in rows]
+    content_urls = list({row["content"]["url"] for row in rows})
+    store = await as_objects.storage()
+    boosts = await store.boost_stats(content_urls, viewer) if rows else {}
+    reactions = await store.reaction_stats(content_urls, viewer) if rows else {}
+    return [_make_status(row, accounts, replies, boosts, reactions) for row in rows]
 

@@ -19,10 +19,10 @@ def start(config: dict) -> None:
         except Exception:
             logger.exception("sweeping orphaned counters failed")
             return 0
- 
+
     def interval(swept: int) -> float:
         return sleep_min + (sleep_max - sleep_min) / (1 + swept / agility)
- 
+
     async def watch(sleep=asyncio.sleep) -> None:
         while True:
             await asyncio.sleep(interval(await sweep()))

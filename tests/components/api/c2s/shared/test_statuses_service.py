@@ -14,7 +14,9 @@ def _row(status, actor="https://x/actors/alice", url="https://x/notes/5"):
 
 
 def _store(**kwargs):
-    return AsyncMock(**{"boost_stats": AsyncMock(return_value={}), **kwargs})
+    return AsyncMock(**{"boost_stats": AsyncMock(return_value={}),
+                        "reaction_stats": AsyncMock(return_value={}),
+                        **kwargs})
 
 
 def _patches(store):
@@ -145,4 +147,49 @@ async def test_a_boost_wrapper_repeats_the_counts_of_the_boosted_status():
     assert result[0].reblog.reblogs_count == 2
     assert result[0].reblogs_count == 2
     assert result[0].reblogged is True
+
+
+@pytest.mark.asyncio
+async def test_make_statuses_reads_the_reaction_count_for_the_content_url():
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}),
+                   reaction_stats=AsyncMock(return_value={"https://x/notes/5": {"n_of_reactions": 8,
+                                                                                "reacted": False}}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([_row({"id": "5"})])
+
+    assert result[0].favourites_count == 8
+    assert result[0].favourited is False
+    store.reaction_stats.assert_awaited_once_with(["https://x/notes/5"], None)
+
+
+@pytest.mark.asyncio
+async def test_make_statuses_marks_the_viewers_own_reaction():
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}),
+                   reaction_stats=AsyncMock(return_value={"https://x/notes/5": {"n_of_reactions": 1,
+                                                                                "reacted": True}}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([_row({"id": "5"})], "https://x/actors/me")
+
+    assert result[0].favourited is True
+    store.reaction_stats.assert_awaited_once_with(["https://x/notes/5"], "https://x/actors/me")
+
+
+@pytest.mark.asyncio
+async def test_a_boost_wrapper_repeats_the_reaction_counts():
+    row = {**_row({"id": "9"}), "kind": "announce", "status": {"id": "9"}}
+    store = _store(mastodon_ids_for=AsyncMock(return_value={}),
+                   reaction_stats=AsyncMock(return_value={"https://x/notes/5": {"n_of_reactions": 4,
+                                                                                "reacted": True}}))
+    cached, storage = _patches(store)
+
+    with cached, storage:
+        result = await service.make_statuses([row], "https://x/actors/me")
+
+    assert result[0].reblog.favourites_count == 4
+    assert result[0].favourites_count == 4
+    assert result[0].favourited is True
 

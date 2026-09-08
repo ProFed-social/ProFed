@@ -81,7 +81,8 @@ def _store_returning(row):
     return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                  AsyncMock(return_value=Mock(get=AsyncMock(return_value=row),
                                              mastodon_ids_for=AsyncMock(return_value={}),
-                                             boost_stats=AsyncMock(return_value={}))))
+                                             boost_stats=AsyncMock(return_value={}),
+                                             reaction_stats=AsyncMock(return_value={}))))
 
 
 def _patched_accounts(mapping):
@@ -452,12 +453,102 @@ BOOSTED = {"mastodon_id": 424242,
                        "url": "https://remote.example/notes/7"}}
 
 
+def _store_with_reacted(reaction_of=None, stats=None):
+    return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                 AsyncMock(return_value=Mock(get=AsyncMock(return_value=BOOSTED),
+                                             mastodon_ids_for=AsyncMock(return_value={}),
+                                             reaction_of=AsyncMock(return_value=reaction_of),
+                                             boost_stats=AsyncMock(return_value={}),
+                                             reaction_stats=AsyncMock(return_value=stats or {}))))
+
+
+REACTION_STATS = {"https://remote.example/notes/7": {"n_of_reactions": 4, "reacted": True}}
+
+
+def _like_url():
+    return f"{actor_url_from_username('alice')}#like/7"
+
+
+def _favourite(client, reaction_of=None, stats=None):
+    with _store_with_reacted(reaction_of=reaction_of, stats=stats), \
+         patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
+        return client.post("/statuses/424242/favourite")
+
+
+def _unfavourite(client, reaction_of, stats=None):
+    with _store_with_reacted(reaction_of=reaction_of, stats=stats), \
+         patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
+        return client.post("/statuses/424242/unfavourite")
+
+
+def test_a_favourite_publishes_a_like(client, fake_bus):
+    _favourite(client)
+
+    published = fake_bus.topic("raw_activities").published
+    assert [message["event_type"] for message in published] == ["Like"]
+    assert published[0]["payload"]["activity"]["object"] == BOOSTED["content"]["url"]
+
+
+def test_the_like_is_addressed_to_the_author(client, fake_bus):
+    _favourite(client)
+
+    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["to"] == \
+        [BOOSTED["content"]["actor"]]
+
+
+def test_a_favourite_of_an_already_liked_status_publishes_nothing(client, fake_bus):
+    _favourite(client, reaction_of=_like_url())
+
+    assert fake_bus.topic("raw_activities").published == []
+
+
+def test_a_favourite_reports_the_status_as_favourited(client, fake_bus):
+    assert _favourite(client).json()["favourited"] is True
+
+
+def test_a_favourite_raises_the_count(client, fake_bus):
+    assert _favourite(client).json()["favourites_count"] == 1
+
+
+def test_a_favourite_of_an_already_liked_status_does_not_raise_the_count(client, fake_bus):
+    assert _favourite(client, reaction_of=_like_url(), stats=REACTION_STATS).json()["favourites_count"] == 4
+
+
+def test_an_unfavourite_undoes_the_like(client, fake_bus):
+    _unfavourite(client, _like_url())
+
+    published = fake_bus.topic("raw_activities").published
+    assert [message["event_type"] for message in published] == ["Undo"]
+    assert published[0]["payload"]["activity"]["object"]["type"] == "Like"
+
+
+def test_the_undo_carries_the_original_like_id(client, fake_bus):
+    _unfavourite(client, _like_url())
+
+    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["id"] == _like_url()
+
+
+def test_an_unfavourite_without_a_recorded_like_publishes_nothing(client, fake_bus):
+    _unfavourite(client, None)
+
+    assert fake_bus.topic("raw_activities").published == []
+
+
+def test_an_unfavourite_lowers_the_recorded_count(client, fake_bus):
+    assert _unfavourite(client, _like_url(), stats=REACTION_STATS).json()["favourites_count"] == 3
+
+
+def test_the_favourite_count_never_drops_below_zero(client, fake_bus):
+    assert _unfavourite(client, None).json()["favourites_count"] == 0
+
+
 def _store_with_boosted(boost_of=None, stats=None):
     return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                  AsyncMock(return_value=Mock(get=AsyncMock(return_value=BOOSTED),
                                              mastodon_ids_for=AsyncMock(return_value={}),
                                              boost_of=AsyncMock(return_value=boost_of),
-                                             boost_stats=AsyncMock(return_value=stats or {}))))
+                                             boost_stats=AsyncMock(return_value=stats or {}),
+                                             reaction_stats=AsyncMock(return_value={}))))
 
 
 def _reblog(client):

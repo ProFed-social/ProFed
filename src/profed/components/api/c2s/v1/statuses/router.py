@@ -13,7 +13,9 @@ from profed.models.activity_pub import (AnnounceActivity,
                                         CreateActivity,
                                         DeleteActivity,
                                         Note,
-                                        UndoAnnounceActivity)
+                                        UndoAnnounceActivity,
+                                        LikeActivity,
+                                        UndoLikeActivity)
 from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
@@ -172,13 +174,35 @@ async def status_context(id: str, claims: Annotated[dict, Depends(current_user)]
 
 @router.post("/statuses/{id}/favourite")
 async def favourite_status(id: str, claims: Annotated[dict, Depends(current_user)]):
-    raise HTTPException(status_code=404, detail="status_not_found")
+    username = _username(claims)
+    row = await _boosted_row(id)
+    actor_url = actor_url_from_username(username)
+    if await (await as_objects.storage()).reaction_of(actor_url, row["content"]["url"]) is None:
+        await _publish_activity("Like",
+                                username,
+                                LikeActivity(id=f"{actor_url}#like/{uuid.uuid4()}",
+                                             actor=actor_url,
+                                             object=row["content"]["url"],
+                                             published=datetime.now(timezone.utc).isoformat(),
+                                             to=[row["content"]["actor"]]))
+    return _reaction_state((await service.make_statuses([row], actor_url))[0], favourited=True)
 
 
 @router.post("/statuses/{id}/unfavourite")
-async def unfavourite_status(id: str,
-                             claims: Annotated[dict, Depends(current_user)]):
-    raise HTTPException(status_code=404, detail="status_not_found")
+async def unfavourite_status(id: str, claims: Annotated[dict, Depends(current_user)]):
+    username = _username(claims)
+    row = await _boosted_row(id)
+    actor_url = actor_url_from_username(username)
+    like_url = await (await as_objects.storage()).reaction_of(actor_url, row["content"]["url"])
+    if like_url is not None:
+        await _publish_activity("Undo",
+                                username,
+                                UndoLikeActivity(id=f"{actor_url}#undo/{uuid.uuid4()}",
+                                                 actor=actor_url,
+                                                 object=LikeActivity(id=like_url,
+                                                                     actor=actor_url,
+                                                                     object=row["content"]["url"])))
+    return _reaction_state((await service.make_statuses([row], actor_url))[0], favourited=False)
 
 
 def _viewer(claims: dict | None) -> str | None:
@@ -199,6 +223,18 @@ async def _boosted_row(id: str) -> dict:
         raise HTTPException(status_code=404, detail="status_not_found")
 
     return row
+
+
+def _reaction_state(status: Status, *, favourited: bool) -> Status:
+    content = status.reblog or status
+    if content.favourited != favourited:
+        content.favourited = favourited
+        content.favourites_count = max(content.favourites_count + (1 if favourited else -1), 0)
+
+    status.favourited = content.favourited
+    status.favourites_count = content.favourites_count
+
+    return status
 
 
 def _boost_state(status: Status, *, reblogged: bool) -> Status:

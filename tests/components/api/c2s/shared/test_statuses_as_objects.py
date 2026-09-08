@@ -85,7 +85,7 @@ async def test_ensure_schema_creates_every_object_before_the_statement_using_it(
     for position, statement in enumerate(statements):
         for name in set(re.findall(r"api\.\w+", statement)) & set(created):
             assert created[name] <= position, f"{name} is used at {position} but created at {created[name]}"
- 
+
 
 @pytest.mark.asyncio
 async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):
@@ -570,4 +570,50 @@ async def test_sweep_orphans_clears_all_four_counter_tables(fake_pool, fake_conn
 
     for table in ("api.boosts", "api.boost_counts", "api.reactions", "api.reaction_counts"):
         assert any(f"DELETE FROM {table} AS c" in sql for sql in swept)
+
+
+@pytest.mark.asyncio
+async def test_reaction_of_looks_the_reaction_up_by_object_and_actor(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = {"reaction_url": "https://x/actors/me#like/7"}
+
+    result = await (await as_objects.storage()).reaction_of("https://x/actors/me", "https://x/notes/5")
+
+    sql, *args = fake_conn.fetchrow.await_args.args
+    assert "FROM\n                api.reactions" in sql
+    assert "object_url = $1" in sql
+    assert "actor_url = $2" in sql
+    assert args == ["https://x/notes/5", "https://x/actors/me"]
+    assert result == "https://x/actors/me#like/7"
+
+
+@pytest.mark.asyncio
+async def test_reaction_of_returns_none_when_the_actor_has_not_reacted(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = None
+
+    assert await (await as_objects.storage()).reaction_of("https://x/actors/me", "https://x/notes/5") is None
+
+
+@pytest.mark.asyncio
+async def test_reaction_stats_sums_the_counts_over_all_emoji(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"object_url": "https://x/notes/5", "n_of_reactions": 8, "reacted": True}]
+
+    result = await (await as_objects.storage()).reaction_stats(["https://x/notes/5"], "https://x/actors/me")
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "COALESCE(SUM(c.n_of_reactions), 0)::int" in sql
+    assert "api.reaction_counts AS c ON c.object_url = u.object_url" in sql
+    assert "GROUP BY" in sql
+    assert args == [["https://x/notes/5"], "https://x/actors/me"]
+    assert result["https://x/notes/5"]["n_of_reactions"] == 8
+
+
+@pytest.mark.asyncio
+async def test_reaction_stats_marks_the_viewers_own_reaction(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await as_objects.storage()).reaction_stats(["https://x/notes/5"], "https://x/actors/me")
+
+    sql = fake_conn.fetch.await_args.args[0]
+    assert "FROM api.reactions AS r" in sql
+    assert "r.actor_url = $2) AS reacted" in sql
 

@@ -75,7 +75,8 @@ def _patched_accounts(mapping):
 @pytest.fixture(autouse=True)
 def no_boosts():
     with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
-               AsyncMock(return_value=AsyncMock(boost_stats=AsyncMock(return_value={})))):
+               AsyncMock(return_value=AsyncMock(boost_stats=AsyncMock(return_value={}),
+                                                reaction_stats=AsyncMock(return_value={})))):
         yield
 
 

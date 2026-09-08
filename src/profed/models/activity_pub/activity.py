@@ -54,6 +54,16 @@ class UndoAnnounceActivity(ActivityStreamsObject):
     object: AnnounceActivity
 
 
+class LikeActivity(Activity):
+    type: str = "Like"
+
+
+class UndoLikeActivity(ActivityStreamsObject):
+    type: str = "Undo"
+    actor: ActorRef
+    object: LikeActivity
+
+
 class FollowActivity(ActivityStreamsObject):
     type: str = "Follow"
     actor: ActorRef
