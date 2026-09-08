@@ -482,6 +482,26 @@ class _storage(BaseStorage):
                                     max_id,
                                     since_id)
 
+    async def reaction_breakdown(self, object_urls: list[str], viewer: Optional[str]) -> dict:
+        rows = await self.fetch_all("""
+            SELECT
+                c.object_url,
+                c.emoji,
+                c.n_of_reactions,
+                EXISTS (SELECT 1
+                        FROM api.reactions AS r
+                        WHERE r.object_url = c.object_url AND
+                              r.emoji = c.emoji AND
+                              r.actor_url = $2) AS reacted
+            FROM
+                api.reaction_counts AS c
+            WHERE
+                c.object_url = ANY($1::text[]) AND
+                c.n_of_reactions > 0""",
+                                    object_urls,
+                                    viewer)
+        return {url: [row for row in rows if row["object_url"] == url] for url in object_urls}
+
     async def reaction_of(self, actor_url: str, object_url: str) -> Optional[str]:
         row = await self.fetch_one("""
             SELECT

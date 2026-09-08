@@ -218,6 +218,7 @@ class Status(BaseModel):
     reblogged: bool = False
     muted: bool = False
     pinned: bool = False
+    pleroma: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def from_activity(cls, activity: dict, *, id: str, account: "Account | None" = None) -> "Status":

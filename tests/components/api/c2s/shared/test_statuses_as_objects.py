@@ -617,3 +617,29 @@ async def test_reaction_stats_marks_the_viewers_own_reaction(fake_pool, fake_con
     assert "FROM api.reactions AS r" in sql
     assert "r.actor_url = $2) AS reacted" in sql
 
+
+@pytest.mark.asyncio
+async def test_reaction_breakdown_returns_one_row_per_emoji(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"object_url": "https://x/notes/5", "emoji": "🎉",
+                                     "n_of_reactions": 2, "reacted": True},
+                                    {"object_url": "https://x/notes/5", "emoji": "",
+                                     "n_of_reactions": 1, "reacted": False}]
+ 
+    result = await (await as_objects.storage()).reaction_breakdown(["https://x/notes/5"], "https://x/actors/me")
+ 
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "FROM\n                api.reaction_counts AS c" in sql
+    assert "c.object_url = ANY($1::text[])" in sql
+    assert "r.actor_url = $2) AS reacted" in sql
+    assert args == [["https://x/notes/5"], "https://x/actors/me"]
+    assert [row["emoji"] for row in result["https://x/notes/5"]] == ["🎉", ""]
+ 
+ 
+@pytest.mark.asyncio
+async def test_reaction_breakdown_skips_emptied_counters(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+ 
+    await (await as_objects.storage()).reaction_breakdown(["https://x/notes/5"], None)
+ 
+    assert "c.n_of_reactions > 0" in fake_conn.fetch.await_args.args[0]
+

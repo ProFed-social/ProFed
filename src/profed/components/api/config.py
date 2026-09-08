@@ -11,6 +11,7 @@ def parse(cfg: dict, database: dict) -> dict:
                                          "compression_sample_size": int(cfg.get("compression_sample_size", 100)),
                                          "compression_sleep_min": float(cfg.get("compression_sleep_min", 1.0)),
                                          "compression_sleep_max": float(cfg.get("compression_sleep_max", 60.0)),
-                                         "compression_agility": float(cfg.get("compression_agility", 50.0))},
+                                         "compression_agility": float(cfg.get("compression_agility", 50.0)),
+                                         "default_reaction_emoji": cfg.get("default_reaction_emoji", "\u2764\ufe0f")},
                                   database)
 

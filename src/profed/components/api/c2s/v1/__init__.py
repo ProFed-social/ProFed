@@ -22,6 +22,7 @@ from .notifications import router as notifications
 from .lists import router as lists
 from .markers import router as markers
 from .conversations import router as conversations
+from .pleroma import router as pleroma
 from .accounts.follows import storage as follows_storage
 from .accounts.follows import projection as follows_projection
 from .accounts.preferences import storage as preferences_storage
@@ -77,7 +78,8 @@ async def init(config: dict, deactivate: List[str]) -> None:
                          "lists": lists,
                          "markers": markers,
                          "media": media,
-                         "conversations": conversations},
+                         "conversations": conversations,
+                         "pleroma": pleroma},
                         deactivate):
         r.init(config)
 
@@ -93,7 +95,8 @@ def mount_routers(parent, deactivate: List[str]) -> None:
                          "lists": lists,
                          "markers": markers,
                          "media": media,
-                         "conversations": conversations},
+                         "conversations": conversations,
+                         "pleroma": pleroma},
                         deactivate):
         router.include_router(r.router)
     parent.include_router(router)

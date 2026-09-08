@@ -756,7 +756,8 @@ def test_get_suggestions_returns_empty_list(client):
 def test_account_statuses_anonymous_returns_list(anon_client):
     store = AsyncMock(fetch_by_actor=AsyncMock(return_value=[]),
                       boost_stats=AsyncMock(return_value={}),
-                      reaction_stats=AsyncMock(return_value={}))
+                      reaction_stats=AsyncMock(return_value={}),
+                      reaction_breakdown=AsyncMock(return_value={}))
     with Cfg({"profed": {"run": "api"},
               "api":    {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
@@ -792,7 +793,8 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
            "content": {"status": status, "actor": actor_url, "url": "https://x/notes/1"}}
     store = AsyncMock(fetch_by_actor=AsyncMock(return_value=[row]),
                       boost_stats=AsyncMock(return_value={}),
-                      reaction_stats=AsyncMock(return_value={}))
+                      reaction_stats=AsyncMock(return_value={}),
+                      reaction_breakdown=AsyncMock(return_value={}))
 
     with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
@@ -850,7 +852,8 @@ def test_account_statuses_are_looked_up_by_the_actor_url(anon_client):
                                  url="https://remote.example/@bob")
     store = AsyncMock(fetch_by_actor=AsyncMock(return_value=[]),
                       boost_stats=AsyncMock(return_value={}),
-                      reaction_stats=AsyncMock(return_value={}))
+                      reaction_stats=AsyncMock(return_value={}),
+                      reaction_breakdown=AsyncMock(return_value={}))
 
     with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
         with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",

@@ -76,7 +76,8 @@ def _patched_accounts(mapping):
 def no_boosts():
     with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                AsyncMock(return_value=AsyncMock(boost_stats=AsyncMock(return_value={}),
-                                                reaction_stats=AsyncMock(return_value={})))):
+                                                reaction_stats=AsyncMock(return_value={}),
+                                                reaction_breakdown=AsyncMock(return_value={})))):
         yield
 
 

@@ -82,7 +82,8 @@ def _store_returning(row):
                  AsyncMock(return_value=Mock(get=AsyncMock(return_value=row),
                                              mastodon_ids_for=AsyncMock(return_value={}),
                                              boost_stats=AsyncMock(return_value={}),
-                                             reaction_stats=AsyncMock(return_value={}))))
+                                             reaction_stats=AsyncMock(return_value={}),
+                                             reaction_breakdown=AsyncMock(return_value={}))))
 
 
 def _patched_accounts(mapping):
@@ -459,7 +460,8 @@ def _store_with_reacted(reaction_of=None, stats=None):
                                              mastodon_ids_for=AsyncMock(return_value={}),
                                              reaction_of=AsyncMock(return_value=reaction_of),
                                              boost_stats=AsyncMock(return_value={}),
-                                             reaction_stats=AsyncMock(return_value=stats or {}))))
+                                             reaction_stats=AsyncMock(return_value=stats or {}),
+                                             reaction_breakdown=AsyncMock(return_value={}))))
 
 
 REACTION_STATS = {"https://remote.example/notes/7": {"n_of_reactions": 4, "reacted": True}}
@@ -548,7 +550,8 @@ def _store_with_boosted(boost_of=None, stats=None):
                                              mastodon_ids_for=AsyncMock(return_value={}),
                                              boost_of=AsyncMock(return_value=boost_of),
                                              boost_stats=AsyncMock(return_value=stats or {}),
-                                             reaction_stats=AsyncMock(return_value={}))))
+                                             reaction_stats=AsyncMock(return_value={}),
+                                             reaction_breakdown=AsyncMock(return_value={}))))
 
 
 def _reblog(client):
@@ -669,5 +672,4 @@ def test_an_unreblog_lowers_the_recorded_count(client, fake_bus):
              response = client.post("/statuses/424242/unreblog")
 
     assert response.json()["reblogs_count"] == 3
-
 
