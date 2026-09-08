@@ -127,3 +127,59 @@ async def test_a_failing_reblog_is_reported(monkeypatch):
 
     assert (await _post(_app(), "/statuses/42/reblog")).status_code == 404
 
+
+def _like_resp(favourited, count=1):
+    response = Mock()
+    response.status_code = 200
+    response.text = ""
+    response.json = Mock(return_value={"id": "42", "favourites_count": count, "favourited": favourited})
+    return response
+
+
+async def test_a_favourite_calls_the_api_with_the_session_token(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(post=AsyncMock(return_value=_like_resp(True)))
+    monkeypatch.setattr(statuses, "api_client", lambda: client)
+
+    await _post(_app(), "/statuses/42/favourite")
+
+    client.post.assert_awaited_once_with("/api/v1/statuses/42/favourite", token="tok")
+
+
+async def test_an_unfavourite_calls_the_undo_endpoint(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(post=AsyncMock(return_value=_like_resp(False, 0)))
+    monkeypatch.setattr(statuses, "api_client", lambda: client)
+
+    await _post(_app(), "/statuses/42/unfavourite")
+
+    client.post.assert_awaited_once_with("/api/v1/statuses/42/unfavourite", token="tok")
+
+
+async def test_a_favourite_returns_the_updated_button(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(post=AsyncMock(return_value=_like_resp(True, 3))))
+
+    response = await _post(_app(), "/statuses/42/favourite")
+
+    assert 'hx-post="/statuses/42/unfavourite"' in response.text
+    assert "is-liked" in response.text
+    assert ">3<" in response.text
+
+
+async def test_an_unfavourite_returns_a_button_that_likes_again(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(post=AsyncMock(return_value=_like_resp(False, 0))))
+
+    response = await _post(_app(), "/statuses/42/unfavourite")
+
+    assert 'hx-post="/statuses/42/favourite"' in response.text
+    assert "is-liked" not in response.text
+
+
+async def test_a_failing_favourite_is_reported(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(post=AsyncMock(return_value=_resp(404))))
+
+    assert (await _post(_app(), "/statuses/42/favourite")).status_code == 404
+
