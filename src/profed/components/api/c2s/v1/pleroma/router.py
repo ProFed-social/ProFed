@@ -27,6 +27,30 @@ def init(config: dict) -> None:
     active = True
 
 
+def _reacted(status: Status, emoji: str) -> Status:
+    content = status.reblog or status
+    if not any(entry["me"] for entry in content.pleroma.get("emoji_reactions", [])):
+        content.pleroma = {**content.pleroma,
+                           "emoji_reactions": _with_own(content.pleroma.get("emoji_reactions", []), emoji)}
+
+    return _reaction_state(status, favourited=True)
+
+def _with_own(reactions: list[dict], emoji: str) -> list[dict]:
+    others = [entry for entry in reactions if entry["name"] != emoji]
+    mine = next((entry for entry in reactions if entry["name"] == emoji), {"name": emoji, "count": 0, "me": False})
+
+    return [*others, {"name": emoji, "count": mine["count"] + 1, "me": True}]
+
+def _unreacted(status: Status) -> Status:
+    content = status.reblog or status
+    remaining = [{**entry, "count": entry["count"] - 1, "me": False} if entry["me"] else entry
+                 for entry in content.pleroma.get("emoji_reactions", [])]
+    content.pleroma = {**content.pleroma, "emoji_reactions": [e for e in remaining if e["count"] > 0]}
+
+    return _reaction_state(status, favourited=False)
+
+
+
 @router.put("/pleroma/statuses/{id}/reactions/{emoji}")
 async def react(id: str, emoji: str, claims: Annotated[dict, Depends(current_user)]) -> Status:
     username = _username(claims)
@@ -42,7 +66,7 @@ async def react(id: str, emoji: str, claims: Annotated[dict, Depends(current_use
                                              published=datetime.now(timezone.utc).isoformat(),
                                              to=[row["content"]["actor"]],
                                              **{"_misskey_reaction": emoji}))
-    return _reaction_state((await service.make_statuses([row], actor_url))[0], favourited=True)
+    return _reacted((await service.make_statuses([row], actor_url))[0], emoji)
 
 
 @router.delete("/pleroma/statuses/{id}/reactions/{emoji}")
@@ -56,8 +80,9 @@ async def unreact(id: str, emoji: str, claims: Annotated[dict, Depends(current_u
                                 username,
                                 UndoLikeActivity(id=f"{actor_url}#undo/{uuid.uuid4()}",
                                                  actor=actor_url,
+                                                 to=[row["content"]["actor"]],
                                                  object=LikeActivity(id=like_url,
                                                                      actor=actor_url,
                                                                      object=row["content"]["url"])))
-    return _reaction_state((await service.make_statuses([row], actor_url))[0], favourited=False)
+    return _unreacted((await service.make_statuses([row], actor_url))[0])
 

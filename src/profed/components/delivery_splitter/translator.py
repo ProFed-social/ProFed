@@ -30,6 +30,11 @@ def _accept_target(activity: dict) -> str | None:
     return obj.get("actor") if isinstance(obj, dict) else None
 
 
+def _addressed_target(activity: dict) -> str | None:
+    recipients = activity.get("to") or []
+    return recipients[0] if recipients else None
+
+
 def _undo_target(activity: dict) -> str | None:
     obj = activity.get("object")
     inner = obj.get("object") if isinstance(obj, dict) else None
@@ -156,7 +161,9 @@ _announce = _object_fan_out(_announce_recipients, _store)
 _follow = _directed_fan_out(_follow_target)
 _accept = _directed_fan_out(_accept_target)
 _undo_announce = _object_fan_out(_undo_announce_recipients, _forget, object_url_of=_undo_target)
-_undo = _undo_fan_out({"Announce": _undo_announce}, _directed_fan_out(_undo_target))
+_like = _directed_fan_out(_addressed_target)
+_undo_like = _directed_fan_out(_addressed_target)
+_undo = _undo_fan_out({"Announce": _undo_announce, "Like": _undo_like}, _directed_fan_out(_undo_target))
 
 
 handle_events, rebuild, _ = build_projection(topic=activities,
@@ -169,6 +176,7 @@ handle_events, rebuild, _ = build_projection(topic=activities,
                                                               "Accept": _accept,
                                                               "Reject": _accept,
                                                               "Undo": _undo,
-                                                              "Announce": _announce},
+                                                              "Announce": _announce,
+                                                              "Like": _like},
                                              event_handler_signature=(with_event_type & with_emitted_at))
 

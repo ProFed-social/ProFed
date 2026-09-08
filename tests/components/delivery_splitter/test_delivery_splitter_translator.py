@@ -81,6 +81,7 @@ async def test_create_without_recipients_publishes_nothing(fake_bus, fake_storag
 
     assert fake_bus.topic("deliveries").published == []
 
+
 def _undo_payload(inner_type, inner_object):
     return {"username": "alice",
             "activity": {"actor": "https://example.com/actors/alice",
@@ -349,4 +350,59 @@ def test_audience_of_an_activity_without_addressing_is_empty():
 
 def test_audience_survives_a_string_object():
     assert translator._audience({"object": "https://example.com/notes/1"}) == set()
+
+
+def _like_payload():
+    return {"username": "alice",
+            "activity": {"actor": "https://example.com/actors/alice",
+                         "object": "https://r.example/notes/7",
+                         "content": "🎉",
+                         "to": ["https://r.example/bob"]}}
+
+
+async def test_a_like_is_delivered_to_the_addressed_author(fake_bus, fake_storage):
+    await translator._like("Like", "https://example.com/actors/alice#like/1", _like_payload(), AT)
+
+    published = fake_bus.topic("deliveries").published
+    assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob"}
+
+
+async def test_a_like_without_a_recipient_is_delivered_to_nobody(fake_bus, fake_storage):
+    payload = _like_payload()
+    payload["activity"]["to"] = []
+
+    await translator._like("Like", "https://example.com/actors/alice#like/1", payload, AT)
+
+    assert fake_bus.topic("deliveries").published == []
+
+
+async def test_an_undone_like_goes_to_the_addressed_author(fake_bus, fake_storage):
+    payload = _undo_payload("Like", "https://r.example/notes/7")
+    payload["activity"]["to"] = ["https://r.example/bob"]
+
+    await translator._undo("Undo", "https://example.com/actors/alice#undo/1", payload, AT)
+
+    published = fake_bus.topic("deliveries").published
+    assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob"}
+
+
+def test_the_addressed_target_is_the_first_recipient():
+    assert translator._addressed_target({"to": ["https://r.example/bob"]}) == "https://r.example/bob"
+
+
+def test_an_unaddressed_activity_has_no_target():
+    assert translator._addressed_target({}) is None
+
+
+async def test_a_like_from_the_activities_topic_is_delivered(fake_bus, fake_storage):
+    fake_bus.topic("activities").messages = [(1,
+                                              "Like",
+                                              "https://example.com/actors/alice#like/1",
+                                              AT,
+                                              _like_payload())]
+
+    await translator.rebuild()
+
+    published = fake_bus.topic("deliveries").published
+    assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob"}
 

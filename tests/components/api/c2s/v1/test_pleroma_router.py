@@ -6,9 +6,17 @@ from unittest.mock import AsyncMock, Mock, patch
 from fastapi import FastAPI
 from starlette.routing import Match
 from fastapi.testclient import TestClient
+from profed import identity
 from profed.identity import actor_url_from_username
+from profed.models.mastodon import Status, placeholder_account
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.v1 import pleroma as pleroma_module
+
+
+@pytest.fixture(autouse=True)
+def domain():
+    with patch.object(identity, "domain", lambda: "example.com"):
+        yield
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
@@ -29,6 +37,17 @@ def client(fake_bus):
     app.include_router(pleroma_module.router)
     app.dependency_overrides[current_user] = lambda: CLAIMS
     return TestClient(app)
+
+
+def _status_with(reactions):
+    return Status(id="424242",
+                  uri=BOOSTED["content"]["url"],
+                  created_at="2026-01-01T00:00:00.000Z",
+                  account=placeholder_account(BOOSTED["content"]["actor"]),
+                  content="<p>hello</p>",
+                  favourites_count=sum(entry["count"] for entry in reactions),
+                  favourited=any(entry["me"] for entry in reactions),
+                  pleroma={"emoji_reactions": reactions})
 
 
 def _like_url():
@@ -122,4 +141,41 @@ def test_the_reaction_routes_are_mounted_under_the_api():
 
 def test_the_reaction_routes_can_be_deactivated():
     assert _handles(["pleroma"], "PUT", "/v1/pleroma/statuses/42/reactions/x") is False
+
+
+def test_a_reaction_shows_the_chosen_emoji_before_the_projection_catches_up(client, fake_bus):
+    reactions = _react(client, "🎉").json()["pleroma"]["emoji_reactions"]
+
+    assert reactions == [{"name": "🎉", "count": 1, "me": True}]
+
+
+def test_a_reaction_joins_an_existing_bucket(client, fake_bus):
+    with patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
+               AsyncMock(return_value=[_status_with([{"name": "🎉", "count": 2, "me": False}])])):
+        reactions = _react(client, "🎉").json()["pleroma"]["emoji_reactions"]
+
+    assert reactions == [{"name": "🎉", "count": 3, "me": True}]
+
+
+def test_removing_a_reaction_takes_the_emoji_away_again(client, fake_bus):
+    with patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
+               AsyncMock(return_value=[_status_with([{"name": "🎉", "count": 1, "me": True}])])):
+        reactions = _unreact(client, "🎉", reaction_of=_like_url()).json()["pleroma"]["emoji_reactions"]
+
+    assert reactions == []
+
+
+def test_removing_a_reaction_leaves_the_reactions_of_others(client, fake_bus):
+    with patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
+               AsyncMock(return_value=[_status_with([{"name": "🎉", "count": 2, "me": True},
+                                                     {"name": "🐶", "count": 1, "me": False}])])):
+        reactions = _unreact(client, "🎉", reaction_of=_like_url()).json()["pleroma"]["emoji_reactions"]
+
+    assert reactions == [{"name": "🎉", "count": 1, "me": False}, {"name": "🐶", "count": 1, "me": False}]
+
+
+def test_the_undo_is_addressed_to_the_author(client, fake_bus):
+    _unreact(client, "🎉", reaction_of=_like_url())
+
+    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["to"] == [BOOSTED["content"]["actor"]]
 
