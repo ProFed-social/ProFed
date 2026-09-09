@@ -289,11 +289,15 @@ a:hover { text-decoration: underline; }
 .action-menu > summary { list-style: none; }
 .action-menu > summary::-webkit-details-marker { display: none; }
 .msg-actions .action-menu { margin-left: 0; }
-.msg:has(.action-menu[open]) .msg-actions { opacity: 1; }
+.msg:has(.action-menu-items:popover-open) .msg-actions { opacity: 1; }
 .action-menu-items {
-  position: absolute; top: 100%; right: 0; z-index: 10; min-width: 11rem; margin: .25rem 0 0;
-  padding: .25rem; list-style: none; border: 1px solid var(--line); border-radius: .5rem;
-  background: Canvas; box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
+  min-width: 11rem;
+  margin: 0; padding: .25rem;
+  list-style: none;
+  border: 1px solid var(--line); border-radius: .5rem;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
 }
 .action-menu-item {
   display: block; width: 100%; padding: .4rem .6rem; border: 0; border-radius: .35rem;

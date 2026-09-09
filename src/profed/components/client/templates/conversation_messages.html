@@ -33,9 +33,9 @@
                 data-reply-text="{{ message.content | striptags | truncate(160) }}">&#8617;</button>
         <button class="msg-action" type="button" title="React" disabled>&#9825;</button>
         <button class="msg-action" type="button" title="Bookmark" disabled><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
-        <details class="action-menu">
-          <summary class="msg-action" title="More" aria-label="More">&#8943;</summary>
-          <ul class="action-menu-items">
+        <span class="action-menu">
+          <button type="button" class="msg-action" popovertarget="menu-{{ message.id }}" title="More" aria-label="More">&#8943;</button>
+          <ul popover id="menu-{{ message.id }}" class="action-menu-items">
             <li><a class="u-url action-menu-item" href="{{ message.url }}">Permalink</a></li>
             {% if message.own %}
             <li><button type="button" class="action-menu-item destructive"
@@ -45,7 +45,7 @@
                         hx-confirm="Delete this message?">Delete</button></li>
             {% endif %}
           </ul>
-        </details>
+        </span>
       </div></div>
     </div>
   </div>

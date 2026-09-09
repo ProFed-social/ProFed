@@ -6,7 +6,8 @@ import pytest
 from profed.components.client.templating import STANDARD_TEMPLATES, build_environment
 
 
-STATUS = {"content": "<p>Hallo Welt</p>",
+STATUS = {"id": "1",
+          "content": "<p>Hallo Welt</p>",
           "created_at": "2026-01-01T10:00:00.000Z",
           "url": "https://example.com/@alice/1",
           "uri": "https://example.com/actors/alice/notes/1",
@@ -192,11 +193,11 @@ def test_the_menu_omits_deleting_for_an_anonymous_visitor():
     assert "hx-delete" not in rendered
 
 
-def test_the_menu_is_a_details_element_that_works_without_javascript():
+def test_the_menu_is_a_native_popover_that_works_without_javascript():
     rendered = _render(STATUS, current_acct="alice")
 
-    assert '<details class="action-menu">' in rendered
-    assert '<summary class="action menu"' in rendered
+    assert 'popovertarget="menu-1"' in rendered
+    assert '<ul popover id="menu-1" class="action-menu-items">' in rendered
 
 
 def test_the_timestamp_is_colloquial_and_carries_the_exact_time_as_a_tooltip():

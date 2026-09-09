@@ -20,9 +20,10 @@
   {% with status = s %}{% include "boost_button.html" %}{% endwith %}
   {% with status = s %}{% include "reaction_button.html" %}{% endwith %}
   <button type="button" class="action bookmark" title="Bookmark" aria-label="Bookmark"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
-  <details class="action-menu">
-    <summary class="action menu" title="More" aria-label="More">&#8943;</summary>
-    <ul class="action-menu-items">
+  <span class="action-menu">
+    <button type="button" class="action menu" popovertarget="menu-{{ s.id }}"
+            title="More" aria-label="More">&#8943;</button>
+    <ul popover id="menu-{{ s.id }}" class="action-menu-items">
       <li><a class="u-url action-menu-item" href="{{ s.url }}">Permalink</a></li>
       {% if own_acct and s.account and s.account.acct == own_acct %}
       <li><button type="button" class="action-menu-item destructive"
@@ -32,7 +33,7 @@
                   hx-confirm="Delete this post?">Delete</button></li>
       {% endif %}
     </ul>
-  </details>
+  </span>
   {% if uid %}<data class="u-uid" value="{{ s.uri }}"></data>{% endif %}
 </footer>
 {% endmacro %}
