@@ -321,3 +321,14 @@ async def test_the_reaction_form_posts_to_the_react_endpoint(monkeypatch):
     assert '<form class="reaction-area" id="reactions-42"' in response.text
     assert 'hx-post="/statuses/42/react"' in response.text
 
+
+async def test_the_grid_replaces_only_itself(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp([]))))
+
+    response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
+
+    grid = response.text[response.text.index('<div class="grid"'):]
+    assert 'hx-target="this"' in grid[:grid.index(">") + 200]
+
