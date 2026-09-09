@@ -171,9 +171,15 @@ class _storage(BaseStorage):
                 o.actor_url,
                 o.kind,
                 o.status,
-                jsonb_build_object('status', o.status, 'actor', o.actor_url, 'url', o.url) AS content,
+                jsonb_build_object('status', o.status,
+                                   'actor', o.actor_url,
+                                   'url', o.url,
+                                   'mastodon_id', o.mastodon_id) AS content,
                 CASE WHEN c.parent = c.conversation_id OR p.url IS NULL THEN NULL
-                     ELSE jsonb_build_object('status', p.status, 'actor', p.actor_url, 'url', p.url)
+                     ELSE jsonb_build_object('status', p.status,
+                                             'actor', p.actor_url,
+                                             'url', p.url,
+                                             'mastodon_id', p.mastodon_id)
                 END AS parent_content
             FROM
                 api.conversations AS c INNER JOIN

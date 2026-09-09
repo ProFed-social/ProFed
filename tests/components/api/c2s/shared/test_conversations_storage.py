@@ -127,8 +127,8 @@ async def test_messages_of_carries_the_content_url_in_both_content_objects(fake_
     await (await storage.storage()).messages_of("c1")
 
     query = fake_conn.fetch.await_args.args[0]
-    assert "jsonb_build_object('status', o.status, 'actor', o.actor_url, 'url', o.url)" in query
-    assert "jsonb_build_object('status', p.status, 'actor', p.actor_url, 'url', p.url)" in query
+    assert "'url', o.url,\n                                   'mastodon_id', o.mastodon_id) AS content" in query
+    assert "'url', p.url,\n                                             'mastodon_id', p.mastodon_id)" in query
 
 
 @pytest.mark.asyncio
