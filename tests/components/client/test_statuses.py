@@ -92,10 +92,10 @@ async def _get(app, path):
         return await client.get(path)
 
 
-async def _post(app, path):
+async def _post(app, path, data=None):
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="https://test.local") as client:
-        return await client.post(path)
+        return await client.post(path, data=data)
 
 
 def _boost_resp(reblogged, count=1):
@@ -158,7 +158,7 @@ async def test_a_reaction_calls_the_pleroma_endpoint(monkeypatch):
     client = Mock(request=AsyncMock(return_value=_status_resp([])))
     monkeypatch.setattr(statuses, "api_client", lambda: client)
 
-    await _post(_app(), "/statuses/42/react/%F0%9F%8E%89")
+    await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
 
     client.request.assert_awaited_once_with("PUT", "/api/v1/pleroma/statuses/42/reactions/%F0%9F%8E%89", token="tok")
 
@@ -180,7 +180,7 @@ async def test_a_favourite_returns_the_updated_button(monkeypatch):
                         "api_client",
                         lambda: Mock(request=AsyncMock(return_value=_status_resp(reactions, count=2))))
 
-    response = await _post(_app(), "/statuses/42/react/%F0%9F%8E%89")
+    response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
 
     assert 'hx-swap="outerHTML">🎉' in response.text
     assert "is-reacted" in response.text
@@ -203,7 +203,7 @@ async def test_the_button_carries_the_breakdown_as_its_title(monkeypatch):
     monkeypatch.setattr(statuses, "api_client",
                         lambda: Mock(request=AsyncMock(return_value=_status_resp(reactions, count=3))))
 
-    response = await _post(_app(), "/statuses/42/react/%F0%9F%8E%89")
+    response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
 
     assert 'title="🎉 2, 🐶 1"' in response.text
 
@@ -216,7 +216,7 @@ async def test_the_choices_are_loaded_on_demand(monkeypatch):
     response = await _get(_app(), "/statuses/42/reactions/choices")
 
     client.get.assert_awaited_once_with("/api/v1/statuses/42", token="tok")
-    assert "/statuses/42/react/" in response.text
+    assert 'hx-post="/statuses/42/react"' in response.text
 
 
 async def test_the_choices_mark_the_own_emoji_for_removal(monkeypatch):
@@ -242,7 +242,7 @@ async def test_a_failing_reaction_is_reported(monkeypatch):
     _login(monkeypatch)
     monkeypatch.setattr(statuses, "api_client", lambda: Mock(request=AsyncMock(return_value=_resp(404))))
 
-    assert (await _post(_app(), "/statuses/42/react/%F0%9F%8E%89")).status_code == 404
+    assert (await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})).status_code == 404
 
 
 async def test_the_choices_offer_an_empty_heart_to_remove_the_reaction(monkeypatch):
@@ -274,4 +274,67 @@ async def test_picking_another_emoji_always_reacts(monkeypatch):
     response = await _get(_app(), "/statuses/42/reactions/choices")
 
     assert response.text.count("/statuses/42/unreact/") == 1
+
+
+async def test_the_emoji_grid_is_served_with_a_long_cache_lifetime():
+    response = await _get(_app(), "/emoji/choices")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "public, max-age=86400"
+    assert response.headers["etag"]
+
+
+async def test_a_matching_etag_answers_with_not_modified():
+    etag = (await _get(_app(), "/emoji/choices")).headers["etag"]
+    transport = httpx.ASGITransport(app=_app())
+    async with httpx.AsyncClient(transport=transport, base_url="https://test.local") as client:
+        response = await client.get("/emoji/choices", headers={"If-None-Match": etag})
+
+    assert response.status_code == 304
+    assert response.text == ""
+
+
+async def test_a_head_request_reports_the_size_without_the_body():
+    transport = httpx.ASGITransport(app=_app())
+    async with httpx.AsyncClient(transport=transport, base_url="https://test.local") as client:
+        response = await client.head("/emoji/choices")
+
+    assert response.status_code == 200
+    assert response.text == ""
+    assert response.headers["etag"]
+    assert response.headers["cache-control"] == "public, max-age=86400"
+
+
+async def test_the_grid_carries_the_emoji_as_a_submit_value():
+    response = await _get(_app(), "/emoji/choices")
+
+    assert 'name="emoji" value="🎉"' in response.text
+    assert 'name="tone"' in response.text
+
+
+async def test_the_grid_is_the_same_for_every_reader():
+    first = await _get(_app(), "/emoji/choices")
+    second = await _get(_app(), "/emoji/choices")
+
+    assert first.text == second.text
+
+
+async def test_a_skin_tone_is_applied_to_the_chosen_emoji(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(request=AsyncMock(return_value=_status_resp([])))
+    monkeypatch.setattr(statuses, "api_client", lambda: client)
+
+    await _post(_app(), "/statuses/42/react", {"emoji": "👍", "tone": "🏽"})
+
+    assert "%F0%9F%91%8D%F0%9F%8F%BD" in client.request.await_args.args[1]
+
+
+async def test_a_skin_tone_is_ignored_where_it_does_not_apply(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(request=AsyncMock(return_value=_status_resp([])))
+    monkeypatch.setattr(statuses, "api_client", lambda: client)
+
+    await _post(_app(), "/statuses/42/react", {"emoji": "🎉", "tone": "🏽"})
+
+    assert client.request.await_args.args[1].endswith("%F0%9F%8E%89")
 

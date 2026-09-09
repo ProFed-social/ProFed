@@ -2,13 +2,17 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from functools import cache
+from hashlib import sha256
+from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 
 from .api_client import api_client
 from .auth import requires_login
+from .emoji import toned
 from .templating import environment
 
 logger = logging.getLogger(__name__)
@@ -86,10 +90,33 @@ async def _reaction_action(id: str, method: str, emoji: str, token: str) -> HTML
     return HTMLResponse(_button(response.json()))
 
 
-@router.post("/statuses/{id}/react/{emoji}", response_class=HTMLResponse)
+@cache
+def _grid() -> str:
+    return environment().get_template("emoji_grid.html").render()
+
+
+@cache
+def _grid_etag() -> str:
+    return f'"{sha256(_grid().encode()).hexdigest()[:32]}"'
+
+
+def _grid_headers() -> dict:
+    return {"Cache-Control": "public, max-age=86400", "ETag": _grid_etag()}
+
+
+@router.api_route("/emoji/choices", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def emoji_choices(request: Request):
+    return (Response(status_code=304, headers=_grid_headers())
+            if _grid_etag() in request.headers.get("if-none-match", "") else
+            Response(content=_grid(),
+                     media_type="text/html; charset=utf-8",
+                     headers=_grid_headers()))
+
+
+@router.post("/statuses/{id}/react", response_class=HTMLResponse)
 @requires_login
-async def react(request: Request, session, id: str, emoji: str):
-    return await _reaction_action(id, "PUT", emoji, session["token"])
+async def react(request: Request, session, id: str, emoji: Annotated[str, Form()], tone: Annotated[str, Form()] = ""):
+    return await _reaction_action(id, "PUT", toned(emoji, tone), session["token"])
 
 
 @router.post("/statuses/{id}/unreact/{emoji}", response_class=HTMLResponse)

@@ -1,0 +1,23 @@
+{% for group in emoji_groups() %}
+<input type="radio" name="emoji-group" id="emoji-group-{{ loop.index }}" {% if loop.first %}checked{% endif %}>
+{% endfor %}
+<span class="head">
+  <span class="tabs">
+    {% for group in emoji_groups() %}
+    <label for="emoji-group-{{ loop.index }}" title="{{ group }}">{{ emoji_groups()[group][0] }}</label>
+    {% endfor %}
+  </span>
+  <span class="tones">
+    {% for tone in emoji_tones %}
+    <input type="radio" name="tone" id="emoji-tone-{{ loop.index }}" value="{{ tone }}"
+           {% if loop.first %}checked{% endif %}>
+    <label for="emoji-tone-{{ loop.index }}">&#9995;{{ tone }}</label>
+    {% endfor %}
+  </span>
+</span>
+<span class="pages">
+  {% for group, choices in emoji_groups().items() %}
+  <span class="page">{% for choice in choices %}<button class="action" name="emoji" value="{{ choice }}">{{ choice }}</button>{% endfor %}</span>
+  {% endfor %}
+</span>
+

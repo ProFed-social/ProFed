@@ -9,6 +9,7 @@ from markupsafe import escape
 from profed.core.config import config
 from profed.identity import domain
 from profed.sanitize import sanitize_html
+from profed.components.client import emoji
 
 
 STANDARD_TEMPLATES = Path(__file__).parent / "templates"
@@ -96,7 +97,9 @@ def build_environment(standard_dir, theme_dir):
                                rfc822=rfc822,
                                relative_time=relative_time,
                                local_minutes=local_minutes)
-    environment.globals.update(breakdown_title=breakdown_title)
+    environment.globals.update(breakdown_title=breakdown_title,
+                               emoji_groups=emoji.groups,
+                               emoji_tones=('', *emoji.TONES))
     return environment
 
 

@@ -1,21 +1,18 @@
-{% set choices = ["\U0001F44D", "\U0001F389", "\U0001F602", "\U0001F914", "\U0001F440", "\U0001F525",
-                  "\U0001F64F", "\U0001F4A1", "\U0001F44F", "\U00002705"] %}
 {% set mine = (status.pleroma or {}).get("emoji_reactions", []) | selectattr("me") | list %}
 <span class="reaction-area is-open" id="reactions-{{ status.id }}">
+  <span class="reaction-choices">
     {% if mine %}
     <button type="button" class="action undo" title="Remove reaction" aria-label="Remove reaction"
             hx-post="/statuses/{{ status.id }}/unreact/{{ mine[0].name | urlencode }}"
             hx-target="#reactions-{{ status.id }}"
             hx-swap="outerHTML">&#9825;</button>
     {% endif %}
-  <span class="reaction-choices">
-    {% for choice in choices %}
-    <button type="button" class="action{% if mine and mine[0].name == choice %} is-reacted{% endif %}"
-            title="{{ choice }}" aria-label="{{ choice }}"
-            hx-post="/statuses/{{ status.id }}/react/{{ choice | urlencode }}"
-            hx-target="#reactions-{{ status.id }}"
-            hx-swap="outerHTML">{{ choice }}</button>
-    {% endfor %}
+    <form class="emoji-picker"
+          hx-post="/statuses/{{ status.id }}/react"
+          hx-target="#reactions-{{ status.id }}"
+          hx-swap="outerHTML">
+      <span class="grid" hx-get="/emoji/choices" hx-trigger="load" hx-swap="innerHTML"></span>
+    </form>
     <button type="button" class="action close" title="Close" aria-label="Close"
             hx-get="/statuses/{{ status.id }}/reactions"
             hx-target="#reactions-{{ status.id }}"
