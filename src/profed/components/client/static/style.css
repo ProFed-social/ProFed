@@ -286,8 +286,6 @@ a:hover { text-decoration: underline; }
 .actions .action svg { display: block; }
 .visibility svg { display: block; }
 .action-menu { position: relative; display: flex; align-items: center; margin-left: auto; }
-.action-menu > summary { list-style: none; }
-.action-menu > summary::-webkit-details-marker { display: none; }
 .msg-actions .action-menu { margin-left: 0; }
 .msg:has(.action-menu-items:popover-open) .msg-actions { opacity: 1; }
 .action-menu-items {
