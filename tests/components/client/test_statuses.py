@@ -182,7 +182,7 @@ async def test_a_favourite_returns_the_updated_button(monkeypatch):
 
     response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
 
-    assert 'hx-swap="outerHTML">🎉' in response.text
+    assert 'aria-label="React">🎉' in response.text
     assert "is-reacted" in response.text
     assert ">2<" in response.text
 
@@ -208,72 +208,11 @@ async def test_the_button_carries_the_breakdown_as_its_title(monkeypatch):
     assert 'title="🎉 2, 🐶 1"' in response.text
 
 
-async def test_the_choices_are_loaded_on_demand(monkeypatch):
-    _login(monkeypatch)
-    client = Mock(get=AsyncMock(return_value=_status_resp([])))
-    monkeypatch.setattr(statuses, "api_client", lambda: client)
-
-    response = await _get(_app(), "/statuses/42/reactions/choices")
-
-    client.get.assert_awaited_once_with("/api/v1/statuses/42", token="tok")
-    assert 'hx-post="/statuses/42/react"' in response.text
-
-
-async def test_the_choices_mark_the_own_emoji_for_removal(monkeypatch):
-    _login(monkeypatch)
-    reactions = [{"name": "🎉", "count": 1, "me": True}]
-    monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp(reactions, 1))))
-
-    response = await _get(_app(), "/statuses/42/reactions/choices")
-
-    assert "/statuses/42/unreact/" in response.text
-
-
-async def test_closing_the_choices_returns_the_button(monkeypatch):
-    _login(monkeypatch)
-    monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp([]))))
-
-    response = await _get(_app(), "/statuses/42/reactions")
-
-    assert "reactions/choices" in response.text
-
-
 async def test_a_failing_reaction_is_reported(monkeypatch):
     _login(monkeypatch)
     monkeypatch.setattr(statuses, "api_client", lambda: Mock(request=AsyncMock(return_value=_resp(404))))
 
     assert (await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})).status_code == 404
-
-
-async def test_the_choices_offer_an_empty_heart_to_remove_the_reaction(monkeypatch):
-    _login(monkeypatch)
-    reactions = [{"name": "🎉", "count": 1, "me": True}]
-    monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp(reactions, 1))))
-
-    response = await _get(_app(), "/statuses/42/reactions/choices")
-
-    assert "action undo" in response.text
-    assert "/statuses/42/unreact/" in response.text
-
-
-async def test_the_choices_offer_no_removal_without_an_own_reaction(monkeypatch):
-    _login(monkeypatch)
-    monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp([]))))
-
-    response = await _get(_app(), "/statuses/42/reactions/choices")
-
-    assert "action undo" not in response.text
-    assert "/statuses/42/unreact/" not in response.text
-
-
-async def test_picking_another_emoji_always_reacts(monkeypatch):
-    _login(monkeypatch)
-    reactions = [{"name": "🎉", "count": 1, "me": True}]
-    monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp(reactions, 1))))
-
-    response = await _get(_app(), "/statuses/42/reactions/choices")
-
-    assert response.text.count("/statuses/42/unreact/") == 1
 
 
 async def test_the_emoji_grid_is_served_with_a_long_cache_lifetime():
@@ -337,4 +276,48 @@ async def test_a_skin_tone_is_ignored_where_it_does_not_apply(monkeypatch):
     await _post(_app(), "/statuses/42/react", {"emoji": "🎉", "tone": "🏽"})
 
     assert client.request.await_args.args[1].endswith("%F0%9F%8E%89")
+
+
+async def test_the_button_opens_the_picker_without_a_second_request(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp([]))))
+
+    response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
+
+    assert "<details" in response.text
+    assert 'hx-get="/emoji/choices"' in response.text
+    assert 'hx-trigger="toggle once from:closest details"' in response.text
+
+
+async def test_an_own_reaction_offers_the_empty_heart_for_removal(monkeypatch):
+    _login(monkeypatch)
+    reactions = [{"name": "🎉", "count": 1, "me": True}]
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp(reactions, 1))))
+
+    response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
+
+    assert 'hx-post="/statuses/42/unreact/%F0%9F%8E%89"' in response.text
+
+
+async def test_without_an_own_reaction_there_is_nothing_to_remove(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp([]))))
+
+    response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
+
+    assert "/statuses/42/unreact/" not in response.text
+
+
+async def test_the_reaction_form_posts_to_the_react_endpoint(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp([]))))
+
+    response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
+
+    assert '<form class="reaction-area" id="reactions-42"' in response.text
+    assert 'hx-post="/statuses/42/react"' in response.text
 

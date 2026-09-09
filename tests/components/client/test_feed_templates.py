@@ -247,13 +247,14 @@ def test_the_timeline_entries_carry_a_boost_button():
 def test_the_timeline_entries_carry_a_reaction_button():
     rendered = _render_home([_block(STATUS)])
 
-    assert 'hx-get="/statuses/1/reactions/choices"' in rendered
+    assert 'hx-post="/statuses/1/react"' in rendered
+    assert 'hx-get="/emoji/choices"' in rendered
 
 
 def test_an_own_reaction_replaces_the_heart_in_the_timeline():
     status = {**STATUS, "pleroma": {"emoji_reactions": [{"name": "🎉", "count": 3, "me": True}]}}
     rendered = _render_home([_block(status)])
 
-    assert 'hx-swap="outerHTML">🎉' in rendered
+    assert 'aria-label="React">🎉' in rendered
     assert "is-reacted" in rendered
 
