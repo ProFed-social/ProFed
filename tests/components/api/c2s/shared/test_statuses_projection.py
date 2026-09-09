@@ -75,7 +75,7 @@ async def test_create_upserts_the_content_object_and_adds_the_membership(fake_ob
     await projection._on_store("https://remote/activities/1", _payload())
 
     assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None, None)) in fake_objects.calls
-    assert ("add", ("alice", NOTE_ID, "424242")) in fake_memberships.calls
+    assert ("add", ("alice", NOTE_ID)) in fake_memberships.calls
 
 
 @pytest.mark.asyncio
@@ -86,7 +86,7 @@ async def test_announce_upserts_a_boost_pointing_at_its_target(fake_objects, fak
     await projection._on_store(announce, _payload(reference=reference, status_id=announce))
 
     assert ("upsert", ("424242", announce, ACTOR_URL, STATUS, "announce", NOTE_ID, None)) in fake_objects.calls
-    assert ("add", ("alice", announce, "424242")) in fake_memberships.calls
+    assert ("add", ("alice", announce)) in fake_memberships.calls
 
 
 @pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_snapshot_item_upserts_and_adds_the_membership(fake_objects, fake_
     await projection._apply_item(_payload())
 
     assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None, None)) in fake_objects.calls
-    assert ("add", ("alice", NOTE_ID, "424242")) in fake_memberships.calls
+    assert ("add", ("alice", NOTE_ID)) in fake_memberships.calls
 
 
 @pytest.mark.asyncio
@@ -153,7 +153,7 @@ async def test_create_from_the_timeline_topic_reaches_both_storages(fake_bus, fa
     await projection.rebuild()
 
     assert ("upsert", ("424242", NOTE_ID, ACTOR_URL, STATUS, "content", None, None)) in fake_objects.calls
-    assert ("add", ("alice", NOTE_ID, "424242")) in fake_memberships.calls
+    assert ("add", ("alice", NOTE_ID)) in fake_memberships.calls
 
 
 @pytest.mark.asyncio

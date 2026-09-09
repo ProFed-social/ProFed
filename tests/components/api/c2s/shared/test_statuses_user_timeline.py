@@ -38,18 +38,20 @@ def fake_pool(fake_conn):
 async def test_ensure_schema_creates_the_membership_table(fake_pool, fake_conn):
     await (await user_timeline.storage()).ensure_schema()
 
-    assert fake_conn.execute.await_count == 2
+    assert fake_conn.execute.await_count == 1
     assert "CREATE TABLE" in fake_conn.execute.await_args_list[0].args[0]
+    assert "PRIMARY KEY (username, object_url)" in fake_conn.execute.await_args_list[0].args[0]
+    assert "mastodon_id" not in fake_conn.execute.await_args_list[0].args[0]
 
 
 @pytest.mark.asyncio
 async def test_add_inserts_the_membership(fake_pool, fake_conn):
-    await (await user_timeline.storage()).add("alice", "https://r/1", "42")
+    await (await user_timeline.storage()).add("alice", "https://r/1")
 
     sql, *args = fake_conn.execute.await_args.args
-    assert "INSERT INTO api.user_timeline" in sql
+    assert "INSERT INTO api.user_timeline\n                                          (username, object_url)" in sql
     assert "ON CONFLICT (username, object_url) DO NOTHING" in sql
-    assert args == ["alice", "https://r/1", "42"]
+    assert args == ["alice", "https://r/1"]
 
 
 @pytest.mark.asyncio
@@ -80,11 +82,11 @@ async def test_fetch_joins_resolves_filters_and_paginates(fake_pool, fake_conn):
     result = await (await user_timeline.storage()).fetch("alice", limit=5, max_id="999")
 
     sql, *args = fake_conn.fetch.await_args.args
-    assert "JOIN api.as_objects o ON o.url = ut.object_url" in sql
+    assert "JOIN api.user_timeline ut ON ut.object_url = o.url" in sql
     assert "api.resolve_content(o.url)" in sql
     assert "r.content IS NOT NULL" in sql
     assert "o.actor_url, o.kind" in sql
-    assert "ORDER BY ut.mastodon_id DESC" in sql
+    assert "ORDER BY o.mastodon_id DESC" in sql
     assert args == ["alice", 5, "999", None]
     assert [row["mastodon_id"] for row in result] == [102, 100]
 
@@ -104,9 +106,9 @@ async def test_thread_roots_streams_rows_with_thread_root_and_booster(fake_pool)
     rows = [row async for row in st.thread_roots("me", max_depth=10)]
 
     assert "api.thread_root(api.content_url(o.url), $2) AS root" in captured["sql"]
-    assert "JOIN api.as_objects o ON o.url = ut.object_url" in captured["sql"]
+    assert "JOIN api.user_timeline ut ON ut.object_url = o.url" in captured["sql"]
     assert "WHERE ut.username = $1" in captured["sql"]
-    assert "ORDER BY ut.mastodon_id DESC" in captured["sql"]
+    assert "ORDER BY o.mastodon_id DESC" in captured["sql"]
     assert captured["args"] == ("me", 10)
     assert rows == [{"mastodon_id": 7, "root": "s1", "booster": None}]
 

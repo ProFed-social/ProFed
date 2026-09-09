@@ -22,7 +22,7 @@ def _edge(reference: dict | None) -> tuple[str, str | None, str | None]:
 
 async def _store(username: str, url: str, actor_url: str, status: dict, reference: dict | None) -> None:
     await (await as_objects.storage()).upsert(status["id"], url, actor_url, status, *_edge(reference))
-    await (await user_timeline.storage()).add(username, url, status["id"])
+    await (await user_timeline.storage()).add(username, url)
 
 
 async def _apply_item(data: dict) -> None:
