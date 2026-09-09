@@ -256,6 +256,12 @@ a:hover { text-decoration: underline; }
 .actions .action.boost.is-boosted { color: var(--accent); }
 .actions .action.reaction.is-reacted { color: var(--accent); }
 .reaction-area { display: inline-flex; align-items: center; margin: 0; }
+@supports (position-area: block-end) {
+  .action-menu-items { margin: initial; position-area: block-end span-inline-start; }
+  .picker-body { margin: initial; position-area: block-end span-inline-end; }
+  .action-menu-items,
+  .picker-body { position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline; }
+}
 .picker-body {
   width: min(30rem, 92vw); padding: .5rem;
   border: 1px solid var(--line);
@@ -290,9 +296,10 @@ a:hover { text-decoration: underline; }
 .msg:has(.action-menu-items:popover-open) .msg-actions { opacity: 1; }
 .action-menu-items {
   min-width: 11rem;
-  margin: 0; padding: .25rem;
+  padding: .25rem;
   list-style: none;
-  border: 1px solid var(--line); border-radius: .5rem;
+  border: 1px solid var(--line);
+  border-radius: .5rem;
   background: Canvas;
   color: CanvasText;
   box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
