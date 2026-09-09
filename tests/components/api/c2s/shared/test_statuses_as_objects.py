@@ -573,24 +573,24 @@ async def test_sweep_orphans_clears_all_four_counter_tables(fake_pool, fake_conn
 
 
 @pytest.mark.asyncio
-async def test_reaction_of_looks_the_reaction_up_by_object_and_actor(fake_pool, fake_conn):
-    fake_conn.fetchrow.return_value = {"reaction_url": "https://x/actors/me#like/7"}
+async def test_own_reaction_looks_the_reaction_up_by_object_and_actor(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = {"reaction_url": "https://x/actors/me#like/7", "emoji": "🎉"}
 
-    result = await (await as_objects.storage()).reaction_of("https://x/actors/me", "https://x/notes/5")
+    result = await (await as_objects.storage()).own_reaction("https://x/actors/me", "https://x/notes/5")
 
     sql, *args = fake_conn.fetchrow.await_args.args
     assert "FROM\n                api.reactions" in sql
     assert "object_url = $1" in sql
     assert "actor_url = $2" in sql
     assert args == ["https://x/notes/5", "https://x/actors/me"]
-    assert result == "https://x/actors/me#like/7"
+    assert result == {"reaction_url": "https://x/actors/me#like/7", "emoji": "🎉"}
 
 
 @pytest.mark.asyncio
-async def test_reaction_of_returns_none_when_the_actor_has_not_reacted(fake_pool, fake_conn):
+async def test_own_reaction_returns_none_when_the_actor_has_not_reacted(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = None
 
-    assert await (await as_objects.storage()).reaction_of("https://x/actors/me", "https://x/notes/5") is None
+    assert await (await as_objects.storage()).own_reaction("https://x/actors/me", "https://x/notes/5") is None
 
 
 @pytest.mark.asyncio

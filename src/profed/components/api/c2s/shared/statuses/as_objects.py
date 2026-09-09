@@ -502,18 +502,18 @@ class _storage(BaseStorage):
                                     viewer)
         return {url: [row for row in rows if row["object_url"] == url] for url in object_urls}
 
-    async def reaction_of(self, actor_url: str, object_url: str) -> Optional[str]:
-        row = await self.fetch_one("""
+    async def own_reaction(self, actor_url: str, object_url: str) -> Optional[dict]:
+        return await self.fetch_one("""
             SELECT
-                reaction_url
+                reaction_url,
+                emoji
             FROM
                 api.reactions
             WHERE
                 object_url = $1 AND
                 actor_url = $2""",
-                                   object_url,
-                                   actor_url)
-        return row["reaction_url"] if row else None
+                                    object_url,
+                                    actor_url)
 
     async def reaction_stats(self, object_urls: list[str], viewer: Optional[str]) -> dict:
         rows = await self.fetch_all("""

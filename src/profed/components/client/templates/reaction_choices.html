@@ -2,11 +2,17 @@
                   "\U0001F64F", "\U0001F4A1", "\U0001F44F", "\U00002705"] %}
 {% set mine = (status.pleroma or {}).get("emoji_reactions", []) | selectattr("me") | list %}
 <span class="reaction-area is-open" id="reactions-{{ status.id }}">
+    {% if mine %}
+    <button type="button" class="action undo" title="Remove reaction" aria-label="Remove reaction"
+            hx-post="/statuses/{{ status.id }}/unreact/{{ mine[0].name | urlencode }}"
+            hx-target="#reactions-{{ status.id }}"
+            hx-swap="outerHTML">&#9825;</button>
+    {% endif %}
   <span class="reaction-choices">
     {% for choice in choices %}
     <button type="button" class="action{% if mine and mine[0].name == choice %} is-reacted{% endif %}"
             title="{{ choice }}" aria-label="{{ choice }}"
-            hx-post="/statuses/{{ status.id }}/{% if mine and mine[0].name == choice %}unreact{% else %}react{% endif %}/{{ choice | urlencode }}"
+            hx-post="/statuses/{{ status.id }}/react/{{ choice | urlencode }}"
             hx-target="#reactions-{{ status.id }}"
             hx-swap="outerHTML">{{ choice }}</button>
     {% endfor %}

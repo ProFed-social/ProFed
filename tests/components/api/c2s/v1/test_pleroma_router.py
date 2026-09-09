@@ -58,10 +58,14 @@ def _store(reaction_of=None):
     return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                  AsyncMock(return_value=Mock(get=AsyncMock(return_value=BOOSTED),
                                              mastodon_ids_for=AsyncMock(return_value={}),
-                                             reaction_of=AsyncMock(return_value=reaction_of),
+                                             own_reaction=AsyncMock(return_value=reaction_of),
                                              boost_stats=AsyncMock(return_value={}),
                                              reaction_stats=AsyncMock(return_value={}),
                                              reaction_breakdown=AsyncMock(return_value={}))))
+
+
+def _own(emoji):
+    return {"reaction_url": _like_url(), "emoji": emoji}
 
 
 def _react(client, emoji, reaction_of=None):
@@ -93,7 +97,7 @@ def test_a_reaction_is_published_as_a_like_addressed_to_the_author(client, fake_
 
 
 def test_a_second_reaction_publishes_nothing(client, fake_bus):
-    _react(client, "🎉", reaction_of=_like_url())
+    _react(client, "🎉", reaction_of=_own("🎉"))
 
     assert fake_bus.topic("raw_activities").published == []
 
@@ -103,13 +107,13 @@ def test_a_reaction_reports_the_status_as_favourited(client, fake_bus):
 
 
 def test_removing_a_reaction_undoes_the_recorded_like(client, fake_bus):
-    _unreact(client, "🎉", reaction_of=_like_url())
+    _unreact(client, "🎉", reaction_of=_own("🎉"))
 
     assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["id"] == _like_url()
 
 
 def test_removing_a_reaction_ignores_the_emoji_in_the_path(client, fake_bus):
-    _unreact(client, "🐶", reaction_of=_like_url())
+    _unreact(client, "🐶", reaction_of=_own("🎉"))
 
     assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["id"] == _like_url()
 
@@ -121,7 +125,7 @@ def test_removing_a_reaction_that_is_not_recorded_publishes_nothing(client, fake
 
 
 def test_removing_a_reaction_reports_the_status_as_not_favourited(client, fake_bus):
-    assert _unreact(client, "🎉", reaction_of=_like_url()).json()["favourited"] is False
+    assert _unreact(client, "🎉", reaction_of=_own("🎉")).json()["favourited"] is False
 
 
 def _handles(deactivate, method, path):
@@ -160,7 +164,7 @@ def test_a_reaction_joins_an_existing_bucket(client, fake_bus):
 def test_removing_a_reaction_takes_the_emoji_away_again(client, fake_bus):
     with patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
                AsyncMock(return_value=[_status_with([{"name": "🎉", "count": 1, "me": True}])])):
-        reactions = _unreact(client, "🎉", reaction_of=_like_url()).json()["pleroma"]["emoji_reactions"]
+        reactions = _unreact(client, "🎉", reaction_of=_own("🎉")).json()["pleroma"]["emoji_reactions"]
 
     assert reactions == []
 
@@ -169,13 +173,31 @@ def test_removing_a_reaction_leaves_the_reactions_of_others(client, fake_bus):
     with patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
                AsyncMock(return_value=[_status_with([{"name": "🎉", "count": 2, "me": True},
                                                      {"name": "🐶", "count": 1, "me": False}])])):
-        reactions = _unreact(client, "🎉", reaction_of=_like_url()).json()["pleroma"]["emoji_reactions"]
+        reactions = _unreact(client, "🎉", reaction_of=_own("🎉")).json()["pleroma"]["emoji_reactions"]
 
     assert reactions == [{"name": "🎉", "count": 1, "me": False}, {"name": "🐶", "count": 1, "me": False}]
 
 
 def test_the_undo_is_addressed_to_the_author(client, fake_bus):
-    _unreact(client, "🎉", reaction_of=_like_url())
+    _unreact(client, "🎉", reaction_of=_own("🎉"))
 
     assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["to"] == [BOOSTED["content"]["actor"]]
+
+
+def test_choosing_another_emoji_undoes_the_old_reaction_and_sets_the_new_one(client, fake_bus):
+    _react(client, "🐶", reaction_of=_own("🎉"))
+
+    published = fake_bus.topic("raw_activities").published
+    assert [message["event_type"] for message in published] == ["Undo", "Like"]
+    assert published[0]["payload"]["activity"]["object"]["id"] == _like_url()
+    assert published[1]["payload"]["activity"]["content"] == "🐶"
+
+
+def test_choosing_another_emoji_replaces_it_in_the_breakdown(client, fake_bus):
+    with patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
+               AsyncMock(return_value=[_status_with([{"name": "🎉", "count": 1, "me": True}])])):
+        reactions = _react(client, "🐶", reaction_of=_own("🎉")).json()["pleroma"]["emoji_reactions"]
+
+    assert reactions == [{"name": "🐶", "count": 1, "me": True}]
+
 

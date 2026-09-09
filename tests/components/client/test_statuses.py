@@ -244,3 +244,34 @@ async def test_a_failing_reaction_is_reported(monkeypatch):
 
     assert (await _post(_app(), "/statuses/42/react/%F0%9F%8E%89")).status_code == 404
 
+
+async def test_the_choices_offer_an_empty_heart_to_remove_the_reaction(monkeypatch):
+    _login(monkeypatch)
+    reactions = [{"name": "🎉", "count": 1, "me": True}]
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp(reactions, 1))))
+
+    response = await _get(_app(), "/statuses/42/reactions/choices")
+
+    assert "action undo" in response.text
+    assert "/statuses/42/unreact/" in response.text
+
+
+async def test_the_choices_offer_no_removal_without_an_own_reaction(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp([]))))
+
+    response = await _get(_app(), "/statuses/42/reactions/choices")
+
+    assert "action undo" not in response.text
+    assert "/statuses/42/unreact/" not in response.text
+
+
+async def test_picking_another_emoji_always_reacts(monkeypatch):
+    _login(monkeypatch)
+    reactions = [{"name": "🎉", "count": 1, "me": True}]
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(get=AsyncMock(return_value=_status_resp(reactions, 1))))
+
+    response = await _get(_app(), "/statuses/42/reactions/choices")
+
+    assert response.text.count("/statuses/42/unreact/") == 1
+
