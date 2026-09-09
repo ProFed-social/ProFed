@@ -285,9 +285,9 @@ async def test_the_button_opens_the_picker_without_a_second_request(monkeypatch)
 
     response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
 
-    assert "<details" in response.text
-    assert 'hx-get="/emoji/choices"' in response.text
-    assert 'hx-trigger="toggle once from:closest details"' in response.text
+    assert 'popovertarget="picker-42"' in response.text
+    assert '<div popover id="picker-42"' in response.text
+    assert 'hx-trigger="toggle once from:closest [popover]"' in response.text
 
 
 async def test_an_own_reaction_offers_the_empty_heart_for_removal(monkeypatch):
@@ -331,4 +331,17 @@ async def test_the_grid_replaces_only_itself(monkeypatch):
 
     grid = response.text[response.text.index('<div class="grid"'):]
     assert 'hx-target="this"' in grid[:grid.index(">") + 200]
+
+
+async def test_the_grid_uses_no_element_ids():
+    response = await _get(_app(), "/emoji/choices")
+
+    assert " id=" not in response.text
+    assert "for=" not in response.text
+
+
+async def test_the_grid_wraps_its_radios_in_labels():
+    response = await _get(_app(), "/emoji/choices")
+
+    assert '<label><input type="radio" name="tone"' in response.text
 
