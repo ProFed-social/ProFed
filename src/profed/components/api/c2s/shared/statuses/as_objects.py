@@ -25,7 +25,10 @@ class _storage(BaseStorage):
             CREATE OR REPLACE FUNCTION api.resolve_content(start_url TEXT)
             RETURNS jsonb LANGUAGE sql STABLE AS $$
                 SELECT
-                    jsonb_build_object('status', t.status, 'actor', t.actor_url, 'url', t.url)
+                    jsonb_build_object('status', t.status,
+                                       'actor', t.actor_url,
+                                       'url', t.url,
+                                       'mastodon_id', t.mastodon_id)
                 FROM
                     api.as_objects AS o INNER JOIN
                     api.as_objects AS t ON t.url = COALESCE(o.target_url, o.url)

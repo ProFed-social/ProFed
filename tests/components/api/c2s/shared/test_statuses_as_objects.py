@@ -136,7 +136,7 @@ async def test_resolve_content_joins_a_single_hop_and_returns_the_content_url(fa
 
     body = _function_body([call.args[0] for call in fake_conn.execute.await_args_list], "api.resolve_content")
 
-    assert "jsonb_build_object('status', t.status, 'actor', t.actor_url, 'url', t.url)" in body
+    assert "'mastodon_id', t.mastodon_id)" in body
     assert "api.as_objects AS t ON t.url = COALESCE(o.target_url, o.url)" in body
     assert "t.kind = 'content'" in body
     assert "RECURSIVE" not in body

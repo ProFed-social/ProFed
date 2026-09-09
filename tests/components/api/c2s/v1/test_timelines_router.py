@@ -48,7 +48,7 @@ def _content_row():
             "actor_url": BOB_URL,
             "kind": "content",
             "status": STATUS,
-            "content": {"status": STATUS, "actor": BOB_URL, "url": NOTE_URL}}
+            "content": {"status": STATUS, "actor": BOB_URL, "url": NOTE_URL, "mastodon_id": STATUS["id"]}}
 
 
 def _boost_row():
@@ -57,7 +57,7 @@ def _boost_row():
             "actor_url": CAROL_URL,
             "kind": "announce",
             "status": BOOST,
-            "content": {"status": STATUS, "actor": BOB_URL, "url": NOTE_URL}}
+            "content": {"status": STATUS, "actor": BOB_URL, "url": NOTE_URL, "mastodon_id": STATUS["id"]}}
 
 
 class FakeStorage:

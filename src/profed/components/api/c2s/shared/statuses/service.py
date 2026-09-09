@@ -48,6 +48,7 @@ def _make_status(row: dict,
         stats = boosts.get(row["content"]["url"], {})
         reaction = reactions.get(row["content"]["url"], {})
         return Status(**{**status,
+                         "id": str(row["content"]["mastodon_id"]),
                          "in_reply_to_id": replies.get(status.get("in_reply_to_id")),
                          "reply_to": reply(row, accounts),
                          "reblogs_count": stats.get("n_of_boosts", 0),
@@ -63,6 +64,7 @@ def _make_status(row: dict,
     def wrapper(row, accounts):
         reblog = content(row, accounts)
         return Status(**{**row["status"],
+                         "id": str(row["mastodon_id"]),
                          "reblog": reblog,
                          "reblogs_count": reblog.reblogs_count,
                          "reblogged": reblog.reblogged,

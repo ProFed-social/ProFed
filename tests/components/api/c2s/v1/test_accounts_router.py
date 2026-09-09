@@ -790,7 +790,7 @@ def test_account_statuses_returns_rendered_statuses(anon_client):
            "actor_url": actor_url,
            "kind": "content",
            "status": status,
-           "content": {"status": status, "actor": actor_url, "url": "https://x/notes/1"}}
+           "content": {"status": status, "actor": actor_url, "url": "https://x/notes/1", "mastodon_id": status["id"]}}
     store = AsyncMock(fetch_by_actor=AsyncMock(return_value=[row]),
                       boost_stats=AsyncMock(return_value={}),
                       reaction_stats=AsyncMock(return_value={}),

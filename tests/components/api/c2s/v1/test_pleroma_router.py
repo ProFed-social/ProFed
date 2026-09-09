@@ -28,7 +28,8 @@ BOOSTED = {"mastodon_id": 424242,
            "status": {"id": "424242", "content": "<p>hello</p>"},
            "content": {"status": {"id": "424242", "content": "<p>hello</p>"},
                        "actor": "https://remote.example/users/bob",
-                       "url": "https://remote.example/notes/7"}}
+                       "url": "https://remote.example/notes/7",
+                       "mastodon_id": "424242"}}
 
 
 @pytest.fixture

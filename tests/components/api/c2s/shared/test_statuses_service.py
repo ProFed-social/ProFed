@@ -28,8 +28,9 @@ class Cfg:
 def _row(status, actor="https://x/actors/alice", url="https://x/notes/5"):
     return {"actor_url": actor,
             "kind": "content",
+            "mastodon_id": status.get("id"),
             "status": status,
-            "content": {"status": status, "actor": actor, "url": url}}
+            "content": {"status": status, "actor": actor, "url": url, "mastodon_id": status.get("id")}}
 
 
 def _store(**kwargs):
@@ -305,4 +306,35 @@ async def test_a_reply_carries_the_acct_of_the_replied_account():
         result = await service.make_statuses([row])
 
     assert result[0].pleroma["in_reply_to_account_acct"] == result[0].reply_to.account.acct
+
+
+@pytest.mark.asyncio
+async def test_a_stale_id_in_the_stored_status_is_overruled_by_the_column():
+    row = _row({"id": "424242"})
+    row["content"]["mastodon_id"] = "999"
+    row["mastodon_id"] = "999"
+    cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
+
+    with cached, storage, patch.object(service, "is_local_actor_url", lambda url: True):
+        result = await service.make_statuses([row])
+
+    assert result[0].id == "999"
+
+
+@pytest.mark.asyncio
+async def test_a_boost_keeps_the_announce_id_outside_and_the_content_id_inside():
+    note = {"id": "1", "content": "<p>hi</p>"}
+    row = {"actor_url": "https://x/actors/carol",
+           "kind": "announce",
+           "mastodon_id": "500",
+           "status": {"id": "stale", "content": ""},
+           "content": {"status": note, "actor": "https://x/actors/bob",
+                       "url": "https://x/notes/5", "mastodon_id": "424242"}}
+    cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
+
+    with cached, storage, patch.object(service, "is_local_actor_url", lambda url: True):
+        result = await service.make_statuses([row])
+
+    assert result[0].id == "500"
+    assert result[0].reblog.id == "424242"
 

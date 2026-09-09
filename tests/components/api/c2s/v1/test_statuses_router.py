@@ -65,7 +65,7 @@ def _content_row():
             "actor_url": BOB_URL,
             "kind": "content",
             "status": NOTE_STATUS,
-            "content": {"status": NOTE_STATUS, "actor": BOB_URL, "url": NOTE_URL}}
+            "content": {"status": NOTE_STATUS, "actor": BOB_URL, "url": NOTE_URL, "mastodon_id": NOTE_STATUS["id"]}}
 
 
 def _boost_row():
@@ -74,7 +74,7 @@ def _boost_row():
             "actor_url": CAROL_URL,
             "kind": "announce",
             "status": BOOST_STATUS,
-            "content": {"status": NOTE_STATUS, "actor": BOB_URL, "url": NOTE_URL}}
+            "content": {"status": NOTE_STATUS, "actor": BOB_URL, "url": NOTE_URL, "mastodon_id": NOTE_STATUS["id"]}}
 
 
 def _store_returning(row):
@@ -451,7 +451,8 @@ BOOSTED = {"mastodon_id": 424242,
            "status": {"id": "424242", "content": "<p>hello</p>"},
            "content": {"status": {"id": "424242", "content": "<p>hello</p>"},
                        "actor": "https://remote.example/users/bob",
-                       "url": "https://remote.example/notes/7"}}
+                       "url": "https://remote.example/notes/7",
+                       "mastodon_id": "424242"}}
 
 
 def _store_with_reacted(reaction_of=None, stats=None):
