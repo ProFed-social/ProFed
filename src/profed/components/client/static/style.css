@@ -537,6 +537,24 @@ a:hover { text-decoration: underline; }
   transition: opacity .12s;
 }
 .msg:hover .msg-actions { opacity: 1; }
+.msg-reactions {
+  position: absolute;
+  bottom: -12px;
+  right: 8px;
+  display: flex;
+  gap: 2px;
+}
+.msg--own .msg-reactions { right: auto; left: 8px; }
+.msg-reaction {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: Canvas;
+  font-size: .75rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.msg-reaction.is-mine { border-color: var(--accent); color: var(--accent); }
 .msg--own .msg-actions { right: auto; left: 8px; }
 .msg-action {
   border: none;

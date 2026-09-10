@@ -338,3 +338,37 @@ async def test_an_own_chat_reaction_replaces_the_heart(monkeypatch):
     assert 'aria-label="React">🎉' in body
     assert "is-reacted" in body
 
+
+async def test_a_chat_message_shows_its_reactions_as_a_breakdown(monkeypatch):
+    _login(monkeypatch)
+    message = {**_status("11", "hi"),
+               "pleroma": {"emoji_reactions": [{"name": "🎉", "count": 2, "me": False},
+                                               {"name": "🐶", "count": 1, "me": True}]}}
+    _api(monkeypatch, [_conversation()], messages=[message])
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert '<span class="msg-reactions">' in body
+    assert '<span class="msg-reaction" title="🎉">🎉 2</span>' in body
+    assert '<span class="msg-reaction is-mine" title="🐶">🐶 1</span>' in body
+
+
+async def test_an_own_chat_reaction_is_marked_in_the_breakdown(monkeypatch):
+    _login(monkeypatch)
+    message = {**_status("11", "hi"),
+               "pleroma": {"emoji_reactions": [{"name": "🐶", "count": 1, "me": True}]}}
+    _api(monkeypatch, [_conversation()], messages=[message])
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert 'class="msg-reaction is-mine"' in body
+
+
+async def test_a_chat_message_without_reactions_shows_no_breakdown(monkeypatch):
+    _login(monkeypatch)
+    _api(monkeypatch, [_conversation()], messages=[_status("11", "hi")])
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert "msg-reactions" not in body
+
