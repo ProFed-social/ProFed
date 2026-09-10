@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import secrets
 from urllib.parse import urlencode
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -15,6 +16,7 @@ from .service import (authorization_url,
 from ..shared.oidc import validate_token, set_oidc_issuer
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -47,11 +49,15 @@ async def authorize(response_type: str = Query(),
     nc_state = secrets.token_urlsafe(16)
     _pending[nc_state] = (client_id, redirect_uri, state)
 
-    url = await authorization_url(issuer=_config["oidc_issuer"],
-                                  client_id=_config["oidc_client_id"],
-                                  callback_url=_config["oidc_callback_url"],
-                                  state=nc_state)
-    return RedirectResponse(url)
+    try:
+        return RedirectResponse(await authorization_url(issuer=_config["oidc_issuer"],
+                                                        client_id=_config["oidc_client_id"],
+                                                        callback_url=_config["oidc_callback_url"],
+                                                        state=nc_state))
+    except Exception:
+        logger.warning("reaching the identity provider failed", exc_info=True)
+        _pending.pop(nc_state, None)
+        raise HTTPException(status_code=503, detail="identity_provider_unavailable")
 
 
 @router.get("/oauth/callback")

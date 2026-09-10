@@ -62,6 +62,32 @@ def test_authorize_redirects_to_nextcloud(client):
     assert response.headers["location"] == "https://cloud.example.com/authorize"
 
 
+def test_authorize_reports_an_unreachable_identity_provider(client):
+    with patch("profed.components.api.c2s.oauth.router.get_app", return_value=APP), \
+         patch("profed.components.api.c2s.oauth.router.authorization_url",
+               new=AsyncMock(side_effect=TimeoutError("too slow"))):
+        response = client.get("/oauth/authorize"
+                              "?response_type=code"
+                              "&client_id=abc123"
+                              "&redirect_uri=https://app.example.com/callback")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "identity_provider_unavailable"
+
+
+def test_a_failed_authorize_leaves_no_pending_state(client):
+    before = len(oauth_router_module._pending)
+    with patch("profed.components.api.c2s.oauth.router.get_app", return_value=APP), \
+         patch("profed.components.api.c2s.oauth.router.authorization_url",
+               new=AsyncMock(side_effect=TimeoutError("too slow"))):
+        client.get("/oauth/authorize"
+                   "?response_type=code"
+                   "&client_id=abc123"
+                   "&redirect_uri=https://app.example.com/callback")
+
+    assert len(oauth_router_module._pending) == before
+
+
 def test_callback_invalid_state_returns_400(client):
     response = client.get("/oauth/callback?code=nc_code&state=unknown_state")
     assert response.status_code == 400
