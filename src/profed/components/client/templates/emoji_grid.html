@@ -1,18 +1,22 @@
 <span class="head">
   <span class="tabs">
-    {% for group in emoji_groups() %}
-    <label title="{{ group }}"><input type="radio" name="emoji-group" {% if loop.first %}checked{% endif %}>{{ emoji_groups()[group][0] }}</label>
+    {% for group in choices %}
+    <label title="{{ group }}"><input type="radio" name="emoji-group"
+                                      {% if loop.first %}checked{% endif %}>{{ choices[group][0] }}</label>
     {% endfor %}
   </span>
-  <span class="tones">
-    {% for tone in emoji_tones %}
-    <label><input type="radio" name="tone" value="{{ tone }}" {% if loop.first %}checked{% endif %}>&#9995;{{ tone }}</label>
+  <span class="tones" hx-target="closest .grid" hx-swap="innerHTML">
+    <button type="button" class="tone{% if not tone %} is-current{% endif %}"
+            hx-get="/emoji/choices" title="default">&#9995;</button>
+    {% for name, modifier in emoji_tones().items() %}
+    <button type="button" class="tone{% if tone == name %} is-current{% endif %}"
+            hx-get="/emoji/choices/{{ name }}" title="{{ name }}">&#9995;{{ modifier }}</button>
     {% endfor %}
   </span>
 </span>
 <span class="pages">
-  {% for group, choices in emoji_groups().items() %}
-  <span class="page">{% for choice in choices %}<button class="action" name="emoji" value="{{ choice }}">{{ choice }}</button>{% endfor %}</span>
+  {% for group, emojis in choices.items() %}
+  <span class="page">{% for choice in emojis %}<button class="action" name="emoji" value="{{ choice }}">{{ choice }}</button>{% endfor %}</span>
   {% endfor %}
 </span>
 

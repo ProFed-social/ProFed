@@ -248,7 +248,6 @@ async def test_the_grid_carries_the_emoji_as_a_submit_value():
     response = await _get(_app(), "/emoji/choices")
 
     assert 'name="emoji" value="🎉"' in response.text
-    assert 'name="tone"' in response.text
 
 
 async def test_the_grid_is_the_same_for_every_reader():
@@ -256,26 +255,6 @@ async def test_the_grid_is_the_same_for_every_reader():
     second = await _get(_app(), "/emoji/choices")
 
     assert first.text == second.text
-
-
-async def test_a_skin_tone_is_applied_to_the_chosen_emoji(monkeypatch):
-    _login(monkeypatch)
-    client = Mock(request=AsyncMock(return_value=_status_resp([])))
-    monkeypatch.setattr(statuses, "api_client", lambda: client)
-
-    await _post(_app(), "/statuses/42/react", {"emoji": "👍", "tone": "🏽"})
-
-    assert "%F0%9F%91%8D%F0%9F%8F%BD" in client.request.await_args.args[1]
-
-
-async def test_a_skin_tone_is_ignored_where_it_does_not_apply(monkeypatch):
-    _login(monkeypatch)
-    client = Mock(request=AsyncMock(return_value=_status_resp([])))
-    monkeypatch.setattr(statuses, "api_client", lambda: client)
-
-    await _post(_app(), "/statuses/42/react", {"emoji": "🎉", "tone": "🏽"})
-
-    assert client.request.await_args.args[1].endswith("%F0%9F%8E%89")
 
 
 async def test_the_button_opens_the_picker_without_a_second_request(monkeypatch):
@@ -340,8 +319,42 @@ async def test_the_grid_uses_no_element_ids():
     assert "for=" not in response.text
 
 
-async def test_the_grid_wraps_its_radios_in_labels():
+async def test_the_grid_wraps_its_group_radios_in_labels():
     response = await _get(_app(), "/emoji/choices")
 
-    assert '<label><input type="radio" name="tone"' in response.text
+    assert '<input type="radio" name="emoji-group"' in response.text
+    assert "<label title=" in response.text
+
+    
+async def test_the_grid_offers_every_skin_tone():
+    response = await _get(_app(), "/emoji/choices")
+
+    assert 'hx-get="/emoji/choices/light"' in response.text
+    assert 'hx-get="/emoji/choices/dark"' in response.text
+    assert 'class="tone is-current"' in response.text
+
+
+async def test_a_toned_grid_carries_the_toned_emoji():
+    response = await _get(_app(), "/emoji/choices/medium")
+
+    assert 'value="👍🏽"' in response.text
+    assert 'value="🎉"' in response.text
+
+
+async def test_a_toned_grid_marks_its_own_tone():
+    response = await _get(_app(), "/emoji/choices/medium")
+
+    assert 'hx-get="/emoji/choices/medium" title="medium"' in response.text
+    assert response.text.count('class="tone is-current"') == 1
+
+
+async def test_an_unknown_skin_tone_is_not_found():
+    assert (await _get(_app(), "/emoji/choices/purple")).status_code == 404
+
+
+async def test_every_toned_grid_has_its_own_etag():
+    plain = (await _get(_app(), "/emoji/choices")).headers["etag"]
+    medium = (await _get(_app(), "/emoji/choices/medium")).headers["etag"]
+
+    assert plain != medium
 

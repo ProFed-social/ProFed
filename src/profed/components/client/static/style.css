@@ -273,10 +273,11 @@ a:hover { text-decoration: underline; }
 .picker-body > .undo { margin-bottom: .3rem; }
 .grid > .head { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .4rem; }
 .grid .tabs, .grid .tones { display: flex; flex-wrap: wrap; gap: .15rem; }
-.grid .tabs label, .grid .tones label { cursor: pointer; padding: .15rem .3rem; border-radius: 6px; }
-.grid .tabs input, .grid .tones input { position: absolute; width: 0; height: 0; opacity: 0; }
+.grid .tabs label, .grid .tone { cursor: pointer; padding: .15rem .3rem; border-radius: 6px; }
+.grid .tone { border: 0; background: none; color: inherit; font: inherit; }
+.grid .tabs input { position: absolute; width: 0; height: 0; opacity: 0; }
 .grid .tabs label:has(input:checked),
-.grid .tones label:has(input:checked) { background: var(--chip-bg); }
+.grid .tone.is-current { background: var(--chip-bg); }
 .grid > .pages { display: block; max-height: 14rem; overflow-y: auto; }
 .grid .page { display: none; flex-wrap: wrap; gap: .15rem; }
 .grid .page .action { padding: .1rem .2rem; font-size: 1.2rem; }
