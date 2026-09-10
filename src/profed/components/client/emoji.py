@@ -64,9 +64,22 @@ def toned(emoji: str, tone: str) -> str:
             emoji)
 
 
+def _plain(emoji: str) -> str:
+    return emoji.replace("\U0000FE0F", "")
+
+
+@cache
+def _variants(tone: str) -> dict[str, str]:
+    modifier = tones()[tone]
+    return {_plain(emoji).replace(modifier, ""): emoji
+            for emojis in _grouped(DATA.read_text(encoding="utf-8").splitlines()).values()
+            for emoji in emojis
+            if modifier in emoji}
+
+
 @cache
 def grid(tone: str = "") -> dict[str, list[str]]:
-    return ({group: [toned(emoji, tones()[tone]) for emoji in emojis]
+    return ({group: [_variants(tone).get(_plain(emoji), emoji) for emoji in emojis]
              for group, emojis in groups().items()}
             if tone else
             groups())
