@@ -293,6 +293,8 @@ a:hover { text-decoration: underline; }
 .visibility svg { display: block; }
 .action-menu { position: relative; display: flex; align-items: center; margin-left: auto; }
 .msg-actions .action-menu { margin-left: 0; }
+.msg-actions .reaction-area { display: inline-flex; align-items: center; margin: 0; }
+.msg-action.reaction.is-reacted { color: var(--accent); }
 .msg:has(.action-menu-items:popover-open) .msg-actions { opacity: 1; }
 .action-menu-items {
   min-width: 11rem;

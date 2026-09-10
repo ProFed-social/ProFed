@@ -1,15 +1,16 @@
 {% set mine = (status.pleroma or {}).get("emoji_reactions", []) | selectattr("me") | list %}
+{% set button = button_class | default("action") %}
 <form class="reaction-area" id="reactions-{{ status.id }}"
       hx-post="/statuses/{{ status.id }}/react"
       hx-target="#reactions-{{ status.id }}"
       hx-swap="outerHTML">
-  <button type="button" class="action reaction{% if mine %} is-reacted{% endif %}"
+  <button type="button" class="{{ button }} reaction{% if mine %} is-reacted{% endif %}"
           popovertarget="picker-{{ status.id }}"
           title="{{ breakdown_title(status) }}" aria-label="React">{% if mine %}{{ mine[0].name }}{% else %}&#9825;{% endif %}
     <span class="count">{{ status.favourites_count }}</span></button>
   <div popover id="picker-{{ status.id }}" class="picker-body">
     {% if mine %}
-    <button type="button" class="action undo" title="Remove reaction" aria-label="Remove reaction"
+    <button type="button" class="{{ button }} undo" title="Remove reaction" aria-label="Remove reaction"
             hx-post="/statuses/{{ status.id }}/unreact/{{ mine[0].name | urlencode }}">&#9825;</button>
     {% endif %}
     <div class="grid" hx-get="/emoji/choices" hx-trigger="toggle once from:closest [popover]"

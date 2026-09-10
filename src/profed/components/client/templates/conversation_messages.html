@@ -31,7 +31,7 @@
                 data-reply-id="{{ message.id }}"
                 data-reply-name="{% if message.own %}You{% else %}{{ message.account.display_name or message.account.username }}{% endif %}"
                 data-reply-text="{{ message.content | striptags | truncate(160) }}">&#8617;</button>
-        <button class="msg-action" type="button" title="React" disabled>&#9825;</button>
+        {% with status = message, button_class = "msg-action" %}{% include "reaction_button.html" %}{% endwith %}
         <button class="msg-action" type="button" title="Bookmark" disabled><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
         <span class="action-menu">
           <button type="button" class="msg-action" popovertarget="menu-{{ message.id }}" title="More" aria-label="More">&#8943;</button>
