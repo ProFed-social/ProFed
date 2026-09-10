@@ -542,10 +542,7 @@ a:hover { text-decoration: underline; }
   bottom: -12px;
   right: 8px;
   display: flex;
-  gap: 2px;
-}
-.msg--own .msg-reactions { right: auto; left: 8px; }
-.msg-reaction {
+  gap: .35rem;
   padding: 1px 6px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -554,6 +551,8 @@ a:hover { text-decoration: underline; }
   line-height: 1.4;
   white-space: nowrap;
 }
+.msg--own .msg-reactions { right: auto; left: 8px; }
+.msg-reaction.is-mine { color: var(--accent); }
 .msg-reaction.is-mine { border-color: var(--accent); color: var(--accent); }
 .msg--own .msg-actions { right: auto; left: 8px; }
 .msg-action {
