@@ -518,6 +518,38 @@ class _storage(BaseStorage):
                                     object_url,
                                     actor_url)
 
+    async def reaction_counts_of(self, actor_url: str) -> list[dict]:
+        return await self.fetch_all("""
+            SELECT
+                emoji,
+                count(*) AS n_of_uses
+            FROM
+                api.reactions
+            WHERE
+                actor_url = $1 AND
+                emoji <> ''
+            GROUP BY
+                emoji
+            ORDER BY
+                n_of_uses DESC, emoji""",
+                                    actor_url)
+
+    async def last_toned_reaction_of(self, actor_url: str) -> Optional[str]:
+        row = await self.fetch_one("""
+            SELECT
+                r.emoji
+            FROM
+                api.reactions AS r INNER JOIN
+                api.as_objects AS o ON o.url = r.reaction_url
+            WHERE
+                r.actor_url = $1 AND
+                r.emoji <> ''
+            ORDER BY
+                o.mastodon_id DESC
+            LIMIT 1""",
+                                   actor_url)
+        return row["emoji"] if row else None
+
     async def reaction_stats(self, object_urls: list[str], viewer: Optional[str]) -> dict:
         rows = await self.fetch_all("""
             SELECT

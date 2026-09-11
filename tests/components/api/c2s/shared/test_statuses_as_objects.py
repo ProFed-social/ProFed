@@ -643,3 +643,36 @@ async def test_reaction_breakdown_skips_emptied_counters(fake_pool, fake_conn):
 
     assert "c.n_of_reactions > 0" in fake_conn.fetch.await_args.args[0]
 
+
+@pytest.mark.asyncio
+async def test_reaction_counts_of_groups_by_emoji(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"emoji": "🎉", "n_of_uses": 3}, {"emoji": "🐶", "n_of_uses": 1}]
+
+    result = await (await as_objects.storage()).reaction_counts_of("https://x/actors/me")
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "FROM\n                api.reactions" in sql
+    assert "emoji <> ''" in sql
+    assert "ORDER BY\n                n_of_uses DESC, emoji" in sql
+    assert args == ["https://x/actors/me"]
+    assert [row["emoji"] for row in result] == ["🎉", "🐶"]
+
+
+@pytest.mark.asyncio
+async def test_last_toned_reaction_of_takes_the_newest(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = {"emoji": "👍🏽"}
+
+    result = await (await as_objects.storage()).last_toned_reaction_of("https://x/actors/me")
+
+    sql, *args = fake_conn.fetchrow.await_args.args
+    assert "ORDER BY\n                o.mastodon_id DESC" in sql
+    assert "LIMIT 1" in sql
+    assert result == "👍🏽"
+
+
+@pytest.mark.asyncio
+async def test_last_toned_reaction_of_without_any_reaction(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = None
+
+    assert await (await as_objects.storage()).last_toned_reaction_of("https://x/actors/me") is None
+

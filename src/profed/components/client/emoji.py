@@ -84,3 +84,7 @@ def grid(tone: str = "") -> dict[str, list[str]]:
             if tone else
             groups())
 
+
+def tone_of(emoji: str) -> str:
+    return next((name for name, modifier in tones().items() if modifier in emoji), "")
+

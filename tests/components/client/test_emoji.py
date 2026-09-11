@@ -73,3 +73,11 @@ def test_a_variant_that_keeps_its_own_selector_is_found_too():
 
     assert emoji.grid("light")["People & Body"][people.index("🧔\u200d♂\uFE0F")] == "🧔🏻\u200d♂\uFE0F"
 
+
+def test_the_tone_of_a_toned_emoji_is_named():
+    assert emoji.tone_of("👍🏽") == "medium"
+
+
+def test_an_untoned_emoji_has_no_tone():
+    assert emoji.tone_of("🎉") == ""
+

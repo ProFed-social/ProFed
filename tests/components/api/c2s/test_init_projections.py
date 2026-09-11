@@ -37,6 +37,7 @@ async def test_known_accounts_projection_skipped_when_no_reader_is_active(monkey
                         "v1_accounts",
                         "v1_statuses",
                         "v1_pleroma",
+                        "profed_reactions",
                         "v1_timelines",
                         "v2_search",
                         "v1_media",
@@ -44,3 +45,21 @@ async def test_known_accounts_projection_skipped_when_no_reader_is_active(monkey
                         "oauth"])
 
     assert "c2s_known_accounts" not in awaited
+
+
+async def test_the_reaction_history_alone_still_gets_its_projections(monkeypatch):
+    awaited = _record_initializers(monkeypatch)
+    await c2s.init({}, ["v1_search",
+                        "v1_accounts",
+                        "v1_statuses",
+                        "v1_pleroma",
+                        "v1_timelines",
+                        "v2_search",
+                        "v1_media",
+                        "v2_media",
+                        "oauth",
+                        "profed_timeline"])
+
+    assert "c2s_known_accounts" in awaited
+    assert "c2s_statuses" in awaited
+
