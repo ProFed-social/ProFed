@@ -127,7 +127,7 @@ async def unreact(id: str, emoji: str, claims: Annotated[dict, Depends(current_u
                               row,
                               actor_url,
                               own=await (await as_objects.storage()).own_reaction(actor_url, row["content"]["url"]))
-  
+
         return [row], actor_url
 
     async def do_unreact(username, row):

@@ -671,6 +671,15 @@ async def test_last_toned_reaction_of_takes_the_newest(fake_pool, fake_conn):
 
 
 @pytest.mark.asyncio
+async def test_last_toned_reaction_of_skips_untoned_reactions(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = None
+
+    await (await as_objects.storage()).last_toned_reaction_of("https://x/actors/me")
+
+    assert "r.emoji ~ '[\U0001F3FB-\U0001F3FF]'" in fake_conn.fetchrow.await_args.args[0]
+
+
+@pytest.mark.asyncio
 async def test_last_toned_reaction_of_without_any_reaction(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = None
 

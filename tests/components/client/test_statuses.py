@@ -38,11 +38,24 @@ def _resp(status=200):
     return r
 
 
-def _login(monkeypatch, token="tok"):
+def _login(monkeypatch, token="tok", **session):
     monkeypatch.setattr(auth, "current_user_optional",
                         AsyncMock(return_value={"username": "christof",
                                                 "acct": "christof@test.local",
-                                                "token": token}))
+                                                "token": token,
+                                                **session}))
+    monkeypatch.setattr(statuses, "current_user_optional", auth.current_user_optional)
+
+
+def _quick_reactions(monkeypatch, *choices):
+    monkeypatch.setattr(statuses, "config", lambda: {"client": {"quick_reactions": list(choices)}})
+
+
+def _saved(monkeypatch):
+    saving = AsyncMock()
+    monkeypatch.setattr(statuses, "save_session", saving)
+
+    return saving
 
 
 async def test_delete_status_calls_the_api_with_the_session_token(monkeypatch):
@@ -301,15 +314,15 @@ async def test_the_reaction_form_posts_to_the_react_endpoint(monkeypatch):
     assert 'hx-post="/statuses/42/react"' in response.text
 
 
-async def test_the_grid_replaces_only_itself(monkeypatch):
+async def test_the_picker_replaces_only_itself(monkeypatch):
     _login(monkeypatch)
     monkeypatch.setattr(statuses, "api_client",
                         lambda: Mock(request=AsyncMock(return_value=_status_resp([]))))
 
     response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
 
-    grid = response.text[response.text.index('<div class="grid"'):]
-    assert 'hx-target="this"' in grid[:grid.index(">") + 200]
+    picker = response.text[response.text.index('<div class="picker"'):]
+    assert 'hx-target="this"' in picker[:picker.index(">") + 200]
 
 
 async def test_the_grid_uses_no_element_ids():
@@ -325,7 +338,7 @@ async def test_the_grid_wraps_its_group_radios_in_labels():
     assert '<input type="radio" name="emoji-group"' in response.text
     assert "<label title=" in response.text
 
-    
+
 async def test_the_grid_offers_every_skin_tone():
     response = await _get(_app(), "/emoji/choices")
 
@@ -357,4 +370,121 @@ async def test_every_toned_grid_has_its_own_etag():
     medium = (await _get(_app(), "/emoji/choices/medium")).headers["etag"]
 
     assert plain != medium
+
+
+async def test_the_picker_offers_the_configured_choices_to_a_reader_without_a_history(monkeypatch):
+    _quick_reactions(monkeypatch, "👍", "❤️", "👏", "💡", "😂")
+
+    response = await _get(_app(), "/emoji/picker")
+
+    assert response.status_code == 200
+    assert 'value="👍"' in response.text
+    assert 'value="😂"' in response.text
+
+
+async def test_the_picker_leads_with_the_most_used_emoji(monkeypatch):
+    _login(monkeypatch, reactions={"🐶": 7}, tone="")
+    _quick_reactions(monkeypatch, "👍", "❤️", "👏", "💡", "😂")
+
+    response = await _get(_app(), "/emoji/picker")
+
+    assert response.text.index('value="🐶"') < response.text.index('value="👍"')
+
+
+async def test_the_picker_offers_every_tone_of_a_choice(monkeypatch):
+    _quick_reactions(monkeypatch, "👍")
+
+    response = await _get(_app(), "/emoji/picker")
+
+    assert 'value="👍"' in response.text
+    assert 'value="👍🏻"' in response.text
+    assert 'value="👍🏿"' in response.text
+
+
+async def test_the_picker_marks_the_tone_of_the_session(monkeypatch):
+    _login(monkeypatch, reactions={}, tone="medium")
+    _quick_reactions(monkeypatch, "👍")
+
+    marked = [button
+              for button in (await _get(_app(), "/emoji/picker")).text.split("<button")
+              if "is-current" in button]
+
+    assert len(marked) == 1
+    assert 'value="👍🏽"' in marked[0]
+
+
+async def test_the_picker_asks_for_the_grid_in_the_tone_of_the_session(monkeypatch):
+    _login(monkeypatch, reactions={}, tone="medium")
+    _quick_reactions(monkeypatch, "👍")
+
+    assert 'hx-get="/emoji/choices/medium"' in (await _get(_app(), "/emoji/picker")).text
+
+
+async def test_the_picker_asks_for_the_plain_grid_without_a_tone(monkeypatch):
+    _quick_reactions(monkeypatch, "👍")
+
+    assert 'hx-get="/emoji/choices"' in (await _get(_app(), "/emoji/picker")).text
+
+
+async def test_the_picker_is_not_cached(monkeypatch):
+    _quick_reactions(monkeypatch, "👍")
+
+    assert (await _get(_app(), "/emoji/picker")).headers["cache-control"] == "no-store"
+
+
+async def test_the_reaction_form_carries_the_own_reaction_as_the_previous_one(monkeypatch):
+    _login(monkeypatch)
+    reactions = [{"name": "🎉", "count": 1, "me": True}]
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp(reactions, 1))))
+
+    response = await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
+
+    assert '<input type="hidden" name="previous" value="🎉">' in response.text
+
+
+async def test_reacting_counts_the_emoji_up_in_the_session(monkeypatch):
+    _login(monkeypatch, reactions={"👍": 2}, tone="")
+    saving = _saved(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp([]))))
+
+    await _post(_app(), "/statuses/42/react", {"emoji": "👍🏽", "previous": ""})
+
+    assert saving.await_args.args[1]["reactions"] == {"👍": 3}
+    assert saving.await_args.args[1]["tone"] == "medium"
+    assert saving.await_args.args[1]["token"] == "tok"
+
+
+async def test_changing_the_reaction_moves_the_count_over(monkeypatch):
+    _login(monkeypatch, reactions={"👍": 2}, tone="")
+    saving = _saved(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp([]))))
+
+    await _post(_app(), "/statuses/42/react", {"emoji": "🎉", "previous": "👍"})
+
+    assert saving.await_args.args[1]["reactions"] == {"👍": 1, "🎉": 1}
+
+
+async def test_taking_a_reaction_back_counts_it_down_in_the_session(monkeypatch):
+    _login(monkeypatch, reactions={"🎉": 2}, tone="medium")
+    saving = _saved(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client",
+                        lambda: Mock(request=AsyncMock(return_value=_status_resp([]))))
+
+    await _post(_app(), "/statuses/42/unreact/%F0%9F%8E%89")
+
+    assert saving.await_args.args[1]["reactions"] == {"🎉": 1}
+    assert saving.await_args.args[1]["tone"] == "medium"
+
+
+async def test_a_failing_reaction_leaves_the_session_alone(monkeypatch):
+    _login(monkeypatch, reactions={"🎉": 2}, tone="")
+    saving = _saved(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(request=AsyncMock(return_value=_resp(502))))
+
+    await _post(_app(), "/statuses/42/react", {"emoji": "🎉"})
+
+    saving.assert_not_awaited()
 

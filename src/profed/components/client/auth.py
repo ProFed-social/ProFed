@@ -15,6 +15,7 @@ from profed.core.key_value_store import key_value_store
 from profed.identity import domain
 
 from .api_client import api_client
+from .reactions import from_history
 
 
 logger = logging.getLogger(__name__)
@@ -137,15 +138,30 @@ async def _account(access_token: str):
     return account.json()
 
 
+async def _reaction_state(access_token: str):
+    response = await api_client().get("/api/profed/reactions/history", token=access_token)
+    if response.status_code != 200:
+        logger.warning("fetching the reaction history failed: %s %s", response.status_code, response.text)
+        return from_history({})
+    return from_history(response.json())
+
+
 async def _start_session(access_token: str, session_ttl):
     sid = secrets.token_urlsafe(32)
     me = await _account(access_token)
     await key_value_store().set(_session_key(sid),
                                 {"username": me["username"],
                                  "acct": me["acct"],
-                                 "token": access_token},
+                                 "token": access_token,
+                                 **await _reaction_state(access_token)},
                                 session_ttl)
     return sid
+
+
+async def save_session(request: Request, session):
+    sid = request.cookies.get(SESSION_COOKIE)
+    if sid is not None:
+        await key_value_store().set(_session_key(sid), session, config().get("client", {})["session_ttl"])
 
 
 @router.get("/auth/callback")

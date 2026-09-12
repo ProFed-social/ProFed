@@ -271,6 +271,16 @@ a:hover { text-decoration: underline; }
 }
 .picker-body::backdrop { background: color-mix(in srgb, CanvasText 12%, transparent); }
 .picker-body > .undo { margin-bottom: .3rem; }
+.quick { display: flex; flex-wrap: wrap; gap: .15rem; margin-bottom: .4rem; }
+.quick .action { padding: .1rem .2rem; font-size: 1.2rem; }
+.quick .choice > button { display: none; }
+.picker:not(:has(.tones)) .quick .choice > button.is-current,
+.picker:has(.tones .tone:nth-child(1).is-current) .quick .choice > button:nth-child(1),
+.picker:has(.tones .tone:nth-child(2).is-current) .quick .choice > button:nth-child(2),
+.picker:has(.tones .tone:nth-child(3).is-current) .quick .choice > button:nth-child(3),
+.picker:has(.tones .tone:nth-child(4).is-current) .quick .choice > button:nth-child(4),
+.picker:has(.tones .tone:nth-child(5).is-current) .quick .choice > button:nth-child(5),
+.picker:has(.tones .tone:nth-child(6).is-current) .quick .choice > button:nth-child(6) { display: inline-block; }
 .grid > .head { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .4rem; }
 .grid .tabs, .grid .tones { display: flex; flex-wrap: wrap; gap: .15rem; }
 .grid .tabs label, .grid .tone { cursor: pointer; padding: .15rem .3rem; border-radius: 6px; }

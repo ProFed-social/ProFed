@@ -1,0 +1,15 @@
+<span class="quick">
+  {% for choice in quick %}
+  <span class="choice">
+    <button class="action{% if not tone %} is-current{% endif %}"
+            name="emoji" value="{{ choice }}">{{ choice }}</button>
+    {% for name in emoji_tones() %}
+    <button class="action{% if tone == name %} is-current{% endif %}"
+            name="emoji" value="{{ emoji_toned(choice, name) }}">{{ emoji_toned(choice, name) }}</button>
+    {% endfor %}
+  </span>
+  {% endfor %}
+</span>
+<div class="grid" hx-get="/emoji/choices{% if tone %}/{{ tone }}{% endif %}"
+     hx-trigger="load" hx-target="this" hx-swap="innerHTML"></div>
+

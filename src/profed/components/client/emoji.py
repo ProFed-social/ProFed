@@ -9,6 +9,7 @@ DATA = Path(__file__).parent / "data" / "emoji-test.txt"
 TONES = ("\U0001F3FB", "\U0001F3FC", "\U0001F3FD", "\U0001F3FE", "\U0001F3FF")
 
 SUFFIX = " skin tone"
+PREFIXES = ("\\u", "\\U", "U+", "u+")
 
 
 def _character(codepoints: str) -> str:
@@ -40,28 +41,25 @@ def groups() -> dict[str, list[str]]:
 @cache
 def tones() -> dict[str, str]:
     return {name[:-len(SUFFIX)]: _character(codepoints)
-            for codepoints, name in _components(DATA.read_text(encoding="utf-8").splitlines())
+            for codepoints, name in _labelled(DATA.read_text(encoding="utf-8").splitlines(), "component")
             if name.endswith(SUFFIX)}
 
 
-def _components(lines):
+def _labelled(lines, kind: str):
     return ((line.split(";")[0].strip(), line.split("# ", 1)[1].split(" ", 2)[2].strip())
             for line in lines
-            if "; component" in line and "# " in line)
+            if f"; {kind}" in line and "# " in line)
 
 
 @cache
-def _tonable() -> frozenset[str]:
-    return frozenset(emoji.replace(TONES[0], "")
-                     for emojis in _grouped(DATA.read_text(encoding="utf-8").splitlines()).values()
-                     for emoji in emojis
-                     if TONES[0] in emoji)
+def by_name() -> dict[str, str]:
+    return {name: _character(codepoints)
+            for codepoints, name in _labelled(DATA.read_text(encoding="utf-8").splitlines(), "fully-qualified")}
 
 
-def toned(emoji: str, tone: str) -> str:
-    return (plain + tone
-            if tone and (plain := emoji.replace("\U0000FE0F", "")) in _tonable() else
-            emoji)
+@cache
+def known() -> frozenset[str]:
+    return frozenset(by_name().values())
 
 
 def _plain(emoji: str) -> str:
@@ -77,14 +75,46 @@ def _variants(tone: str) -> dict[str, str]:
             if modifier in emoji}
 
 
+def toned(emoji: str, tone: str) -> str:
+    return _variants(tone).get(_plain(emoji), emoji) if tone else emoji
+
+
 @cache
 def grid(tone: str = "") -> dict[str, list[str]]:
-    return ({group: [_variants(tone).get(_plain(emoji), emoji) for emoji in emojis]
-             for group, emojis in groups().items()}
-            if tone else
-            groups())
+    return {group: [toned(emoji, tone) for emoji in emojis] for group, emojis in groups().items()}
 
 
 def tone_of(emoji: str) -> str:
     return next((name for name, modifier in tones().items() if modifier in emoji), "")
+
+
+@cache
+def _bases() -> dict[str, str]:
+    return {_plain(emoji): emoji for emojis in groups().values() for emoji in emojis}
+
+
+def _untoned(emoji: str) -> str:
+    return reduce(lambda plain, modifier: plain.replace(modifier, ""), tones().values(), _plain(emoji))
+
+
+def base_of(emoji: str) -> str:
+    return _bases().get(_untoned(emoji), emoji)
+
+
+def _digits(token: str) -> str:
+    return next((token[len(prefix):] for prefix in PREFIXES if token.startswith(prefix)), token)
+
+
+def _codes(text: str) -> str:
+    try:
+        return _character(" ".join(_digits(token) for token in text.split()))
+    except ValueError:
+        return ""
+
+
+def from_text(text: str) -> str:
+    return next((candidate
+                 for candidate in (by_name().get(text, ""), _codes(text), text)
+                 if candidate in known()),
+                "")
 

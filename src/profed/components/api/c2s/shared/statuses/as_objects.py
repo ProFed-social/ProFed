@@ -543,7 +543,7 @@ class _storage(BaseStorage):
                 api.as_objects AS o ON o.url = r.reaction_url
             WHERE
                 r.actor_url = $1 AND
-                r.emoji <> ''
+                r.emoji ~ '[\U0001F3FB-\U0001F3FF]'
             ORDER BY
                 o.mastodon_id DESC
             LIMIT 1""",

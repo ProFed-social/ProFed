@@ -72,28 +72,72 @@ def test_callback_rejects_state_mismatch():
     assert response.status_code == 400
 
 
-def test_callback_exchanges_token_and_creates_session():
-    api = MagicMock()
-    api.post = AsyncMock(return_value=_response(200, {"access_token": "acc-tok"}))
-    api.get = AsyncMock(return_value=_response(200, {"username": "alice", "acct": "alice@example.com"}))
-    kv = MagicMock()
-    kv.set = AsyncMock()
-
+def _callback(api, kv):
     client = TestClient(_app())
     client.cookies.set("oauth_state", "s")
 
     with patch("profed.components.client.auth.config", new=lambda: CLIENT_CFG), \
          patch("profed.components.client.auth.api_client", return_value=api), \
          patch("profed.components.client.auth.key_value_store", return_value=kv):
-        response = client.get("/auth/callback?code=the-code&state=s", follow_redirects=False)
+        return client.get("/auth/callback?code=the-code&state=s", follow_redirects=False)
+
+
+def _logging_in(history=None):
+    api = MagicMock()
+    api.post = AsyncMock(return_value=_response(200, {"access_token": "acc-tok"}))
+    api.get = AsyncMock(side_effect=[_response(200, {"username": "alice", "acct": "alice@example.com"}),
+                                     _response(200, history if history is not None else {"counts": [],
+                                                                                         "last_toned": None})])
+    return api
+
+
+def test_callback_exchanges_token_and_creates_session():
+    api = _logging_in()
+    kv = MagicMock()
+    kv.set = AsyncMock()
+
+    response = _callback(api, kv)
 
     assert response.status_code == 303
     assert api.post.await_args.args[0] == "/oauth/token"
     assert api.post.await_args.kwargs["data"]["code"] == "the-code"
-    assert api.get.await_args.kwargs["token"] == "acc-tok"
+    assert api.get.await_args_list[0].kwargs["token"] == "acc-tok"
     assert kv.set.await_args.args[0].startswith("client:session:")
-    assert kv.set.await_args.args[1] == {"username": "alice", "acct": "alice@example.com", "token": "acc-tok"}
+    assert kv.set.await_args.args[1] == {"username": "alice",
+                                         "acct": "alice@example.com",
+                                         "token": "acc-tok",
+                                         "reactions": {},
+                                         "tone": ""}
     assert response.cookies.get("session") is not None
+
+
+def test_a_new_session_carries_the_reaction_history():
+    api = _logging_in({"counts": [{"emoji": "\U0001F44D", "n_of_uses": 2},
+                                  {"emoji": "\U0001F44D\U0001F3FD", "n_of_uses": 3},
+                                  {"emoji": "\U0001F389", "n_of_uses": 1}],
+                       "last_toned": "\U0001F44D\U0001F3FD"})
+    kv = MagicMock()
+    kv.set = AsyncMock()
+
+    _callback(api, kv)
+
+    assert api.get.await_args_list[1].args[0] == "/api/profed/reactions/history"
+    assert kv.set.await_args.args[1]["reactions"] == {"\U0001F44D": 5, "\U0001F389": 1}
+    assert kv.set.await_args.args[1]["tone"] == "medium"
+
+
+def test_a_failing_reaction_history_does_not_stop_the_login():
+    unavailable = _response(503)
+    unavailable.json = MagicMock(side_effect=ValueError("no json"))
+    api = _logging_in()
+    api.get = AsyncMock(side_effect=[_response(200, {"username": "alice", "acct": "alice@example.com"}),
+                                     unavailable])
+    kv = MagicMock()
+    kv.set = AsyncMock()
+
+    assert _callback(api, kv).status_code == 303
+    assert kv.set.await_args.args[1]["reactions"] == {}
+    assert kv.set.await_args.args[1]["tone"] == ""
 
 
 def test_callback_fails_when_token_exchange_fails():
@@ -270,4 +314,29 @@ async def test_page_context_reports_logged_in_username():
         ctx = await auth.page_context(request)
 
     assert ctx["current_username"] == "christof"
+
+
+async def test_save_session_writes_the_session_back_under_its_own_key():
+    request = MagicMock()
+    request.cookies = {"session": "sid1"}
+    kv = MagicMock()
+    kv.set = AsyncMock()
+
+    with patch("profed.components.client.auth.config", new=lambda: CLIENT_CFG), \
+         patch("profed.components.client.auth.key_value_store", return_value=kv):
+        await auth.save_session(request, {"username": "alice", "tone": "medium"})
+
+    assert kv.set.await_args.args == ("client:session:sid1", {"username": "alice", "tone": "medium"}, 86400)
+
+
+async def test_save_session_without_a_cookie_writes_nothing():
+    request = MagicMock()
+    request.cookies = {}
+    kv = MagicMock()
+    kv.set = AsyncMock()
+
+    with patch("profed.components.client.auth.key_value_store", return_value=kv):
+        await auth.save_session(request, {"username": "alice"})
+
+    kv.set.assert_not_awaited()
 

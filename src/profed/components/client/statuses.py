@@ -10,9 +10,12 @@ from urllib.parse import quote
 from fastapi import APIRouter, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 
+from profed.core.config import config
+
 from .api_client import api_client
-from .auth import requires_login
+from .auth import current_user_optional, requires_login, save_session
 from .emoji import grid, tones
+from .reactions import after_react, after_unreact, quick_access
 from .templating import environment
 
 logger = logging.getLogger(__name__)
@@ -94,6 +97,17 @@ async def emoji_choices_toned(request: Request, tone: str):
     return _grid_response(request, tone)
 
 
+@router.get("/emoji/picker", response_class=HTMLResponse)
+async def emoji_picker(request: Request):
+    session = await current_user_optional(request) or {}
+
+    return HTMLResponse(environment().get_template("picker.html")
+                        .render(quick=quick_access(session.get("reactions", {}),
+                                                   config().get("client", {}).get("quick_reactions", [])),
+                                tone=session.get("tone", "")),
+                        headers={"Cache-Control": "no-store"})
+
+
 async def _reaction_action(id: str, method: str, emoji: str, token: str) -> HTMLResponse:
     response = await api_client().request(method,
                                           f"/api/v1/pleroma/statuses/{id}/reactions/{quote(emoji)}",
@@ -107,12 +121,22 @@ async def _reaction_action(id: str, method: str, emoji: str, token: str) -> HTML
 
 @router.post("/statuses/{id}/react", response_class=HTMLResponse)
 @requires_login
-async def react(request: Request, session, id: str, emoji: Annotated[str, Form()]):
-    return await _reaction_action(id, "PUT", emoji, session["token"])
+async def react(request: Request,
+                session,
+                id: str,
+                emoji: Annotated[str, Form()],
+                previous: Annotated[str, Form()] = ""):
+    button = await _reaction_action(id, "PUT", emoji, session["token"])
+    await save_session(request, {**session, **after_react(session, emoji, previous)})
+
+    return button
 
 
 @router.post("/statuses/{id}/unreact/{emoji}", response_class=HTMLResponse)
 @requires_login
 async def unreact(request: Request, session, id: str, emoji: str):
-    return await _reaction_action(id, "DELETE", emoji, session["token"])
+    button = await _reaction_action(id, "DELETE", emoji, session["token"])
+    await save_session(request, {**session, **after_unreact(session, emoji)})
+
+    return button
 

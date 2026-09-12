@@ -97,7 +97,9 @@ def build_environment(standard_dir, theme_dir):
                                rfc822=rfc822,
                                relative_time=relative_time,
                                local_minutes=local_minutes)
-    environment.globals.update(breakdown_title=breakdown_title, emoji_tones=emoji.tones)
+    environment.globals.update(breakdown_title=breakdown_title,
+                               emoji_tones=emoji.tones,
+                               emoji_toned=emoji.toned)
     return environment
 
 
