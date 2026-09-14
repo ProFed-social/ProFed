@@ -9,6 +9,8 @@ from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import narrow_deactivate_routers
 from profed.components.api.c2s.shared.known_accounts import storage as known_accounts_storage
 from profed.components.api.c2s.shared.known_accounts import projection as known_accounts_projection
+from profed.components.api.c2s.shared.known_servers import storage as known_servers_storage
+from profed.components.api.c2s.shared.known_servers import projection as known_servers_projection
 from profed.components.api.c2s.shared.me_links import storage as me_links_storage
 from profed.components.api.c2s.shared.me_links import projection as me_links_projection
 from profed.components.api.c2s.shared import instance_key as instance_key_projection
@@ -65,6 +67,11 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       known_accounts_projection,
                                                       known_accounts_projection.handle_events,
                                                       "c2s_known_accounts")),
+                             (["v1_pleroma"],
+                              _projection_initializer(known_servers_storage,
+                                                      known_servers_projection,
+                                                      known_servers_projection.handle_events,
+                                                      "c2s_known_servers")),
                              (["v1_search", "v1_accounts", "v2_search"],
                               _projection_initializer(me_links_storage,
                                                       me_links_projection,

@@ -23,6 +23,8 @@ from .lists import router as lists
 from .markers import router as markers
 from .conversations import router as conversations
 from .pleroma import router as pleroma
+from .pleroma import storage as reaction_formats_storage
+from .pleroma import projection as reaction_formats_projection
 from .accounts.follows import storage as follows_storage
 from .accounts.follows import projection as follows_projection
 from .accounts.preferences import storage as preferences_storage
@@ -65,7 +67,12 @@ async def init(config: dict, deactivate: List[str]) -> None:
                               _projection_initializer(user_statuses_storage,
                                                       user_statuses_projection,
                                                       user_statuses_projection.handle_events,
-                                                      "c2s_v1_user_statuses"))]:
+                                                      "c2s_v1_user_statuses")),
+                             (["pleroma"],
+                              _projection_initializer(reaction_formats_storage,
+                                                      reaction_formats_projection,
+                                                      reaction_formats_projection.handle_events,
+                                                      "c2s_v1_reaction_formats"))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
 

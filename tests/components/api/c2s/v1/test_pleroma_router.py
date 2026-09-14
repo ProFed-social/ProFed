@@ -65,18 +65,28 @@ def _store(reaction_of=None):
                                              reaction_breakdown=AsyncMock(return_value={}))))
 
 
+def _formats(verb=None):
+    return patch("profed.components.api.c2s.v1.pleroma.router.reaction_formats",
+                 AsyncMock(return_value=Mock(verb_of=AsyncMock(return_value=verb))))
+
+
+def _understanding(supported=False):
+    return patch("profed.components.api.c2s.v1.pleroma.router.understands_reactions",
+                 AsyncMock(return_value=supported))
+
+
 def _own(emoji):
     return {"reaction_url": _like_url(), "emoji": emoji}
 
 
-def _react(client, emoji, reaction_of=None):
-    with _store(reaction_of), \
+def _react(client, emoji, reaction_of=None, supported=False, verb=None):
+    with _store(reaction_of), _understanding(supported), _formats(verb), \
          patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
         return client.put(f"/pleroma/statuses/424242/reactions/{emoji}")
 
 
-def _unreact(client, emoji, reaction_of):
-    with _store(reaction_of), \
+def _unreact(client, emoji, reaction_of, verb=None):
+    with _store(reaction_of), _understanding(), _formats(verb), \
          patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
         return client.delete(f"/pleroma/statuses/424242/reactions/{emoji}")
 
@@ -127,6 +137,53 @@ def test_removing_a_reaction_that_is_not_recorded_publishes_nothing(client, fake
 
 def test_removing_a_reaction_reports_the_status_as_not_favourited(client, fake_bus):
     assert _unreact(client, "🎉", reaction_of=_own("🎉")).json()["favourited"] is False
+
+
+def test_a_reaction_to_a_supporting_host_goes_out_as_an_emoji_react(client, fake_bus):
+    _react(client, "🎉", supported=True)
+
+    published = fake_bus.topic("raw_activities").published[0]
+    assert published["event_type"] == "EmojiReact"
+    assert published["payload"]["activity"]["content"] == "🎉"
+    assert "_misskey_reaction" not in published["payload"]["activity"]
+
+
+def test_an_emoji_react_is_addressed_to_the_author(client, fake_bus):
+    _react(client, "🎉", supported=True)
+
+    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["to"] == \
+        [BOOSTED["content"]["actor"]]
+
+
+def test_a_reaction_to_an_unknown_host_keeps_the_degraded_like(client, fake_bus):
+    _react(client, "🎉", supported=False)
+
+    published = fake_bus.topic("raw_activities").published[0]
+    assert published["event_type"] == "Like"
+    assert published["payload"]["activity"]["_misskey_reaction"] == "🎉"
+
+
+def test_an_undo_takes_the_form_of_the_reaction_it_undoes(client, fake_bus):
+    _unreact(client, "🎉", reaction_of=_own("🎉"), verb="EmojiReact")
+
+    undone = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
+    assert undone["type"] == "EmojiReact"
+    assert undone["id"] == _like_url()
+    assert undone["content"] == "🎉"
+
+
+def test_an_undo_of_an_unremembered_reaction_falls_back_to_a_like(client, fake_bus):
+    _unreact(client, "🎉", reaction_of=_own("🎉"), verb=None)
+
+    assert fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["type"] == "Like"
+
+
+def test_changing_to_another_emoji_undoes_in_the_remembered_form(client, fake_bus):
+    _react(client, "🐶", reaction_of=_own("🎉"), supported=True, verb="EmojiReact")
+
+    published = fake_bus.topic("raw_activities").published
+    assert published[0]["payload"]["activity"]["object"]["type"] == "EmojiReact"
+    assert published[1]["event_type"] == "EmojiReact"
 
 
 def _handles(deactivate, method, path):
