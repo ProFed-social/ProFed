@@ -21,6 +21,10 @@ def test_valid_announce_event_returns_payload():
     assert validate_activities_event("Announce", PAYLOAD) is not None
 
 
+def test_valid_emoji_react_event_returns_payload():
+    assert validate_activities_event("EmojiReact", PAYLOAD) is not None
+
+
 def test_unknown_verb_returns_none():
     assert validate_activities_event("Foo", PAYLOAD) is None
 

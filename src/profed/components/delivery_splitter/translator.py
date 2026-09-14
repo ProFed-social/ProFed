@@ -161,9 +161,9 @@ _announce = _object_fan_out(_announce_recipients, _store)
 _follow = _directed_fan_out(_follow_target)
 _accept = _directed_fan_out(_accept_target)
 _undo_announce = _object_fan_out(_undo_announce_recipients, _forget, object_url_of=_undo_target)
-_like = _directed_fan_out(_addressed_target)
-_undo_like = _directed_fan_out(_addressed_target)
-_undo = _undo_fan_out({"Announce": _undo_announce, "Like": _undo_like}, _directed_fan_out(_undo_target))
+_reaction = _directed_fan_out(_addressed_target)
+_undo = _undo_fan_out({"Announce": _undo_announce, "Like": _reaction, "EmojiReact": _reaction},
+                      _directed_fan_out(_undo_target))
 
 
 handle_events, rebuild, _ = build_projection(topic=activities,
@@ -177,6 +177,7 @@ handle_events, rebuild, _ = build_projection(topic=activities,
                                                               "Reject": _accept,
                                                               "Undo": _undo,
                                                               "Announce": _announce,
-                                                              "Like": _like},
+                                                              "Like": _reaction,
+                                                              "EmojiReact": _reaction},
                                              event_handler_signature=(with_event_type & with_emitted_at))
 

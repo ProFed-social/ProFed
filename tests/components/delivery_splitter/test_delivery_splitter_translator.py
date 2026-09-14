@@ -361,7 +361,38 @@ def _like_payload():
 
 
 async def test_a_like_is_delivered_to_the_addressed_author(fake_bus, fake_storage):
-    await translator._like("Like", "https://example.com/actors/alice#like/1", _like_payload(), AT)
+    await translator._reaction("Like", "https://example.com/actors/alice#like/1", _like_payload(), AT)
+
+    published = fake_bus.topic("deliveries").published
+    assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob"}
+
+
+async def test_an_emoji_react_is_delivered_to_the_addressed_author(fake_bus, fake_storage):
+    await translator._reaction("EmojiReact", "https://example.com/actors/alice#react/1", _like_payload(), AT)
+
+    published = fake_bus.topic("deliveries").published
+    assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob"}
+    assert published[0]["payload"]["activity"]["type"] == "EmojiReact"
+
+
+async def test_an_emoji_react_is_registered_on_the_activities_topic(fake_bus, fake_storage):
+    fake_bus.topic("activities").messages.append((1,
+                                                  "EmojiReact",
+                                                  "https://example.com/actors/alice#react/1",
+                                                  AT,
+                                                  _like_payload()))
+
+    await translator.handle_events()
+
+    published = fake_bus.topic("deliveries").published
+    assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob"}
+
+
+async def test_an_undone_emoji_react_goes_to_the_addressed_author(fake_bus, fake_storage):
+    payload = _undo_payload("EmojiReact", "https://r.example/notes/7")
+    payload["activity"]["to"] = ["https://r.example/bob"]
+
+    await translator._undo("Undo", "https://example.com/actors/alice#undo/1", payload, AT)
 
     published = fake_bus.topic("deliveries").published
     assert {message["object_id"].split("|")[1] for message in published} == {"https://r.example/bob"}
@@ -371,7 +402,7 @@ async def test_a_like_without_a_recipient_is_delivered_to_nobody(fake_bus, fake_
     payload = _like_payload()
     payload["activity"]["to"] = []
 
-    await translator._like("Like", "https://example.com/actors/alice#like/1", payload, AT)
+    await translator._reaction("Like", "https://example.com/actors/alice#like/1", payload, AT)
 
     assert fake_bus.topic("deliveries").published == []
 

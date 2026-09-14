@@ -17,6 +17,8 @@ from .activity import (Activity,
                        AnnounceActivity,
                        LikeActivity,
                        UndoLikeActivity,
+                       EmojiReactActivity,
+                       UndoEmojiReactActivity,
                        UndoAnnounceActivity)
 from .object import Note
 
@@ -37,5 +39,7 @@ __all__ = ["ActivityStreamsObject",
            "UndoAnnounceActivity",
            "LikeActivity",
            "UndoLikeActivity",
+           "EmojiReactActivity",
+           "UndoEmojiReactActivity",
            "Note"]
 

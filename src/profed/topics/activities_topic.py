@@ -16,6 +16,7 @@ ACTIVITIES_VERBS = {"Create",
                     "Reject",
                     "Undo",
                     "Like",
+                    "EmojiReact",
                     "Announce",
                     "Block"}
 

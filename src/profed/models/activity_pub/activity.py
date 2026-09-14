@@ -64,6 +64,17 @@ class UndoLikeActivity(ActivityStreamsObject):
     object: LikeActivity
 
 
+class EmojiReactActivity(Activity):
+    type: str = "EmojiReact"
+    content: Annotated[str, Field(min_length=1)]
+
+
+class UndoEmojiReactActivity(ActivityStreamsObject):
+    type: str = "Undo"
+    actor: ActorRef
+    object: EmojiReactActivity
+
+
 class FollowActivity(ActivityStreamsObject):
     type: str = "Follow"
     actor: ActorRef
