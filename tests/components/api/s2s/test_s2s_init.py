@@ -22,9 +22,18 @@ async def _started_projections(deactivate):
 
 @pytest.mark.asyncio
 async def test_all_projections_start_when_nothing_deactivated():
-    assert await _started_projections([]) == ["s2s_webfinger", "s2s_actor", "s2s_inbox",
-                                              "s2s_inbox_public_keys", "s2s_outbox",
+    assert await _started_projections([]) == ["s2s_webfinger",
+                                              "s2s_actor",
+                                              "s2s_inbox",
+                                              "s2s_inbox_public_keys",
+                                              "s2s_reactions",
+                                              "s2s_outbox",
                                               "s2s_instance_actor"]
+
+
+@pytest.mark.asyncio
+async def test_reactions_stop_with_the_outbox():
+    assert "s2s_reactions" not in await _started_projections(["outbox"])
 
 
 @pytest.mark.asyncio
