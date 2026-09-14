@@ -94,6 +94,7 @@ class ServerUpdateEvent(BaseModel):
     model_config = ConfigDict(extra="allow")
     checked_at: str = Field(min_length=1)
     stable_since: str = Field(min_length=1)
+    failures: int = 0
     software: Optional[str] = None
     features: List[str] = Field(default_factory=list)
     last_modified: Optional[str] = None

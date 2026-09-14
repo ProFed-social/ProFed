@@ -12,7 +12,9 @@ from profed.topics.common import (ServerObservationEvent,
 
 DEFAULT_PORTS = {"http": "80", "https": "443"}
 
-PAYLOAD_MODELS = {"observed": ServerObservationEvent, "updated": ServerUpdateEvent}
+PAYLOAD_MODELS = {"observed": ServerObservationEvent,
+                  "updated": ServerUpdateEvent,
+                  "unreachable": ServerUpdateEvent}
 
 KNOWN_SERVER_STATES = {"discovered", "lost"} | set(PAYLOAD_MODELS)
 

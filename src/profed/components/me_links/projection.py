@@ -4,9 +4,9 @@
 from datetime import datetime
 from profed.core.persistence.projections import build_projection
 from profed.topics import me_links as topic
+from profed.federation.refresh import due_at
 from profed.topics.me_links_topic import CHECK_STATES, link_parts
 from profed.util import noop
-from .refresh import due_at
 from .storage import storage
 
 

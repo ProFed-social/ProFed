@@ -33,11 +33,17 @@ def test_an_observation_without_an_activity_is_rejected():
 
 def test_an_update_passes_and_defaults_to_no_features():
     assert validate_known_servers_event("updated", UPDATED) == dict(UPDATED,
+                                                                    failures=0,
                                                                     software=None,
                                                                     features=[],
                                                                     last_modified=None,
                                                                     etag=None,
                                                                     content_hash=None)
+
+
+def test_a_failed_check_is_validated_like_an_update():
+    assert validate_known_servers_event("unreachable", dict(UPDATED, failures=3))["failures"] == 3
+
 
 
 def test_an_update_keeps_software_and_features():

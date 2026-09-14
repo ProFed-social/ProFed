@@ -11,9 +11,8 @@ router = APIRouter()
 
 @router.api_route("/.well-known/nodeinfo", methods=["GET", "HEAD"])
 async def well_known_nodeinfo():
-    d = domain()
     return {"links": [{"rel": "http://nodeinfo.diaspora.software/ns/schema/2.0",
-                        "href": f"https://{d}/nodeinfo/2.0"}]}
+                        "href": f"https://{ domain() }/nodeinfo/2.0"}]}
 
 
 @router.api_route("/nodeinfo/2.0", methods=["GET", "HEAD"])
@@ -22,6 +21,7 @@ async def nodeinfo():
                                  "software": {"name": "profed",
                                               "version": "0.1.0"},
                                  "protocols": ["activitypub"],
+                                 "metadata": {"features": ["pleroma_emoji_reactions"]},
                                  "usage": {"users": {"total": 0,
                                                      "activeMonth": 0,
                                                      "activeHalfyear": 0},

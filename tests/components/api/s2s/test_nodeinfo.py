@@ -57,6 +57,12 @@ def test_nodeinfo_returns_correct_software_name(client):
     assert response.json()["software"]["name"] == "profed"
 
 
+def test_nodeinfo_announces_that_it_understands_emoji_reactions(client):
+    response = client.get("/nodeinfo/2.0")
+
+    assert "pleroma_emoji_reactions" in response.json()["metadata"]["features"]
+
+
 def test_nodeinfo_content_type(client):
     response = client.get("/nodeinfo/2.0")
 

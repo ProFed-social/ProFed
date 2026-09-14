@@ -3,7 +3,7 @@
 
 from datetime import datetime, timedelta, timezone
 from profed.components.me_links.config import parse
-from profed.components.me_links.refresh import due_at, is_due, modified_at, parse_http_date, refresh_interval
+from profed.federation.refresh import due_at, is_due, modified_at, parse_http_date, refresh_interval
 
 
 NOW = datetime(2026, 8, 30, 12, 0, tzinfo=timezone.utc)
