@@ -46,8 +46,8 @@ def document_url(links) -> Optional[str]:
 
 def features_of(document: dict) -> list:
     metadata = document.get("metadata")
-    listed = (metadata or {}).get("features") if isinstance(metadata, dict) else None
-    return [feature for feature in listed or [] if isinstance(feature, str)]
+    listed = metadata.get("features") if isinstance(metadata, dict) else None
+    return [feature for feature in listed if isinstance(feature, str)] if isinstance(listed, list) else []
 
 
 def software_of(document: dict) -> Optional[str]:

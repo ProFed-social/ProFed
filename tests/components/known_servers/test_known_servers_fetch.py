@@ -55,6 +55,10 @@ def test_only_strings_count_as_features():
     assert fetch.features_of({"metadata": {"features": ["a", 7, None]}}) == ["a"]
 
 
+def test_a_feature_object_says_nothing():
+    assert fetch.features_of({"metadata": {"features": {"pleroma_emoji_reactions": False}}}) == []
+
+
 def test_the_software_name_is_read():
     assert fetch.software_of(DOCUMENT) == "pleroma"
     assert fetch.software_of({"software": "nonsense"}) is None

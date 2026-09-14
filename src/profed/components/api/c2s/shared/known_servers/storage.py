@@ -20,7 +20,8 @@ class _Storage(BaseStorage):
 
     async def support_of(self, host: str) -> Optional[bool]:
         row = await self.fetch_one("""SELECT (reacted_at IS NOT NULL OR
-                                              features ? 'pleroma_emoji_reactions') AS supported
+                                              features ?| array['pleroma_emoji_reactions',
+                                                                'emoji_reactions']) AS supported
                                       FROM api.known_servers
                                       WHERE host = $1""",
                                    host)

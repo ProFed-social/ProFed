@@ -51,7 +51,16 @@ async def test_support_follows_an_observation_or_the_feature_list(fake_pool):
 
     sql = fake_pool.fetchrow.await_args.args[0]
     assert "reacted_at IS NOT NULL" in sql
-    assert "features ? 'pleroma_emoji_reactions'" in sql
+    assert "'pleroma_emoji_reactions'" in sql
+
+
+@pytest.mark.asyncio
+async def test_support_counts_the_neutral_feature_name_too(fake_pool):
+    await (await module.storage()).support_of("a.test")
+
+    sql = fake_pool.fetchrow.await_args.args[0]
+    assert "features ?|" in sql
+    assert "'emoji_reactions'" in sql
 
 
 @pytest.mark.asyncio
