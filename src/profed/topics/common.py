@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from typing import Dict, Optional, Type
+from typing import Dict, List, Optional, Type
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -79,6 +79,23 @@ class MeLinkEvent(BaseModel):
     profile_url: str = Field(min_length=1)
     checked_at: str = Field(min_length=1)
     stable_since: str = Field(min_length=1)
+    last_modified: Optional[str] = None
+    etag: Optional[str] = None
+    content_hash: Optional[str] = None
+
+
+class ServerObservationEvent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    activity_type: str = Field(min_length=1)
+    observed_at: str = Field(min_length=1)
+
+
+class ServerUpdateEvent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    checked_at: str = Field(min_length=1)
+    stable_since: str = Field(min_length=1)
+    software: Optional[str] = None
+    features: List[str] = Field(default_factory=list)
     last_modified: Optional[str] = None
     etag: Optional[str] = None
     content_hash: Optional[str] = None
