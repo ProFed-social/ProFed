@@ -21,7 +21,7 @@ async def nodeinfo():
                                  "software": {"name": "profed",
                                               "version": "0.1.0"},
                                  "protocols": ["activitypub"],
-                                 "metadata": {"features": ["pleroma_emoji_reactions"]},
+                                 "metadata": {"features": ["pleroma_emoji_reactions", "emoji_reactions"]},
                                  "usage": {"users": {"total": 0,
                                                      "activeMonth": 0,
                                                      "activeHalfyear": 0},
