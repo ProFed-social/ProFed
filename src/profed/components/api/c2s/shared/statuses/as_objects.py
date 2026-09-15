@@ -108,83 +108,13 @@ class _storage(BaseStorage):
                                    actor_url    TEXT NOT NULL,
                                    object_url   TEXT NOT NULL,
                                    PRIMARY KEY (announce_url))""")
+        await self.execute("""CREATE UNIQUE INDEX IF NOT EXISTS
+                              boosts_actor_object_uniq
+                              ON api.boosts (actor_url, object_url)""")
         await self.execute("""CREATE TABLE IF NOT EXISTS api.boost_counts
                                   (object_url  TEXT NOT NULL,
                                    n_of_boosts INTEGER NOT NULL,
                                    PRIMARY KEY (object_url))""")
-        await self.execute("""DO $$ BEGIN
-                                  CREATE TYPE api.boost_row AS (announce_url TEXT,
-                                                                actor_url TEXT,
-                                                                object_url TEXT);
-                              EXCEPTION WHEN duplicate_object THEN NULL;
-                              END $$""")
-        await self.execute("""
-            CREATE OR REPLACE FUNCTION api.record_boosts(entries api.boost_row[])
-            RETURNS void LANGUAGE sql AS $fn$
-                WITH ins AS (
-                        INSERT INTO api.boosts (announce_url, actor_url, object_url)
-                        SELECT
-                            e.announce_url,
-                            e.actor_url,
-                            e.object_url
-                        FROM
-                            unnest(entries) AS e
-                        ON CONFLICT (announce_url) DO NOTHING
-                        RETURNING actor_url, object_url),
-                     fresh AS (
-                        SELECT DISTINCT
-                            i.actor_url,
-                            i.object_url
-                        FROM
-                            ins AS i
-                        WHERE
-                            NOT EXISTS (SELECT 1
-                                        FROM api.boosts AS o
-                                        WHERE o.actor_url = i.actor_url AND
-                                              o.object_url = i.object_url))
-                INSERT INTO api.boost_counts (object_url, n_of_boosts)
-                SELECT
-                    object_url,
-                    count(*)
-                FROM
-                    fresh
-                GROUP BY
-                    object_url
-                ON CONFLICT (object_url) DO UPDATE
-                    SET n_of_boosts = api.boost_counts.n_of_boosts + EXCLUDED.n_of_boosts
-            $fn$""")
-        await self.execute("""
-            CREATE OR REPLACE FUNCTION api.forget_boosts(announce_urls TEXT[])
-            RETURNS void LANGUAGE sql AS $fn$
-                WITH del AS (
-                        DELETE FROM api.boosts
-                        WHERE announce_url = ANY(announce_urls)
-                        RETURNING actor_url, object_url),
-                     gone AS (
-                        SELECT DISTINCT
-                            d.actor_url,
-                            d.object_url
-                        FROM
-                            del AS d
-                        WHERE
-                            NOT EXISTS (SELECT 1
-                                        FROM api.boosts AS o
-                                        WHERE o.actor_url = d.actor_url AND
-                                              o.object_url = d.object_url AND
-                                              o.announce_url <> ALL(announce_urls)))
-                UPDATE api.boost_counts AS c
-                SET n_of_boosts = GREATEST(c.n_of_boosts - g.n, 0)
-                FROM
-                    (SELECT
-                        object_url,
-                        count(*) AS n
-                    FROM
-                        gone
-                    GROUP BY
-                        object_url) AS g
-                WHERE
-                    c.object_url = g.object_url
-            $fn$""")
         await self.execute("""CREATE TABLE IF NOT EXISTS api.reactions
                                   (reaction_url TEXT NOT NULL,
                                    actor_url    TEXT NOT NULL,
@@ -197,60 +127,207 @@ class _storage(BaseStorage):
                                    emoji           TEXT NOT NULL,
                                    n_of_reactions  INTEGER NOT NULL,
                                    PRIMARY KEY (object_url, emoji))""")
-        await self.execute("""DO $$ BEGIN
-                                  CREATE TYPE api.reaction_row AS (reaction_url TEXT,
-                                                                   actor_url TEXT,
-                                                                   object_url TEXT,
-                                                                   emoji TEXT);
-                              EXCEPTION WHEN duplicate_object THEN NULL;
-                              END $$""")
+
         await self.execute("""
-            CREATE OR REPLACE FUNCTION api.record_reactions(entries api.reaction_row[])
-            RETURNS void LANGUAGE sql AS $fn$
-                WITH ins AS (
-                        INSERT INTO api.reactions (reaction_url, actor_url, object_url, emoji)
-                        SELECT
-                            e.reaction_url,
-                            e.actor_url,
-                            e.object_url,
-                            e.emoji
-                        FROM
-                            unnest(entries) AS e
-                        ON CONFLICT DO NOTHING
-                        RETURNING object_url, emoji)
-                INSERT INTO api.reaction_counts (object_url, emoji, n_of_reactions)
+            CREATE OR REPLACE FUNCTION api.refresh_boosts(object_urls TEXT[])
+            RETURNS void LANGUAGE plpgsql AS $fn$
+            BEGIN
+                CREATE TEMPORARY TABLE valid_boosts
+                ON COMMIT DROP
+                AS SELECT DISTINCT ON (o.actor_url, o.target_url)
+                       o.url,
+                       o.actor_url,
+                       o.target_url AS object_url
+                   FROM
+                       api.as_objects AS o INNER JOIN
+                       api.as_objects AS n ON n.url = o.target_url
+                   WHERE
+                       o.kind = 'announce' AND
+                       n.kind = 'content' AND
+                       n.url = ANY(object_urls)
+                   ORDER BY
+                       o.actor_url,
+                       o.target_url,
+                       o.mastodon_id;
+
+                DELETE FROM
+                    api.boosts AS b
+                WHERE
+                    b.object_url = ANY(object_urls) AND
+                    NOT EXISTS (SELECT
+                                    1
+                                FROM
+                                    valid_boosts AS v
+                                WHERE
+                                    v.url = b.announce_url);
+
+                INSERT INTO
+                    api.boosts
+                        (announce_url, actor_url, object_url)
+                SELECT
+                    url,
+                    actor_url,
+                    object_url
+                FROM
+                    valid_boosts
+                ON CONFLICT DO NOTHING;
+
+                INSERT INTO
+                    api.boost_counts
+                        (object_url, n_of_boosts)
+                SELECT
+                    n.url,
+                    count(v.url)
+                FROM
+                    api.as_objects AS n LEFT JOIN
+                    valid_boosts AS v ON v.object_url = n.url
+                WHERE
+                    n.url = ANY(object_urls) AND
+                    n.kind = 'content'
+                GROUP BY
+                    n.url
+                ON CONFLICT (object_url) DO UPDATE
+                    SET
+                        n_of_boosts = EXCLUDED.n_of_boosts;
+
+                DROP TABLE valid_boosts;
+            END
+            $fn$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.refresh_reactions(object_urls TEXT[])
+            RETURNS void LANGUAGE plpgsql AS $fn$
+            BEGIN
+                CREATE TEMPORARY TABLE valid_reactions
+                ON COMMIT DROP
+                AS SELECT DISTINCT ON (o.actor_url, o.target_url, o.emoji)
+                       o.url,
+                       o.actor_url,
+                       o.target_url AS object_url,
+                       o.emoji
+                   FROM
+                       api.as_objects AS o INNER JOIN
+                       api.as_objects AS n ON n.url = o.target_url
+                   WHERE
+                       o.kind = 'like' AND
+                       n.kind = 'content' AND
+                       n.url = ANY(object_urls)
+                   ORDER BY
+                       o.actor_url,
+                       o.target_url,
+                       o.emoji,
+                       o.mastodon_id;
+
+                DELETE FROM
+                    api.reactions AS r
+                WHERE
+                    r.object_url = ANY(object_urls) AND
+                    NOT EXISTS (SELECT
+                                    1
+                                FROM
+                                    valid_reactions AS v
+                                WHERE
+                                    v.url = r.reaction_url);
+
+                INSERT INTO
+                    api.reactions
+                        (reaction_url, actor_url, object_url, emoji)
+                SELECT
+                    url,
+                    actor_url,
+                    object_url,
+                    emoji
+                FROM
+                    valid_reactions
+                ON CONFLICT DO NOTHING;
+
+                DELETE FROM
+                    api.reaction_counts AS c
+                WHERE
+                    c.object_url = ANY(object_urls) AND
+                    NOT EXISTS (SELECT
+                                    1
+                                FROM
+                                    valid_reactions AS v
+                                WHERE
+                                    v.object_url = c.object_url AND
+                                    v.emoji = c.emoji);
+
+                INSERT INTO
+                    api.reaction_counts
+                        (object_url, emoji, n_of_reactions)
                 SELECT
                     object_url,
                     emoji,
                     count(*)
                 FROM
-                    ins
+                    valid_reactions
                 GROUP BY
-                    object_url, emoji
+                    object_url,
+                    emoji
                 ON CONFLICT (object_url, emoji) DO UPDATE
-                    SET n_of_reactions = api.reaction_counts.n_of_reactions + EXCLUDED.n_of_reactions
+                    SET
+                        n_of_reactions = EXCLUDED.n_of_reactions;
+
+                DROP TABLE valid_reactions;
+            END
             $fn$""")
         await self.execute("""
-            CREATE OR REPLACE FUNCTION api.forget_reactions(reaction_urls TEXT[])
-            RETURNS void LANGUAGE sql AS $fn$
-                WITH del AS (
-                        DELETE FROM api.reactions
-                        WHERE reaction_url = ANY(reaction_urls)
-                        RETURNING object_url, emoji)
-                UPDATE api.reaction_counts AS c
-                SET n_of_reactions = GREATEST(c.n_of_reactions - g.n, 0)
-                FROM
-                    (SELECT
-                        object_url,
-                        emoji,
-                        count(*) AS n
-                    FROM
-                        del
-                    GROUP BY
-                        object_url, emoji) AS g
+            CREATE OR REPLACE FUNCTION api.refresh_edges(object_urls TEXT[])
+            RETURNS void LANGUAGE plpgsql AS $fn$
+            BEGIN
+                PERFORM api.refresh_boosts(object_urls);
+                PERFORM api.refresh_reactions(object_urls);
+            END
+            $fn$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.store_object(p_mastodon_id NUMERIC,
+                                                        p_url TEXT,
+                                                        p_actor_url TEXT,
+                                                        p_status JSONB,
+                                                        p_kind TEXT,
+                                                        p_target_url TEXT,
+                                                        p_emoji TEXT)
+            RETURNS void LANGUAGE plpgsql AS $fn$
+            BEGIN
+                INSERT INTO
+                    api.as_objects
+                        (mastodon_id, url, actor_url, status, kind, target_url, emoji)
+                VALUES
+                    (p_mastodon_id, p_url, p_actor_url, p_status, p_kind, p_target_url, p_emoji)
+                ON CONFLICT (url) DO NOTHING;
+
+                PERFORM api.refresh_edges(ARRAY(SELECT
+                                                    p_url
+                                                WHERE
+                                                    p_kind = 'content'
+                                              UNION
+                                                SELECT
+                                                    p_target_url
+                                                WHERE
+                                                    p_target_url IS NOT NULL));
+            END
+            $fn$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION api.delete_object(p_url TEXT)
+            RETURNS void LANGUAGE plpgsql AS $fn$
+            DECLARE
+                affected TEXT[];
+            BEGIN
+                affected := ARRAY(SELECT
+                                      o.target_url
+                                  FROM
+                                      api.as_objects AS o
+                                  WHERE
+                                      o.url = p_url AND
+                                      o.target_url IS NOT NULL);
+
+                DELETE FROM
+                    api.as_objects
                 WHERE
-                    c.object_url = g.object_url AND
-                    c.emoji = g.emoji
+                    url = p_url;
+
+                PERFORM api.refresh_edges(affected);
+            END
             $fn$""")
         await self.execute("""CREATE OR REPLACE VIEW api.reblog_compression AS
                               SELECT w.a_url, w.b_url, w.newref, w.chain_start
@@ -277,49 +354,53 @@ class _storage(BaseStorage):
                                   CREATE TYPE api.reblog_compression_kind AS ENUM ('chain', 'cycle');
                               EXCEPTION WHEN duplicate_object THEN NULL;
                               END $$""")
-        await self.execute("""CREATE OR REPLACE FUNCTION
-                              api.compress_reblogs(kind api.reblog_compression_kind, sample int DEFAULT NULL)
-                              RETURNS int LANGUAGE sql AS $fn$
-                                  WITH picked AS (
-                                      SELECT a_url, b_url, newref
-                                      FROM api.reblog_compression
-                                      WHERE chain_start = (kind = 'chain')
-                                      ORDER BY CASE WHEN kind = 'chain' THEN 0 ELSE RANDOM() END
-                                      LIMIT sample),
-                                  upd AS (
-                                      UPDATE api.as_objects t SET target_url = p.newref
-                                      FROM picked p
-                                      WHERE (t.url = p.a_url OR t.url = p.b_url)
-                                        AND t.target_url IS DISTINCT FROM p.newref
-                                      RETURNING t.url, t.actor_url, t.kind, t.emoji, p.newref),
-                                  linked AS (
-                                      SELECT
-                                          u.url,
-                                          u.actor_url,
-                                          u.kind,
-                                          u.emoji,
-                                          u.newref AS object_url
-                                      FROM
-                                          upd AS u INNER JOIN
-                                          api.as_objects AS n ON n.url = u.newref
-                                      WHERE
-                                          n.kind = 'content'),
-                                  recorded AS (
-                                      SELECT api.record_boosts(
-                                                 ARRAY(SELECT ROW(url,
-                                                                  actor_url,
-                                                                  object_url)::api.boost_row
-                                                       FROM linked
-                                                       WHERE kind = 'announce')),
-                                             api.record_reactions(
-                                                 ARRAY(SELECT ROW(url,
-                                                                  actor_url,
-                                                                  object_url,
-                                                                  emoji)::api.reaction_row
-                                                       FROM linked
-                                                       WHERE kind = 'like')))
-                                  SELECT count(*)::int FROM upd, recorded
-                              $fn$""")
+        await self.execute("""
+            CREATE OR REPLACE FUNCTION
+            api.compress_reblogs(kind api.reblog_compression_kind, sample int DEFAULT NULL)
+            RETURNS int LANGUAGE plpgsql AS $fn$
+            DECLARE
+                affected TEXT[];
+                moved INT;
+            BEGIN
+                WITH
+                picked
+                AS (SELECT
+                        a_url,
+                        b_url,
+                        newref
+                    FROM
+                        api.reblog_compression
+                    WHERE
+                        chain_start = (kind = 'chain')
+                    ORDER BY
+                        CASE WHEN kind = 'chain' THEN 0 ELSE RANDOM() END
+                    LIMIT sample),
+                upd
+                AS (UPDATE
+                        api.as_objects AS t
+                    SET
+                        target_url = p.newref
+                    FROM
+                        picked AS p
+                    WHERE
+                        (t.url = p.a_url OR t.url = p.b_url) AND
+                        t.target_url IS DISTINCT FROM p.newref
+                    RETURNING
+                        t.url,
+                        t.target_url AS newref)
+                SELECT
+                    count(*)::int,
+                    ARRAY(SELECT DISTINCT newref FROM upd)
+                INTO
+                    moved,
+                    affected
+                FROM
+                    upd;
+
+                PERFORM api.refresh_edges(affected);
+                RETURN moved;
+            END
+            $fn$""")
         await self.execute("""CREATE UNIQUE INDEX IF NOT EXISTS
                               as_objects_mastodon_idx
                               ON api.as_objects (mastodon_id)""")
@@ -344,45 +425,7 @@ class _storage(BaseStorage):
                      kind: str,
                      target_url: Optional[str],
                      emoji: Optional[str] = None) -> None:
-        await self.execute("""
-            WITH ins AS (
-                    INSERT INTO api.as_objects
-                        (mastodon_id, url, actor_url, status, kind, target_url, emoji)
-                    VALUES ($1::numeric, $2, $3, $4, $5, $6, $7)
-                    ON CONFLICT (url) DO NOTHING
-                    RETURNING url, actor_url, kind, target_url, emoji),
-                 linked AS (
-                    SELECT
-                        i.url,
-                        i.actor_url,
-                        i.kind,
-                        i.target_url AS object_url,
-                        i.emoji
-                    FROM
-                        ins AS i INNER JOIN
-                        api.as_objects AS n ON n.url = i.target_url
-                    WHERE
-                        n.kind = 'content'
-                  UNION ALL
-                    SELECT
-                        b.url,
-                        b.actor_url,
-                        b.kind,
-                        b.target_url,
-                        b.emoji
-                    FROM
-                        ins AS i INNER JOIN
-                        api.as_objects AS b ON b.target_url = i.url
-                    WHERE
-                        i.kind = 'content'),
-                 recorded AS (
-                    SELECT api.record_boosts(ARRAY(SELECT ROW(url, actor_url, object_url)::api.boost_row
-                                                   FROM linked
-                                                   WHERE kind = 'announce')))
-            SELECT api.record_reactions(ARRAY(SELECT ROW(url, actor_url, object_url, emoji)::api.reaction_row
-                                              FROM linked
-                                              WHERE kind = 'like')),
-                   (SELECT count(*) FROM recorded)""",
+        await self.execute("""SELECT api.store_object($1::numeric, $2, $3, $4, $5, $6, $7)""",
                            mastodon_id,
                            url,
                            actor_url,
@@ -400,16 +443,7 @@ class _storage(BaseStorage):
                            edited_at)
 
     async def delete(self, url: str) -> None:
-        await self.execute("""
-            WITH del AS (
-                    DELETE FROM api.as_objects
-                    WHERE url = $1
-                    RETURNING url)
-            SELECT api.forget_boosts(u.urls),
-                   api.forget_reactions(u.urls)
-            FROM
-                (SELECT ARRAY(SELECT url FROM del) AS urls) AS u""",
-                           url)
+        await self.execute("""SELECT api.delete_object($1)""", url)
 
     async def sweep_orphans(self) -> int:
         return sum([await self._sweep_orphans_from(table)

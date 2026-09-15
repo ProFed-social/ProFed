@@ -49,7 +49,7 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
     assert any("CREATE OR REPLACE VIEW api.reblog_compression" in s and "LEAST(b.mastodon_id, c.mastodon_id)" in s
                for s in statements)
     assert any("CREATE TYPE api.reblog_compression_kind AS ENUM" in s for s in statements)
-    assert any("CREATE OR REPLACE FUNCTION\n" in s and "api.compress_reblogs" in s for s in statements)
+    assert any("api.compress_reblogs(kind" in s and "RETURNS int LANGUAGE plpgsql" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.ancestor_chain" in s and
                "NOT break_on_author OR p.actor_url = c.actor_url" in s
                for s in statements)
@@ -65,9 +65,10 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
                for s in statements)
     assert any("CREATE TABLE IF NOT EXISTS api.boost_counts" in s and "PRIMARY KEY (object_url)" in s
                for s in statements)
-    assert any("CREATE TYPE api.boost_row AS" in s for s in statements)
-    assert any("CREATE OR REPLACE FUNCTION api.record_boosts(entries api.boost_row[])" in s for s in statements)
-    assert any("CREATE OR REPLACE FUNCTION api.forget_boosts(announce_urls TEXT[])" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.store_object" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.delete_object" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.refresh_boosts(object_urls TEXT[])" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.refresh_edges(object_urls TEXT[])" in s for s in statements)
 
 
 @pytest.mark.asyncio
@@ -99,31 +100,28 @@ async def test_ensure_schema_indexes_the_boost_lookups(fake_pool, fake_conn):
 
 
 @pytest.mark.asyncio
-async def test_record_boosts_counts_an_actor_once_per_object(fake_pool, fake_conn):
+async def test_refresh_boosts_keeps_one_row_per_actor_and_object(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
 
-    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
-                if "CREATE OR REPLACE FUNCTION api.record_boosts" in s)
+    statements = [call.args[0] for call in fake_conn.execute.await_args_list]
+    body = next(s for s in statements if "CREATE OR REPLACE FUNCTION api.refresh_boosts" in s)
 
-    assert "ON CONFLICT (announce_url) DO NOTHING" in body
-    assert "SELECT DISTINCT" in body
-    assert "NOT EXISTS (SELECT 1" in body
-    assert "o.actor_url = i.actor_url" in body
-    assert "o.object_url = i.object_url" in body
-    assert "SET n_of_boosts = api.boost_counts.n_of_boosts + EXCLUDED.n_of_boosts" in body
+    assert "SELECT DISTINCT ON (o.actor_url, o.target_url)" in body
+    assert "o.kind = 'announce'" in body
+    assert "n.kind = 'content'" in body
+    assert any("boosts_actor_object_uniq" in s and "ON api.boosts (actor_url, object_url)" in s for s in statements)
 
 
 @pytest.mark.asyncio
-async def test_forget_boosts_decrements_only_when_the_actor_has_no_other_boost_left(fake_pool, fake_conn):
+async def test_refresh_boosts_drops_what_the_source_no_longer_holds(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
 
     body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
-                if "CREATE OR REPLACE FUNCTION api.forget_boosts" in s)
+                if "CREATE OR REPLACE FUNCTION api.refresh_boosts" in s)
 
-    assert "DELETE FROM api.boosts" in body
-    assert "WHERE announce_url = ANY(announce_urls)" in body
-    assert "o.announce_url <> ALL(announce_urls)" in body
-    assert "SET n_of_boosts = GREATEST(c.n_of_boosts - g.n, 0)" in body
+    assert "DELETE FROM\n                    api.boosts AS b" in body
+    assert "v.url = b.announce_url" in body
+    assert "SET\n                        n_of_boosts = EXCLUDED.n_of_boosts" in body
 
 
 def _function_body(statements, name):
@@ -156,38 +154,35 @@ async def test_content_url_joins_a_single_hop(fake_pool, fake_conn):
 
 
 @pytest.mark.asyncio
-async def test_upsert_inserts_the_object(fake_pool, fake_conn):
+async def test_upsert_hands_the_object_to_the_database(fake_pool, fake_conn):
     await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None)
 
     sql, *args = fake_conn.execute.await_args.args
-    assert "INSERT INTO api.as_objects" in sql
-    assert "ON CONFLICT (url) DO NOTHING" in sql
+    assert "SELECT api.store_object(" in sql
     assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None, None]
 
 
 @pytest.mark.asyncio
-async def test_upsert_records_the_inserted_row_as_a_boost(fake_pool, fake_conn):
-    await (await as_objects.storage()).upsert("43",
-                                              "https://r/boost",
-                                              "https://r/carol",
-                                              {"id": "43"},
-                                              "announce",
-                                              "https://r/1")
+async def test_store_object_refreshes_the_target_of_an_edge(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
 
-    sql = fake_conn.execute.await_args.args[0]
-    assert "RETURNING url, actor_url, kind, target_url, emoji" in sql
-    assert "api.as_objects AS n ON n.url = i.target_url" in sql
-    assert "api.record_boosts(ARRAY(SELECT ROW(url, actor_url, object_url)::api.boost_row" in sql
+    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
+                if "CREATE OR REPLACE FUNCTION api.store_object" in s)
+
+    assert "INSERT INTO\n                    api.as_objects" in body
+    assert "ON CONFLICT (url) DO NOTHING" in body
+    assert "p_target_url IS NOT NULL" in body
+    assert "PERFORM api.refresh_edges(" in body
 
 
 @pytest.mark.asyncio
-async def test_upsert_records_the_boosts_that_were_waiting_for_the_inserted_row(fake_pool, fake_conn):
-    await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None)
+async def test_store_object_refreshes_a_content_that_others_may_point_at(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
 
-    sql = fake_conn.execute.await_args.args[0]
-    assert "api.as_objects AS b ON b.target_url = i.url" in sql
-    assert "i.kind = 'content'" in sql
-    assert "WHERE kind = 'announce'" in sql
+    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
+                if "CREATE OR REPLACE FUNCTION api.store_object" in s)
+
+    assert "p_kind = 'content'" in body
 
 
 @pytest.mark.asyncio
@@ -215,22 +210,24 @@ async def test_update_content_writes_status_and_edited_at_only(fake_pool, fake_c
 
 
 @pytest.mark.asyncio
-async def test_delete_removes_the_object(fake_pool, fake_conn):
+async def test_delete_hands_the_url_to_the_database(fake_pool, fake_conn):
     await (await as_objects.storage()).delete("https://r/1")
 
     sql, *args = fake_conn.execute.await_args.args
-    assert "DELETE FROM api.as_objects" in sql
+    assert "SELECT api.delete_object(" in sql
     assert args == ["https://r/1"]
 
 
 @pytest.mark.asyncio
-async def test_delete_forgets_the_boost_of_the_removed_row(fake_pool, fake_conn):
-    await (await as_objects.storage()).delete("https://r/boost")
+async def test_delete_object_refreshes_the_target_it_pointed_at(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
 
-    sql = fake_conn.execute.await_args.args[0]
-    assert "RETURNING url)" in sql
-    assert "api.forget_boosts(u.urls)" in sql
-    assert "api.forget_reactions(u.urls)" in sql
+    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
+                if "CREATE OR REPLACE FUNCTION api.delete_object" in s)
+
+    assert body.index("affected := ARRAY(") < body.index("DELETE FROM")
+    assert "o.target_url IS NOT NULL" in body
+    assert "PERFORM api.refresh_edges(affected)" in body
 
 
 @pytest.mark.asyncio
@@ -295,20 +292,16 @@ async def test_compress_chains_calls_the_function_for_heads_and_returns_the_coun
 
 
 @pytest.mark.asyncio
-async def test_compress_reblogs_records_the_boosts_it_just_made_direct(fake_pool, fake_conn):
+async def test_compress_reblogs_refreshes_what_it_just_made_direct(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
 
     body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
                 if "api.compress_reblogs(kind" in s)
 
-    assert "RETURNING t.url, t.actor_url, t.kind, t.emoji, p.newref" in body
-    assert "api.as_objects AS n ON n.url = u.newref" in body
-    assert "n.kind = 'content'" in body
-    assert "api.record_boosts(" in body
-    assert "WHERE kind = 'announce'" in body
-    assert "api.record_reactions(" in body
-    assert "WHERE kind = 'like'" in body
-    assert "SELECT count(*)::int FROM upd, recorded" in body
+    assert "RETURNING\n                        t.url,\n                        t.target_url AS newref" in body
+    assert "ARRAY(SELECT DISTINCT newref FROM upd)" in body
+    assert "PERFORM api.refresh_edges(affected)" in body
+    assert "RETURN moved" in body
 
 
 @pytest.mark.asyncio
@@ -456,34 +449,28 @@ async def test_boost_stats_joins_counts_and_the_viewers_own_boost(fake_pool, fak
 
 
 @pytest.mark.asyncio
-async def test_upsert_stores_the_emoji_of_a_reaction(fake_pool, fake_conn):
+async def test_upsert_passes_the_emoji_of_a_reaction(fake_pool, fake_conn):
     await (await as_objects.storage()).upsert("44",
                                               "https://r/like",
                                               "https://r/dave",
                                               {"id": "44"},
                                               "like",
                                               "https://r/1",
-                                              "🎉")
+                                              "\U0001F389")
 
-    sql, *args = fake_conn.execute.await_args.args
-    assert "(mastodon_id, url, actor_url, status, kind, target_url, emoji)" in sql
-    assert args[4:] == ["like", "https://r/1", "🎉"]
+    args = fake_conn.execute.await_args.args[1:]
+    assert args[4:] == ("like", "https://r/1", "\U0001F389")
 
 
 @pytest.mark.asyncio
-async def test_upsert_records_a_reaction_and_not_a_boost(fake_pool, fake_conn):
-    await (await as_objects.storage()).upsert("44",
-                                              "https://r/like",
-                                              "https://r/dave",
-                                              {"id": "44"},
-                                              "like",
-                                              "https://r/1",
-                                              "🎉")
+async def test_refresh_reactions_looks_only_at_reactions(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
 
-    sql = fake_conn.execute.await_args.args[0]
-    assert "api.record_reactions(ARRAY(SELECT ROW(url, actor_url, object_url, emoji)::api.reaction_row" in sql
-    assert "WHERE kind = 'like'" in sql
-    assert "WHERE kind = 'announce'" in sql
+    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
+                if "CREATE OR REPLACE FUNCTION api.refresh_reactions" in s)
+
+    assert "o.kind = 'like'" in body
+    assert "o.kind = 'announce'" not in body
 
 
 @pytest.mark.asyncio
@@ -496,10 +483,8 @@ async def test_ensure_schema_creates_the_reaction_tables_and_functions(fake_pool
                for s in statements)
     assert any("CREATE TABLE IF NOT EXISTS api.reaction_counts" in s and "PRIMARY KEY (object_url, emoji)" in s
                for s in statements)
-    assert any("CREATE TYPE api.reaction_row AS" in s for s in statements)
-    assert any("CREATE OR REPLACE FUNCTION api.record_reactions(entries api.reaction_row[])" in s
-               for s in statements)
-    assert any("CREATE OR REPLACE FUNCTION api.forget_reactions(reaction_urls TEXT[])" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.refresh_reactions(object_urls TEXT[])" in s for s in statements)
+    assert any("CREATE OR REPLACE FUNCTION api.refresh_edges(object_urls TEXT[])" in s for s in statements)
 
 
 @pytest.mark.asyncio
@@ -513,28 +498,26 @@ async def test_the_same_actor_cannot_react_twice_with_the_same_emoji(fake_pool, 
 
 
 @pytest.mark.asyncio
-async def test_record_reactions_counts_per_object_and_emoji(fake_pool, fake_conn):
+async def test_refresh_reactions_counts_per_object_and_emoji(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
 
     body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
-                if "CREATE OR REPLACE FUNCTION api.record_reactions" in s)
+                if "CREATE OR REPLACE FUNCTION api.refresh_reactions" in s)
 
-    assert "ON CONFLICT DO NOTHING" in body
-    assert "GROUP BY\n                    object_url, emoji" in body
-    assert "SET n_of_reactions = api.reaction_counts.n_of_reactions + EXCLUDED.n_of_reactions" in body
+    assert "GROUP BY\n                    object_url,\n                    emoji" in body
+    assert "SET\n                        n_of_reactions = EXCLUDED.n_of_reactions" in body
 
 
 @pytest.mark.asyncio
-async def test_forget_reactions_lowers_the_count_of_the_removed_emoji(fake_pool, fake_conn):
+async def test_refresh_reactions_drops_counts_that_no_longer_have_a_reaction(fake_pool, fake_conn):
     await (await as_objects.storage()).ensure_schema()
 
     body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
-                if "CREATE OR REPLACE FUNCTION api.forget_reactions" in s)
+                if "CREATE OR REPLACE FUNCTION api.refresh_reactions" in s)
 
-    assert "DELETE FROM api.reactions" in body
-    assert "WHERE reaction_url = ANY(reaction_urls)" in body
-    assert "SET n_of_reactions = GREATEST(c.n_of_reactions - g.n, 0)" in body
-    assert "c.emoji = g.emoji" in body
+    assert "DELETE FROM\n                    api.reaction_counts AS c" in body
+    assert "v.object_url = c.object_url AND" in body
+    assert "SELECT DISTINCT ON (o.actor_url, o.target_url, o.emoji)" in body
 
 
 @pytest.mark.asyncio
