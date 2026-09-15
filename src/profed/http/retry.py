@@ -22,8 +22,8 @@ def due_at(failed_at: datetime, attempt: int, config: dict) -> datetime:
 
 
 def exhausted(first_attempt_at: datetime, now: datetime, config: dict) -> bool:
-    return (first_attempt_at is not None
-            and (now - first_attempt_at).total_seconds() > int(config.get("max_total", MAX_TOTAL)))
+    return (first_attempt_at is not None and
+            (now - first_attempt_at).total_seconds() > int(config.get("max_total", MAX_TOTAL)))
 
 
 def leased(attempt_at: datetime, now: datetime, config: dict) -> bool:

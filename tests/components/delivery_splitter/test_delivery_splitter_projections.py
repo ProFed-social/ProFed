@@ -29,9 +29,9 @@ class FakeStorage:
     async def recipients_at(self, following, at):
         return {follower
                 for (target, follower), (accepted_at, deleted_at) in self.edges.items()
-                if target == following
-                and accepted_at <= at
-                and (deleted_at is None or deleted_at > at)}
+                if target == following and
+                   accepted_at <= at and
+                   (deleted_at is None or deleted_at > at)}
 
 
 @pytest.fixture

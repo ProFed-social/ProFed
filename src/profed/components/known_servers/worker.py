@@ -33,12 +33,12 @@ async def publish(event_type: str, host: str, payload: dict) -> None:
 
 
 def _stable_since(info, known: dict | None, now: datetime) -> datetime:
-    unchanged = (known is not None
-                 and info.etag is not None
-                 and info.etag == known.get("etag"))
-    same_body = (known is not None
-                 and info.content_hash is not None
-                 and info.content_hash == known.get("content_hash"))
+    unchanged = (known is not None and
+                 info.etag is not None and
+                 info.etag == known.get("etag"))
+    same_body = (known is not None and
+                 info.content_hash is not None and
+                 info.content_hash == known.get("content_hash"))
     return known["stable_since"] if (unchanged or same_body) else now
 
 

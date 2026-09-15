@@ -50,9 +50,9 @@ class Resolution:
 
 
 def _is_self_link(link) -> bool:
-    return (isinstance(link, dict)
-            and link.get("rel") == "self"
-            and (link.get("type") or "").replace(" ", "") in _SELF_TYPES)
+    return (isinstance(link, dict) and
+            link.get("rel") == "self" and
+            (link.get("type") or "").replace(" ", "") in _SELF_TYPES)
 
 
 def self_links(jrd: Optional[dict]) -> list[str]:

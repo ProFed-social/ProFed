@@ -133,7 +133,7 @@ handle_events, rebuild, _ = build_projection(topic=raw_activities,
                                                                      if verb == "Delete" else
                                                                      _forward)
                                                               for verb in ACTIVITIES_VERBS},
-                                             event_handler_signature=(with_event_type
-                                                                      & with_emitted_at
-                                                                      & with_sequence_id))
+                                             event_handler_signature=(with_event_type &
+                                                                      with_emitted_at &
+                                                                      with_sequence_id))
 

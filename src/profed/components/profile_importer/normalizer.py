@@ -106,8 +106,8 @@ def _normalize_entry(item: Any) -> dict:
     if technologies:
         result["technologies"] = technologies
 
-    organization = (_to_text(_first(props.get("org", [])))
-                    or _to_text(_first(props.get("location", []))))
+    organization = (_to_text(_first(props.get("org", []))) or
+                    _to_text(_first(props.get("location", []))))
     if organization is not None:
         result["organization"] = organization
 

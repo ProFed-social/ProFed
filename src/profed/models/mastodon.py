@@ -111,8 +111,10 @@ def tags_from_tag(tag: list) -> list[dict]:
 def property_value_fields(attachment) -> list[dict]:
     return [{"name": item["name"], "value": item["value"], "verified_at": None}
             for item in (attachment or [])
-            if isinstance(item, dict) and item.get("type") == "PropertyValue"
-            and item.get("name") and item.get("value")]
+            if isinstance(item, dict) and
+               item.get("type") == "PropertyValue" and
+               item.get("name") and
+               item.get("value")]
 
 
 def _attachment_type(entry: dict) -> str:

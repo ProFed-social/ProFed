@@ -80,8 +80,8 @@ async def _resolve_account(query: str, config: dict) -> Account | None:
             if query.startswith("https://") else
             await lookup_by_id(int(query), config)
             if query.isdigit() else
-            await lookup_by_acct(f"{query}@{instance_domain()}" if "@" not in query else query, config)
-            or (await lookup_by_acct(query, config) if "@" not in query else None))
+            await lookup_by_acct(f"{query}@{instance_domain()}" if "@" not in query else query, config) or
+            (await lookup_by_acct(query, config) if "@" not in query else None))
 
 
 async def _with_counts(account: Account) -> Account:
@@ -170,8 +170,8 @@ async def unfollow(id: str,
         raise HTTPException(status_code=404, detail="account_not_found")
 
     edge = await (await follows_storage()).get(acct_from_username(username), account.acct)
-    follow_id = ((edge or {}).get("follow_activity_id")
-                 or f"{actor_url_from_username(username)}#follows/{account.id}")
+    follow_id = ((edge or {}).get("follow_activity_id") or
+                 f"{actor_url_from_username(username)}#follows/{account.id}")
     actor_url   = actor_url_from_username(username)
     target_url  = account.uri or account.url
     undo_id     = f"{actor_url}#unfollows/{uuid.uuid4()}"
