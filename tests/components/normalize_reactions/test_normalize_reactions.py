@@ -1,10 +1,13 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import os
 import pytest
+from datetime import datetime, timezone
+from profed.core.config import raw, config
 from profed.components.normalize_reactions import translator
 
-
+AT = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
 REACTION = "https://remote.example/bob#react/3"
 
 
@@ -30,9 +33,25 @@ def _published(fake_bus):
     return fake_bus.topic("resolved_activities").published
 
 
+def _observed(fake_bus):
+    return [(message["object_id"], message["payload"]) for message in fake_bus.topic("known_servers").published]
+
+
+@pytest.fixture(autouse=True)
+def cfg():
+    backup = (raw.paths, raw.argv, os.environ)
+    raw.paths = []
+    raw.argv = []
+    os.environ = {"PROFED_EXAMPLE__DOMAIN": "example.com", "PROFED_PROFED__RUN": "api"}
+
+    config.reset()
+    yield
+    raw.paths, raw.argv, os.environ = backup
+
+
 @pytest.mark.asyncio
 async def test_an_emoji_react_becomes_a_like(fake_bus):
-    await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content="🎉"), 1)
+    await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content="🎉"), AT, 1)
 
     published = _published(fake_bus)[0]
     assert published["event_type"] == "Like"
@@ -42,7 +61,7 @@ async def test_an_emoji_react_becomes_a_like(fake_bus):
 
 @pytest.mark.asyncio
 async def test_a_misskey_reaction_moves_into_the_content(fake_bus):
-    await translator._handle("Like", REACTION, _payload(type="Like", **{"_misskey_reaction": "🎉"}), 1)
+    await translator._handle("Like", REACTION, _payload(type="Like", **{"_misskey_reaction": "🎉"}), AT, 1)
 
     activity = _published(fake_bus)[0]["payload"]["activity"]
     assert activity["content"] == "🎉"
@@ -51,14 +70,14 @@ async def test_a_misskey_reaction_moves_into_the_content(fake_bus):
 
 @pytest.mark.asyncio
 async def test_a_bare_like_keeps_no_content(fake_bus):
-    await translator._handle("Like", REACTION, _payload(type="Like"), 1)
+    await translator._handle("Like", REACTION, _payload(type="Like"), AT, 1)
 
     assert "content" not in _published(fake_bus)[0]["payload"]["activity"]
 
 
 @pytest.mark.asyncio
 async def test_something_that_is_not_an_emoji_is_dropped(fake_bus):
-    await translator._handle("Like", REACTION, _payload(type="Like", content="<script>alert(1)</script>"), 1)
+    await translator._handle("Like", REACTION, _payload(type="Like", content="<script>alert(1)</script>"), AT, 1)
 
     activity = _published(fake_bus)[0]["payload"]["activity"]
     assert "content" not in activity
@@ -67,14 +86,14 @@ async def test_something_that_is_not_an_emoji_is_dropped(fake_bus):
 
 @pytest.mark.asyncio
 async def test_a_custom_shortcode_is_dropped(fake_bus):
-    await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content=":blobcat:"), 1)
+    await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content=":blobcat:"), AT, 1)
 
     assert "content" not in _published(fake_bus)[0]["payload"]["activity"]
 
 
 @pytest.mark.asyncio
 async def test_an_undone_reaction_is_normalized_inside(fake_bus):
-    await translator._handle("Undo", "https://remote.example/bob#undo/1", _undo(type="EmojiReact", content="🎉"), 1)
+    await translator._handle("Undo", "https://remote.example/bob#undo/1", _undo(type="EmojiReact", content="🎉"), AT, 1)
 
     published = _published(fake_bus)[0]
     assert published["event_type"] == "Undo"
@@ -84,7 +103,7 @@ async def test_an_undone_reaction_is_normalized_inside(fake_bus):
 
 @pytest.mark.asyncio
 async def test_an_undone_boost_is_not_ours(fake_bus):
-    await translator._handle("Undo", "https://remote.example/bob#undo/2", _undo(type="Announce"), 1)
+    await translator._handle("Undo", "https://remote.example/bob#undo/2", _undo(type="Announce"), AT, 1)
 
     assert _published(fake_bus) == []
 
@@ -94,7 +113,7 @@ async def test_an_undo_that_names_only_an_id_is_not_ours(fake_bus):
     payload = {"username": "alice",
                "activity": {"id": "https://remote.example/bob#undo/3", "object": REACTION}}
 
-    await translator._handle("Undo", "https://remote.example/bob#undo/3", payload, 1)
+    await translator._handle("Undo", "https://remote.example/bob#undo/3", payload, AT, 1)
 
     assert _published(fake_bus) == []
 
@@ -102,18 +121,72 @@ async def test_an_undo_that_names_only_an_id_is_not_ours(fake_bus):
 @pytest.mark.asyncio
 async def test_the_same_incoming_message_is_published_once(fake_bus):
     fake_bus.topic("resolved_activities", lookup_message_ids=True)
-    await translator._handle("Like", REACTION, _payload(type="Like", content="🎉"), 5)
-    await translator._handle("Like", REACTION, _payload(type="Like", content="🎉"), 5)
+    await translator._handle("Like", REACTION, _payload(type="Like", content="🎉"), AT, 5)
+    await translator._handle("Like", REACTION, _payload(type="Like", content="🎉"), AT, 5)
 
     assert len(_published(fake_bus)) == 1
 
 
 @pytest.mark.asyncio
 async def test_the_actor_and_the_target_survive(fake_bus):
-    await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content="🎉"), 1)
+    await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content="🎉"), AT, 1)
 
     activity = _published(fake_bus)[0]["payload"]["activity"]
     assert activity["actor"] == "https://remote.example/bob"
     assert activity["object"] == "https://example.com/actors/alice/notes/7"
     assert activity["id"] == REACTION
+
+
+@pytest.mark.asyncio
+async def test_an_emoji_react_shows_that_the_host_understands_them(fake_bus):
+    await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content="🎉"), AT, 1)
+
+    assert _observed(fake_bus) == [("remote.example",
+                                    {"activity_type": "EmojiReact", "observed_at": AT.isoformat()})]
+
+
+@pytest.mark.asyncio
+async def test_a_like_shows_nothing_about_the_host(fake_bus):
+    await translator._handle("Like", REACTION, _payload(type="Like", content="🎉"), AT, 1)
+
+    assert _observed(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_an_undone_reaction_shows_nothing_about_the_host(fake_bus):
+    await translator._handle("Undo",
+                             "https://remote.example/bob#undo/1",
+                             _undo(type="EmojiReact", content="🎉"),
+                             AT,
+                             1)
+
+    assert _observed(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_our_own_host_is_never_observed(fake_bus):
+    payload = _payload(type="EmojiReact", content="🎉", actor="https://example.com/actors/alice")
+
+    await translator._handle("EmojiReact", REACTION, payload, AT, 1)
+
+    assert _observed(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_an_actor_without_a_host_is_not_observed(fake_bus):
+    await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content="🎉", actor=""), AT, 1)
+
+    assert _observed(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_a_busy_host_is_observed_once_per_window(fake_bus):
+    for sequence_id in (1, 2, 3):
+        await translator._handle("EmojiReact",
+                                 REACTION,
+                                 _payload(type="EmojiReact", content="🎉"),
+                                 AT,
+                                 sequence_id)
+
+    assert len(_observed(fake_bus)) == 1
 
