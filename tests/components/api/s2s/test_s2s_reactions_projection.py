@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from profed.components.api.s2s.reactions import projection
-from profed.components.api.s2s.reactions import storage as storage_module
+from profed.components.api.s2s.outbox import reactions_projection as projection
+from profed.components.api.s2s.outbox import reactions_storage as storage_module
 
 
 NOTE = "https://example.com/actors/alice/notes/7"

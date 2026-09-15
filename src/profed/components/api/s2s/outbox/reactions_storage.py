@@ -38,19 +38,26 @@ class _Storage(BaseStorage):
     async def forget(self, reaction_url: str) -> None:
         await self.execute("""DELETE FROM api.s2s_reactions WHERE reaction_url = $1""", reaction_url)
 
-    async def count_for(self, object_url: str) -> int:
-        row = await self.fetch_one("""SELECT count(*) AS n FROM api.s2s_reactions WHERE object_url = $1""",
-                                   object_url)
+    async def count_for(self, object_url: str, emoji_only: bool = False) -> int:
+        row = await self.fetch_one("""SELECT count(*) AS n
+                                      FROM api.s2s_reactions
+                                      WHERE object_url = $1 AND (NOT $2 OR emoji <> '')""",
+                                   object_url,
+                                   emoji_only)
         return 0 if row is None else row["n"]
 
-    async def page(self, object_url: str, limit: int, before: Optional[int] = None) -> List[dict]:
+    async def page(self, object_url: str, limit: int, before: Optional[int] = None, emoji_only: bool = False) \
+            -> List[dict]:
         return await self.fetch_all("""SELECT reaction_url, actor_url, emoji, status_id
                                        FROM api.s2s_reactions
-                                       WHERE object_url = $1 AND ($2::BIGINT IS NULL OR status_id < $2)
+                                       WHERE object_url = $1
+                                         AND ($2::BIGINT IS NULL OR status_id < $2)
+                                         AND (NOT $3 OR emoji <> '')
                                        ORDER BY status_id DESC
-                                       LIMIT $3""",
+                                       LIMIT $4""",
                                     object_url,
                                     before,
+                                    emoji_only,
                                     limit)
 
 

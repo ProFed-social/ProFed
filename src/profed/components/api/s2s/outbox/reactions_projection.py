@@ -5,7 +5,7 @@ from typing import Optional
 from profed.core.persistence.projections import build_projection
 from profed.topics import timeline as topic
 from profed.util import noop
-from .storage import storage
+from .reactions_storage import storage
 
 
 def _reaction(payload: dict) -> Optional[dict]:

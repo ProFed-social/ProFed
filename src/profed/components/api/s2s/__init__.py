@@ -20,7 +20,7 @@ from .actor import router as actor_router
 from .inbox import router as inbox_router
 from .outbox import router as outbox_router
 from .nodeinfo import router as nodeinfo_router
-from .reactions import storage as reactions_storage, projection as reactions_projection
+from .outbox import reactions_storage, reactions_projection
 from .instance_actor import router as instance_actor_router
 
 
