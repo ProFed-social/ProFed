@@ -4,8 +4,9 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
+from profed.emoji import is_emoji
 from profed.identity import actor_url_from_username
 from profed.models.activity_pub import EmojiReactActivity, LikeActivity, UndoEmojiReactActivity, UndoLikeActivity
 from profed.models.mastodon import Status
@@ -111,8 +112,16 @@ def _degraded_like(actor_url: str, row: dict, emoji: str) -> LikeActivity:
                         **{"_misskey_reaction": emoji})
 
 
+def _checked(emoji: str) -> str:
+    if not is_emoji(emoji):
+        raise HTTPException(status_code=400, detail="not_a_single_emoji")
+    return emoji
+
+
 @router.put("/pleroma/statuses/{id}/reactions/{emoji}")
 async def react(id: str, emoji: str, claims: Annotated[dict, Depends(current_user)]) -> Status:
+    emoji = _checked(emoji)
+
     async def publish_undo(username, row, actor_url, own):
         if own is not None and own["emoji"] != emoji:
             await _undo_reaction(username, actor_url, row, own)
@@ -147,6 +156,8 @@ async def react(id: str, emoji: str, claims: Annotated[dict, Depends(current_use
 
 @router.delete("/pleroma/statuses/{id}/reactions/{emoji}")
 async def unreact(id: str, emoji: str, claims: Annotated[dict, Depends(current_user)]) -> Status:
+    emoji = _checked(emoji)
+
     async def do_publish_undo(username, row, actor_url, own):
         if own is not None:
             await _undo_reaction(username, actor_url, row, own)

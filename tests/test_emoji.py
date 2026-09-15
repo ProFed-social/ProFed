@@ -1,7 +1,35 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.components.client import emoji
+from profed import emoji
+
+
+def test_a_known_emoji_is_an_emoji():
+    assert emoji.is_emoji("\U0001F389") is True
+
+
+def test_a_toned_variant_is_an_emoji():
+    assert emoji.is_emoji(emoji.toned("\U0001F44D", "medium")) is True
+
+
+def test_a_word_is_not_an_emoji():
+    assert emoji.is_emoji("thumbs up") is False
+
+
+def test_two_emojis_are_not_an_emoji():
+    assert emoji.is_emoji("\U0001F389\U0001F389") is False
+
+
+def test_html_is_not_an_emoji():
+    assert emoji.is_emoji("<script>alert(1)</script>") is False
+
+
+def test_an_empty_string_is_not_an_emoji():
+    assert emoji.is_emoji("") is False
+
+
+def test_a_custom_shortcode_is_not_an_emoji():
+    assert emoji.is_emoji(":blobcat:") is False
 
 
 def test_the_groups_keep_the_unicode_order():

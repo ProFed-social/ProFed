@@ -3,7 +3,7 @@
 
 from profed.core.config.component_parser import ConfigError
 from .auth import DEFAULT_SCOPE, DEFAULT_SESSION_TTL
-from .emoji import base_of, from_text
+from profed.emoji import base_of, from_text
 
 
 def _as_bool(value):

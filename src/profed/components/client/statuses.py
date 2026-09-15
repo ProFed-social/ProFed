@@ -14,7 +14,7 @@ from profed.core.config import config
 
 from .api_client import api_client
 from .auth import current_user_optional, requires_login, save_session
-from .emoji import grid, tones
+from profed.emoji import grid, tones
 from .reactions import after_react, after_unreact, quick_access
 from .templating import environment
 

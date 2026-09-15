@@ -9,7 +9,7 @@ from markupsafe import escape
 from profed.core.config import config
 from profed.identity import domain
 from profed.sanitize import sanitize_html
-from profed.components.client import emoji
+from profed import emoji
 
 
 STANDARD_TEMPLATES = Path(__file__).parent / "templates"

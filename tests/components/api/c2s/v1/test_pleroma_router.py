@@ -186,6 +186,20 @@ def test_changing_to_another_emoji_undoes_in_the_remembered_form(client, fake_bu
     assert published[1]["event_type"] == "EmojiReact"
 
 
+def test_a_reaction_that_is_not_an_emoji_is_refused(client, fake_bus):
+    assert _react(client, "thumbs%20up").status_code == 400
+    assert fake_bus.topic("raw_activities").published == []
+
+
+def test_a_reaction_with_two_emojis_is_refused(client, fake_bus):
+    assert _react(client, "\U0001F389\U0001F389").status_code == 400
+
+
+def test_taking_back_something_that_is_not_an_emoji_is_refused(client, fake_bus):
+    assert _unreact(client, "nonsense", reaction_of=_own("\U0001F389")).status_code == 400
+    assert fake_bus.topic("raw_activities").published == []
+
+
 def _handles(deactivate, method, path):
     from profed.components.api.c2s import v1
 

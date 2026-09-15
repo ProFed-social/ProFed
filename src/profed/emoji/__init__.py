@@ -4,8 +4,7 @@
 from functools import cache, reduce
 from pathlib import Path
 
-
-DATA = Path(__file__).parent / "data" / "emoji-test.txt"
+DATA = Path(__file__).parent / "emoji-test.txt"
 TONES = ("\U0001F3FB", "\U0001F3FC", "\U0001F3FD", "\U0001F3FE", "\U0001F3FF")
 
 SUFFIX = " skin tone"
@@ -115,6 +114,10 @@ def _codes(text: str) -> str:
 def from_text(text: str) -> str:
     return next((candidate
                  for candidate in (by_name().get(text, ""), _codes(text), text)
-                 if candidate in known()),
+                 if is_emoji(candidate)),
                 "")
+
+
+def is_emoji(text: str) -> bool:
+    return text in known()
 
