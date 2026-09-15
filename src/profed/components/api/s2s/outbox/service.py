@@ -3,6 +3,7 @@
 
 from profed.identity import actor_url_from_username
 from profed.components.api.s2s.outbox.models import OrderedCollection
+from profed.components.api.s2s.outbox.reactions_service import with_collections
 from profed.components.api.s2s.outbox.storage import storage
 from typing import Optional
 
@@ -33,5 +34,5 @@ async def resolve_note(username: str, note_id: str) -> Optional[dict]:
             if row is None else
             _tombstone(url, row["created_at"])
             if row["type"] == "Delete" else
-            row["object"])
+            with_collections(username, note_id, row["object"]))
 

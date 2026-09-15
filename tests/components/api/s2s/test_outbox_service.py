@@ -35,7 +35,60 @@ async def test_resolve_note_returns_the_note_object(fake_storage):
     result = await resolve_note("alice", "abc")
 
     fake_storage.latest_for_object.assert_awaited_once_with("alice", NOTE_URL)
-    assert result == note
+    assert {key: result[key] for key in note} == note
+
+
+@pytest.mark.asyncio
+async def test_resolve_note_points_at_its_reaction_collections(fake_storage):
+    fake_storage.latest_for_object.return_value = {"type": "Create",
+                                                   "object": {"id": NOTE_URL, "type": "Note", "content": "hi"},
+                                                   "created_at": DELETED_AT}
+
+    result = await resolve_note("alice", "abc")
+
+    assert result["likes"] == f"{NOTE_URL}/likes"
+    assert result["emojiReactions"] == f"{NOTE_URL}/emojiReactions"
+
+
+@pytest.mark.asyncio
+async def test_the_note_context_explains_the_emoji_reactions_term(fake_storage):
+    fake_storage.latest_for_object.return_value = {"type": "Create",
+                                                   "object": {"id": NOTE_URL, "type": "Note", "content": "hi"},
+                                                   "created_at": DELETED_AT}
+
+    result = await resolve_note("alice", "abc")
+
+    assert result["@context"][-1] == {"emojiReactions": {"@id": "http://fedibird.com/ns#emojiReactions",
+                                                         "@type": "@id"}}
+
+
+@pytest.mark.asyncio
+async def test_an_existing_context_is_kept(fake_storage):
+    note = {"id": NOTE_URL, "type": "Note", "content": "hi", "@context": ["https://example.test/ns"]}
+    fake_storage.latest_for_object.return_value = {"type": "Create",
+                                                   "object": note,
+                                                   "created_at": DELETED_AT}
+
+    assert (await resolve_note("alice", "abc"))["@context"][0] == "https://example.test/ns"
+
+
+@pytest.mark.asyncio
+async def test_a_single_context_becomes_a_list(fake_storage):
+    note = {"id": NOTE_URL, "type": "Note", "content": "hi", "@context": "https://example.test/ns"}
+    fake_storage.latest_for_object.return_value = {"type": "Create",
+                                                   "object": note,
+                                                   "created_at": DELETED_AT}
+
+    assert (await resolve_note("alice", "abc"))["@context"][:1] == ["https://example.test/ns"]
+
+
+@pytest.mark.asyncio
+async def test_a_tombstone_has_no_collections(fake_storage):
+    fake_storage.latest_for_object.return_value = {"type": "Delete",
+                                                   "object": NOTE_URL,
+                                                   "created_at": DELETED_AT}
+
+    assert "likes" not in await resolve_note("alice", "abc")
 
 
 @pytest.mark.asyncio
@@ -45,7 +98,7 @@ async def test_resolve_note_returns_the_edited_note_after_an_update(fake_storage
                                                    "object": edited,
                                                    "created_at": DELETED_AT}
 
-    assert await resolve_note("alice", "abc") == edited
+    assert (await resolve_note("alice", "abc"))["content"] == "edited"
 
 
 @pytest.mark.asyncio

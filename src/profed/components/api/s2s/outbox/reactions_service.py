@@ -9,6 +9,7 @@ from .reactions_storage import storage
 PAGE_SIZE = 40
 
 CONTEXT = "https://www.w3.org/ns/activitystreams"
+TERM = {"emojiReactions": {"@id": "http://fedibird.com/ns#emojiReactions", "@type": "@id"}}
 
 COLLECTIONS = {"likes": False, "emojiReactions": True}
 
@@ -19,6 +20,17 @@ def note_url(username: str, note_id: str) -> str:
 
 def collection_url(username: str, note_id: str, name: str) -> str:
     return f"{note_url(username, note_id)}/{name}"
+
+
+def _contexts(note: dict) -> list:
+    context = note.get("@context") or CONTEXT
+    return context if isinstance(context, list) else [context]
+
+
+def with_collections(username: str, note_id: str, note: dict) -> dict:
+    return dict(note,
+                **{"@context": _contexts(note) + [TERM],
+                   **{name: collection_url(username, note_id, name) for name in COLLECTIONS}})
 
 
 def _like(row: dict, object_url: str) -> dict:
