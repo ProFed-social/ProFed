@@ -18,6 +18,8 @@ from profed.topics import (account_resolution_topic,
                            person_topic,
                            preferences_topic,
                            raw_activities_topic,
+                           reaction_refresh_topic,
+                           reactions_resolution_topic,
                            remote_actors_topic,
                            resolution_topic,
                            resolved_activities_topic,
@@ -44,6 +46,8 @@ oauth_tokens = oauth_tokens_topic.topic
 person = person_topic.topic
 preferences = preferences_topic.topic
 raw_activities = raw_activities_topic.topic
+reaction_refresh = reaction_refresh_topic.topic
+reactions_resolution = reactions_resolution_topic.topic
 remote_actors = remote_actors_topic.topic
 resolution = resolution_topic.topic
 resolved_activities = resolved_activities_topic.topic
@@ -72,6 +76,8 @@ def names():
             person["name"],
             preferences["name"],
             raw_activities["name"],
+            reaction_refresh["name"],
+            reactions_resolution["name"],
             remote_actors["name"],
             resolution["name"],
             resolved_activities["name"],
