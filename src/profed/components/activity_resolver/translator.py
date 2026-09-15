@@ -8,6 +8,7 @@ from profed.core.persistence.projections import (build_projection,
                                                  with_event_type,
                                                  with_sequence_id)
 from profed.topics import incoming_activities
+from profed.topics.incoming_activities_topic import is_reaction
 from profed.components.activity_resolver import fetcher
 from profed.components.activity_resolver import instance_key
 from profed.federation.references import flatten_references
@@ -36,12 +37,13 @@ def _forwarder(should_resolve: bool):
                               message_id=message_id)
 
     async def _handle(event_type, object_id, payload, emitted_at, sequence_id) -> None:
-        await _publish_if_not_exists(topic=message_bus().topic("resolved_activities", lookup_message_ids=True),
-                                     event_type=event_type,
-                                     object_id=object_id,
-                                     payload=payload,
-                                     emitted_at=emitted_at,
-                                     message_id=_SOURCE.message_id(sequence_id))
+        if not is_reaction(event_type, payload["activity"]):
+            await _publish_if_not_exists(topic=message_bus().topic("resolved_activities", lookup_message_ids=True),
+                                         event_type=event_type,
+                                         object_id=object_id,
+                                         payload=payload,
+                                         emitted_at=emitted_at,
+                                         message_id=_SOURCE.message_id(sequence_id))
 
     return _handle
 
@@ -53,8 +55,6 @@ handle_events, rebuild, _ = \
                      on_message_type={"Create": _forwarder(True),
                                       "Update": _forwarder(True),
                                       "Announce": _forwarder(True),
-                                      "Like": _forwarder(True),
-                                      "EmojiReact": _forwarder(True),
                                       "Delete": _forwarder(False),
                                       "Undo": _forwarder(False)},
                      event_handler_signature=with_event_type & with_emitted_at & with_sequence_id)

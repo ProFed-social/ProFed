@@ -98,25 +98,40 @@ async def test_undo_passes_through_without_flattening(fake_bus):
 
 
 @pytest.mark.asyncio
-async def test_a_like_is_forwarded_and_its_target_is_resolved(fake_bus):
+async def test_a_like_is_left_to_the_normalizer(fake_bus):
     payload = _payload(obj="https://remote.example/notes/1")
 
     with patch.object(translator, "flatten_references", Mock(return_value=payload["activity"])) as flatten:
         await translator._forwarder(True)("Like", "https://remote.example/bob#like/3", payload, EMITTED, 9)
 
-    flatten.assert_called_once()
-    assert fake_bus.topic("resolved_activities").published[0]["event_type"] == "Like"
+    flatten.assert_not_called()
+    assert fake_bus.topic("resolved_activities").published == []
 
 
 @pytest.mark.asyncio
-async def test_an_emoji_react_is_forwarded_unchanged(fake_bus):
+async def test_an_emoji_react_is_left_to_the_normalizer(fake_bus):
     payload = _payload(obj="https://remote.example/notes/1")
     payload["activity"]["content"] = "🎉"
 
-    with patch.object(translator, "flatten_references", Mock(return_value=payload["activity"])):
-        await translator._forwarder(True)("EmojiReact", "https://remote.example/bob#react/3", payload, EMITTED, 10)
+    await translator._forwarder(True)("EmojiReact", "https://remote.example/bob#react/3", payload, EMITTED, 10)
 
-    published = fake_bus.topic("resolved_activities").published[0]
-    assert published["event_type"] == "EmojiReact"
-    assert published["payload"]["activity"]["content"] == "🎉"
+    assert fake_bus.topic("resolved_activities").published == []
+
+
+@pytest.mark.asyncio
+async def test_an_undone_reaction_is_left_to_the_normalizer(fake_bus):
+    payload = _payload(obj={"id": "https://remote.example/bob#like/3", "type": "Like"})
+
+    await translator._forwarder(False)("Undo", "https://remote.example/bob#undo/1", payload, EMITTED, 11)
+
+    assert fake_bus.topic("resolved_activities").published == []
+
+
+@pytest.mark.asyncio
+async def test_an_undone_boost_stays_with_the_resolver(fake_bus):
+    payload = _payload(obj={"id": "https://remote.example/bob#announce/3", "type": "Announce"})
+
+    await translator._forwarder(False)("Undo", "https://remote.example/bob#undo/2", payload, EMITTED, 12)
+
+    assert fake_bus.topic("resolved_activities").published[0]["event_type"] == "Undo"
 

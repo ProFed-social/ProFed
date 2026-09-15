@@ -19,6 +19,20 @@ _KNOWN_VERBS = {"Create",
                 "Block"}
 
 
+REACTION_VERBS = {"Like", "EmojiReact"}
+
+
+def _undone_type(activity: Dict) -> Optional[str]:
+    undone = activity.get("object")
+    return undone.get("type") if isinstance(undone, dict) else None
+
+
+def is_reaction(event_type: str, activity: Dict) -> bool:
+    return (event_type in REACTION_VERBS
+            if event_type != "Undo" else
+            _undone_type(activity) in REACTION_VERBS)
+
+
 def validate_incoming_activities_event(event_type: str, payload: Dict) -> Optional[Dict]:
     return (None
             if not validate_verb(event_type, _KNOWN_VERBS, "incoming_activities") else
