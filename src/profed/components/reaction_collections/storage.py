@@ -57,8 +57,8 @@ class _Storage(BaseStorage):
             WHERE
                 c.object_url = ANY($1::text[]) AND
                 (i.object_url IS NULL OR
-                 (i.state = 'attempting' AND i.checked_at < $2 - $3) OR
-                 (i.state <> 'attempting' AND i.next_due_at <= $2))""",
+                 (i.state = 'attempting' AND i.checked_at < $2::timestamptz - $3::interval) OR
+                 (i.state <> 'attempting' AND i.next_due_at <= $2::timestamptz))""",
                                     object_urls,
                                     now,
                                     lease)
@@ -73,7 +73,7 @@ class _Storage(BaseStorage):
                                   reaction_collections.inspection
                                       (object_url, state, checked_at, next_due_at, attempt)
                               VALUES
-                                  ($1, $2, $3, COALESCE($4, $3), $5)
+                                  ($1, $2, $3::timestamptz, COALESCE($4::timestamptz, $3::timestamptz), $5)
                               ON CONFLICT (object_url) DO UPDATE
                                   SET
                                       state = EXCLUDED.state,

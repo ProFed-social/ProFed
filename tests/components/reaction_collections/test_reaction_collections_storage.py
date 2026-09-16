@@ -80,7 +80,7 @@ async def test_work_that_is_still_running_is_not_due(fake_pool, fake_conn):
     await (await _storage(fake_pool)).due(["https://r/1"], NOW, timedelta(minutes=5))
 
     sql = fake_conn.fetch.await_args.args[0]
-    assert "i.state = 'attempting' AND i.checked_at < $2 - $3" in sql
+    assert "i.state = 'attempting' AND i.checked_at < $2::timestamptz - $3::interval" in sql
 
 
 @pytest.mark.asyncio
@@ -88,7 +88,7 @@ async def test_an_object_is_due_again_at_its_next_turn(fake_pool, fake_conn):
     await (await _storage(fake_pool)).due(["https://r/1"], NOW, timedelta(minutes=5))
 
     sql = fake_conn.fetch.await_args.args[0]
-    assert "i.state <> 'attempting' AND i.next_due_at <= $2" in sql
+    assert "i.state <> 'attempting' AND i.next_due_at <= $2::timestamptz" in sql
 
 
 @pytest.mark.asyncio
@@ -97,6 +97,24 @@ async def test_the_number_of_attempts_comes_along(fake_pool, fake_conn):
 
     assert "COALESCE(i.attempt, 0) AS attempt" in fake_conn.fetch.await_args.args[0]
     assert due[0]["attempt"] == 0
+
+
+
+@pytest.mark.asyncio
+async def test_the_parameters_of_due_carry_their_types(fake_pool, fake_conn):
+    await (await _storage(fake_pool)).due(["https://r/1"], NOW, timedelta(minutes=5))
+
+    sql = fake_conn.fetch.await_args.args[0]
+    assert "$2 - $3" not in sql
+    assert "$1::text[]" in sql
+
+
+@pytest.mark.asyncio
+async def test_the_next_turn_falls_back_to_the_moment_it_was_checked(fake_pool, fake_conn):
+    await (await _storage(fake_pool)).record("https://r/1", "attempting", NOW, None, 0)
+
+    sql = fake_conn.execute.await_args.args[0]
+    assert "COALESCE($4::timestamptz, $3::timestamptz)" in sql
 
 
 @pytest.mark.asyncio
