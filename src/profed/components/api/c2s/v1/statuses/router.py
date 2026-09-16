@@ -20,7 +20,6 @@ from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
-from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.pagination import paginated
 from profed.topics.bookmarks_topic import publish_bookmark
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple

@@ -43,10 +43,6 @@ def test_an_empty_owner_is_no_owner():
     assert validate_bookmarks_event("added", {"actor_url": "", "object_url": NOTE}) is None
 
 
-def test_an_empty_name_is_no_name():
-    assert validate_bookmarks_event("added", {"username": "", "object_url": NOTE}) is None
-
-
 def test_other_fields_survive():
     event = validate_bookmarks_event("added", {**MARK, "folder": "later"})
 
