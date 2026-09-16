@@ -4,6 +4,7 @@
 from profed.topics import (account_resolution_topic,
                            accounts_topic,
                            activities_topic,
+                           bookmarks_topic,
                            deliveries_topic,
                            followers_topic,
                            incoming_activities_topic,
@@ -32,6 +33,7 @@ from profed.topics import (account_resolution_topic,
 account_resolution = account_resolution_topic.topic
 accounts = accounts_topic.topic
 activities = activities_topic.topic
+bookmarks = bookmarks_topic.topic
 deliveries = deliveries_topic.topic
 followers = followers_topic.topic
 incoming_activities = incoming_activities_topic.topic
@@ -62,6 +64,7 @@ def names():
     return [account_resolution["name"],
             accounts["name"],
             activities["name"],
+            bookmarks["name"],
             deliveries["name"],
             followers["name"],
             incoming_activities["name"],
