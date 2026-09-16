@@ -81,7 +81,7 @@ def _make_status(row: dict,
 async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Status]:
     def actor_urls(row: dict) -> list[str]:
         return ([row["actor_url"], row["content"]["actor"]] +
-                ([row["parent_content"]["actor"]]if row.get("parent_content") else []))
+                ([row["parent_content"]["actor"]] if row.get("parent_content") else []))
 
     async def do_make_statuses(rows, viewer, store, accounts, reply_urls, content_urls):
         await publish_refresh(content_urls)

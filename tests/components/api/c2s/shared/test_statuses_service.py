@@ -344,35 +344,35 @@ async def test_reading_asks_for_the_reactions_of_what_it_shows(fake_bus):
     rows = [_row({"id": "1"}, url="https://remote.example/notes/5"),
             _row({"id": "2"}, url="https://remote.example/notes/6")]
     cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
- 
+
     with cached, storage:
         await service.make_statuses(rows)
- 
+
     asked = fake_bus.topic("reaction_refresh").published
     assert len(asked) == 1
     assert sorted(asked[0]["payload"]["object_urls"]) == ["https://remote.example/notes/5",
                                                           "https://remote.example/notes/6"]
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_page_of_posts_is_one_question_not_twenty(fake_bus):
     rows = [_row({"id": str(n)}, url=f"https://remote.example/notes/{n}") for n in range(20)]
     cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
- 
+
     with cached, storage:
         await service.make_statuses(rows)
- 
+
     assert len(fake_bus.topic("reaction_refresh").published) == 1
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_the_same_post_twice_is_asked_for_once(fake_bus):
     rows = [_row({"id": "1"}), _row({"id": "1"})]
     cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
- 
+
     with cached, storage:
         await service.make_statuses(rows)
- 
+
     assert fake_bus.topic("reaction_refresh").published[0]["payload"]["object_urls"] == \
         ["https://x/notes/5"]
 

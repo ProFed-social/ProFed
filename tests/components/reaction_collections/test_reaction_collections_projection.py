@@ -91,12 +91,12 @@ async def test_an_update_replaces_what_was_known(fake_bus, store):
 @pytest.mark.asyncio
 async def test_a_remembered_note_is_asked_for_right_away(fake_bus, store):
     await projection._on_object(NOTE, _create(emojiReactions=REACTIONS))
- 
+
     published = fake_bus.topic("reaction_refresh").published
     assert published[0]["event_type"] == "requested"
     assert published[0]["payload"]["object_urls"] == [NOTE]
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_note_of_our_own_is_neither_remembered_nor_asked_for(fake_bus, store):
     ours = "https://example.com/notes/3"
@@ -106,17 +106,17 @@ async def test_a_note_of_our_own_is_neither_remembered_nor_asked_for(fake_bus, s
                             "object": {"id": ours,
                                        "type": "Note",
                                        "emojiReactions": f"{ours}/emojiReactions"}}}
- 
+
     await projection._on_object(ours, payload)
- 
+
     assert store.known == {}
     assert fake_bus.topic("reaction_refresh").published == []
- 
- 
+
+
 @pytest.mark.asyncio
 async def test_a_note_without_a_collection_is_not_asked_for(fake_bus, store):
     await projection._on_object(NOTE, _create())
- 
+
     assert fake_bus.topic("reaction_refresh").published == []
 
 
