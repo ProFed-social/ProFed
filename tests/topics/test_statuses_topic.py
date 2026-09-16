@@ -217,8 +217,24 @@ def test_is_undoable_object_rejects_a_follow():
     assert is_undoable_object(UNDO_FOLLOW["activity"]["object"]) is False
 
 
-def test_is_undoable_object_rejects_a_string_reference():
-    assert is_undoable_object("https://remote/notes/original") is False
+def test_is_undoable_object_accepts_a_bare_reference():
+    assert is_undoable_object("https://remote/bob#react/3") is True
+
+
+def test_is_undoable_object_rejects_an_empty_reference():
+    assert is_undoable_object("") is False
+    assert is_undoable_object(None) is False
+
+
+def test_undo_event_removes_what_a_bare_reference_names():
+    undo = {"username": "alice",
+            "activity": {"id": "https://remote/bob#undo/4",
+                         "type": "Undo",
+                         "actor": "https://remote/bob",
+                         "object": "https://remote/bob#react/3"}}
+
+    assert undo_event("Undo", "https://remote/bob#undo/4", undo) == \
+        {"username": "alice", "status_id": "https://remote/bob#react/3"}
 
 
 def test_undo_event_removes_the_boost_by_its_announce_id():

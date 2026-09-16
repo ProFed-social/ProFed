@@ -49,7 +49,9 @@ def is_actor_object(obj) -> bool:
 
 
 def is_undoable_object(obj) -> bool:
-    return isinstance(obj, dict) and obj.get("type") in _UNDOABLE_TYPES
+    return (bool(obj)
+            if isinstance(obj, str) else
+            isinstance(obj, dict) and obj.get("type") in _UNDOABLE_TYPES)
 
 
 def object_key_of(event_type: str, object_id: str, activity: dict) -> str | None:
