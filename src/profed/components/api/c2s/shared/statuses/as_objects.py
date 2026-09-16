@@ -615,10 +615,11 @@ class _storage(BaseStorage):
                                    actor_url)
         return row["announce_url"] if row else None
 
-    async def reacted_by(self, object_url: str, limit: int) -> list[str]:
-        return [row["actor_url"] for row in await self.fetch_all("""
+    async def reacted_by(self, object_url: str, limit: int, max_id: Optional[str], since_id: Optional[str]) -> list:
+        return await self.fetch_all("""
             SELECT
-                r.actor_url
+                r.actor_url,
+                max(o.mastodon_id) AS mastodon_id
             FROM
                 api.reactions AS r INNER JOIN
                 api.as_objects AS o ON o.url = r.reaction_url
@@ -626,34 +627,37 @@ class _storage(BaseStorage):
                 r.object_url = $1
             GROUP BY
                 r.actor_url
+            HAVING
+                ($3::numeric IS NULL OR max(o.mastodon_id) < $3::numeric) AND
+                ($4::numeric IS NULL OR max(o.mastodon_id) > $4::numeric)
             ORDER BY
                 max(o.mastodon_id) DESC
             LIMIT $2""",
-                                                                 object_url,
-                                                                 limit)]
- 
-    async def boosted_by(self, object_url: str, limit: int) -> list[str]:
-        return [row["actor_url"] for row in await self.fetch_all("""
+                                    object_url,
+                                    limit,
+                                    max_id,
+                                    since_id)
+
+    async def boosted_by(self, object_url: str, limit: int, max_id: Optional[str], since_id: Optional[str]) -> list:
+        return await self.fetch_all("""
             SELECT
-                actor_url
-            FROM
-                api.boosts
-            WHERE
-                object_url = $1
-            ORDER BY
-                actor_url
-                b.actor_url
+                b.actor_url,
+                o.mastodon_id
             FROM
                 api.boosts AS b INNER JOIN
                 api.as_objects AS o ON o.url = b.announce_url
             WHERE
-                b.object_url = $1
+                b.object_url = $1 AND
+                ($3::numeric IS NULL OR o.mastodon_id < $3::numeric) AND
+                ($4::numeric IS NULL OR o.mastodon_id > $4::numeric)
             ORDER BY
                 o.mastodon_id DESC
             LIMIT $2""",
-                                                                 object_url,
-                                                                 limit)]
- 
+                                    object_url,
+                                    limit,
+                                    max_id,
+                                    since_id)
+
     async def boost_stats(self, object_urls: list[str], viewer: Optional[str]) -> dict:
         rows = await self.fetch_all("""
             SELECT

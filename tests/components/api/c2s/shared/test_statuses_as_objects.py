@@ -669,23 +669,42 @@ async def test_last_toned_reaction_of_without_any_reaction(fake_pool, fake_conn)
     assert await (await as_objects.storage()).last_toned_reaction_of("https://x/actors/me") is None
 
 
-@pytest.mark.asyncio
+pytest.mark.asyncio
 async def test_who_reacted_is_listed_newest_first_and_once_each(fake_pool, fake_conn):
-    await (await as_objects.storage()).reacted_by("https://r/note", 80)
- 
+    await (await as_objects.storage()).reacted_by("https://r/note", 80, None, None)
+
     sql, *args = fake_conn.fetch.await_args.args
     assert "api.as_objects AS o ON o.url = r.reaction_url" in sql
     assert "GROUP BY\n                r.actor_url" in sql
     assert "ORDER BY\n                max(o.mastodon_id) DESC" in sql
-    assert args == ["https://r/note", 80]
- 
- 
+    assert args == ["https://r/note", 80, None, None]
+
+
 @pytest.mark.asyncio
 async def test_who_boosted_is_listed_newest_first(fake_pool, fake_conn):
-    await (await as_objects.storage()).boosted_by("https://r/note", 80)
- 
+    await (await as_objects.storage()).boosted_by("https://r/note", 80, None, None)
+
     sql, *args = fake_conn.fetch.await_args.args
     assert "api.as_objects AS o ON o.url = b.announce_url" in sql
     assert "ORDER BY\n                o.mastodon_id DESC" in sql
-    assert args == ["https://r/note", 80]
+    assert args == ["https://r/note", 80, None, None]
+
+
+@pytest.mark.asyncio
+async def test_who_reacted_can_start_after_a_cursor(fake_pool, fake_conn):
+    await (await as_objects.storage()).reacted_by("https://r/note", 80, "500", "100")
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "max(o.mastodon_id) < $3::numeric" in sql
+    assert "max(o.mastodon_id) > $4::numeric" in sql
+    assert args == ["https://r/note", 80, "500", "100"]
+
+
+@pytest.mark.asyncio
+async def test_who_boosted_can_start_after_a_cursor(fake_pool, fake_conn):
+    await (await as_objects.storage()).boosted_by("https://r/note", 80, "500", "100")
+
+    sql = fake_conn.fetch.await_args.args[0]
+    assert "o.mastodon_id < $3::numeric" in sql
+    assert "o.mastodon_id > $4::numeric" in sql
 

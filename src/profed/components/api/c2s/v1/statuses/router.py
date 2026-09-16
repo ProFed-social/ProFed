@@ -4,9 +4,9 @@
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Annotated
+from typing import Annotated, Optional
 from profed.core.message_bus import message_bus
 from profed.identity import actor_url_from_username, heuristic_acct
 from profed.models.activity_pub import (AnnounceActivity,
@@ -20,6 +20,8 @@ from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
+from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
+from profed.components.api.c2s.shared.pagination import paginated
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
 from profed.components.api.c2s.shared.statuses import as_objects, service
@@ -295,28 +297,50 @@ async def unreblog_status(id: str, claims: Annotated[dict, Depends(current_user)
     return _boost_state((await service.make_statuses([row], actor_url))[0], reblogged=False)
 
 
-async def _listed_by(id: str, limit: int, actors_of) -> list:
+async def _listed_by(id: str, limit: int, max_id, since_id, actors_of) -> list:
     if not id.isdigit():
         raise HTTPException(status_code=404, detail="status_not_found")
- 
+
     store = await as_objects.storage()
     url = await store.url_for(id)
     if url is None:
         raise HTTPException(status_code=404, detail="status_not_found")
 
-    return list((await cached_multiple(await actors_of(store,
-                                                       url,
-                                                       max(1, min(limit, 80))))).values())
+    rows = await actors_of(store, url, limit, max_id, since_id)
+    accounts = await cached_multiple([row["actor_url"] for row in rows])
+    return [{"mastodon_id": row["mastodon_id"], "account": accounts[row["actor_url"]]}
+            for row in rows
+            if row["actor_url"] in accounts]
+
+
+def _without_the_cursor(rows: list) -> list:
+    return [row["account"] for row in rows]
+
+
+def _the_cursor(row: dict) -> str:
+    return str(row["mastodon_id"])
 
 
 @router.get("/statuses/{id}/favourited_by")
-async def favourited_by(id: str, limit: int = 40, claims: Annotated[dict, Depends(current_user)] = None):
-    return await _listed_by(id, limit, lambda store, url, n: store.reacted_by(url, n))
+@paginated(convert=_without_the_cursor, cursor=_the_cursor)
+async def favourited_by(id: str,
+                        limit: int = Query(default=40, ge=1, le=80),
+                        max_id: Optional[str] = Query(default=None),
+                        since_id: Optional[str] = Query(default=None),
+                        claims: Annotated[dict, Depends(current_user)] = None):
+    return await _listed_by(id, limit, max_id, since_id,
+                            lambda store, url, n, older, newer: store.reacted_by(url, n, older, newer))
 
 
 @router.get("/statuses/{id}/reblogged_by")
-async def reblogged_by(id: str, limit: int = 40, claims: Annotated[dict, Depends(current_user)] = None):
-    return await _listed_by(id, limit, lambda store, url, n: store.boosted_by(url, n))
+@paginated(convert=_without_the_cursor, cursor=_the_cursor)
+async def reblogged_by(id: str,
+                       limit: int = Query(default=40, ge=1, le=80),
+                       max_id: Optional[str] = Query(default=None),
+                       since_id: Optional[str] = Query(default=None),
+                       claims: Annotated[dict, Depends(current_user)] = None):
+    return await _listed_by(id, limit, max_id, since_id,
+                            lambda store, url, n, older, newer: store.boosted_by(url, n, older, newer))
 
 
 @router.post("/statuses/{id}/bookmark")
