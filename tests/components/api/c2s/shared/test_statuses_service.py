@@ -376,3 +376,38 @@ async def test_the_same_post_twice_is_asked_for_once(fake_bus):
     assert fake_bus.topic("reaction_refresh").published[0]["payload"]["object_urls"] == \
         ["https://x/notes/5"]
 
+
+@pytest.mark.asyncio
+async def test_a_bookmarked_status_says_so(fake_bus, no_bookmarks):
+    no_bookmarks.marked = AsyncMock(return_value={"https://x/notes/5"})
+    cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
+
+    with cached, storage:
+        result = await service.make_statuses([_row({"id": "1"})])
+
+    assert result[0].bookmarked is True
+
+
+@pytest.mark.asyncio
+async def test_a_status_nobody_marked_is_not_bookmarked(fake_bus, no_bookmarks):
+    cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
+
+    with cached, storage:
+        result = await service.make_statuses([_row({"id": "1"})])
+
+    assert result[0].bookmarked is False
+
+
+@pytest.mark.asyncio
+async def test_a_boost_of_a_bookmarked_status_says_so_on_both(fake_bus, no_bookmarks):
+    no_bookmarks.marked = AsyncMock(return_value={"https://x/notes/5"})
+    boost = {**_row({"id": "1"}), "kind": "announce", "mastodon_id": 500, "status": {"id": "500"}}
+    cached, storage = _patches(_store(mastodon_ids_for=AsyncMock(return_value={})))
+
+    with cached, storage:
+        result = await service.make_statuses([boost])
+
+    assert result[0].bookmarked is True
+    assert result[0].reblog.bookmarked is True
+
+

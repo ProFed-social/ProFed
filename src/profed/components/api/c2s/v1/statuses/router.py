@@ -22,6 +22,7 @@ from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.pagination import paginated
+from profed.topics.bookmarks_topic import publish_bookmark
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
 from profed.components.api.c2s.shared.statuses import as_objects, service
@@ -228,6 +229,23 @@ async def _boosted_row(id: str) -> dict:
     return row
 
 
+async def _bookmark_state(id: str, claims: dict, *, bookmarked: bool) -> Status:
+    actor_url = actor_url_from_username(_username(claims))
+    row = await _boosted_row(id)
+
+    await publish_bookmark("added" if bookmarked else "removed", actor_url, row["content"]["url"])
+
+    return _marked((await service.make_statuses([row], actor_url))[0], bookmarked=bookmarked)
+
+
+def _marked(status: Status, *, bookmarked: bool) -> Status:
+    content = status.reblog or status
+    content.bookmarked = bookmarked
+    status.bookmarked = bookmarked
+
+    return status
+
+
 def _reaction_state(status: Status, *, favourited: bool) -> Status:
     content = status.reblog or status
     if content.favourited != favourited:
@@ -345,12 +363,12 @@ async def reblogged_by(id: str,
 
 @router.post("/statuses/{id}/bookmark")
 async def bookmark_status(id: str, claims: Annotated[dict, Depends(current_user)]):
-    raise HTTPException(status_code=404, detail="status_not_found")
+    return await _bookmark_state(id, claims, bookmarked=True)
 
 
 @router.post("/statuses/{id}/unbookmark")
 async def unbookmark_status(id: str, claims: Annotated[dict, Depends(current_user)]):
-    raise HTTPException(status_code=404, detail="status_not_found")
+    return await _bookmark_state(id, claims, bookmarked=False)
 
 
 @router.post("/statuses/{id}/pin")

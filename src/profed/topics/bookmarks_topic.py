@@ -21,8 +21,8 @@ def _named(payload: Dict, key: str) -> Optional[str]:
     return value if isinstance(value, str) and value else None
 
 
-def bookmark_id(username: str, object_url: str) -> str:
-    return f"{username}|{object_url}"
+def bookmark_id(actor_url: str, object_url: str) -> str:
+    return f"{actor_url}|{object_url}"
 
 
 def validate_bookmarks_event(event_type: str, payload: Dict) -> Optional[Dict]:
@@ -34,8 +34,8 @@ def validate_bookmarks_event(event_type: str, payload: Dict) -> Optional[Dict]:
         logger.warning(_ignore(f"payload not a dict: {payload!r}"))
         return None
 
-    if not all(_named(payload, key) for key in ("username", "object_url")):
-        logger.warning(_ignore(f"no usable username and object_url: {payload!r}"))
+    if not all(_named(payload, key) for key in ("actor_url", "object_url")):
+        logger.warning(_ignore(f"no usable actor_url and object_url: {payload!r}"))
         return None
 
     return payload
@@ -43,15 +43,15 @@ def validate_bookmarks_event(event_type: str, payload: Dict) -> Optional[Dict]:
 
 def validate_bookmarks_snapshot_item(item) -> Optional[Dict]:
     return (item
-            if isinstance(item, dict) and all(_named(item, key) for key in ("username", "object_url")) else
+            if isinstance(item, dict) and all(_named(item, key) for key in ("actor_url", "object_url")) else
             None)
 
 
-async def publish_bookmark(event_type: str, username: str, object_url: str) -> None:
+async def publish_bookmark(event_type: str, actor_url: str, object_url: str) -> None:
     async with message_bus().topic("bookmarks").publish() as publish:
         await publish(event_type=event_type,
-                      object_id=bookmark_id(username, object_url),
-                      payload={"username": username, "object_url": object_url})
+                      object_id=bookmark_id(actor_url, object_url),
+                      payload={"actor_url": actor_url, "object_url": object_url})
 
 
 topic = {"name":              "bookmarks",

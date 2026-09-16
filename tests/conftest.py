@@ -4,7 +4,26 @@
 import pytest
 
 from profed.core import message_bus, media_storage
+from profed.components.api.c2s.shared.bookmarks import storage as bookmarks_storage
 from _fakes import FakeMediaStorage, FakeMessageBus
+
+
+class _NobodyBookmarkedAnything:
+    async def marked(self, object_urls, actor_url):
+        return set()
+
+    async def page(self, actor_url, limit, max_id, since_id):
+        return []
+
+
+@pytest.fixture(autouse=True)
+def no_bookmarks():
+    backup = bookmarks_storage._instance
+    bookmarks_storage._instance = _NobodyBookmarkedAnything()
+
+    yield bookmarks_storage._instance
+
+    bookmarks_storage._instance = backup
 
 
 @pytest.fixture

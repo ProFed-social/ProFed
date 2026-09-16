@@ -6,6 +6,7 @@ from profed.components.api.c2s.shared.known_accounts.service import cached_multi
 from profed.core.config import config
 from profed.identity import is_local_actor_url
 from profed.topics.reaction_refresh_topic import publish_refresh
+from profed.components.api.c2s.shared.bookmarks import storage as bookmarks
 from profed.components.api.c2s.shared.statuses import as_objects
 
 
@@ -30,6 +31,7 @@ def _make_status(row: dict,
                  boosts: dict,
                  reactions: dict,
                  breakdown: dict,
+                 marked: set,
                  default_emoji: str) -> Status:
     def account(accounts: dict, url: str):
         return accounts.get(url) or placeholder_account(url)
@@ -56,6 +58,7 @@ def _make_status(row: dict,
                          "reblogged": stats.get("reblogged", False),
                          "favourites_count": reaction.get("n_of_reactions", 0),
                          "favourited": reaction.get("reacted", False),
+                         "bookmarked": row["content"]["url"] in marked,
                          "pleroma": {"emoji_reactions":
                                      _emoji_reactions(breakdown.get(row["content"]["url"], []), default_emoji),
                                      "local": is_local_actor_url(row["content"]["actor"]),
@@ -70,7 +73,8 @@ def _make_status(row: dict,
                          "reblogs_count": reblog.reblogs_count,
                          "reblogged": reblog.reblogged,
                          "favourites_count": reblog.favourites_count,
-                         "favourited": reblog.favourited},
+                         "favourited": reblog.favourited,
+                         "bookmarked": reblog.bookmarked},
                       account=account(accounts, row["actor_url"]))
 
     return (wrapper(row, accounts)
@@ -86,9 +90,10 @@ async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Sta
     async def do_make_statuses(rows, viewer, store, accounts, reply_urls, content_urls):
         await publish_refresh(content_urls)
 
-        async def build_statuses_list(rows, accounts, replies, boosts, reactions, breakdown):
+        async def build_statuses_list(rows, accounts, replies, boosts, reactions, breakdown, marked):
             default_emoji = _default_emoji() if any(breakdown.values()) else ""
-            return [_make_status(row, accounts, replies, boosts, reactions, breakdown, default_emoji) for row in rows]
+            return [_make_status(row, accounts, replies, boosts, reactions, breakdown, marked, default_emoji)
+                    for row in rows]
 
         return await (build_statuses_list(rows,
                                           accounts,
@@ -97,7 +102,8 @@ async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Sta
                                                   {},
                                           boosts=await store.boost_stats(content_urls, viewer),
                                           reactions=await store.reaction_stats(content_urls, viewer),
-                                          breakdown=await store.reaction_breakdown(content_urls, viewer))
+                                          breakdown=await store.reaction_breakdown(content_urls, viewer),
+                                          marked=await (await bookmarks.storage()).marked(content_urls, viewer))
                       if rows else
                       build_statuses_list(rows,
                                           accounts,
@@ -106,7 +112,8 @@ async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Sta
                                                   {},
                                           boosts={},
                                           reactions={},
-                                          breakdown={}))
+                                          breakdown={},
+                                          marked=set()))
 
     return await do_make_statuses(rows,
                                   viewer,

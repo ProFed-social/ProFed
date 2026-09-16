@@ -21,6 +21,8 @@ from profed.components.api.c2s.shared.statuses import user_timeline as statuses_
 from profed.components.api.c2s.shared.statuses import projection as statuses_projection
 from profed.components.api.c2s.shared.statuses import compressor as statuses_compressor
 from profed.components.api.c2s.shared.statuses import sweeper as statuses_sweeper
+from profed.components.api.c2s.shared.bookmarks import storage as bookmarks_storage
+from profed.components.api.c2s.shared.bookmarks import projection as bookmarks_projection
 from profed.components.api.c2s.shared.conversations import storage as conversations_storage
 from profed.components.api.c2s.shared.conversations import projection as conversations_projection
 from . import oauth
@@ -102,6 +104,17 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       conversations_projection,
                                                       conversations_projection.handle_events,
                                                       "c2s_conversations")),
+                             (["v1_timelines",
+                               "v1_statuses",
+                               "v1_pleroma",
+                               "profed_reactions",
+                               "v1_accounts",
+                               "v1_lists",
+                               "profed_timeline"],
+                              _projection_initializer(bookmarks_storage,
+                                                      bookmarks_projection,
+                                                      bookmarks_projection.handle_events,
+                                                      "c2s_bookmarks")),
                              (["v1_timelines",
                                "v1_statuses",
                                "v1_pleroma",

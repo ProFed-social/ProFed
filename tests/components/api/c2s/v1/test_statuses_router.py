@@ -767,3 +767,62 @@ def test_favourited_by_refuses_less_than_one(client, fake_bus):
 
     assert response.status_code == 422
 
+
+def test_bookmarking_publishes_the_bookmark(client, fake_bus):
+    row = {"mastodon_id": 424242,
+           "url": NOTE_URL,
+           "actor_url": "https://example.com/actors/bob",
+           "kind": "content",
+           "status": {"id": "424242", "content": "hi"},
+           "content": {"mastodon_id": 424242,
+                       "url": NOTE_URL,
+                       "actor": "https://example.com/actors/bob",
+                       "status": {"id": "424242", "content": "hi"}}}
+
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=Mock(get=AsyncMock(return_value=row),
+                                           boost_stats=AsyncMock(return_value={}),
+                                           reaction_stats=AsyncMock(return_value={}),
+                                           reaction_breakdown=AsyncMock(return_value={}),
+                                           mastodon_ids_for=AsyncMock(return_value={})))), \
+         _patched_accounts({}):
+        response = client.post("/statuses/424242/bookmark")
+
+    published = fake_bus.topic("bookmarks").published[0]
+    assert response.status_code == 200
+    assert published["event_type"] == "added"
+    assert published["payload"]["object_url"] == NOTE_URL
+    assert response.json()["bookmarked"] is True
+
+
+def test_unbookmarking_publishes_the_removal(client, fake_bus):
+    row = {"mastodon_id": 424242,
+           "url": NOTE_URL,
+           "actor_url": "https://example.com/actors/bob",
+           "kind": "content",
+           "status": {"id": "424242", "content": "hi"},
+           "content": {"mastodon_id": 424242,
+                       "url": NOTE_URL,
+                       "actor": "https://example.com/actors/bob",
+                       "status": {"id": "424242", "content": "hi"}}}
+
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=Mock(get=AsyncMock(return_value=row),
+                                           boost_stats=AsyncMock(return_value={}),
+                                           reaction_stats=AsyncMock(return_value={}),
+                                           reaction_breakdown=AsyncMock(return_value={}),
+                                           mastodon_ids_for=AsyncMock(return_value={})))), \
+         _patched_accounts({}):
+        response = client.post("/statuses/424242/unbookmark")
+
+    assert fake_bus.topic("bookmarks").published[0]["event_type"] == "removed"
+    assert response.json()["bookmarked"] is False
+
+
+def test_bookmarking_an_unknown_status_publishes_nothing(client, fake_bus):
+    response = client.post("/statuses/some-id/bookmark")
+
+    assert response.status_code == 404
+    assert fake_bus.topic("bookmarks").published == []
+
+

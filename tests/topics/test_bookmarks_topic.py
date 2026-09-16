@@ -10,7 +10,9 @@ from profed.topics.bookmarks_topic import (bookmark_id,
 
 NOTE = "https://remote.example/notes/7"
 
-MARK = {"username": "alice", "object_url": NOTE}
+ALICE = "https://example.com/actors/alice"
+
+MARK = {"actor_url": ALICE, "object_url": NOTE}
 
 
 def test_adding_a_bookmark_is_an_event():
@@ -34,7 +36,11 @@ def test_a_bookmark_without_an_owner_is_refused():
 
 
 def test_a_bookmark_without_an_object_is_refused():
-    assert validate_bookmarks_event("added", {"username": "alice"}) is None
+    assert validate_bookmarks_event("added", {"actor_url": ALICE}) is None
+
+
+def test_an_empty_owner_is_no_owner():
+    assert validate_bookmarks_event("added", {"actor_url": "", "object_url": NOTE}) is None
 
 
 def test_an_empty_name_is_no_name():
@@ -52,30 +58,30 @@ def test_a_snapshot_item_names_its_owner_and_its_object():
 
 
 def test_a_snapshot_item_without_an_object_is_refused():
-    assert validate_bookmarks_snapshot_item({"username": "alice"}) is None
+    assert validate_bookmarks_snapshot_item({"actor_url": ALICE}) is None
 
 
 def test_the_subject_combines_the_owner_and_the_object():
-    assert bookmark_id("alice", NOTE) == f"alice|{NOTE}"
+    assert bookmark_id(ALICE, NOTE) == f"{ALICE}|{NOTE}"
 
 
 def test_two_users_bookmarking_the_same_note_are_two_subjects():
-    assert bookmark_id("alice", NOTE) != bookmark_id("bob", NOTE)
+    assert bookmark_id(ALICE, NOTE) != bookmark_id("https://example.com/actors/bob", NOTE)
 
 
 @pytest.mark.asyncio
 async def test_publishing_names_the_pair_as_the_subject(fake_bus):
-    await publish_bookmark("added", "alice", NOTE)
+    await publish_bookmark("added", ALICE, NOTE)
 
     published = fake_bus.topic("bookmarks").published[0]
     assert published["event_type"] == "added"
-    assert published["object_id"] == bookmark_id("alice", NOTE)
+    assert published["object_id"] == bookmark_id(ALICE, NOTE)
     assert published["payload"] == MARK
 
 
 @pytest.mark.asyncio
 async def test_removing_publishes_the_same_subject(fake_bus):
-    await publish_bookmark("removed", "alice", NOTE)
+    await publish_bookmark("removed", ALICE, NOTE)
 
-    assert fake_bus.topic("bookmarks").published[0]["object_id"] == bookmark_id("alice", NOTE)
+    assert fake_bus.topic("bookmarks").published[0]["object_id"] == bookmark_id(ALICE, NOTE)
 
