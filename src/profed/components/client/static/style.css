@@ -255,6 +255,7 @@ a:hover { text-decoration: underline; }
 .actions .action .count { font-size: .8rem; }
 .actions .action.boost.is-boosted { color: var(--accent); }
 .actions .action.reaction.is-reacted { color: var(--accent); }
+.actions .action.bookmark.is-bookmarked { color: var(--accent); }
 .reaction-area { display: inline-flex; align-items: center; margin: 0; }
 @supports (position-area: block-end) {
   .action-menu-items { margin: initial; position-area: block-end span-inline-start; }

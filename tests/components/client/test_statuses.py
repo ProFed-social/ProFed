@@ -488,3 +488,60 @@ async def test_a_failing_reaction_leaves_the_session_alone(monkeypatch):
 
     saving.assert_not_awaited()
 
+
+def _bookmark_resp(bookmarked):
+    response = Mock()
+    response.status_code = 200
+    response.text = ""
+    response.json = Mock(return_value={"id": "42", "bookmarked": bookmarked})
+    return response
+
+
+async def test_a_bookmark_calls_the_api_with_the_session_token(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(post=AsyncMock(return_value=_bookmark_resp(True)))
+    monkeypatch.setattr(statuses, "api_client", lambda: client)
+
+    await _post(_app(), "/statuses/42/bookmark")
+
+    client.post.assert_awaited_once_with("/api/v1/statuses/42/bookmark", token="tok")
+
+
+async def test_an_unbookmark_calls_the_undo_endpoint(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(post=AsyncMock(return_value=_bookmark_resp(False)))
+    monkeypatch.setattr(statuses, "api_client", lambda: client)
+
+    await _post(_app(), "/statuses/42/unbookmark")
+
+    client.post.assert_awaited_once_with("/api/v1/statuses/42/unbookmark", token="tok")
+
+
+async def test_a_bookmark_returns_a_button_that_can_undo_it(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(post=AsyncMock(return_value=_bookmark_resp(True))))
+
+    response = await _post(_app(), "/statuses/42/bookmark")
+
+    assert 'hx-post="/statuses/42/unbookmark"' in response.text
+    assert "is-bookmarked" in response.text
+    assert 'aria-pressed="true"' in response.text
+
+
+async def test_an_unbookmark_returns_a_button_that_can_mark_again(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(post=AsyncMock(return_value=_bookmark_resp(False))))
+
+    response = await _post(_app(), "/statuses/42/unbookmark")
+
+    assert 'hx-post="/statuses/42/bookmark"' in response.text
+    assert "is-bookmarked" not in response.text
+    assert 'aria-pressed="false"' in response.text
+
+
+async def test_a_failing_bookmark_is_reported(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(statuses, "api_client", lambda: Mock(post=AsyncMock(return_value=_resp(404))))
+
+    assert (await _post(_app(), "/statuses/42/bookmark")).status_code == 404
+

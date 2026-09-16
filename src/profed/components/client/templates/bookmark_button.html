@@ -1,0 +1,7 @@
+<button type="button" class="action bookmark{% if status.bookmarked %} is-bookmarked{% endif %}"
+        title="{% if status.bookmarked %}Remove bookmark{% else %}Bookmark{% endif %}"
+        aria-label="{% if status.bookmarked %}Remove bookmark{% else %}Bookmark{% endif %}"
+        aria-pressed="{{ 'true' if status.bookmarked else 'false' }}"
+        hx-post="/statuses/{{ status.id }}/{% if status.bookmarked %}unbookmark{% else %}bookmark{% endif %}"
+        hx-swap="outerHTML"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="{{ 'currentColor' if status.bookmarked else 'none' }}" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+

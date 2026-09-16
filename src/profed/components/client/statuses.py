@@ -54,6 +54,18 @@ async def unreblog(request: Request, session, id: str):
     return await _status_action(id, "unreblog", session["token"], "boost_button.html")
 
 
+@router.post("/statuses/{id}/bookmark", response_class=HTMLResponse)
+@requires_login
+async def bookmark(request: Request, session, id: str):
+    return await _status_action(id, "bookmark", session["token"], "bookmark_button.html")
+
+
+@router.post("/statuses/{id}/unbookmark", response_class=HTMLResponse)
+@requires_login
+async def unbookmark(request: Request, session, id: str):
+    return await _status_action(id, "unbookmark", session["token"], "bookmark_button.html")
+
+
 def _render(template: str, status: dict) -> str:
     return environment().get_template(template).render(status=status)
 
