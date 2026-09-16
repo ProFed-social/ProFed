@@ -5,6 +5,7 @@ from profed.models.mastodon import ReplyPreview, Status, placeholder_account
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.core.config import config
 from profed.identity import is_local_actor_url
+from profed.topics.reaction_refresh_topic import publish_refresh
 from profed.components.api.c2s.shared.statuses import as_objects
 
 
@@ -79,22 +80,42 @@ def _make_status(row: dict,
 
 async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Status]:
     def actor_urls(row: dict) -> list[str]:
-        parents = [row["parent_content"]["actor"]] if row.get("parent_content") else []
-        return [row["actor_url"], row["content"]["actor"], *parents]
+        return ([row["actor_url"], row["content"]["actor"]] +
+                ([row["parent_content"]["actor"]]if row.get("parent_content") else []))
 
-    accounts = await cached_multiple(list({url
-                                           for row in rows
-                                           for url in actor_urls(row)}))
-    reply_urls = list({url
-                       for row in rows
-                       if (url := row["content"]["status"].get("in_reply_to_id"))})
-    replies = await (await as_objects.storage()).mastodon_ids_for(reply_urls) if reply_urls else {}
+    async def do_make_statuses(rows, viewer, store, accounts, reply_urls, content_urls):
+        await publish_refresh(content_urls)
 
-    content_urls = list({row["content"]["url"] for row in rows})
-    store = await as_objects.storage()
-    boosts = await store.boost_stats(content_urls, viewer) if rows else {}
-    reactions = await store.reaction_stats(content_urls, viewer) if rows else {}
-    breakdown = await store.reaction_breakdown(content_urls, viewer) if rows else {}
-    default_emoji = _default_emoji() if any(breakdown.values()) else ""
-    return [_make_status(row, accounts, replies, boosts, reactions, breakdown, default_emoji) for row in rows]
+        async def build_statuses_list(rows, accounts, replies, boosts, reactions, breakdown):
+            default_emoji = _default_emoji() if any(breakdown.values()) else ""
+            return [_make_status(row, accounts, replies, boosts, reactions, breakdown, default_emoji) for row in rows]
+
+        return await (build_statuses_list(rows,
+                                          accounts,
+                                          replies=await (await as_objects.storage()).mastodon_ids_for(reply_urls)
+                                                  if reply_urls else
+                                                  {},
+                                          boosts=await store.boost_stats(content_urls, viewer),
+                                          reactions=await store.reaction_stats(content_urls, viewer),
+                                          breakdown=await store.reaction_breakdown(content_urls, viewer))
+                      if rows else
+                      build_statuses_list(rows,
+                                          accounts,
+                                          replies=await (await as_objects.storage()).mastodon_ids_for(reply_urls)
+                                                  if reply_urls else
+                                                  {},
+                                          boosts={},
+                                          reactions={},
+                                          breakdown={}))
+
+    return await do_make_statuses(rows,
+                                  viewer,
+                                  store=await as_objects.storage(),
+                                  accounts=await cached_multiple(list({url
+                                                                       for row in rows
+                                                                       for url in actor_urls(row)})),
+                                  reply_urls=list({url
+                                                   for row in rows
+                                                   if (url := row["content"]["status"].get("in_reply_to_id"))}),
+                                  content_urls=list({row["content"]["url"] for row in rows}))
 

@@ -35,6 +35,10 @@ def is_local_actor_url(actor_url: str) -> bool:
     return actor_url.startswith(f"https://{domain()}/actors/")
 
 
+def is_local_url(url: str) -> bool:
+    return url.startswith(f"https://{domain()}/")
+
+
 def username_from_actor_url(actor_url: str) -> str:
     return actor_url.rsplit("/", 1)[-1]
 

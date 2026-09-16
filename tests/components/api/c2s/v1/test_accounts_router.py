@@ -775,7 +775,7 @@ def test_account_statuses_anonymous_returns_list(anon_client):
     assert response.json() == []
 
 
-def test_account_statuses_returns_rendered_statuses(anon_client):
+def test_account_statuses_returns_rendered_statuses(fake_bus, anon_client):
     activity = {"id": "https://example.com/actors/bob#create/1",
                 "actor": "https://example.com/actors/bob",
                 "object": {"id": "https://example.com/actors/bob/notes/1",

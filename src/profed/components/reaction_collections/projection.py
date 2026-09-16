@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.persistence.projections import build_projection
+from profed.identity import is_local_url
 from profed.topics import resolved_activities
+from profed.topics.reaction_refresh_topic import publish_refresh
 from profed.topics.statuses_topic import inner_object_id
 from profed.util import noop
 from . import fetch
@@ -19,8 +21,9 @@ async def _on_object(object_id: str, payload: dict) -> None:
     url = inner_object_id(obj) if obj is not None else None
     collection_url = fetch.collection_url(obj) if obj is not None else None
 
-    if url and collection_url:
+    if url and collection_url and not is_local_url(url):
         await (await storage()).remember(url, collection_url)
+        await publish_refresh([url])
 
 
 async def _on_delete(object_id: str, payload: dict) -> None:

@@ -96,7 +96,7 @@ def client():
 
 
 
-def test_home_timeline_returns_the_content_status(client):
+def test_home_timeline_returns_the_content_status(fake_bus, client):
     with _patched_accounts({BOB_URL: BOB}):
         response = client.get("/timelines/home")
 
@@ -109,7 +109,7 @@ def test_home_timeline_returns_the_content_status(client):
     assert data[0]["reblog"] is None
 
 
-def test_home_timeline_nests_a_boost_as_a_reblog(client):
+def test_home_timeline_nests_a_boost_as_a_reblog(fake_bus, client):
     user_timeline._instance = FakeStorage([_boost_row()])
 
     with _patched_accounts({BOB_URL: BOB, CAROL_URL: CAROL}):
@@ -122,7 +122,7 @@ def test_home_timeline_nests_a_boost_as_a_reblog(client):
     assert data[0]["reblog"]["account"]["username"] == "bob"
 
 
-def test_home_timeline_falls_back_to_a_placeholder_account(client):
+def test_home_timeline_falls_back_to_a_placeholder_account(fake_bus, client):
     with _patched_accounts({}):
         response = client.get("/timelines/home")
 
@@ -130,14 +130,14 @@ def test_home_timeline_falls_back_to_a_placeholder_account(client):
     assert response.json()[0]["account"]["username"] == "bob"
 
 
-def test_home_timeline_does_not_webfinger_on_read(client):
+def test_home_timeline_does_not_webfinger_on_read(fake_bus, client):
     with _patched_accounts({BOB_URL: BOB}) as cached:
         client.get("/timelines/home")
 
     cached.assert_awaited_once()
 
 
-def test_home_timeline_empty(client):
+def test_home_timeline_empty(fake_bus, client):
     user_timeline._instance = FakeStorage([])
 
     with _patched_accounts({}):
