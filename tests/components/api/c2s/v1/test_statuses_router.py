@@ -274,18 +274,69 @@ def test_reblog_returns_404(client, fake_bus):
     assert response.status_code == 404
 
 
-def test_favourited_by_returns_empty_list(client, fake_bus):
+def _store_listing(**methods):
+    return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                 AsyncMock(return_value=Mock(url_for=AsyncMock(return_value=NOTE_URL), **methods)))
+ 
+ 
+def _account(username):
+    return Account(id="1",
+                   username=username,
+                   acct=f"{username}@remote.example",
+                   display_name=username,
+                   url=f"https://remote.example/@{username}")
+ 
+ 
+def test_favourited_by_lists_the_accounts_that_reacted(client, fake_bus):
+    accounts = AsyncMock(return_value={"https://remote.example/users/bob": _account("bob")})
+ 
+    with _store_listing(reacted_by=AsyncMock(return_value=["https://remote.example/users/bob"])), \
+         patch("profed.components.api.c2s.v1.statuses.router.cached_multiple", accounts):
+        response = client.get("/statuses/424242/favourited_by")
+ 
+    assert response.status_code == 200
+    assert [entry["username"] for entry in response.json()] == ["bob"]
+ 
+ 
+def test_favourited_by_asks_for_the_content_url_of_the_status(client, fake_bus):
+    store = Mock(url_for=AsyncMock(return_value=NOTE_URL), reacted_by=AsyncMock(return_value=[]))
+ 
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        client.get("/statuses/424242/favourited_by?limit=7")
+ 
+    store.url_for.assert_awaited_once_with("424242")
+    store.reacted_by.assert_awaited_once_with(NOTE_URL, 7)
+ 
+ 
+def test_favourited_by_returns_404_for_an_unknown_status(client, fake_bus):
+    store = Mock(url_for=AsyncMock(return_value=None), reacted_by=AsyncMock(return_value=[]))
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        response = client.get("/statuses/424242/favourited_by")
+ 
+    assert response.status_code == 404
+ 
+ 
+def test_favourited_by_returns_404_for_a_non_numeric_id(client, fake_bus):
     response = client.get("/statuses/some-id/favourited_by")
 
+    assert response.status_code == 404
+ 
+ 
+def test_reblogged_by_lists_the_accounts_that_boosted(client, fake_bus):
+    accounts = AsyncMock(return_value={"https://remote.example/users/carl": _account("carl")})
+ 
+    with _store_listing(boosted_by=AsyncMock(return_value=["https://remote.example/users/carl"])), \
+         patch("profed.components.api.c2s.v1.statuses.router.cached_multiple", accounts):
+        response = client.get("/statuses/424242/reblogged_by")
+
     assert response.status_code == 200
-    assert response.json() == []
+    assert [entry["username"] for entry in response.json()] == ["carl"]
 
 
-def test_reblogged_by_returns_empty_list(client, fake_bus):
+def test_reblogged_by_returns_404_for_a_non_numeric_id(client, fake_bus):
     response = client.get("/statuses/some-id/reblogged_by")
 
-    assert response.status_code == 200
-    assert response.json() == []
+    assert response.status_code == 404
 
 
 def test_bookmark_returns_404(client, fake_bus):
@@ -673,4 +724,22 @@ def test_an_unreblog_lowers_the_recorded_count(client, fake_bus):
              response = client.post("/statuses/424242/unreblog")
 
     assert response.json()["reblogs_count"] == 3
+
+
+def test_favourited_by_never_asks_for_more_than_eighty(client, fake_bus):
+    store = Mock(url_for=AsyncMock(return_value=NOTE_URL), reacted_by=AsyncMock(return_value=[]))
+ 
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        client.get("/statuses/424242/favourited_by?limit=100000")
+ 
+    store.reacted_by.assert_awaited_once_with(NOTE_URL, 80)
+ 
+ 
+def test_favourited_by_asks_for_at_least_one(client, fake_bus):
+    store = Mock(url_for=AsyncMock(return_value=NOTE_URL), reacted_by=AsyncMock(return_value=[]))
+ 
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        client.get("/statuses/424242/favourited_by?limit=-5")
+ 
+    store.reacted_by.assert_awaited_once_with(NOTE_URL, 1)
 

@@ -20,6 +20,7 @@ from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
+from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
 from profed.components.api.c2s.shared.statuses import as_objects, service
 from profed.components.api.c2s.shared.conversations import storage as conversations_storage
@@ -294,14 +295,28 @@ async def unreblog_status(id: str, claims: Annotated[dict, Depends(current_user)
     return _boost_state((await service.make_statuses([row], actor_url))[0], reblogged=False)
 
 
+async def _listed_by(id: str, limit: int, actors_of) -> list:
+    if not id.isdigit():
+        raise HTTPException(status_code=404, detail="status_not_found")
+ 
+    store = await as_objects.storage()
+    url = await store.url_for(id)
+    if url is None:
+        raise HTTPException(status_code=404, detail="status_not_found")
+
+    return list((await cached_multiple(await actors_of(store,
+                                                       url,
+                                                       max(1, min(limit, 80))))).values())
+
+
 @router.get("/statuses/{id}/favourited_by")
-async def favourited_by(id: str, claims: Annotated[dict, Depends(current_user)] = None):
-    return []
+async def favourited_by(id: str, limit: int = 40, claims: Annotated[dict, Depends(current_user)] = None):
+    return await _listed_by(id, limit, lambda store, url, n: store.reacted_by(url, n))
 
 
 @router.get("/statuses/{id}/reblogged_by")
-async def reblogged_by(id: str, claims: Annotated[dict, Depends(current_user)] = None):
-    return []
+async def reblogged_by(id: str, limit: int = 40, claims: Annotated[dict, Depends(current_user)] = None):
+    return await _listed_by(id, limit, lambda store, url, n: store.boosted_by(url, n))
 
 
 @router.post("/statuses/{id}/bookmark")

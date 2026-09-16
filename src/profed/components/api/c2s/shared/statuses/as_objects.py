@@ -615,6 +615,45 @@ class _storage(BaseStorage):
                                    actor_url)
         return row["announce_url"] if row else None
 
+    async def reacted_by(self, object_url: str, limit: int) -> list[str]:
+        return [row["actor_url"] for row in await self.fetch_all("""
+            SELECT
+                r.actor_url
+            FROM
+                api.reactions AS r INNER JOIN
+                api.as_objects AS o ON o.url = r.reaction_url
+            WHERE
+                r.object_url = $1
+            GROUP BY
+                r.actor_url
+            ORDER BY
+                max(o.mastodon_id) DESC
+            LIMIT $2""",
+                                                                 object_url,
+                                                                 limit)]
+ 
+    async def boosted_by(self, object_url: str, limit: int) -> list[str]:
+        return [row["actor_url"] for row in await self.fetch_all("""
+            SELECT
+                actor_url
+            FROM
+                api.boosts
+            WHERE
+                object_url = $1
+            ORDER BY
+                actor_url
+                b.actor_url
+            FROM
+                api.boosts AS b INNER JOIN
+                api.as_objects AS o ON o.url = b.announce_url
+            WHERE
+                b.object_url = $1
+            ORDER BY
+                o.mastodon_id DESC
+            LIMIT $2""",
+                                                                 object_url,
+                                                                 limit)]
+ 
     async def boost_stats(self, object_urls: list[str], viewer: Optional[str]) -> dict:
         rows = await self.fetch_all("""
             SELECT
