@@ -278,7 +278,15 @@ async def test_conversation_view_renders_a_reply_button_with_the_message_id(monk
     assert "msg-reply-btn" in body
     assert 'data-reply-id="7"' in body
     assert "msg-actions" in body
-    assert "disabled" in body
+
+
+async def test_a_chat_message_offers_no_bookmark(monkeypatch):
+    _login(monkeypatch)
+    _api(monkeypatch, [_conversation()], messages=[_reply_msg("7", "https://x/bob", "hallo")])
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert 'title="Bookmark"' not in body
 
 
 async def test_conversation_offers_deleting_an_own_message(monkeypatch):
