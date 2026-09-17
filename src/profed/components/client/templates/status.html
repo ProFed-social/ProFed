@@ -87,7 +87,7 @@
 </div>
 {% elif status.in_reply_to_id %}
 <div class="reply">
-  <p class="reply-head">responded to{% if status.mentions %} <span class="reply-who">@{{ status.mentions[0].acct }}</span>{% endif %}</p>
+  <p class="reply-head">responded to {% if status.mentions %}<span class="reply-who">@{{ status.mentions[0].acct }}</span>{% else %}a post{% endif %}</p>
   {{ status_entry(status, show_author=page_show_author, own_acct=page_own_acct) }}
 </div>
 {% else %}

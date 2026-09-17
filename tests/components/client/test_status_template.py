@@ -3,6 +3,8 @@
 
 import mf2py
 import pytest
+from unittest.mock import patch
+from profed.components.client import templating
 from profed.components.client.templating import STANDARD_TEMPLATES, build_environment
 
 
@@ -35,6 +37,12 @@ def _render(status=STATUS, **context):
 
 def _parse(status=STATUS, **context):
     return mf2py.parse(doc=f"<div class=\"h-feed\">{_render(status, **context)}</div>")
+
+
+@pytest.fixture(autouse=True)
+def domain():
+    with patch.object(templating, "domain", lambda: "example.com"):
+        yield
 
 
 @pytest.fixture
@@ -216,4 +224,17 @@ def test_the_timestamp_is_no_longer_a_link():
 
 def test_the_entry_url_comes_from_the_menu_permalink(entry):
     assert entry["properties"]["url"] == ["https://example.com/@alice/1"]
+
+
+def test_a_reply_without_a_known_target_still_reads_as_a_sentence():
+    body = _render({**STATUS, "in_reply_to_id": "7", "mentions": []})
+
+    assert "responded to a post" in body
+
+
+def test_a_reply_names_whom_it_answers_when_known():
+    body = _render({**STATUS, "in_reply_to_id": "7", "mentions": [{"acct": "bob@remote.example"}]})
+
+    assert "@bob@remote.example" in body
+    assert "responded to a post" not in body
 

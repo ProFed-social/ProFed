@@ -7,7 +7,7 @@
   <p class="boost-head"><span class="boost-who">{{ block.booster.display_name or block.booster.username }}</span> shared</p>
   {% endif %}
   {% if head.in_reply_to_id %}
-  <p class="reply-head">responded to{% if head.mentions %} <span class="reply-who">@{{ head.mentions[0].acct }}</span>{% endif %}</p>
+  <p class="reply-head">responded to {% if head.mentions %}<span class="reply-who">@{{ head.mentions[0].acct }}</span>{% else %}a post{% endif %}</p>
   {% endif %}
   <header class="status-head">
     <a class="p-author h-card author" rel="author" href="{{ head.account | profile_href }}">
