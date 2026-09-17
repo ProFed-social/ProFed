@@ -28,11 +28,14 @@ async def _fetch(app, path):
         return await client.get(path)
 
 
-def _resp(status=200, json_data=None):
+def _resp(status=200, json_data=None, following=None):
     r = Mock()
     r.status_code = status
     r.json = Mock(return_value=json_data)
     r.text = ""
+    r.headers = ({"Link": f'<https://test.local/api/v1/bookmarks?{following}>; rel="next"'}
+                 if following else
+                 {})
     return r
 
 
@@ -71,7 +74,7 @@ async def test_the_page_asks_the_api_with_the_session_token(monkeypatch):
 
     await _fetch(_app(monkeypatch), "/bookmarks")
 
-    client.get.assert_awaited_once_with("/api/v1/bookmarks", params={"limit": 20}, token="tok")
+    client.get.assert_awaited_once_with("/api/v1/bookmarks", params="limit=20", token="tok")
 
 
 async def test_a_kept_post_is_shown(monkeypatch):
@@ -101,4 +104,42 @@ async def test_a_failing_api_leaves_the_page_standing(monkeypatch):
 
     assert response.status_code == 200
     assert "not bookmarked anything yet" in response.text
+
+
+async def test_the_page_offers_to_load_more_when_another_page_follows(monkeypatch):
+    _login(monkeypatch)
+    response = _resp(200, [_status()], following="limit=20&max_id=400")
+    monkeypatch.setattr(bookmarks, "api_client", lambda: Mock(get=AsyncMock(return_value=response)))
+
+    body = (await _fetch(_app(monkeypatch), "/bookmarks")).text
+
+    assert 'hx-get="/bookmarks/more?following=limit%3D20%26max_id%3D400"' in body
+    assert 'hx-trigger="revealed"' in body
+
+
+async def test_the_last_page_offers_nothing_more(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(bookmarks, "api_client", lambda: Mock(get=AsyncMock(return_value=_resp(200, [_status()]))))
+
+    assert "/bookmarks/more" not in (await _fetch(_app(monkeypatch), "/bookmarks")).text
+
+
+async def test_more_hands_the_query_back_to_the_api_unchanged(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(get=AsyncMock(return_value=_resp(200, [])))
+    monkeypatch.setattr(bookmarks, "api_client", lambda: client)
+
+    await _fetch(_app(monkeypatch), "/bookmarks/more?following=limit%3D20%26max_id%3D400")
+
+    assert client.get.call_args.kwargs["params"] == "limit=20&max_id=400"
+
+
+async def test_more_renders_only_the_entries(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(bookmarks, "api_client", lambda: Mock(get=AsyncMock(return_value=_resp(200, [_status()]))))
+
+    body = (await _fetch(_app(monkeypatch), "/bookmarks/more?following=limit%3D20")).text
+
+    assert "a post worth keeping" in body
+    assert "<html" not in body
 

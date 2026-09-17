@@ -1,0 +1,10 @@
+{% for status in statuses %}
+{% include "status.html" %}
+{% endfor %}
+{% if following and statuses %}
+<div class="more" hx-get="{{ more_url }}?following={{ following | urlencode }}"
+     hx-trigger="revealed" hx-swap="outerHTML">
+  <span class="more-hint" role="status"><span class="spinner" aria-hidden="true"></span>Loading more&#8230;</span>
+</div>
+{% endif %}
+

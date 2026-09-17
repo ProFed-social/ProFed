@@ -256,6 +256,13 @@ a:hover { text-decoration: underline; }
 .actions .action.boost.is-boosted { color: var(--accent); }
 .actions .action.reaction.is-reacted { color: var(--accent); }
 .actions .action.bookmark.is-bookmarked { color: var(--accent); }
+
+.more { display: flex; justify-content: center; padding: 1.5rem 0; }
+.more-hint { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9rem; }
+.spinner { width: 1em; height: 1em; border: 2px solid var(--line); border-top-color: var(--accent);
+           border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 .reaction-area { display: inline-flex; align-items: center; margin: 0; }
 @supports (position-area: block-end) {
   .action-menu-items { margin: initial; position-area: block-end span-inline-start; }

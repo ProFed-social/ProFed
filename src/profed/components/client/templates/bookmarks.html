@@ -2,11 +2,11 @@
 {% block content %}
 <section class="h-feed posts">
   <h2>Bookmarks</h2>
-  {% for status in statuses %}
-  {% include "status.html" %}
+  {% if statuses %}
+  {% include "bookmarks_page.html" %}
   {% else %}
   <p class="empty">You have not bookmarked anything yet.</p>
-  {% endfor %}
+  {% endif %}
 </section>
 {% endblock %}
 

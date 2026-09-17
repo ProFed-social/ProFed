@@ -1,13 +1,12 @@
 {% extends "base.html" %}
-{% from "block.html" import timeline_block %}
 {% block content %}
 {% include "compose.html" %}
 <section class="h-feed posts">
-  {% for block in blocks %}
-  {{ timeline_block(block, own_acct=current_acct) }}
+  {% if blocks %}
+  {% include "timeline_page.html" %}
   {% else %}
   <p class="empty">Your timeline is empty. Follow someone to see their posts here.</p>
-  {% endfor %}
+  {% endif %}
 </section>
 {% endblock %}
 

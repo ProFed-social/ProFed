@@ -1,0 +1,11 @@
+{% from "block.html" import timeline_block %}
+{% for block in blocks %}
+{{ timeline_block(block, own_acct=current_acct) }}
+{% endfor %}
+{% if following and blocks %}
+<div class="more" hx-get="{{ more_url }}?following={{ following | urlencode }}"
+     hx-trigger="revealed" hx-swap="outerHTML">
+  <span class="more-hint" role="status"><span class="spinner" aria-hidden="true"></span>Loading more&#8230;</span>
+</div>
+{% endif %}
+

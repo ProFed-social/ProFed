@@ -27,11 +27,14 @@ async def _fetch(app, path):
         return await client.get(path)
 
 
-def _resp(status=200, json_data=None):
+def _resp(status=200, json_data=None, following=None):
     r = Mock()
     r.status_code = status
     r.json = Mock(return_value=json_data)
     r.text = ""
+    r.headers = ({"Link": f'<https://test.local/api/profed/timeline?{following}>; rel="next"'}
+                 if following else
+                 {})
     return r
 
 
@@ -80,18 +83,26 @@ async def test_home_timeline_is_fetched_with_the_session_token(monkeypatch):
     client = Mock(get=AsyncMock(return_value=_resp(200, [_status()])))
     monkeypatch.setattr(home, "api_client", lambda: client)
 
-    statuses = await home._home_timeline("tok")
+    statuses, following = await home._page("limit=20", "tok")
 
     assert statuses == [_status()]
+    assert following is None
     assert client.get.call_args.args[0] == "/api/profed/timeline"
     assert client.get.call_args.kwargs["token"] == "tok"
-    assert client.get.call_args.kwargs["params"] == {"limit": 20}
+    assert client.get.call_args.kwargs["params"] == "limit=20"
+
+
+async def test_the_query_of_the_next_page_comes_from_the_link_header(monkeypatch):
+    response = _resp(200, [_status()], following="limit=20&max_id=400")
+    monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=response)))
+
+    assert (await home._page("limit=20", "tok"))[1] == "limit=20&max_id=400"
 
 
 async def test_home_timeline_failure_yields_no_statuses(monkeypatch):
     monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=_resp(401))))
 
-    assert await home._home_timeline("tok") == []
+    assert await home._page("limit=20", "tok") == ([], None)
 
 
 async def test_home_shows_the_timeline_of_a_logged_in_user(monkeypatch):
@@ -140,4 +151,65 @@ async def test_home_targets_the_single_thread_part_when_deleting(monkeypatch):
     assert body.count('class="thread-part entry') == 2
     assert 'hx-delete="/statuses/1"' in body
     assert 'hx-delete="/statuses/2"' in body
+
+
+async def test_the_page_offers_to_load_more_when_another_page_follows(monkeypatch):
+    _login(monkeypatch)
+    response = _resp(200, [_block(_status())], following="limit=20&max_id=400")
+    monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=response)))
+
+    body = (await _fetch(_app(monkeypatch), "/")).text
+
+    assert 'hx-get="/timeline/more?following=limit%3D20%26max_id%3D400"' in body
+    assert 'hx-trigger="revealed"' in body
+
+
+async def test_the_last_page_offers_nothing_more(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(home, "api_client",
+                        lambda: Mock(get=AsyncMock(return_value=_resp(200, [_block(_status())]))))
+
+    assert "/timeline/more" not in (await _fetch(_app(monkeypatch), "/")).text
+
+
+async def test_more_hands_the_query_back_to_the_api_unchanged(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(get=AsyncMock(return_value=_resp(200, [])))
+    monkeypatch.setattr(home, "api_client", lambda: client)
+
+    await _fetch(_app(monkeypatch), "/timeline/more?following=limit%3D20%26max_id%3D400")
+
+    assert client.get.call_args.kwargs["params"] == "limit=20&max_id=400"
+
+
+async def test_more_without_a_query_starts_at_the_front(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(get=AsyncMock(return_value=_resp(200, [])))
+    monkeypatch.setattr(home, "api_client", lambda: client)
+
+    await _fetch(_app(monkeypatch), "/timeline/more")
+
+    assert client.get.call_args.kwargs["params"] == "limit=20"
+
+
+async def test_more_renders_only_the_entries(monkeypatch):
+    _login(monkeypatch)
+    monkeypatch.setattr(home, "api_client",
+                        lambda: Mock(get=AsyncMock(return_value=_resp(200, [_block(_status())]))))
+
+    body = (await _fetch(_app(monkeypatch), "/timeline/more?following=limit%3D20")).text
+
+    assert "hello world" in body
+    assert "<html" not in body
+
+
+async def test_the_loader_shows_that_something_is_happening(monkeypatch):
+    _login(monkeypatch)
+    response = _resp(200, [_block(_status())], following="limit=20&max_id=400")
+    monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=response)))
+
+    body = (await _fetch(_app(monkeypatch), "/")).text
+
+    assert 'class="spinner"' in body
+    assert 'role="status"' in body
 
