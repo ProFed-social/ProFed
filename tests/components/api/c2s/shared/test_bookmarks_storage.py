@@ -78,11 +78,19 @@ async def test_a_page_is_newest_first_and_belongs_to_one_actor(fake_pool, fake_c
 
 @pytest.mark.asyncio
 async def test_a_page_can_start_after_a_cursor(fake_pool, fake_conn):
-    await (await _storage(fake_pool)).page(ALICE, 20, "500", "100")
+    await (await _storage(fake_pool)).page(ALICE, 20, 500, 100)
 
-    sql = fake_conn.fetch.await_args.args[0]
+    sql, *args = fake_conn.fetch.await_args.args
     assert "marked_at < $3::bigint" in sql
     assert "marked_at > $4::bigint" in sql
+    assert args == [ALICE, 20, 500, 100]
+
+
+@pytest.mark.asyncio
+async def test_a_cursor_reaches_the_database_as_a_number(fake_pool, fake_conn):
+    await (await _storage(fake_pool)).page(ALICE, 20, 500, None)
+
+    assert all(not isinstance(arg, str) or arg == ALICE for arg in fake_conn.fetch.await_args.args[1:])
 
 
 @pytest.mark.asyncio

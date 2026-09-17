@@ -39,7 +39,7 @@ class _storage(BaseStorage):
                            actor_url,
                            object_url)
 
-    async def page(self, actor_url: str, limit: int, max_id: Optional[str], since_id: Optional[str]) -> list:
+    async def page(self, actor_url: str, limit: int, max_id: Optional[int], since_id: Optional[int]) -> list:
         return await self.fetch_all("""
             SELECT
                 object_url,

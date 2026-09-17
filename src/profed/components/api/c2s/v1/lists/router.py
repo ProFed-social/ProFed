@@ -42,8 +42,8 @@ async def _marked_statuses(marks: list, actor_url: str) -> list:
 @paginated(convert=only("status"), cursor=cursor_in("marked_at"))
 async def get_bookmarks(claims: Annotated[dict, Depends(current_user)],
                         limit: int = Query(default=20, ge=1, le=40),
-                        max_id: Optional[str] = Query(default=None),
-                        since_id: Optional[str] = Query(default=None)):
+                        max_id: Optional[int] = Query(default=None),
+                        since_id: Optional[int] = Query(default=None)):
     actor_url = actor_url_from_username(claims.get("preferred_username") or claims.get("sub"))
     marks = await (await bookmarks.storage()).page(actor_url, limit, max_id, since_id)
 
