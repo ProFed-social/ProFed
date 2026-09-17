@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
@@ -14,6 +14,7 @@ from profed.components.api.c2s.shared.known_accounts.service import (lookup_by_i
                                                                      lookup_by_actor_url)
 from profed.components.api.c2s.v1.accounts.credentials.service import credential_account
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
+from profed.components.api.c2s.shared.pagination import paginated
 from profed.components.api.c2s.shared.statuses import as_objects, service
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
@@ -146,15 +147,20 @@ def _viewer(claims: dict | None) -> str | None:
 
 
 @router.get("/accounts/{id}/statuses")
+@paginated()
 async def account_statuses(id: str,
                            limit: int = Query(default=20, ge=1, le=40),
+                           max_id: Optional[str] = Query(default=None),
+                           since_id: Optional[str] = Query(default=None),
                            claims: Annotated[dict | None, Depends(current_user_optional)] = None):
     account = await _resolve_account(id, {})
     if account is None:
         raise HTTPException(status_code=404)
 
     return await service.make_statuses(await (await as_objects.storage()).fetch_by_actor(account.uri or account.url,
-                                                                                         limit=limit),
+                                                                                         limit=limit,
+                                                                                         max_id=max_id,
+                                                                                         since_id=since_id),
                                        _viewer(claims))
 
 

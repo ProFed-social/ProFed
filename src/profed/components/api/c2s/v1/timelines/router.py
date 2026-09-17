@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Annotated, Optional
 from profed.components.api.c2s.shared.statuses import user_timeline, service
 from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.pagination import paginated
 from profed.identity import actor_url_from_username
 
 
@@ -18,6 +19,7 @@ def init(config: dict) -> None:
 
 
 @router.get("/timelines/home")
+@paginated()
 async def home_timeline(claims: Annotated[dict, Depends(current_user)],
                         limit: int = Query(default=20, ge=1, le=40),
                         max_id: Optional[str] = Query(default=None),

@@ -865,6 +865,40 @@ def test_account_statuses_are_looked_up_by_the_actor_url(anon_client):
     assert store.fetch_by_actor.call_args[0][0] == "https://remote.example/users/bob"
 
 
+def _profile_store(rows):
+    return AsyncMock(fetch_by_actor=AsyncMock(return_value=rows),
+                     boost_stats=AsyncMock(return_value={}),
+                     reaction_stats=AsyncMock(return_value={}),
+                     reaction_breakdown=AsyncMock(return_value={}),
+                     mastodon_ids_for=AsyncMock(return_value={}))
+
+
+def test_the_profile_hands_the_cursor_to_the_storage(anon_client, fake_bus):
+    store = _profile_store([])
+
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=_remote_account())), \
+             patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                   AsyncMock(return_value=store)):
+            anon_client.get("/accounts/123456/statuses?max_id=400&since_id=100&limit=7")
+
+    assert store.fetch_by_actor.call_args.kwargs == {"limit": 7, "max_id": "400", "since_id": "100"}
+
+
+def test_the_profile_without_a_cursor_asks_for_the_front(anon_client, fake_bus):
+    store = _profile_store([])
+
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=_remote_account())), \
+             patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                   AsyncMock(return_value=store)):
+            anon_client.get("/accounts/123456/statuses")
+
+    assert store.fetch_by_actor.call_args.kwargs == {"limit": 20, "max_id": None, "since_id": None}
+
+
 def _remote_account():
     return Account.from_actor(ROW["actor_data"],
                               acct=ROW["acct"],

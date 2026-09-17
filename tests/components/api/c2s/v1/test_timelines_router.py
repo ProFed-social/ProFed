@@ -172,3 +172,22 @@ def test_hashtag_timeline_returns_empty_list(client):
     assert response.status_code == 200
     assert response.json() == []
 
+
+def test_the_home_timeline_points_at_the_next_page(client, fake_bus):
+    user_timeline._instance = FakeStorage([_content_row(), _boost_row()])
+
+    with _patched_accounts({BOB_URL: BOB, CAROL_URL: CAROL}):
+        response = client.get("/timelines/home")
+
+    assert 'max_id=500>; rel="next"' in response.headers["Link"]
+    assert 'since_id=424242>; rel="prev"' in response.headers["Link"]
+
+
+def test_an_empty_home_timeline_has_no_link_header(client, fake_bus):
+    user_timeline._instance = FakeStorage([])
+
+    with _patched_accounts({}):
+        response = client.get("/timelines/home")
+
+    assert "Link" not in response.headers
+
