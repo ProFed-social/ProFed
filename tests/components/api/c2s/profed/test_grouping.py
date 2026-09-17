@@ -17,12 +17,12 @@ async def _build(row):
     return {"trigger": row["mastodon_id"], "root": row["root"], "booster": row["booster"]}
 
 
-async def _run(arows, after, limit):
-    return [block async for block in timeline_blocks(arows, after, limit, _build)]
+async def _run(arows, max_id, limit):
+    return [block async for block in timeline_blocks(arows, max_id, limit, _build)]
 
 
-async def _triggers(rows, after, limit):
-    return [block["trigger"] for block in await _run(_aiter(rows), after, limit)]
+async def _triggers(rows, max_id, limit):
+    return [block["trigger"] for block in await _run(_aiter(rows), max_id, limit)]
 
 
 async def test_singles_are_each_emitted_once():
@@ -39,12 +39,12 @@ async def test_same_thread_different_booster_are_separate_blocks():
     assert [(b["root"], b["booster"]) for b in blocks] == [("a", "X"), ("a", None)]
 
 
-async def test_after_switches_to_emitting_and_prescan_suppresses_seen_threads():
+async def test_the_cursor_switches_to_emitting_and_the_prescan_suppresses_seen_threads():
     rows = [_row(5, "a"), _row(4, "b"), _row(3, "a"), _row(2, "c")]
     assert await _triggers(rows, 4, 20) == [2]
 
 
-async def test_the_after_row_itself_is_not_re_emitted():
+async def test_the_cursor_row_itself_is_not_re_emitted():
     assert await _triggers([_row(3, "c"), _row(2, "b"), _row(1, "a")], 2, 20) == [1]
 
 
@@ -72,4 +72,14 @@ async def test_a_block_that_build_returns_none_for_is_skipped():
     rows = [_row(3, "x"), _row(2, "a"), _row(1, "b")]
     blocks = [block async for block in timeline_blocks(_aiter(rows), None, 20, build)]
     assert [block["trigger"] for block in blocks] == [2, 1]
+
+
+async def test_a_vanished_cursor_still_bounds_the_page():
+    rows = [_row(5, "a"), _row(4, "b"), _row(2, "c"), _row(1, "d")]
+
+    assert await _triggers(rows, 3, 20) == [2, 1]
+
+
+async def test_a_cursor_below_everything_yields_nothing():
+    assert await _triggers([_row(3, "c"), _row(2, "b")], 1, 20) == []
 

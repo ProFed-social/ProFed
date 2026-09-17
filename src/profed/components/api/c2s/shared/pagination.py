@@ -25,7 +25,29 @@ def _asking_for_request_and_response(signature: inspect.Signature) -> inspect.Si
                                                            annotation=Response)])
 
 
-def paginated(convert=lambda rows: rows, cursor=lambda row: row.id):
+def the_id(row) -> str:
+    return row.id
+
+
+def cursor_in(field: str):
+    def cursor(row) -> str:
+        return str(row[field])
+
+    return cursor
+
+
+def only(field: str):
+    def convert(rows: list) -> list:
+        return [row[field] for row in rows]
+
+    return convert
+
+
+def unchanged(rows: list) -> list:
+    return rows
+
+
+def paginated(convert=unchanged, cursor=the_id):
     def wrapping(endpoint):
         @wraps(endpoint)
         async def paginating(*args, request: Request, response: Response, **kwargs):

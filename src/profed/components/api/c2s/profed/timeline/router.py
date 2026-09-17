@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Depends, Query
 from typing import Annotated, Optional
 from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.pagination import paginated
 from profed.components.api.c2s.profed.timeline import service
 
 
@@ -17,11 +18,12 @@ def init(config: dict) -> None:
 
 
 @router.get("/timeline")
+@paginated(cursor=lambda block: block["cursor"])
 async def timeline(claims: Annotated[dict, Depends(current_user)],
                    limit: int = Query(default=20, ge=1, le=40),
-                   after: Optional[str] = Query(default=None)):
+                   max_id: Optional[str] = Query(default=None)):
     username = claims.get("preferred_username") or claims.get("sub")
-    blocks = await service.timeline(username, after=int(after) if after is not None else None, limit=limit)
+    blocks = await service.timeline(username, max_id=int(max_id) if max_id is not None else None, limit=limit)
     return [{"parts": block["parts"],
              "booster": block["booster"],
              "boosted": sorted(block["boosted"]),

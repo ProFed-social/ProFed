@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-async def timeline_blocks(rows, after, limit, build_block):
+async def timeline_blocks(rows, max_id, limit, build_block):
     def identity(seen: set, row):
         ident = (row["root"], row["booster"])
         return (ident not in seen), (seen | {ident})
@@ -13,11 +13,12 @@ async def timeline_blocks(rows, after, limit, build_block):
 
     async def skip_front(seen: set, row):
         nonlocal step
-        if row["mastodon_id"] == after:
+        if row["mastodon_id"] < max_id:
             step = try_emit_block
+            return await try_emit_block(seen, row)
         return identity(seen, row)[1], None
 
-    step = try_emit_block if after is None else skip_front
+    step = try_emit_block if max_id is None else skip_front
 
     async def make_all_blocks(seen, emitted):
         async for row in rows:

@@ -66,7 +66,7 @@ async def test_timeline_wires_thread_roots_through_grouping(monkeypatch):
                         "_build_block",
                         AsyncMock(side_effect=lambda row, viewer: {"cursor": row["mastodon_id"]}))
 
-    blocks = await service.timeline("me", after=None, limit=20)
+    blocks = await service.timeline("me", max_id=None, limit=20)
 
     assert [block["cursor"] async for block in blocks] == [2]
 

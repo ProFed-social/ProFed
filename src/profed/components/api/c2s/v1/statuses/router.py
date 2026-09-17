@@ -20,7 +20,7 @@ from profed.models.mastodon import Status, StatusContext
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
-from profed.components.api.c2s.shared.pagination import paginated
+from profed.components.api.c2s.shared.pagination import cursor_in, only, paginated
 from profed.topics.bookmarks_topic import publish_bookmark
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
@@ -330,16 +330,8 @@ async def _listed_by(id: str, limit: int, max_id, since_id, actors_of) -> list:
             if row["actor_url"] in accounts]
 
 
-def _without_the_cursor(rows: list) -> list:
-    return [row["account"] for row in rows]
-
-
-def _the_cursor(row: dict) -> str:
-    return str(row["mastodon_id"])
-
-
 @router.get("/statuses/{id}/favourited_by")
-@paginated(convert=_without_the_cursor, cursor=_the_cursor)
+@paginated(convert=only("account"), cursor=cursor_in("mastodon_id"))
 async def favourited_by(id: str,
                         limit: int = Query(default=40, ge=1, le=80),
                         max_id: Optional[str] = Query(default=None),
@@ -350,7 +342,7 @@ async def favourited_by(id: str,
 
 
 @router.get("/statuses/{id}/reblogged_by")
-@paginated(convert=_without_the_cursor, cursor=_the_cursor)
+@paginated(convert=only("account"), cursor=cursor_in("mastodon_id"))
 async def reblogged_by(id: str,
                        limit: int = Query(default=40, ge=1, le=80),
                        max_id: Optional[str] = Query(default=None),

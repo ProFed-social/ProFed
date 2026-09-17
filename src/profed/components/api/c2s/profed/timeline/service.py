@@ -28,9 +28,9 @@ async def _build_block(row, viewer):
     return {"parts": parts, "booster": booster, "boosted": boosted, "cursor": row["mastodon_id"]}
 
 
-async def timeline(username, after=None, limit=20):
+async def timeline(username, max_id=None, limit=20):
     return timeline_blocks((await user_timeline.storage()).thread_roots(username),
-                           after,
+                           max_id,
                            limit,
                            partial(_build_block, viewer=actor_url_from_username(username)))
 

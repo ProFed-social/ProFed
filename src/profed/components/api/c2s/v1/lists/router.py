@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Annotated, Optional
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.shared.bookmarks import storage as bookmarks
-from profed.components.api.c2s.shared.pagination import paginated
+from profed.components.api.c2s.shared.pagination import cursor_in, only, paginated
 from profed.components.api.c2s.shared.statuses import as_objects, service
 from profed.identity import actor_url_from_username
 
@@ -27,14 +27,6 @@ async def get_lists(claims: Annotated[dict, Depends(current_user)]):
     return []
 
 
-def _without_the_cursor(rows: list) -> list:
-    return [row["status"] for row in rows]
-
-
-def _the_cursor(row: dict) -> str:
-    return str(row["marked_at"])
-
-
 async def _marked_statuses(marks: list, actor_url: str) -> list:
     rows = {row["url"]: row
             for row in await (await as_objects.storage()).rows_for_urls([mark["object_url"] for mark in marks])}
@@ -47,7 +39,7 @@ async def _marked_statuses(marks: list, actor_url: str) -> list:
 
 
 @router.get("/bookmarks")
-@paginated(convert=_without_the_cursor, cursor=_the_cursor)
+@paginated(convert=only("status"), cursor=cursor_in("marked_at"))
 async def get_bookmarks(claims: Annotated[dict, Depends(current_user)],
                         limit: int = Query(default=20, ge=1, le=40),
                         max_id: Optional[str] = Query(default=None),
