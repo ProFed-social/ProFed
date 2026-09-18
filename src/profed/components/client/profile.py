@@ -51,6 +51,8 @@ async def _relationship(account_id, token):
 def _follow_button(handle, relationship):
     return environment().get_template("follow_button.html").render(handle=handle,
                                                                    relationship=relationship)
+
+
 async def _follow_action(handle: str, action: str, token: str) -> HTMLResponse:
     def raise_for_status(response):
         response.raise_for_status()
@@ -71,14 +73,14 @@ def _viewing_other(account, session):
 
 @router.get("/@{handle}", response_class=HTMLResponse)
 async def profile(request: Request, handle: str):
-    async def render_template(request, handle, account, session, relationship, statuses, following):
+    async def render_template(request, handle, account, session, relationship, statuses, next_page):
         return environment().get_template("profile.html").render(account=account,
-                                                                          statuses=statuses,
-                                                                          following=following,
-                                                                          more_url=f"/@{handle}/more",
-                                                                          handle=handle,
-                                                                          relationship=relationship,
-                                                                          **(await page_context(request, session)))
+                                                                 statuses=statuses,
+                                                                 following=next_page,
+                                                                 more_url=f"/@{handle}/more",
+                                                                 handle=handle,
+                                                                 relationship=relationship,
+                                                                 **(await page_context(request, session)))
 
     async def render_response(request, handle, account, session):
         return await render_template(request,
@@ -104,7 +106,8 @@ async def more(request: Request, handle: str, following: Optional[str] = None):
                                                                       more_url=f"/@{handle}/more",
                                                                       show_author=False,
                                                                       **(await page_context(request, session)))
-    async def render_response(request, handle, account, session):
+
+    async def render_response(request, handle, following, account, session):
         return await render_template(request,
                                      handle,
                                      session,
@@ -114,6 +117,7 @@ async def more(request: Request, handle: str, following: Optional[str] = None):
 
     return HTMLResponse(await render_response(request,
                                               handle,
+                                              following,
                                               await _account_from_handle(handle),
                                               await current_user_optional(request)))
 
