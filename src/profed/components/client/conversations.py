@@ -17,14 +17,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _get(path: str, token: str):
-    response = await api_client().get(path, token=token)
-    if response.status_code != 200:
-        logger.warning("fetching %s failed: %s %s", path, response.status_code, response.text)
-        return None
-    return response.json()
-
-
 FIRST_PAGE = "limit=40"
 
 
@@ -41,7 +33,9 @@ async def _messages(id: str, username: str, token: str, query: str = FIRST_PAGE)
         message["own"] = message["account"]["url"] == own_url
         if message.get("reply_to"):
             message["reply_to"]["own"] = message["reply_to"]["account"]["url"] == own_url
-        if previous and message.get("in_reply_to_id") == previous["id"] and message["account"]["url"] == previous["account"]["url"]:
+        if  (previous and
+             message.get("in_reply_to_id") == previous["id"] and
+             message["account"]["url"] == previous["account"]["url"]):
             message["reply_to"] = None
         previous = message
     return messages, following
@@ -95,9 +89,9 @@ async def conversation(request: Request, id: str, session):
 
 @router.post("/conversations/{id}/reply")
 @requires_login
-
 async def reply(request: Request,
-                id: str, session,
+                id: str,
+                session,
                 status: Annotated[str, Form()],
                 in_reply_to_id: Annotated[str, Form()] = ""):
     response = await api_client().post("/api/v1/statuses",

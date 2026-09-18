@@ -81,10 +81,10 @@ def _conversation(accounts=None):
                             "created_at": "2026-07-15T10:00:00Z"}}
 
 
-def _api(monkeypatch, conversations_list, messages=None, following=None):
+def _api(monkeypatch, conversations_list, messages=None, following=None, following_list=None):
     async def get(path, **kwargs):
         if path == "/api/v1/conversations":
-            return _resp(200, conversations_list)
+            return _resp(200, conversations_list, following_list)
         if path.endswith("/messages"):
             return _resp(200, messages if messages is not None else [], following)
         return _resp(200, None)
@@ -250,7 +250,6 @@ async def test_conversation_view_shows_the_reply_marking_across_authors(monkeypa
     _api(monkeypatch, [_conversation()], messages=messages)
 
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
-
 
     assert "msg-reply-name" in body
 
@@ -440,9 +439,7 @@ async def test_loading_older_messages_renders_only_the_entries(monkeypatch):
 
 async def test_the_list_offers_to_load_more_conversations(monkeypatch):
     _login(monkeypatch)
-    client = Mock(get=AsyncMock(side_effect=lambda path, **kw: (
-        _resp(200, [_conversation()], "limit=20&max_id=400") if path == "/api/v1/conversations" else _resp(200, []))))
-    monkeypatch.setattr(conversations, "api_client", lambda: client)
+    _api(monkeypatch, [_conversation()], following_list="limit=20&max_id=400")
 
     body = (await _fetch(_app(monkeypatch), "/conversations")).text
 
@@ -451,10 +448,7 @@ async def test_the_list_offers_to_load_more_conversations(monkeypatch):
 
 async def test_the_list_cursor_is_not_the_chat_cursor(monkeypatch):
     _login(monkeypatch)
-    client = Mock(get=AsyncMock(side_effect=lambda path, **kw: (
-        _resp(200, [_conversation()]) if path == "/api/v1/conversations" else
-        _resp(200, [], "limit=40&max_id=77"))))
-    monkeypatch.setattr(conversations, "api_client", lambda: client)
+    _api(monkeypatch, [_conversation()], following="limit=40&max_id=77")
 
     body = (await _fetch(_app(monkeypatch), "/conversations")).text
 
