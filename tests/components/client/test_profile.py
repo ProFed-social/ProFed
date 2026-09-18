@@ -192,6 +192,14 @@ def test_masthead_nav_when_logged_out():
     assert "/settings" not in out and "/logout" not in out
 
 
+def test_a_narrow_screen_gets_a_menu_button_for_the_one_nav():
+    out = _ENV.get_template("base.html").render(current_username="alice", login_url="/login")
+
+    assert 'popovertarget="masthead-nav"' in out
+    assert 'popover id="masthead-nav"' in out
+    assert out.count('<a href="/@alice">My profile</a>') == 1
+
+
 _ENV.filters["sanitize"] = templating.sanitize_html
 
 async def test_profile_render_sanitizes_malicious_note(monkeypatch):

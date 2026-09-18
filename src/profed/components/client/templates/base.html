@@ -25,7 +25,9 @@
         <img class="masthead-logo" src="/static/profed-icon.svg" width="32" height="32" alt="">
         <span class="masthead-name">ProFed</span>
       </a>
-      <nav class="masthead-nav">
+      <button type="button" class="masthead-menu" popovertarget="masthead-nav"
+              title="Menu" aria-label="Menu">&#9776;</button>
+      <nav popover id="masthead-nav" class="masthead-nav">
         {% if current_username %}
         <a href="/@{{ current_username }}">My profile</a>
         <a href="/conversations">Conversations</a>

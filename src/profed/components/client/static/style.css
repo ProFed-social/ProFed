@@ -34,6 +34,9 @@
 
 body {
   margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background: Canvas;
   color: CanvasText;
   font-family: "InterVariable", system-ui, sans-serif;
@@ -64,10 +67,53 @@ a:hover { text-decoration: underline; }
 .masthead-brand:hover { text-decoration: none; }
 .masthead-logo { width: 28px; height: 28px; }
 .masthead-name { font-weight: 700; letter-spacing: -.01em; }
+.masthead-menu {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: .4rem;
+  color: CanvasText;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: .3rem .55rem;
+  cursor: pointer;
+}
 .masthead-nav {
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
+  flex-direction: column;
+  gap: .25rem;
+  position: fixed;
+  inset: auto;
+  top: 0;
+  right: 0;
+  min-width: min(16rem, 80vw);
+  padding: .75rem 1rem;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 0 0 0 .6rem;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 4px 16px color-mix(in srgb, CanvasText 22%, transparent);
+}
+.masthead-nav::backdrop { background: color-mix(in srgb, CanvasText 12%, transparent); }
+ 
+@media (min-width: 50em) {
+  .masthead-menu { display: none; }
+  .masthead-nav {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1.25rem;
+    position: static;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    overflow: visible;
+  }
 }
 
 .column {
@@ -75,6 +121,7 @@ a:hover { text-decoration: underline; }
   margin-inline: auto;
   padding-inline: 1.25rem;
 }
+main.column { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
 .profile {
   padding-bottom: 4rem;
   container-type: inline-size;
@@ -453,7 +500,8 @@ a:hover { text-decoration: underline; }
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   gap: 1rem;
-  height: calc(100dvh - var(--masthead-space));
+  flex: 1;
+  min-height: 0;
 }
  
 .conversations { overflow-y: auto; border-right: 1px solid var(--line); }
@@ -652,7 +700,7 @@ a:hover { text-decoration: underline; }
 }
  
 @media (max-width: 720px) {
-  .conversations-layout { grid-template-columns: 1fr; height: auto; }
+  .conversations-layout { grid-template-columns: 1fr; }
   .conversations { border-right: none; }
   .conversations-layout--list .conversation-view { display: none; }
   .conversations-layout--view .conversations { display: none; }
