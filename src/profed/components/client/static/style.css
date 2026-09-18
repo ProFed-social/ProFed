@@ -34,9 +34,6 @@
 
 body {
   margin: 0;
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
   background: Canvas;
   color: CanvasText;
   font-family: "InterVariable", system-ui, sans-serif;
@@ -80,7 +77,6 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .masthead-nav {
-  display: flex;
   flex-direction: column;
   gap: .25rem;
   position: fixed;
@@ -96,6 +92,7 @@ a:hover { text-decoration: underline; }
   color: CanvasText;
   box-shadow: 0 4px 16px color-mix(in srgb, CanvasText 22%, transparent);
 }
+.masthead-nav:popover-open { display: flex; }
 .masthead-nav::backdrop { background: color-mix(in srgb, CanvasText 12%, transparent); }
  
 @media (min-width: 50em) {
@@ -121,7 +118,6 @@ a:hover { text-decoration: underline; }
   margin-inline: auto;
   padding-inline: 1.25rem;
 }
-main.column { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
 .profile {
   padding-bottom: 4rem;
   container-type: inline-size;
@@ -500,8 +496,7 @@ main.column { flex: 1; min-height: 0; display: flex; flex-direction: column; wid
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   gap: 1rem;
-  flex: 1;
-  min-height: 0;
+  height: calc(100dvh - var(--masthead-space));
 }
  
 .conversations { overflow-y: auto; border-right: 1px solid var(--line); }
