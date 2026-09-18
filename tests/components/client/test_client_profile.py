@@ -14,11 +14,15 @@ def standalone_env():
         yield
 
 
-def _resp(status=200, json_data=None):
+def _resp(status=200, json_data=None, following=None):
     r = Mock()
     r.status_code = status
     r.json = Mock(return_value=json_data)
     r.raise_for_status = Mock()
+    r.text = ""
+    r.headers = ({"Link": f'<https://test.local/api/v1/accounts/5/statuses?{following}>; rel="next"'}
+                 if following else
+                 {})
     return r
 
 
@@ -70,8 +74,10 @@ async def test_follow_action_posts_with_token_and_renders_button():
     client = Mock()
     client.get = AsyncMock(return_value=_resp(200, {"id": "5", "acct": "bob@remote.example"}))
     client.post = AsyncMock(return_value=_resp(200, {"following": False, "requested": True}))
+
     with patch.object(profile, "api_client", return_value=client):
         response = await profile._follow_action("bob@remote.example", "follow", "tok")
+
     assert client.post.call_args[0][0] == "/api/v1/accounts/5/follow"
     assert client.post.call_args.kwargs["token"] == "tok"
     assert b"Requested" in response.body
@@ -111,29 +117,77 @@ async def test_account_statuses_sends_no_token_without_a_session():
 
 @pytest.mark.asyncio
 async def test_the_profile_page_reads_the_statuses_as_the_logged_in_viewer():
-    statuses = AsyncMock(return_value=[])
+    statuses = AsyncMock(return_value=([], None))
     with patch.object(profile, "_account_from_handle", AsyncMock(return_value={"id": "5", "acct": "bob@remote"})), \
          patch.object(profile, "current_user_optional", AsyncMock(return_value={"token": "tok", "acct": "me@local"})), \
          patch.object(profile, "_relationship", AsyncMock(return_value=None)), \
          patch.object(profile, "page_context", AsyncMock(return_value={})), \
-         patch.object(profile, "environment",
+         patch.object(profile,
+                      "environment",
                       Mock(return_value=Mock(get_template=Mock(return_value=Mock(render=Mock(return_value="")))))), \
-         patch.object(profile, "_account_statuses", statuses):
+         patch.object(profile, "_account_page", statuses):
         await profile.profile(Mock(), "bob@remote")
 
-    assert statuses.await_args.args == ("5", "tok")
+    assert statuses.await_args.args == ("5", profile.FIRST_PAGE, "tok")
 
 
 @pytest.mark.asyncio
 async def test_the_profile_page_reads_the_statuses_anonymously_without_a_session():
-    statuses = AsyncMock(return_value=[])
+    statuses = AsyncMock(return_value=([], None))
+    with patch.object(profile, "_account_from_handle", AsyncMock(return_value={"id": "5", "acct": "bob@remote"})), \
+         patch.object(profile, "current_user_optional", AsyncMock(return_value=None)), \
+         patch.object(profile, "page_context", AsyncMock(return_value={})), \
+         patch.object(profile,
+                      "environment",
+                      Mock(return_value=Mock(get_template=Mock(return_value=Mock(render=Mock(return_value="")))))), \
+         patch.object(profile, "_account_page", statuses):
+        await profile.profile(Mock(), "bob@remote")
+
+    assert statuses.await_args.args == ("5", profile.FIRST_PAGE, None)
+
+
+@pytest.mark.asyncio
+async def test_the_profile_offers_to_load_more_when_another_page_follows():
+    page = AsyncMock(return_value=([{"id": "1"}], "limit=20&max_id=400"))
+    rendered = Mock(render=Mock(return_value=""))
+ 
+    with patch.object(profile, "_account_from_handle", AsyncMock(return_value={"id": "5", "acct": "bob@remote"})), \
+         patch.object(profile, "current_user_optional", AsyncMock(return_value=None)), \
+         patch.object(profile, "page_context", AsyncMock(return_value={})), \
+         patch.object(profile, "environment", Mock(return_value=Mock(get_template=Mock(return_value=rendered)))), \
+         patch.object(profile, "_account_page", page):
+        await profile.profile(Mock(), "bob@remote")
+ 
+    assert rendered.render.call_args.kwargs["following"] == "limit=20&max_id=400"
+    assert rendered.render.call_args.kwargs["more_url"] == "/@bob@remote/more"
+ 
+ 
+@pytest.mark.asyncio
+async def test_more_hands_the_query_back_unchanged():
+    page = AsyncMock(return_value=([], None))
+ 
     with patch.object(profile, "_account_from_handle", AsyncMock(return_value={"id": "5", "acct": "bob@remote"})), \
          patch.object(profile, "current_user_optional", AsyncMock(return_value=None)), \
          patch.object(profile, "page_context", AsyncMock(return_value={})), \
          patch.object(profile, "environment",
                       Mock(return_value=Mock(get_template=Mock(return_value=Mock(render=Mock(return_value="")))))), \
-         patch.object(profile, "_account_statuses", statuses):
-        await profile.profile(Mock(), "bob@remote")
-
-    assert statuses.await_args.args == ("5", None)
+         patch.object(profile, "_account_page", page):
+        await profile.more(Mock(), "bob@remote", following="limit=20&max_id=400")
+ 
+    assert page.await_args.args == ("5", "limit=20&max_id=400", None)
+ 
+ 
+@pytest.mark.asyncio
+async def test_more_renders_only_the_entries():
+    page = AsyncMock(return_value=([], None))
+    environment = Mock(return_value=Mock(get_template=Mock(return_value=Mock(render=Mock(return_value="")))))
+ 
+    with patch.object(profile, "_account_from_handle", AsyncMock(return_value={"id": "5", "acct": "bob@remote"})), \
+         patch.object(profile, "current_user_optional", AsyncMock(return_value=None)), \
+         patch.object(profile, "page_context", AsyncMock(return_value={})), \
+         patch.object(profile, "environment", environment), \
+         patch.object(profile, "_account_page", page):
+        await profile.more(Mock(), "bob@remote")
+ 
+    assert environment().get_template.call_args.args == ("profile_page.html",)
 

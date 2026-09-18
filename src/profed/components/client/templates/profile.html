@@ -65,11 +65,12 @@
 <section class="h-feed posts">
   <h2>Latest posts</h2>
   {% set show_author = false %}
-  {% for status in statuses %}
+  {% if statuses %}
+  {% include "profile_page.html" %}
   {% include "status.html" %}
   {% else %}
   <p class="empty">No posts yet.</p>
-  {% endfor %}
+  {% endif %}
 </section>
 {% endblock %}
 

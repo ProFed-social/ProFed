@@ -80,29 +80,24 @@ async def test_home_renders_logged_in_nav(monkeypatch):
 
 
 async def test_home_timeline_is_fetched_with_the_session_token(monkeypatch):
-    client = Mock(get=AsyncMock(return_value=_resp(200, [_status()])))
+    _login(monkeypatch)
+    client = Mock(get=AsyncMock(return_value=_resp(200, [])))
     monkeypatch.setattr(home, "api_client", lambda: client)
 
-    statuses, following = await home._page("limit=20", "tok")
+    await _fetch(_app(monkeypatch), "/")
 
-    assert statuses == [_status()]
-    assert following is None
     assert client.get.call_args.args[0] == "/api/profed/timeline"
     assert client.get.call_args.kwargs["token"] == "tok"
     assert client.get.call_args.kwargs["params"] == "limit=20"
 
 
-async def test_the_query_of_the_next_page_comes_from_the_link_header(monkeypatch):
-    response = _resp(200, [_status()], following="limit=20&max_id=400")
-    monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=response)))
-
-    assert (await home._page("limit=20", "tok"))[1] == "limit=20&max_id=400"
-
-
 async def test_home_timeline_failure_yields_no_statuses(monkeypatch):
+    _login(monkeypatch)
     monkeypatch.setattr(home, "api_client", lambda: Mock(get=AsyncMock(return_value=_resp(401))))
 
-    assert await home._page("limit=20", "tok") == ([], None)
+    body = (await _fetch(_app(monkeypatch), "/")).text
+
+    assert "Your timeline is empty" in body
 
 
 async def test_home_shows_the_timeline_of_a_logged_in_user(monkeypatch):
