@@ -1,6 +1,7 @@
 <div id="conversation-messages" class="conversation-messages">
   {% if messages %}
   {% include "conversation_messages_page.html" %}
+  {% else %}
   <p class="empty">No messages in this conversation.</p>
   {% endif %}
 </div>
