@@ -518,7 +518,7 @@ a:hover { text-decoration: underline; }
 }
 .conversation-time { color: var(--muted); font-size: .8rem; }
  
-.conversation-view { display: flex; flex-direction: column; min-width: 0; }
+.conversation-view { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .conversation-head { padding: .5rem .75rem; border-bottom: 1px solid var(--line); }
 .conversation-head .back { display: none; }
 .conversation-messages { padding: .75rem; display: flex; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; }
