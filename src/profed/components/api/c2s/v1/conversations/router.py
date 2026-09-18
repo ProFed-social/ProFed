@@ -7,7 +7,7 @@ from typing import Annotated, Optional
 from profed.identity import actor_url_from_username
 from profed.models.mastodon import Account, Conversation, placeholder_account
 from profed.components.api.c2s.shared.auth import current_user
-from profed.components.api.c2s.shared.pagination import paginated
+from profed.components.api.c2s.shared.pagination import cursor_in, only, paginated
 from profed.components.api.c2s.shared.conversations import storage as conversations
 from profed.components.api.c2s.shared.known_accounts import storage as known_accounts
 from profed.components.api.c2s.shared.statuses import as_objects
@@ -26,9 +26,12 @@ def init(config: dict) -> None:
 
 
 @router.get("/conversations")
-async def get_conversations(claims: Annotated[dict, Depends(current_user)]):
+@paginated(convert=only("conversation"), cursor=cursor_in("cursor"))
+async def get_conversations(claims: Annotated[dict, Depends(current_user)],
+                            limit: int = Query(default=20, ge=1, le=40),
+                            max_id: Optional[str] = Query(default=None)):
     viewer = actor_url_from_username(claims.get("preferred_username") or claims.get("sub"))
-    rows = await (await conversations.storage()).conversations_of(viewer)
+    rows = await (await conversations.storage()).conversations_of(viewer, limit, max_id)
     if not rows:
         return []
 
@@ -45,9 +48,10 @@ async def get_conversations(claims: Annotated[dict, Depends(current_user)]):
             return Account.model_validate(entry["account"]) if entry else placeholder_account(actor_url)
         return await asyncio.gather(*(resolve(actor_url) for actor_url in actor_urls))
 
-    return [Conversation(id=roots.get(row["conversation_id"], row["conversation_id"]),
-                         accounts=await accounts_of(row["accounts"]),
-                         last_status=last_status.get(row["last_message"]))
+    return [{"cursor": row["cursor"],
+             "conversation": Conversation(id=roots.get(row["conversation_id"], row["conversation_id"]),
+                                          accounts=await accounts_of(row["accounts"]),
+                                          last_status=last_status.get(row["last_message"]))}
             for row in rows]
 
 

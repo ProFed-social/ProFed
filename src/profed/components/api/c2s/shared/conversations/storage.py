@@ -17,6 +17,7 @@ class _storage(BaseStorage):
                                      message_id      TEXT        NOT NULL,
                                      parent          TEXT,
                                      message_time    TIMESTAMPTZ NOT NULL,
+                                     mastodon_id     NUMERIC     NOT NULL,
                                      PRIMARY KEY (message_id))""")
         await self.execute("""CREATE INDEX IF NOT EXISTS conversations_parent
                               ON api.conversations (parent)""")
@@ -34,6 +35,7 @@ class _storage(BaseStorage):
                      message_url:  str,
                      parent:       Optional[str],
                      message_time: datetime,
+                     mastodon_id:  str,
                      sender:       str,
                      recipients:   List[str]) -> None:
         keep_earliest = """ON CONFLICT (conversation_id, actor_url) DO UPDATE
@@ -49,17 +51,18 @@ class _storage(BaseStorage):
 
         async def store_message() -> str:
             row = await self.write_row("""INSERT INTO api.conversations
-                                                (conversation_id, message_id, parent, message_time)
+                                                (conversation_id, message_id, parent, message_time, mastodon_id)
                                           VALUES (COALESCE((SELECT conversation_id
                                                             FROM api.conversations
                                                             WHERE message_id = $2),
                                                            $1),
-                                                  $1, $2, $3)
+                                                  $1, $2, $3, $4::numeric)
                                           ON CONFLICT (message_id) DO UPDATE SET parent = EXCLUDED.parent
                                           RETURNING conversation_id""",
                                        message_url,
                                        parent,
-                                       message_time)
+                                       message_time,
+                                       mastodon_id)
             return row["conversation_id"]
 
         async def add_participants(conversation_id: str) -> None:
@@ -122,7 +125,7 @@ class _storage(BaseStorage):
         return [row["actor_url"] for row in rows]
 
 
-    async def conversations_of(self, actor_url: str) -> List[dict]:
+    async def conversations_of(self, actor_url: str, limit: int, max_id: Optional[str]) -> List[dict]:
         return await self.fetch_all("""
             SELECT
                 me.conversation_id,
@@ -130,38 +133,34 @@ class _storage(BaseStorage):
                           ORDER BY COALESCE(other.actor_url = root.actor_url, false) DESC,
                                    other.begin_time,
                                    other.actor_url) AS accounts,
-                last.message_id AS last_message
+                last.message_id AS last_message,
+                last.cursor
             FROM
                 api.conversation_participants AS me INNER JOIN
                 api.conversation_participants AS other ON me.conversation_id = other.conversation_id AND
                                                           me.actor_url <> other.actor_url INNER JOIN
                 (SELECT
                     conversation_id,
-                    message_time,
-                    max(message_id) AS message_id
+                    max(mastodon_id) AS cursor,
+                    (array_agg(message_id ORDER BY mastodon_id DESC))[1] AS message_id
                 FROM
-                    (SELECT
-                        conversation_id,
-                        message_id,
-                        message_time,
-                        max(message_time) OVER (PARTITION BY conversation_id) AS last_time
-                    FROM
-                        api.conversations) AS timed
-                WHERE
-                    message_time = last_time
+                    api.conversations
                 GROUP BY
-                    conversation_id,
-                    message_time) AS last ON last.conversation_id = me.conversation_id LEFT JOIN
+                    conversation_id) AS last ON last.conversation_id = me.conversation_id LEFT JOIN
                 api.as_objects AS root ON root.url = me.conversation_id
             WHERE
-                me.actor_url = $1
+                me.actor_url = $1 AND
+                ($3::numeric IS NULL OR last.cursor < $3::numeric)
             GROUP BY
                 me.conversation_id,
                 last.message_id,
-                last.message_time
+                last.cursor
             ORDER BY
-                last.message_time DESC""",
-                                    actor_url)
+                last.cursor DESC
+            LIMIT $2""",
+                                    actor_url,
+                                    limit,
+                                    max_id)
 
     async def messages_of(self, conversation_id: str, limit: int, max_id: Optional[str]) -> List[dict]:
         return await self.fetch_all("""

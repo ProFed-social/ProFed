@@ -437,3 +437,36 @@ async def test_loading_older_messages_renders_only_the_entries(monkeypatch):
     assert "<html" not in body
     assert 'id="conversation-messages"' not in body
 
+
+async def test_the_list_offers_to_load_more_conversations(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(get=AsyncMock(side_effect=lambda path, **kw: (
+        _resp(200, [_conversation()], "limit=20&max_id=400") if path == "/api/v1/conversations" else _resp(200, []))))
+    monkeypatch.setattr(conversations, "api_client", lambda: client)
+
+    body = (await _fetch(_app(monkeypatch), "/conversations")).text
+
+    assert 'hx-get="/conversations/more?following=limit%3D20%26max_id%3D400"' in body
+
+
+async def test_the_list_cursor_is_not_the_chat_cursor(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(get=AsyncMock(side_effect=lambda path, **kw: (
+        _resp(200, [_conversation()]) if path == "/api/v1/conversations" else
+        _resp(200, [], "limit=40&max_id=77"))))
+    monkeypatch.setattr(conversations, "api_client", lambda: client)
+
+    body = (await _fetch(_app(monkeypatch), "/conversations")).text
+
+    assert "/conversations/more?following=" not in body
+
+
+async def test_loading_more_conversations_hands_the_query_back(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(get=AsyncMock(return_value=_resp(200, [])))
+    monkeypatch.setattr(conversations, "api_client", lambda: client)
+
+    await _fetch(_app(monkeypatch), "/conversations/more?following=limit%3D20%26max_id%3D400")
+
+    assert client.get.call_args.kwargs["params"] == "limit=20&max_id=400"
+

@@ -18,6 +18,7 @@ async def _record(message_url: str, actor_url: str, status: dict) -> None:
     await (await storage.storage()).record(message_url,
                                            status.get("in_reply_to_id"),
                                            datetime.fromisoformat(status["created_at"]),
+                                           status["id"],
                                            actor_url,
                                            [mention["url"] for mention in status.get("mentions", [])])
 

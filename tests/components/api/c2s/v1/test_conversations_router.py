@@ -36,10 +36,9 @@ def client():
 
 
 def test_conversations_lists_grouped_chats_with_accounts_and_last_status(client):
-    conversations = Mock(conversations_of=AsyncMock(return_value=[
-        {"conversation_id": "https://r/root",
-         "accounts": ["https://remote.example/actors/bob"],
-         "last_message": "https://r/m4"}]))
+    conversations = Mock(conversations_of=AsyncMock(return_value=[{"conversation_id": "https://r/root",
+                                                                   "accounts": ["https://remote.example/actors/bob"],
+                                                                   "last_message": "https://r/m4", "cursor": 400}]))
     objects = Mock(rows_for_urls=AsyncMock(return_value=[{"url": "https://r/m4"}]),
                    mastodon_ids_for=AsyncMock(return_value={"https://r/root": "42"}))
     accounts = Mock(get_by_actor_url=AsyncMock(return_value={"account": BOB.model_dump()}))
@@ -79,10 +78,10 @@ def test_conversations_empty_when_user_has_none(client):
 
 
 def test_conversations_uses_a_placeholder_for_unknown_participants(client):
-    conversations = Mock(conversations_of=AsyncMock(return_value=[
-        {"conversation_id": "https://r/root",
-         "accounts": ["https://remote.example/actors/bob", "https://other.example/users/zoe"],
-         "last_message": "https://r/m4"}]))
+    conversations = Mock(conversations_of=AsyncMock(return_value=[{"conversation_id": "https://r/root",
+                                                                   "accounts": ["https://remote.example/actors/bob",
+                                                                                "https://other.example/users/zoe"],
+                                                                   "last_message": "https://r/m4", "cursor": 400}]))
     objects = Mock(rows_for_urls=AsyncMock(return_value=[{"url": "https://r/m4"}]),
                    mastodon_ids_for=AsyncMock(return_value={"https://r/root": "42"}))
 
@@ -110,10 +109,16 @@ def test_conversations_uses_a_placeholder_for_unknown_participants(client):
 def test_conversation_messages_joins_the_conversation_with_the_objects(client):
     objects = Mock(url_for=AsyncMock(return_value="https://r/root"))
     convs = Mock(messages_of=AsyncMock(return_value=[{"url": "https://r/root"}, {"url": "https://r/m1"}]))
-    root_status = Status(id="1", account=BOB, created_at="2026-01-01T00:00:00+00:00",
-                         uri="https://r/root", url="https://r/root")
-    m1_status = Status(id="2", account=BOB, created_at="2026-01-01T00:01:00+00:00",
-                       uri="https://r/m1", url="https://r/m1")
+    root_status = Status(id="1",
+                         account=BOB,
+                         created_at="2026-01-01T00:00:00+00:00",
+                         uri="https://r/root",
+                         url="https://r/root")
+    m1_status = Status(id="2",
+                       account=BOB,
+                       created_at="2026-01-01T00:01:00+00:00",
+                       uri="https://r/m1",
+                       url="https://r/m1")
 
     with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                AsyncMock(return_value=objects)), \
@@ -138,8 +143,11 @@ def _messages_answering(statuses):
 
 
 def _message(mastodon_id):
-    return Status(id=mastodon_id, account=BOB, created_at="2026-01-01T00:00:00+00:00",
-                  uri=f"https://r/{mastodon_id}", url=f"https://r/{mastodon_id}")
+    return Status(id=mastodon_id,
+                  account=BOB,
+                  created_at="2026-01-01T00:00:00+00:00",
+                  uri=f"https://r/{mastodon_id}",
+                  url=f"https://r/{mastodon_id}")
 
 
 def test_the_next_page_of_messages_is_the_older_one(client):

@@ -47,8 +47,17 @@ async def _messages(id: str, username: str, token: str, query: str = FIRST_PAGE)
     return messages, following
 
 
+CONVERSATIONS = "/api/v1/conversations"
+
+FIRST_LIST_PAGE = "limit=20"
+
+
+async def _conversations(token: str, query: str = FIRST_LIST_PAGE):
+    return await fetched(api_client, CONVERSATIONS, query, token, "conversations")
+
+
 async def _view(request: Request, session, active_id, pane: str):
-    conversations = await _get("/api/v1/conversations", session["token"]) or []
+    conversations, following_list = await _conversations(session["token"])
     active_id = active_id if active_id is not None else (conversations[0]["id"] if conversations else None)
     messages, following = (await _messages(active_id, session["username"], session["token"])
                            if active_id is not None else
@@ -57,6 +66,7 @@ async def _view(request: Request, session, active_id, pane: str):
                                                                                       active_id=active_id,
                                                                                       messages=messages,
                                                                                       following=following,
+                                                                                      following_list=following_list,
                                                                                       pane=pane,
                                                                                       **(await page_context(request,
                                                                                                             session))))
@@ -66,6 +76,15 @@ async def _view(request: Request, session, active_id, pane: str):
 @requires_login
 async def conversation_list(request: Request, session):
     return await _view(request, session, None, "list")
+
+
+@router.get("/conversations/more", response_class=HTMLResponse)
+@requires_login
+async def more_conversations(request: Request, session, following: Optional[str] = None):
+    conversations, next_page = await _conversations(session["token"], following or FIRST_LIST_PAGE)
+    return HTMLResponse(environment().get_template("conversation_list_page.html").render(conversations=conversations,
+                                                                                         following=next_page,
+                                                                                         active_id=None))
 
 
 @router.get("/conversations/{id}", response_class=HTMLResponse)

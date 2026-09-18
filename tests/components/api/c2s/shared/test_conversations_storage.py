@@ -54,12 +54,16 @@ async def test_ensure_schema_creates_both_tables_and_indexes(fake_pool, fake_con
 async def test_record_stores_message_and_participants_and_skips_merge_when_nothing_merged(fake_pool, fake_conn):
     fake_conn.fetchrow.side_effect = [{"conversation_id": "root-url"}, {"merged": 0}]
 
-    await (await storage.storage()).record("m2", "m1", "2026-01-01T00:00:02Z",
-                                           "https://s/alice", ["https://s/bob"])
+    await (await storage.storage()).record("m2",
+                                           "m1",
+                                           "2026-01-01T00:00:02Z",
+                                           "500",
+                                           "https://s/alice",
+                                           ["https://s/bob"])
 
     store_message, merge_count = fake_conn.fetchrow.await_args_list
     assert "INSERT INTO api.conversations" in store_message.args[0]
-    assert store_message.args[1:] == ("m2", "m1", "2026-01-01T00:00:02Z")
+    assert store_message.args[1:] == ("m2", "m1", "2026-01-01T00:00:02Z", "500")
     assert "WITH consolidated" in merge_count.args[0]
     assert merge_count.args[1:] == ("m2", "root-url")
 
@@ -77,8 +81,12 @@ async def test_record_stores_message_and_participants_and_skips_merge_when_nothi
 async def test_record_deletes_and_moves_conversations_when_something_merged(fake_pool, fake_conn):
     fake_conn.fetchrow.side_effect = [{"conversation_id": "root-url"}, {"merged": 2}]
 
-    await (await storage.storage()).record("m2", "m1", "2026-01-01T00:00:02Z",
-                                           "https://s/alice", ["https://s/bob"])
+    await (await storage.storage()).record("m2",
+                                           "m1",
+                                           "2026-01-01T00:00:02Z",
+                                           "500",
+                                           "https://s/alice",
+                                           ["https://s/bob"])
 
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
     assert any("unnest" in s for s in statements)
@@ -92,13 +100,14 @@ async def test_conversations_of_queries_participants_by_actor(fake_pool, fake_co
                                      "accounts": ["https://s/bob"],
                                      "last_message": "m4"}]
 
-    result = await (await storage.storage()).conversations_of("https://s/alice")
+    result = await (await storage.storage()).conversations_of("https://s/alice", 20, None)
 
-    query = fake_conn.fetch.await_args.args[0]
+    query, *args = fake_conn.fetch.await_args.args
     assert "api.conversation_participants" in query
     assert "other.actor_url = root.actor_url" in query
     assert "api.as_objects AS root" in query
-    assert fake_conn.fetch.await_args.args[1] == "https://s/alice"
+    assert "ORDER BY\n                last.cursor DESC" in query
+    assert args == ["https://s/alice", 20, None]
     assert result == [{"conversation_id": "c1",
                        "accounts": ["https://s/bob"],
                        "last_message": "m4"}]
@@ -143,8 +152,7 @@ async def test_messages_of_carries_the_content_url_in_both_content_objects(fake_
 
 @pytest.mark.asyncio
 async def test_recipients_for_resolves_the_conversation_from_the_replied_to_message(fake_pool, fake_conn):
-    fake_conn.fetch.return_value = [{"actor_url": "https://s/bob"},
-                                    {"actor_url": "https://s/carol"}]
+    fake_conn.fetch.return_value = [{"actor_url": "https://s/bob"}, {"actor_url": "https://s/carol"}]
 
     result = await (await storage.storage()).recipients_for("https://s/m2", "https://s/alice")
 

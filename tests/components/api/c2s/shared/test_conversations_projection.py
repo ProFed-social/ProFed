@@ -6,12 +6,14 @@ import pytest
 from profed.components.api.c2s.shared.conversations import projection, storage
 
 
-DIRECT = {"created_at": "2026-01-01T00:00:00.000Z",
+DIRECT = {"id": "500",
+          "created_at": "2026-01-01T00:00:00.000Z",
           "visibility": "direct",
           "in_reply_to_id": "https://remote/notes/root",
           "mentions": [{"url": "https://s/bob"}, {"url": "https://s/carol"}]}
 
-PUBLIC = {"created_at": "2026-01-01T00:00:00.000Z",
+PUBLIC = {"id": "501",
+          "created_at": "2026-01-01T00:00:00.000Z",
           "visibility": "public",
           "in_reply_to_id": None,
           "mentions": []}
@@ -50,6 +52,7 @@ async def test_records_a_direct_message(fake_conversations):
     assert fake_conversations.records == [("https://remote/notes/1",
                                            "https://remote/notes/root",
                                            datetime.fromisoformat("2026-01-01T00:00:00.000Z"),
+                                           "500",
                                            "https://s/alice",
                                            ["https://s/bob", "https://s/carol"])]
 
