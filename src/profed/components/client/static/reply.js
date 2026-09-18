@@ -78,5 +78,6 @@
     } else if (sendsAReply(event)) {
       scrollToBottom();
     }
+  });
 })();
 
