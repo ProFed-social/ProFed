@@ -163,7 +163,7 @@ class _storage(BaseStorage):
                 last.message_time DESC""",
                                     actor_url)
 
-    async def messages_of(self, conversation_id: str) -> List[dict]:
+    async def messages_of(self, conversation_id: str, limit: int, max_id: Optional[str]) -> List[dict]:
         return await self.fetch_all("""
             SELECT
                 o.mastodon_id,
@@ -186,10 +186,15 @@ class _storage(BaseStorage):
                 api.as_objects AS o ON o.url = c.message_id LEFT JOIN
                 api.as_objects AS p ON c.parent = p.url
             WHERE
-                c.conversation_id = $1
+                c.conversation_id = $1 AND
+                ($3::numeric IS NULL OR o.mastodon_id < $3::numeric)
             ORDER BY
-                c.message_time""",
-                                    conversation_id)
+                o.mastodon_id DESC
+            LIMIT $2""",
+                                    conversation_id,
+                                    limit,
+                                    max_id)
+
 
 
 _instance: _storage | None = None

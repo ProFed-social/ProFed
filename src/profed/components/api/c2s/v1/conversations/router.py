@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
-from fastapi import APIRouter, Depends
-from typing import Annotated
+from fastapi import APIRouter, Depends, Query
+from typing import Annotated, Optional
 from profed.identity import actor_url_from_username
 from profed.models.mastodon import Account, Conversation, placeholder_account
 from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.pagination import paginated
 from profed.components.api.c2s.shared.conversations import storage as conversations
 from profed.components.api.c2s.shared.known_accounts import storage as known_accounts
 from profed.components.api.c2s.shared.statuses import as_objects
@@ -51,8 +52,14 @@ async def get_conversations(claims: Annotated[dict, Depends(current_user)]):
 
 
 @router.get("/conversations/{id}/messages")
-async def conversation_messages(id: str, claims: Annotated[dict, Depends(current_user)]):
+@paginated()
+async def conversation_messages(id: str,
+                                claims: Annotated[dict, Depends(current_user)],
+                                limit: int = Query(default=40, ge=1, le=80),
+                                max_id: Optional[str] = Query(default=None)):
     return await service.make_statuses(await (await conversations.storage()).messages_of(
-                                                                await (await as_objects.storage()).url_for(id) or id),
+                                                                await (await as_objects.storage()).url_for(id) or id,
+                                                                limit,
+                                                                max_id),
                                        actor_url_from_username(claims.get("preferred_username") or claims.get("sub")))
 

@@ -124,6 +124,50 @@ def test_conversation_messages_joins_the_conversation_with_the_objects(client):
         response = client.get("/conversations/42/messages")
 
     assert response.status_code == 200
-    convs.messages_of.assert_awaited_once_with("https://r/root")
+    convs.messages_of.assert_awaited_once_with("https://r/root", 40, None)
     assert [s["url"] for s in response.json()] == ["https://r/root", "https://r/m1"]
+
+
+def _messages_answering(statuses):
+    return (patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                  AsyncMock(return_value=Mock(url_for=AsyncMock(return_value="https://r/root")))),
+            patch("profed.components.api.c2s.shared.conversations.storage.storage",
+                  AsyncMock(return_value=Mock(messages_of=AsyncMock(return_value=[{} for _ in statuses])))),
+            patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
+                  AsyncMock(return_value=statuses)))
+
+
+def _message(mastodon_id):
+    return Status(id=mastodon_id, account=BOB, created_at="2026-01-01T00:00:00+00:00",
+                  uri=f"https://r/{mastodon_id}", url=f"https://r/{mastodon_id}")
+
+
+def test_the_next_page_of_messages_is_the_older_one(client):
+    objects, convs, statuses = _messages_answering([_message("500"), _message("400")])
+
+    with objects, convs, statuses:
+        response = client.get("/conversations/42/messages")
+
+    assert 'max_id=400>; rel="next"' in response.headers["Link"]
+    assert 'since_id=500>; rel="prev"' in response.headers["Link"]
+
+
+def test_a_conversation_without_messages_has_no_link_header(client):
+    objects, convs, statuses = _messages_answering([])
+
+    with objects, convs, statuses:
+        response = client.get("/conversations/42/messages")
+
+    assert "Link" not in response.headers
+
+
+def test_the_cursor_reaches_the_storage(client):
+    objects, convs, statuses = _messages_answering([])
+    store = Mock(messages_of=AsyncMock(return_value=[]))
+
+    with objects, patch("profed.components.api.c2s.shared.conversations.storage.storage",
+                        AsyncMock(return_value=store)), statuses:
+        client.get("/conversations/42/messages?max_id=400&limit=7")
+
+    store.messages_of.assert_awaited_once_with("https://r/root", 7, "400")
 

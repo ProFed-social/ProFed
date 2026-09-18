@@ -33,11 +33,14 @@ async def _post(app, path, data):
         return await client.post(path, data=data)
 
 
-def _resp(status=200, json_data=None):
+def _resp(status=200, json_data=None, following=None):
     r = Mock()
     r.status_code = status
     r.json = Mock(return_value=json_data)
     r.text = ""
+    r.headers = ({"Link": f'<https://test.local/api/v1/conversations/42/messages?{following}>; rel="next"'}
+                 if following else
+                 {})
     return r
 
 
@@ -78,12 +81,12 @@ def _conversation(accounts=None):
                             "created_at": "2026-07-15T10:00:00Z"}}
 
 
-def _api(monkeypatch, conversations_list, messages=None):
+def _api(monkeypatch, conversations_list, messages=None, following=None):
     async def get(path, **kwargs):
         if path == "/api/v1/conversations":
             return _resp(200, conversations_list)
         if path.endswith("/messages"):
-            return _resp(200, messages if messages is not None else [])
+            return _resp(200, messages if messages is not None else [], following)
         return _resp(200, None)
     monkeypatch.setattr(conversations, "api_client", lambda: Mock(get=AsyncMock(side_effect=get)))
 
@@ -118,10 +121,10 @@ async def test_conversation_list_without_conversations_says_so(monkeypatch):
     assert "No conversations yet" in response.text
 
 
-async def test_conversation_shows_root_and_descendants_sorted_by_time(monkeypatch):
+async def test_conversation_shows_the_oldest_message_at_the_top(monkeypatch):
     _login(monkeypatch)
-    messages = [_status("10", "the root message", "2026-07-15T10:00:00Z"),
-                _status("11", "a later reply", "2026-07-15T10:05:00Z")]
+    messages = [_status("11", "a later reply", "2026-07-15T10:05:00Z"),
+                _status("10", "the root message", "2026-07-15T10:00:00Z")]
     _api(monkeypatch, [_conversation()], messages=messages)
 
     response = await _fetch(_app(monkeypatch), "/conversations/42")
@@ -229,8 +232,8 @@ async def test_conversation_view_omits_the_reply_marking_for_a_self_continuation
     _login(monkeypatch)
     preview = {"account": {"username": "bob", "display_name": "Bob", "url": "https://x/bob", "avatar": None},
                "content": "<p>first</p>"}
-    messages = [_reply_msg("1", "https://x/bob", "first"),
-                _reply_msg("2", "https://x/bob", "second", in_reply_to_id="1", reply_to=preview)]
+    messages = [_reply_msg("2", "https://x/bob", "second", in_reply_to_id="1", reply_to=preview),
+                _reply_msg("1", "https://x/bob", "first")]
     _api(monkeypatch, [_conversation()], messages=messages)
 
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
@@ -379,4 +382,58 @@ async def test_a_chat_message_without_reactions_shows_no_breakdown(monkeypatch):
     body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
 
     assert "msg-reactions" not in body
+
+
+async def test_the_client_turns_the_newest_first_answer_around(monkeypatch):
+    _login(monkeypatch)
+    messages = [_status("12", "newest", "2026-07-15T10:10:00Z"),
+                _status("11", "middle", "2026-07-15T10:05:00Z"),
+                _status("10", "oldest", "2026-07-15T10:00:00Z")]
+    _api(monkeypatch, [_conversation()], messages=messages)
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert body.index("oldest") < body.index("middle") < body.index("newest")
+
+
+async def test_the_chat_offers_to_load_older_messages_when_there_are_some(monkeypatch):
+    _login(monkeypatch)
+    _api(monkeypatch, [_conversation()], messages=[_status("11", "hi", "2026-07-15T10:00:00Z")],
+         following="limit=40&max_id=400")
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert 'hx-get="/conversations/42/messages/more?following=limit%3D40%26max_id%3D400"' in body
+    assert 'hx-trigger="intersect once"' in body
+    assert body.index("more--older") < body.index("hi")
+
+
+async def test_the_oldest_page_offers_nothing_more(monkeypatch):
+    _login(monkeypatch)
+    _api(monkeypatch, [_conversation()], messages=[_status("11", "hi", "2026-07-15T10:00:00Z")])
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42")).text
+
+    assert "messages/more" not in body
+
+
+async def test_loading_older_messages_hands_the_query_back(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(get=AsyncMock(return_value=_resp(200, [])))
+    monkeypatch.setattr(conversations, "api_client", lambda: client)
+
+    await _fetch(_app(monkeypatch), "/conversations/42/messages/more?following=limit%3D40%26max_id%3D400")
+
+    assert client.get.call_args.kwargs["params"] == "limit=40&max_id=400"
+
+
+async def test_loading_older_messages_renders_only_the_entries(monkeypatch):
+    _login(monkeypatch)
+    _api(monkeypatch, [_conversation()], messages=[_status("11", "older one", "2026-07-15T10:00:00Z")])
+
+    body = (await _fetch(_app(monkeypatch), "/conversations/42/messages/more?following=limit%3D40")).text
+
+    assert "older one" in body
+    assert "<html" not in body
+    assert 'id="conversation-messages"' not in body
 

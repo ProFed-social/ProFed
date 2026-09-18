@@ -105,26 +105,36 @@ async def test_conversations_of_queries_participants_by_actor(fake_pool, fake_co
 
 
 @pytest.mark.asyncio
-async def test_messages_of_returns_conversation_messages_ordered_by_time(fake_pool, fake_conn):
-    fake_conn.fetch.return_value = [{"message_id": "m1", "message_time": "2026-01-01T00:00:01Z"},
-                                    {"message_id": "m2", "message_time": "2026-01-01T00:00:02Z"}]
+async def test_messages_of_returns_the_newest_messages_first(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = [{"message_id": "m2"}, {"message_id": "m1"}]
 
-    result = await (await storage.storage()).messages_of("c1")
+    result = await (await storage.storage()).messages_of("c1", 40, None)
 
-    query = fake_conn.fetch.await_args.args[0]
+    query, *args = fake_conn.fetch.await_args.args
     assert "FROM\n                api.conversations" in query
-    assert "ORDER BY" in query and "message_time" in query
+    assert "ORDER BY\n                o.mastodon_id DESC" in query
     assert "api.as_objects AS p" in query
     assert "parent_content" in query
-    assert fake_conn.fetch.await_args.args[1] == "c1"
-    assert [row["message_id"] for row in result] == ["m1", "m2"]
+    assert args == ["c1", 40, None]
+    assert [row["message_id"] for row in result] == ["m2", "m1"]
+
+
+@pytest.mark.asyncio
+async def test_messages_of_can_start_before_a_cursor(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await storage.storage()).messages_of("c1", 40, "500")
+
+    query, *args = fake_conn.fetch.await_args.args
+    assert "o.mastodon_id < $3::numeric" in query
+    assert args == ["c1", 40, "500"]
 
 
 @pytest.mark.asyncio
 async def test_messages_of_carries_the_content_url_in_both_content_objects(fake_pool, fake_conn):
     fake_conn.fetch.return_value = []
 
-    await (await storage.storage()).messages_of("c1")
+    await (await storage.storage()).messages_of("c1", 40, None)
 
     query = fake_conn.fetch.await_args.args[0]
     assert "'url', o.url,\n                                   'mastodon_id', o.mastodon_id) AS content" in query

@@ -5,9 +5,10 @@ import logging
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from typing import Annotated
+from typing import Annotated, Optional
 
 from .api_client import api_client
+from .paging import fetched
 from .auth import page_context, requires_login
 from .templating import environment
 from profed.identity import actor_url_from_username
@@ -24,8 +25,16 @@ async def _get(path: str, token: str):
     return response.json()
 
 
-async def _messages(id: str, username: str, token: str):
-    messages = await _get(f"/api/v1/conversations/{id}/messages", token) or []
+FIRST_PAGE = "limit=40"
+
+
+async def _messages(id: str, username: str, token: str, query: str = FIRST_PAGE):
+    page, following = await fetched(api_client,
+                                    f"/api/v1/conversations/{id}/messages",
+                                    query,
+                                    token,
+                                    f"messages of conversation {id}")
+    messages = list(reversed(page))
     previous = None
     for message in messages:
         own_url = actor_url_from_username(username)
@@ -35,16 +44,19 @@ async def _messages(id: str, username: str, token: str):
         if previous and message.get("in_reply_to_id") == previous["id"] and message["account"]["url"] == previous["account"]["url"]:
             message["reply_to"] = None
         previous = message
-    return messages
+    return messages, following
 
 
 async def _view(request: Request, session, active_id, pane: str):
     conversations = await _get("/api/v1/conversations", session["token"]) or []
     active_id = active_id if active_id is not None else (conversations[0]["id"] if conversations else None)
-    messages = await _messages(active_id, session["username"], session["token"]) if active_id is not None else []
+    messages, following = (await _messages(active_id, session["username"], session["token"])
+                           if active_id is not None else
+                           ([], None))
     return HTMLResponse(environment().get_template("conversation_layout.html").render(conversations=conversations,
                                                                                       active_id=active_id,
                                                                                       messages=messages,
+                                                                                      following=following,
                                                                                       pane=pane,
                                                                                       **(await page_context(request,
                                                                                                             session))))
@@ -77,6 +89,21 @@ async def reply(request: Request,
     if response.status_code != 200:
         logger.warning("posting a reply failed: %s %s", response.status_code, response.text)
         raise HTTPException(status_code=response.status_code, detail="reply failed")
-    messages = await _messages(id, session["username"], session["token"])
-    return HTMLResponse(environment().get_template("conversation_messages.html").render(messages=messages))
+    messages, following = await _messages(id, session["username"], session["token"])
+    return HTMLResponse(environment().get_template("conversation_messages.html").render(messages=messages,
+                                                                                        following=following,
+                                                                                        active_id=id))
+
+
+@router.get("/conversations/{id}/messages/more", response_class=HTMLResponse)
+@requires_login
+async def more(request: Request, session, id: str, following: Optional[str] = None):
+    messages, next_page = await _messages(id,
+                                          session["username"],
+                                          session["token"],
+                                          following or FIRST_PAGE)
+    return HTMLResponse(environment().get_template("conversation_messages_page.html")
+                        .render(messages=messages,
+                                following=next_page,
+                                active_id=id))
 

@@ -1,55 +1,7 @@
 <div id="conversation-messages" class="conversation-messages">
-  {% for message in messages %}
-  {% set run_start = loop.first or loop.previtem.account.acct != message.account.acct %}
-  <div class="msg entry {{ 'msg--own' if message.own else 'msg--other' }} {{ 'msg--run-start' if run_start else 'msg--run-cont' }}">
-    <div class="msg-avatar">
-      {% if run_start %}
-      {% if message.account.avatar %}
-      <img class="u-photo avatar" src="{{ message.account.avatar }}" alt="">
-      {% else %}
-      <span class="avatar avatar-fallback">{{ (message.account.display_name or message.account.username)[:2] | upper }}</span>
-      {% endif %}
-      {% endif %}
-    </div>
-    <div class="msg-stack">
-      {% if run_start and not message.own %}
-      <span class="msg-name">{{ message.account.display_name or message.account.username }}</span>
-      {% endif %}
-      {% if message.reply_to %}
-      <div class="msg-reply">
-        {% if message.reply_to.account.avatar %}
-        <img class="avatar" src="{{ message.reply_to.account.avatar }}" alt="">
-        {% else %}
-        <span class="avatar avatar-fallback">{{ (message.reply_to.account.display_name or message.reply_to.account.username)[:2] | upper }}</span>
-        {% endif %}
-        <span class="msg-reply-name">{% if message.reply_to.own %}You{% else %}{{ message.reply_to.account.display_name or message.reply_to.account.username }}{% endif %}</span>
-        <span class="msg-reply-text">{{ message.reply_to.content | striptags | truncate(160) }}</span>
-      </div>
-      {% endif %}
-      <div class="msg-bubble">{{ message.content | sanitize | safe }}{% set breakdown = (message.pleroma or {}).get("emoji_reactions", []) %}{% if breakdown %}<span class="msg-reactions">{% for reaction in breakdown %}<span class="msg-reaction{% if reaction.me %} is-mine{% endif %}" title="{{ reaction.name }}">{{ reaction.name }} {{ reaction.count }}</span>{% endfor %}</span>{% endif %}<div class="msg-actions">
-        <button class="msg-action msg-reply-btn" type="button" title="Reply"
-                data-reply-id="{{ message.id }}"
-                data-reply-name="{% if message.own %}You{% else %}{{ message.account.display_name or message.account.username }}{% endif %}"
-                data-reply-text="{{ message.content | striptags | truncate(160) }}">&#8617;</button>
-        {% with status = message, button_class = "msg-action" %}{% include "reaction_button.html" %}{% endwith %}
-        <span class="action-menu">
-          <button type="button" class="msg-action" popovertarget="menu-{{ message.id }}" title="More" aria-label="More">&#8943;</button>
-          <ul popover id="menu-{{ message.id }}" class="action-menu-items">
-            <li><a class="u-url action-menu-item" href="{{ message.url }}">Permalink</a></li>
-            {% if message.own %}
-            <li><button type="button" class="action-menu-item destructive"
-                        hx-delete="/statuses/{{ message.id }}"
-                        hx-target="closest .entry"
-                        hx-swap="delete"
-                        hx-confirm="Delete this message?">Delete</button></li>
-            {% endif %}
-          </ul>
-        </span>
-      </div></div>
-    </div>
-  </div>
-  {% else %}
+  {% if messages %}
+  {% include "conversation_messages_page.html" %}
   <p class="empty">No messages in this conversation.</p>
-  {% endfor %}
+  {% endif %}
 </div>
 
