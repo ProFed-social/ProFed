@@ -11,9 +11,25 @@
     form.querySelector(".conversation-reply-target").hidden = true;
   }
 
+  function messages() {
+    return document.querySelector(".conversation-messages");
+  }
+
   function scrollToBottom() {
-    var list = document.querySelector(".conversation-messages");
+    var list = messages();
     if (list) { list.scrollTop = list.scrollHeight; }
+  }
+
+  function requestedPath(event) {
+    return (event.detail && event.detail.requestConfig && event.detail.requestConfig.path) || "";
+  }
+ 
+  function loadsOlderMessages(event) {
+    return requestedPath(event).indexOf("/messages/more") !== -1;
+  }
+ 
+  function sendsAReply(event) {
+    return /\/conversations\/[^/]+\/reply$/.test(requestedPath(event));
   }
 
   function bindReplyButtons(root) {
@@ -45,7 +61,22 @@
     });
   }
 
+  var heightBeforeSwap = null;
+
   document.addEventListener("DOMContentLoaded", function () { bindReplyButtons(document); bindCompose(); scrollToBottom(); });
-  document.addEventListener("htmx:afterSwap", function (event) { bindReplyButtons(event.target); scrollToBottom(); });
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var list = messages();
+    heightBeforeSwap = loadsOlderMessages(event) && list ? list.scrollHeight : null;
+  });
+ 
+  document.addEventListener("htmx:afterSwap", function (event) {
+    var list = messages();
+    bindReplyButtons(event.target);
+    if (heightBeforeSwap !== null && list) {
+      list.scrollTop += list.scrollHeight - heightBeforeSwap;
+      heightBeforeSwap = null;
+    } else if (sendsAReply(event)) {
+      scrollToBottom();
+    }
 })();
 
