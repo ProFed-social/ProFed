@@ -9,33 +9,39 @@
     return document.getElementById(PANE);
   }
  
-  function toTheNewest(messages) {
+  function toTheNewest() {
+    var messages = pane();
     if (messages) {
       messages.scrollTop = messages.scrollHeight;
     }
   }
  
-  function loadsOlderMessages(target) {
-    return target && target.classList && target.classList.contains("more--older");
+  function requestedPath(event) {
+    return (event.detail && event.detail.requestConfig && event.detail.requestConfig.path) || "";
   }
  
-  document.addEventListener("DOMContentLoaded", function () { toTheNewest(pane()); });
+  function loadsOlderMessages(event) {
+    return requestedPath(event).indexOf("/messages/more") !== -1;
+  }
+ 
+  function replacesTheWholePane(event) {
+    return /\/conversations\/[^/]+\/reply$/.test(requestedPath(event));
+  }
+ 
+  document.addEventListener("DOMContentLoaded", toTheNewest);
  
   document.addEventListener("htmx:beforeSwap", function (event) {
     var messages = pane();
-    heightBeforeSwap = loadsOlderMessages(event.target) && messages ? messages.scrollHeight : null;
+    heightBeforeSwap = loadsOlderMessages(event) && messages ? messages.scrollHeight : null;
   });
  
   document.addEventListener("htmx:afterSwap", function (event) {
     var messages = pane();
-    if (!messages) {
-      return;
-    }
-    if (heightBeforeSwap !== null) {
+    if (heightBeforeSwap !== null && messages) {
       messages.scrollTop += messages.scrollHeight - heightBeforeSwap;
       heightBeforeSwap = null;
-    } else if (event.target === messages || messages.contains(event.target)) {
-      toTheNewest(messages);
+    } else if (replacesTheWholePane(event)) {
+      toTheNewest();
     }
   });
 })();
