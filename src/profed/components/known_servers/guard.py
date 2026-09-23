@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 async def submit_unchecked() -> int:
     def do_submit(rows):
         return len([workers().submit(row["host"], row["host"]) for row in rows])
-   
+  
     return do_submit((row
                       for row in await (await storage()).unchecked()
                       if not is_ours(row["host"])))
