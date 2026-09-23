@@ -196,3 +196,53 @@ async def test_the_published_event_carries_the_profile_url(fake_bus, component):
 
     assert fake_bus.topic("me_links").published[0]["payload"]["profile_url"] == PROFILE
 
+
+LOCAL_LINK = "https://example.com/@bob"
+
+
+async def _check_local(fake_bus, component, now=NOW):
+    async def _never(*args, **kwargs):
+        raise AssertionError("a local link must not be fetched")
+
+    with patch.object(worker.fetch, "perform", _never), \
+         patch.object(worker.instance_key, "signer", lambda: None):
+        return await worker.check(ACTOR, PROFILE, LOCAL_LINK, now)
+
+
+@pytest.mark.asyncio
+async def test_a_local_link_that_points_back_is_verified(fake_bus, component):
+    await component.replace_links("https://example.com/actors/bob", LOCAL_LINK, [PROFILE])
+
+    await _check_local(fake_bus, component)
+
+    assert _published(fake_bus) == [("verified", worker.link_id(ACTOR, LOCAL_LINK))]
+
+
+@pytest.mark.asyncio
+async def test_a_local_link_that_does_not_point_back_is_unverified(fake_bus, component):
+    await component.replace_links("https://example.com/actors/bob", LOCAL_LINK, ["https://elsewhere.test/"])
+
+    await _check_local(fake_bus, component)
+
+    assert _published(fake_bus) == [("unverified", worker.link_id(ACTOR, LOCAL_LINK))]
+
+
+@pytest.mark.asyncio
+async def test_an_unchanged_local_link_keeps_its_stability(fake_bus, component):
+    await component.replace_links("https://example.com/actors/bob", LOCAL_LINK, [PROFILE])
+    page = await worker._local_page(LOCAL_LINK)
+    stable_since = NOW - timedelta(days=5)
+    await component.record_verification(ACTOR,
+                                        LOCAL_LINK,
+                                        "verified",
+                                        NOW - timedelta(days=5),
+                                        stable_since,
+                                        NOW,
+                                        None,
+                                        None,
+                                        page.content_hash)
+
+    await _check_local(fake_bus, component)
+
+    assert fake_bus.topic("me_links").published[0]["payload"]["stable_since"] == stable_since.isoformat()
+

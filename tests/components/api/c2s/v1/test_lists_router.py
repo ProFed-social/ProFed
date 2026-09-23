@@ -5,18 +5,11 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from profed import identity
 from profed.components.api.c2s.v1.lists import router as lists_module
 from profed.components.api.c2s.shared.auth import current_user
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
-
-
-@pytest.fixture(autouse=True)
-def domain():
-    with patch.object(identity, "domain", lambda: "example.com"):
-        yield
 
 
 @pytest.fixture

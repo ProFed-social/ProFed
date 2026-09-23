@@ -173,6 +173,15 @@ async def test_our_own_host_is_never_observed(fake_bus):
 
 
 @pytest.mark.asyncio
+async def test_our_own_instance_actor_is_never_observed(fake_bus):
+    payload = _payload(type="EmojiReact", content="🎉", actor="https://example.com/actor")
+
+    await translator._handle("EmojiReact", REACTION, payload, AT, 1)
+
+    assert _observed(fake_bus) == []
+
+
+@pytest.mark.asyncio
 async def test_an_actor_without_a_host_is_not_observed(fake_bus):
     await translator._handle("EmojiReact", REACTION, _payload(type="EmojiReact", content="🎉", actor=""), AT, 1)
 

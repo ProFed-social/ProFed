@@ -3,6 +3,8 @@
 
 from typing import Optional, Dict
 from profed.core.message_bus import message_bus
+from profed.models.activity_pub import IncomingActivity
+from profed.sanitize import sanitize_document
 from profed.topics.common import ActivityEvent, validate_payload, validate_verb
 
 
@@ -41,6 +43,13 @@ def validate_incoming_activities_event(event_type: str, payload: Dict) -> Option
 
 def validate_incoming_activities_snapshot_item(item) -> Optional[Dict]:
     return None
+
+
+def canonical_incoming(activity: dict) -> tuple[str, str, dict]:
+    canonical = IncomingActivity.model_validate(activity).model_dump(by_alias=True, exclude_none=True)
+    return (canonical["type"],
+            canonical["id"],
+            sanitize_document({key: value for key, value in canonical.items() if key not in ("type", "id")}))
 
 
 async def publish_incoming(event_type: str, object_id: str, username: str, activity: dict, message_id=None) -> None:

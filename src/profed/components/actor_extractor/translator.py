@@ -5,7 +5,7 @@ import logging
 from profed.core.message_bus import message_bus
 from profed.core.message_bus.source_key import source_key
 from profed.core.persistence.projections import build_projection, with_event_type, with_sequence_id
-from profed.identity import acct_from_username
+from profed.identity import acct_from_username, is_local, is_local_url
 from profed.topics import incoming_activities, person, raw_activities, remote_actors
 from profed.topics.incoming_activities_topic import _KNOWN_VERBS
 from profed.util import noop
@@ -27,11 +27,15 @@ async def _publish(event_type: str, names, source: str, sequence_id: int) -> Non
 async def _report(activity: dict, source: str, sequence_id: int) -> None:
     store = await storage.storage()
     await _publish("discovered_url",
-                   await store.unknown_urls(sorted(extract.actor_urls(activity))),
+                   [url
+                    for url in await store.unknown_urls(sorted(extract.actor_urls(activity)))
+                    if not is_local_url(url)],
                    source,
                    sequence_id)
     await _publish("discovered_acct",
-                   await store.unknown_accts(sorted(extract.accts(activity))),
+                   [acct
+                    for acct in await store.unknown_accts(sorted(extract.accts(activity)))
+                    if not is_local(acct)],
                    source,
                    sequence_id)
 

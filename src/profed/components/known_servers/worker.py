@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timezone
 from profed.core.message_bus import message_bus
 from profed.core.workers import KeyedWorkers
+from profed.identity import is_local_url
 from . import fetch
 from .storage import storage
 
@@ -18,6 +19,10 @@ _workers = None
 def configure(config: dict) -> None:
     global _config
     _config = config
+
+
+def is_ours(host: str) -> bool:
+    return is_local_url(f"https://{host}/")
 
 
 def workers() -> KeyedWorkers:

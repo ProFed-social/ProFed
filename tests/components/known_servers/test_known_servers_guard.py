@@ -50,3 +50,20 @@ async def test_a_lost_host_is_never_submitted_again(component):
 
     assert await guard.sweep({}) == 0
 
+
+@pytest.mark.asyncio
+async def test_our_own_host_is_never_submitted(component):
+    await component.remember_host("example.com")
+
+    assert await guard.submit_unchecked() == 0
+    assert worker.workers().submitted == []
+
+
+@pytest.mark.asyncio
+async def test_our_own_host_is_not_visited_when_due(component):
+    await component.remember_host("example.com")
+    await component.record_check("example.com", NOW, NOW, NOW - timedelta(days=1), 0, None, None, None)
+
+    assert await guard.visit_due(NOW) == 0
+    assert worker.workers().submitted == []
+

@@ -283,16 +283,28 @@ async def test_a_new_attempt_can_still_claim_after_a_lost_one(fake_bus):
 async def test_backfeed_publishes_an_ownerless_update(fake_bus):
     obj = {"id": "https://r/1", "type": "Note", "attributedTo": "https://r/bob", "content": "hi"}
     await _backfeed(obj, "2026-02-01T00:00:00Z")
-    published = fake_bus.topic("incoming_activities").published
+    published = fake_bus.topic("local_delivery").published
     assert published[0]["event_type"] == "Update"
     assert published[0]["payload"] == {"username": "", "activity": {"actor": "https://r/bob", "object": obj}}
+
+
+async def test_backfeed_takes_the_first_of_several_attributions(fake_bus):
+    obj = {"id": "https://r/1", "type": "Note", "attributedTo": ["https://r/bob", "https://r/carol"]}
+    await _backfeed(obj, "2026-02-01T00:00:00Z")
+    assert fake_bus.topic("local_delivery").published[0]["payload"]["activity"]["actor"] == "https://r/bob"
+
+
+async def test_backfeed_goes_through_the_local_delivery_not_around_it(fake_bus):
+    obj = {"id": "https://r/1", "type": "Note", "attributedTo": "https://r/bob"}
+    await _backfeed(obj, "2026-02-01T00:00:00Z")
+    assert fake_bus.topic("incoming_activities").published == []
 
 
 async def test_backfeed_is_idempotent_per_object_and_version(fake_bus):
     obj = {"id": "https://r/1", "type": "Note", "content": "hi"}
     await _backfeed(obj, "2026-02-01T00:00:00Z")
     await _backfeed(obj, "2026-02-01T00:00:00Z")
-    assert len(fake_bus.topic("incoming_activities").published) == 1
+    assert len(fake_bus.topic("local_delivery").published) == 1
 
 
 def test_ensure_task_is_a_noop_before_start():
@@ -306,12 +318,30 @@ def test_enqueue_queues_the_reference(monkeypatch):
     assert fetcher._queues["https://r/1"].get_nowait() == ("https://r/boost/1", None, "2026-03-01T00:00:00Z", None)
 
 
+def test_a_local_object_is_never_queued(monkeypatch):
+    monkeypatch.setattr(fetcher, "ensure_task", lambda object_id: None)
+
+    fetcher.enqueue("https://example.com/notes/1", "https://r/boost/1", None, "2026-03-01T00:00:00Z", None)
+
+    assert "https://example.com/notes/1" not in fetcher._queues
+
+
+def test_a_local_object_starts_no_task():
+    started = []
+
+    with patch.object(fetcher, "ensure_task", lambda object_id: started.append(object_id)):
+        fetcher.enqueue("https://example.com/notes/1", "https://r/boost/1", None, "2026-03-01T00:00:00Z", None)
+
+    assert started == []
+
+
 async def test_run_resolves_a_reference_backfeeds_then_exits(fake_bus, monkeypatch):
     succeeded = _row("succeeded", version=NEW, cache_end=NOW + timedelta(hours=1))
 
     class FakeStorage:
         def __init__(self, *rows):
             self.rows = list(rows)
+
         async def get(self, object_id):
             return self.rows.pop(0) if len(self.rows) > 1 else self.rows[-1]
 
@@ -326,5 +356,5 @@ async def test_run_resolves_a_reference_backfeeds_then_exits(fake_bus, monkeypat
     types = [p["event_type"] for p in fake_bus.topic("resolution").published]
     assert "attempting" in types
     assert "succeeded" in types
-    assert fake_bus.topic("incoming_activities").published[0]["event_type"] == "Update"
+    assert fake_bus.topic("local_delivery").published[0]["event_type"] == "Update"
 

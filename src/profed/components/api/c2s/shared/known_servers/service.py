@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.message_bus import message_bus
-from profed.identity import is_local_actor_url
+from profed.identity import is_local_url
 from profed.topics.known_servers_topic import host_of
 from profed.topics.unknown_actors_topic import throttled_id
 from .storage import storage
@@ -17,7 +17,7 @@ async def _discover(host: str) -> None:
 
 
 async def understands_reactions(actor_url: str) -> bool:
-    if is_local_actor_url(actor_url):
+    if is_local_url(actor_url):
         return True
 
     host = host_of(actor_url)

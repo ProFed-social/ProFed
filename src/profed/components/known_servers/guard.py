@@ -6,24 +6,28 @@ import logging
 from datetime import datetime, timezone
 from profed.core.workers import jittered_sleep
 from .storage import storage
-from .worker import workers
+from .worker import is_ours, workers
 
 
 logger = logging.getLogger(__name__)
 
 
 async def submit_unchecked() -> int:
-    rows = await (await storage()).unchecked()
-    for row in rows:
-        workers().submit(row["host"], row["host"])
-    return len(rows)
+    def do_submit(rows):
+        return len([workers().submit(row["host"], row["host"]) for row in rows])
+   
+    return do_submit((row
+                      for row in await (await storage()).unchecked()
+                      if not is_ours(row["host"])))
 
 
 async def visit_due(now: datetime) -> int:
-    rows = await (await storage()).due(now)
-    for row in rows:
-        workers().submit(row["host"], row["host"])
-    return len(rows)
+    def do_submit(rows):
+        return len([workers().submit(row["host"], row["host"]) for row in rows])
+
+    return do_submit((row
+                      for row in await (await storage()).due(now)
+                      if not is_ours(row["host"])))
 
 
 async def sweep(config: dict) -> int:

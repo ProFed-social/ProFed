@@ -4,6 +4,7 @@
 import logging
 from profed.core.persistence.projections import build_projection, with_emitted_at, with_sequence_id
 from profed.core.workers import KeyedWorkers
+from profed.identity import is_local, is_local_url
 from profed.topics import unknown_actors as topic
 from profed.util import noop
 from . import gate, worker
@@ -19,8 +20,13 @@ def workers() -> KeyedWorkers:
     return _workers
 
 
+def is_ours(entry: str) -> bool:
+    return is_local_url(entry) or is_local(entry)
+
+
 def submit(source: str, sequence_id: int, entry: str) -> None:
-    _workers.submit((source, sequence_id), entry)
+    if not is_ours(entry):
+        _workers.submit((source, sequence_id), entry)
 
 
 async def _requested(object_id, payload, emitted_at, sequence_id) -> None:
@@ -29,11 +35,12 @@ async def _requested(object_id, payload, emitted_at, sequence_id) -> None:
 
 
 async def resume() -> int:
-    rows = [row for row in await (await storage()).unfinished() if gate.try_start(row["entry"], row["emitted_at"])]
-    for row in rows:
-        submit(row["source"], row["sequence_id"], row["entry"])
+    def submit_all(rows):
+        return len([submit(row["source"], row["sequence_id"], row["entry"]) for row in rows])
 
-    return len(rows)
+    return submit_all((row
+                       for row in await (await storage()).unfinished()
+                       if not is_ours(row["entry"]) and gate.try_start(row["entry"], row["emitted_at"])))
 
 
 handle_events, _, _ = build_projection(topic=topic,

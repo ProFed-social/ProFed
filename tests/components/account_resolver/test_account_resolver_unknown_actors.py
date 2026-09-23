@@ -58,6 +58,27 @@ async def test_a_discovered_url_is_submitted():
 
 
 @pytest.mark.asyncio
+async def test_a_local_acct_is_not_submitted():
+    await unknown_actors._requested("alice@example.com", {}, NOW, 7)
+
+    assert unknown_actors._workers.submitted == []
+
+
+@pytest.mark.asyncio
+async def test_a_local_actor_url_is_not_submitted():
+    await unknown_actors._requested("https://example.com/actors/alice", {}, NOW, 9)
+
+    assert unknown_actors._workers.submitted == []
+
+
+@pytest.mark.asyncio
+async def test_our_instance_actor_is_not_submitted():
+    await unknown_actors._requested("https://example.com/actor", {}, NOW, 9)
+
+    assert unknown_actors._workers.submitted == []
+
+
+@pytest.mark.asyncio
 async def test_a_name_the_gate_blocks_is_not_submitted():
     gate.try_start("alice@a.test", NOW)
 
@@ -90,6 +111,15 @@ async def test_resuming_submits_the_unfinished_processes(component):
     assert await unknown_actors.resume() == 2
     assert unknown_actors._workers.submitted == [(("unknown_actors", 7), "alice@a.test"),
                                                  (("raw_activities", 3), "bob@b.test")]
+
+
+@pytest.mark.asyncio
+async def test_resuming_leaves_local_leftovers_alone(component):
+    component.rows = [{"source": "unknown_actors", "sequence_id": 7, "entry": "alice@example.com", "emitted_at": NOW},
+                      {"source": "unknown_actors", "sequence_id": 8, "entry": "bob@b.test", "emitted_at": NOW}]
+
+    assert await unknown_actors.resume() == 1
+    assert unknown_actors._workers.submitted == [(("unknown_actors", 8), "bob@b.test")]
 
 
 @pytest.mark.asyncio

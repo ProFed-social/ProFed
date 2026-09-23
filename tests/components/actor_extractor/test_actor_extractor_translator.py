@@ -55,6 +55,39 @@ async def test_an_unknown_actor_url_is_reported(fake_bus, fake_storage):
 
 
 @pytest.mark.asyncio
+async def test_an_unknown_local_actor_url_is_not_reported(fake_bus, fake_storage):
+    await translator._reporter("incoming_activities")("Create",
+                                                      "https://a.test/act/1",
+                                                      _payload(actor="https://example.com/actors/nobody"),
+                                                      7)
+
+    assert _published(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_the_instance_actor_is_not_reported(fake_bus, fake_storage):
+    await translator._reporter("incoming_activities")("Create",
+                                                      "https://a.test/act/1",
+                                                      _payload(actor="https://example.com/actor"),
+                                                      7)
+
+    assert _published(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_local_acct_is_not_reported(fake_bus, fake_storage):
+    activity = {"actor": "https://a.test/actors/alice",
+                "object": {"tag": [{"type": "Mention",
+                                    "href": "https://example.com/actors/nobody",
+                                    "name": "@nobody@example.com"}]}}
+    fake_storage.known_urls.add("https://a.test/actors/alice")
+
+    await translator._reporter("incoming_activities")("Create", "https://a.test/act/1", _payload(**activity), 7)
+
+    assert _published(fake_bus) == []
+
+
+@pytest.mark.asyncio
 async def test_a_known_actor_url_is_not_reported(fake_bus, fake_storage):
     fake_storage.known_urls.add("https://a.test/actors/alice")
 

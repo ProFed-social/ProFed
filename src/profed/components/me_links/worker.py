@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import hashlib
 from datetime import datetime, timezone
 from profed.core.message_bus import message_bus
 from profed.core.workers import KeyedWorkers
+from profed.identity import is_local_url
 from profed.topics.me_links_topic import link_id
 from . import fetch, instance_key
 from .storage import storage
@@ -69,9 +71,16 @@ def _state_of(page, known, profile_url: str) -> str | None:
             "unverified")
 
 
+async def _local_page(link_url: str) -> fetch.Page:
+    links = sorted(await (await storage()).links_from_profile(link_url))
+    return fetch.Page("read", links, content_hash=hashlib.sha256("\n".join(links).encode()).hexdigest())
+
+
 async def check(actor_url: str, profile_url: str, link_url: str, now: datetime) -> bool:
     known = await (await storage()).verification(actor_url, link_url)
-    page = await fetch.perform(link_url, known, instance_key.signer())
+    page = (await _local_page(link_url)
+            if is_local_url(link_url) else
+            await fetch.perform(link_url, known, instance_key.signer()))
     state = _state_of(page, known, profile_url)
 
     if state is None:

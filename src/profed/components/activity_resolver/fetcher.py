@@ -11,7 +11,8 @@ from urllib.parse import urlparse
 from profed.core.message_bus import message_bus
 from profed.http.client import HttpClient
 from profed.http.retry import backoff
-from profed.topics.incoming_activities_topic import publish_incoming
+from profed.identity import is_local_url
+from profed.topics.local_delivery_topic import publish_local_delivery
 from .storage import storage
 
 REQUEST_TIMEOUT = 30.0
@@ -147,12 +148,17 @@ def _backfeed_id(object_id, version):
     return uuid.uuid5(uuid.NAMESPACE_URL, f"{object_id}#{version}")
 
 
+def _attributed_actor(obj: dict):
+    attributed = obj.get("attributedTo")
+    return next(iter(attributed), None) if isinstance(attributed, list) else attributed
+
+
 async def _backfeed(obj, version) -> None:
-    await publish_incoming("Update",
-                           obj["id"],
-                           "",
-                           {"actor": obj.get("attributedTo"), "object": obj},
-                           _backfeed_id(obj["id"], version))
+    await publish_local_delivery("Update",
+                                 obj["id"],
+                                 "",
+                                 {"actor": _attributed_actor(obj), "object": obj},
+                                 _backfeed_id(obj["id"], version))
 
 
 async def _sleep() -> None:
@@ -255,6 +261,8 @@ def start(config: dict) -> None:
 
 
 def enqueue(object_id, referrer_id, sought_version, inherited, sign) -> None:
-    _queues.setdefault(object_id, asyncio.Queue()).put_nowait(Reference(referrer_id, sought_version, inherited, sign))
-    ensure_task(object_id)
+    if not is_local_url(object_id):
+        _queues.setdefault(object_id,
+                           asyncio.Queue()).put_nowait(Reference(referrer_id, sought_version, inherited, sign))
+        ensure_task(object_id)
 

@@ -17,6 +17,8 @@ from profed.http.retry import due_at, exhausted, leased
 from profed.http.signatures import sign_request
 from profed.sanitize import sanitize_egress, sanitize_as_object
 from profed.core.message_bus import message_bus
+from profed.identity import is_local_actor_url, is_local_url, username_from_actor_url
+from profed.topics.local_delivery_topic import publish_local_delivery
 from .storage import storage
 
 
@@ -112,7 +114,7 @@ async def _claim(activity_id: str, recipient: str, attempt: int) -> bool:
     return await _publish("attempting", activity_id, recipient, attempt, message_id) is not None
 
 
-async def _deliver(head: dict, recipient: str) -> bool:
+async def _deliver_remotely(head: dict, recipient: str) -> bool:
     inbox_url = await _fetch_inbox_url(recipient)
     if inbox_url is None:
         return False
@@ -122,6 +124,27 @@ async def _deliver(head: dict, recipient: str) -> bool:
     except Exception:
         logger.exception("HTTP error delivering %s -> %s", head["activity_id"], recipient)
         return False
+
+
+async def _hand_to_local_user(head: dict, recipient: str) -> bool:
+    username = username_from_actor_url(recipient)
+    known = await (await storage()).get_user_key(username) is not None
+    if known:
+        activity = {key: value for key, value in head["activity"].items() if key not in _INTERNAL_FIELDS}
+        await publish_local_delivery(activity["type"],
+                                     activity["id"],
+                                     username,
+                                     {key: value for key, value in activity.items() if key not in ("type", "id")},
+                                     uuid.uuid5(uuid.NAMESPACE_URL, f"{head['activity_id']}#{recipient}#local"))
+    return known
+
+
+async def _deliver_locally(head: dict, recipient: str) -> bool:
+    return await _hand_to_local_user(head, recipient) if is_local_actor_url(recipient) else True
+
+
+async def _deliver(head: dict, recipient: str) -> bool:
+    return await (_deliver_locally(head, recipient) if is_local_url(recipient) else _deliver_remotely(head, recipient))
 
 
 async def _sleep() -> None:

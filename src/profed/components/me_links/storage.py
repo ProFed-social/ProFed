@@ -57,6 +57,13 @@ class _Storage(BaseStorage):
                                     actor_url)
         return [row["link_url"] for row in rows]
 
+    async def links_from_profile(self, profile_url: str) -> List[str]:
+        rows = await self.fetch_all("""SELECT link_url
+                                       FROM me_links.link
+                                       WHERE profile_url = $1""",
+                                    profile_url)
+        return [row["link_url"] for row in rows]
+
     async def record_verification(self,
                                   actor_url: str,
                                   link_url: str,

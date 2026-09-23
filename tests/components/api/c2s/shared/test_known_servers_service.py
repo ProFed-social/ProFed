@@ -35,7 +35,7 @@ def fake_storage():
 
 
 def _domain():
-    return patch("profed.components.api.c2s.shared.known_servers.service.is_local_actor_url",
+    return patch("profed.components.api.c2s.shared.known_servers.service.is_local_url",
                  new=lambda url: url.startswith("https://example.com/"))
 
 
@@ -45,6 +45,17 @@ async def test_a_local_author_is_never_asked_about(fake_bus, fake_storage):
 
     with _domain():
         assert await service.understands_reactions(LOCAL) is True
+
+    assert store.asked == []
+    assert fake_bus.topic("known_servers").published == []
+
+
+@pytest.mark.asyncio
+async def test_our_own_instance_actor_is_never_asked_about(fake_bus, fake_storage):
+    store = fake_storage()
+
+    with _domain():
+        assert await service.understands_reactions("https://example.com/actor") is True
 
     assert store.asked == []
     assert fake_bus.topic("known_servers").published == []

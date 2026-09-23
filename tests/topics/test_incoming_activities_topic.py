@@ -1,7 +1,10 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.topics.incoming_activities_topic import (publish_incoming,
+import pytest
+from pydantic import ValidationError
+from profed.topics.incoming_activities_topic import (canonical_incoming,
+                                                     publish_incoming,
                                                      validate_incoming_activities_event,
                                                      validate_incoming_activities_snapshot_item)
 
@@ -77,4 +80,24 @@ def test_emoji_react_is_a_known_verb():
                                               {"username": "alice",
                                                "activity": {"actor": "https://remote/bob",
                                                             "object": "https://local/notes/1"}}) is not None
+
+
+def test_the_canonical_form_splits_off_type_and_id():
+    assert canonical_incoming({"id": "https://example.com/follows/1",
+                               "type": "Follow",
+                               "actor": "https://example.com/actors/bob"}) == \
+           ("Follow", "https://example.com/follows/1", {"actor": "https://example.com/actors/bob"})
+
+
+def test_the_canonical_form_is_sanitized():
+    _, _, activity = canonical_incoming({"id": "https://example.com/notes/1",
+                                         "type": "Create",
+                                         "object": {"content": "<p>hi</p><script>alert(1)</script>"}})
+
+    assert "<script>" not in activity["object"]["content"]
+
+
+def test_a_malformed_actor_is_refused():
+    with pytest.raises(ValidationError):
+        canonical_incoming({"id": "https://example.com/follows/1", "type": "Follow", "actor": 42})
 

@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from profed.core.message_bus import message_bus
-from profed.identity import is_local
+from profed.identity import is_local, is_local_url
 from profed.topics.unknown_actors_topic import throttled_id
 from .storage import storage
 from profed.models.mastodon import Account
@@ -29,7 +29,8 @@ async def _request_acct(acct: str) -> None:
 
 
 async def _request_actor_url(actor_url: str) -> None:
-    await request_resolution("discovered_url", actor_url)
+    if not is_local_url(actor_url):
+        await request_resolution("discovered_url", actor_url)
 
 
 async def _request_if(test, result, callback, *args, **kwargs):
@@ -101,7 +102,10 @@ async def lookup_by_acct(acct: str, config: dict | None = None) -> Optional[Acco
 async def lookup_by_actor_url(actor_url: str, config: dict | None = None) -> Optional[Account]:
     row = await _request_if_none(await (await storage()).get_by_actor_url(actor_url), _request_actor_url, actor_url)
     if row is not None:
-        return _account_from_row(await _request_if(not _is_fresh(row, _ttl(config)), row, _request_actor_url, actor_url))
+        return _account_from_row(await _request_if(not _is_fresh(row, _ttl(config)),
+                                                   row,
+                                                   _request_actor_url,
+                                                   actor_url))
 
 
 async def lookup_multiple(actor_urls: list[str], config: dict | None = None) -> dict[str, Account]:

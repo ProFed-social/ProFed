@@ -27,6 +27,12 @@ class FakeStorage:
     async def links_of(self, actor_url):
         return list(self.links.get(actor_url, []))
 
+    async def links_from_profile(self, profile_url):
+        return [link
+                for actor_url, links in self.links.items()
+                if self.profiles.get(actor_url) == profile_url
+                for link in links]
+
     async def record_verification(self,
                                   actor_url,
                                   link_url,

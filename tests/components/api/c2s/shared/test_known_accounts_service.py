@@ -148,6 +148,22 @@ async def test_lookup_by_actor_url_returns_none_when_unknown(fake_bus, fake_stor
 
 
 @pytest.mark.asyncio
+async def test_lookup_by_actor_url_asks_nobody_about_a_local_actor(fake_bus, fake_storage):
+    fake_storage.get_by_actor_url.return_value = None
+
+    assert await lookup_by_actor_url(ACTOR_URL) is None
+    assert _requested(fake_bus) == []
+
+
+@pytest.mark.asyncio
+async def test_lookup_by_actor_url_asks_nobody_about_the_instance_actor(fake_bus, fake_storage):
+    fake_storage.get_by_actor_url.return_value = None
+
+    assert await lookup_by_actor_url("https://example.com/actor") is None
+    assert _requested(fake_bus) == []
+
+
+@pytest.mark.asyncio
 async def test_lookup_by_actor_url_requests_an_unknown_url(fake_bus, fake_storage):
     fake_storage.get_by_actor_url.return_value = None
 

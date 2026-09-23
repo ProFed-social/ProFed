@@ -2,8 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+from unittest.mock import patch
 
+from profed import identity
+from profed.http import client
 from profed.core import message_bus, media_storage
+from profed.core.persistence import base_storage
 from profed.components.api.c2s.shared.bookmarks import storage as bookmarks_storage
 from _fakes import FakeMediaStorage, FakeMessageBus
 
@@ -14,6 +18,12 @@ class _NobodyBookmarkedAnything:
 
     async def page(self, actor_url, limit, max_id, since_id):
         return []
+
+
+@pytest.fixture(autouse=True)
+def domain():
+    with patch.object(identity, "domain", lambda: "example.com"):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -48,7 +58,6 @@ def fake_media_storage():
 
 @pytest.fixture(autouse=True)
 def no_host_cooldown(monkeypatch):
-    from profed.http import client
     async def _no_wait(host, interval):
         return 0.0
     monkeypatch.setattr(client, "wait_for", _no_wait)
@@ -56,8 +65,8 @@ def no_host_cooldown(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def storages_ready_by_default(monkeypatch):
-    from profed.core.persistence import base_storage
     original_init = base_storage.BaseStorage.__init__
+
     def _init(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
         self._is_rebuilt = None

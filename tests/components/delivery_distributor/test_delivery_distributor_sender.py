@@ -119,3 +119,82 @@ async def test_the_recipient_url_is_asked_for_its_inbox(monkeypatch):
 
     fetch.assert_awaited_once_with("https://r/actors/bob")
 
+
+LOCAL_HEAD = _head(activity_id="https://example.com/follows/1",
+                   activity={"id": "https://example.com/follows/1",
+                             "type": "Follow",
+                             "username": "bob",
+                             "actor": "https://example.com/actors/bob",
+                             "object": "https://example.com/actors/alice"})
+
+
+def _no_http(monkeypatch):
+    fetch = AsyncMock()
+    post = AsyncMock()
+    monkeypatch.setattr(sender, "_fetch_inbox_url", fetch)
+    monkeypatch.setattr(sender, "_post_to_inbox", post)
+    return fetch, post
+
+
+@pytest.mark.asyncio
+async def test_a_local_user_is_delivered_to_without_http(fake_bus, monkeypatch):
+    storage_module._instance = Mock(get_user_key=AsyncMock(return_value=("public", "private")))
+    fetch, post = _no_http(monkeypatch)
+
+    assert await sender._deliver(LOCAL_HEAD, "https://example.com/actors/alice") is True
+    fetch.assert_not_awaited()
+    post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_local_delivery_goes_to_the_recipient(fake_bus, monkeypatch):
+    storage_module._instance = Mock(get_user_key=AsyncMock(return_value=("public", "private")))
+    _no_http(monkeypatch)
+
+    await sender._deliver(LOCAL_HEAD, "https://example.com/actors/alice")
+
+    published = fake_bus.topic("local_delivery").published
+    assert [(p["event_type"], p["object_id"], p["payload"]["username"]) for p in published] == \
+           [("Follow", "https://example.com/follows/1", "alice")]
+
+
+@pytest.mark.asyncio
+async def test_a_local_delivery_carries_no_internal_fields_and_neither_type_nor_id(fake_bus, monkeypatch):
+    storage_module._instance = Mock(get_user_key=AsyncMock(return_value=("public", "private")))
+    _no_http(monkeypatch)
+
+    await sender._deliver(LOCAL_HEAD, "https://example.com/actors/alice")
+
+    assert fake_bus.topic("local_delivery").published[0]["payload"]["activity"] == \
+           {"actor": "https://example.com/actors/bob", "object": "https://example.com/actors/alice"}
+
+
+@pytest.mark.asyncio
+async def test_a_local_delivery_is_published_once_however_often_it_is_tried(fake_bus, monkeypatch):
+    storage_module._instance = Mock(get_user_key=AsyncMock(return_value=("public", "private")))
+    _no_http(monkeypatch)
+
+    await sender._deliver(LOCAL_HEAD, "https://example.com/actors/alice")
+    await sender._deliver(LOCAL_HEAD, "https://example.com/actors/alice")
+
+    assert len(fake_bus.topic("local_delivery").published) == 1
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_local_user_is_not_delivered_to(fake_bus, monkeypatch):
+    storage_module._instance = Mock(get_user_key=AsyncMock(return_value=None))
+    fetch, post = _no_http(monkeypatch)
+
+    assert await sender._deliver(LOCAL_HEAD, "https://example.com/actors/nobody") is False
+    assert fake_bus.topic("local_delivery").published == []
+    post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_the_instance_actor_takes_the_delivery_and_discards_it(fake_bus, monkeypatch):
+    fetch, post = _no_http(monkeypatch)
+
+    assert await sender._deliver(LOCAL_HEAD, "https://example.com/actor") is True
+    assert fake_bus.topic("local_delivery").published == []
+    post.assert_not_awaited()
+

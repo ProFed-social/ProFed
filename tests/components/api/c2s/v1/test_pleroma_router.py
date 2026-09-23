@@ -6,17 +6,10 @@ from unittest.mock import AsyncMock, Mock, patch
 from fastapi import FastAPI
 from starlette.routing import Match
 from fastapi.testclient import TestClient
-from profed import identity
 from profed.identity import actor_url_from_username
 from profed.models.mastodon import Status, placeholder_account
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.v1 import pleroma as pleroma_module
-
-
-@pytest.fixture(autouse=True)
-def domain():
-    with patch.object(identity, "domain", lambda: "example.com"):
-        yield
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}

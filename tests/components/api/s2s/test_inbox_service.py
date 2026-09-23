@@ -99,6 +99,20 @@ async def test_requesting_an_actor_reports_its_url(fake_bus):
 
 
 @pytest.mark.asyncio
+async def test_a_local_actor_is_never_requested(fake_bus):
+    await service.request_actor("https://example.com/actors/alice")
+
+    assert fake_bus.topic("unknown_actors").published == []
+
+
+@pytest.mark.asyncio
+async def test_the_instance_actor_is_never_requested(fake_bus):
+    await service.request_actor("https://example.com/actor")
+
+    assert fake_bus.topic("unknown_actors").published == []
+
+
+@pytest.mark.asyncio
 async def test_the_same_actor_is_requested_once_per_window(fake_bus):
     await service.request_actor("https://r.example/actor")
     await service.request_actor("https://r.example/actor")

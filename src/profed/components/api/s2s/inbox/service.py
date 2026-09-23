@@ -5,10 +5,9 @@ import logging
 from pydantic import ValidationError
 from profed.core.message_bus import message_bus
 from profed.http.signatures import key_id_from_signature_header, verify_request
-from profed.sanitize import sanitize_document
-from profed.topics.incoming_activities_topic import publish_incoming
+from profed.identity import is_local_url
+from profed.topics.incoming_activities_topic import canonical_incoming, publish_incoming
 from profed.topics.unknown_actors_topic import throttled_id
-from profed.models.activity_pub import IncomingActivity
 from profed.components.api.s2s.inbox.storage import storage
 from profed.components.api.s2s.inbox.public_keys_storage import storage as public_keys_storage
 
@@ -17,11 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 async def request_actor(actor_url: str) -> None:
-    async with message_bus().topic("unknown_actors").publish() as publish:
-        await publish(event_type="discovered_url",
-                      object_id=actor_url,
-                      payload={},
-                      message_id=throttled_id("inbox", actor_url))
+    if not is_local_url(actor_url):
+        async with message_bus().topic("unknown_actors").publish() as publish:
+            await publish(event_type="discovered_url",
+                          object_id=actor_url,
+                          payload={},
+                          message_id=throttled_id("inbox", actor_url))
 
 
 async def _public_key_pem(actor_url: str) -> str | None:
@@ -59,15 +59,11 @@ async def accept_inbox_activity(username: str, activity: dict) -> bool:
         return False
 
     try:
-        canonical = IncomingActivity.model_validate(activity)
+        event_type, object_id, canonical = canonical_incoming(activity)
     except ValidationError as error:
         raise ValueError("Malformed ActivityPub activity") from error
 
-    activity = canonical.model_dump(by_alias=True, exclude_none=True)
-    event_type = activity.pop("type")
-    object_id = activity.pop("id")
-
-    await publish_incoming(event_type, object_id, username, sanitize_document(activity))
+    await publish_incoming(event_type, object_id, username, canonical)
 
     return True
 

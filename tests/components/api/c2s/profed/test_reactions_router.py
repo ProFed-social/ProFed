@@ -6,19 +6,12 @@ from unittest.mock import AsyncMock, Mock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.routing import Match
-from profed import identity
 from profed.components.api.c2s import profed
 from profed.components.api.c2s.shared.auth import current_user
 from profed.components.api.c2s.profed.reactions import router as reactions_module
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
-
-
-@pytest.fixture(autouse=True)
-def domain():
-    with patch.object(identity, "domain", lambda: "example.com"):
-        yield
 
 
 @pytest.fixture

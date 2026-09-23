@@ -11,6 +11,7 @@ from profed.topics import (account_resolution_topic,
                            instance_topic,
                            known_accounts_topic,
                            known_servers_topic,
+                           local_delivery_topic,
                            me_links_topic,
                            media_topic,
                            oauth_apps_topic,
@@ -40,6 +41,7 @@ incoming_activities = incoming_activities_topic.topic
 instance = instance_topic.topic
 known_accounts = known_accounts_topic.topic
 known_servers = known_servers_topic.topic
+local_delivery = local_delivery_topic.topic
 me_links = me_links_topic.topic
 media = media_topic.topic
 oauth_apps = oauth_apps_topic.topic
@@ -59,7 +61,6 @@ unknown_actors = unknown_actors_topic.topic
 users = users_topic.topic
 
 
-
 def names():
     return [account_resolution["name"],
             accounts["name"],
@@ -71,6 +72,7 @@ def names():
             instance["name"],
             known_accounts["name"],
             known_servers["name"],
+            local_delivery["name"],
             me_links["name"],
             media["name"],
             oauth_apps["name"],

@@ -8,7 +8,7 @@ from profed.core.persistence.projections import (build_projection,
                                                  with_event_type,
                                                  with_sequence_id)
 from profed.emoji import is_emoji
-from profed.identity import is_local_actor_url
+from profed.identity import is_local_url
 from profed.topics import incoming_activities
 from profed.topics.incoming_activities_topic import is_reaction
 from profed.topics.known_servers_topic import host_of
@@ -41,7 +41,7 @@ def normalized(event_type: str, activity: dict) -> dict:
 
 async def observe(event_type: str, activity: dict, emitted_at) -> None:
     actor = activity.get("actor") or ""
-    host = "" if event_type != "EmojiReact" or is_local_actor_url(actor) else host_of(actor)
+    host = "" if event_type != "EmojiReact" or is_local_url(actor) else host_of(actor)
     if not host:
         return
 
