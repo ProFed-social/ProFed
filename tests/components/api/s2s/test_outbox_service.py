@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
 
 from profed.components.api.s2s.outbox import storage
-from profed.components.api.s2s.outbox.service import resolve_note
+from profed.components.api.s2s.outbox import followers_storage
+from profed.components.api.s2s.outbox.service import resolve_note, resolve_outbox
 
 
 NOTE_URL = "https://example.com/actors/alice/notes/abc"
@@ -120,4 +121,94 @@ async def test_resolve_note_returns_none_for_an_unknown_note(fake_storage):
     fake_storage.latest_for_object.return_value = None
 
     assert await resolve_note("alice", "abc") is None
+
+
+BOB = "https://r.example/users/bob"
+
+SERVER = "https://r.example/actor"
+
+
+@pytest.fixture
+def outbox_and_followers():
+    backup_outbox, backup_followers = storage._instance, followers_storage._instance
+    storage._instance = Mock(fetch=AsyncMock(return_value=[]))
+    followers_storage._instance = Mock(follows=AsyncMock(return_value=False))
+
+    yield storage._instance, followers_storage._instance
+
+    storage._instance, followers_storage._instance = backup_outbox, backup_followers
+
+
+def _asked(outbox):
+    return outbox.fetch.await_args.args[1:]
+
+
+@pytest.mark.asyncio
+async def test_an_unsigned_request_reaches_nothing_but_the_public(outbox_and_followers):
+    outbox, _ = outbox_and_followers
+
+    await resolve_outbox("alice")
+
+    assert _asked(outbox) == ([], [], False)
+
+
+@pytest.mark.asyncio
+async def test_an_actor_key_reaches_what_is_addressed_to_it(outbox_and_followers):
+    outbox, _ = outbox_and_followers
+
+    await resolve_outbox("alice", {"actor_url": BOB, "actor_type": "Person"})
+
+    assert _asked(outbox) == ([BOB], [], False)
+
+
+@pytest.mark.asyncio
+async def test_a_server_key_reaches_its_whole_host(outbox_and_followers):
+    outbox, _ = outbox_and_followers
+
+    await resolve_outbox("alice", {"actor_url": SERVER, "actor_type": "Application"})
+
+    assert _asked(outbox) == ([SERVER], ["r.example"], False)
+
+
+@pytest.mark.asyncio
+async def test_a_following_signer_also_reaches_the_followers_only(outbox_and_followers):
+    outbox, follower_edges = outbox_and_followers
+    follower_edges.follows.return_value = True
+
+    await resolve_outbox("alice", {"actor_url": BOB, "actor_type": "Person"})
+
+    assert _asked(outbox) == ([BOB], [], True)
+
+
+@pytest.mark.asyncio
+async def test_the_author_is_the_one_whose_followers_are_asked_about(outbox_and_followers):
+    _, follower_edges = outbox_and_followers
+
+    await resolve_outbox("alice", {"actor_url": BOB, "actor_type": "Person"})
+
+    assert follower_edges.follows.await_args.args[0] == "https://example.com/actors/alice"
+
+
+@pytest.mark.asyncio
+async def test_the_collection_counts_what_it_carries(outbox_and_followers):
+    outbox, _ = outbox_and_followers
+    outbox.fetch.return_value = [{"id": "https://example.com/a",
+                                  "type": "Create",
+                                  "actor": "https://example.com/actors/alice",
+                                  "object": {"id": "https://example.com/notes/a"}},
+                                 {"id": "https://example.com/b",
+                                  "type": "Create",
+                                  "actor": "https://example.com/actors/alice",
+                                  "object": {"id": "https://example.com/notes/b"}}]
+
+    assert (await resolve_outbox("alice")).totalItems == 2
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_actor_class_reaches_no_host(outbox_and_followers):
+    outbox, _ = outbox_and_followers
+
+    await resolve_outbox("alice", {"actor_url": SERVER, "actor_type": "Robot"})
+
+    assert _asked(outbox) == ([SERVER], [], False)
 

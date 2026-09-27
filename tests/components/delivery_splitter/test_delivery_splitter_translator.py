@@ -175,6 +175,44 @@ async def test_create_recipients_uses_recipients_at():
 
 
 @pytest.mark.asyncio
+async def test_a_followers_only_create_still_reaches_the_followers():
+    with patch.object(translator, "recipients_at", AsyncMock(return_value={"https://r.example/x"})), \
+         patch.object(translator, "actor_url_from_username", return_value="https://example.com/actors/alice"):
+        result = await translator._create_recipients(
+                "https://example.com/notes/1",
+                {"object": {"to": ["https://example.com/actors/alice/followers"]}},
+                "alice",
+                AT)
+
+    assert result == {"https://r.example/x"}
+
+
+@pytest.mark.asyncio
+async def test_a_direct_create_does_not_reach_the_followers():
+    with patch.object(translator, "recipients_at", AsyncMock(return_value={"https://r.example/x"})), \
+         patch.object(translator, "actor_url_from_username", return_value="https://example.com/actors/alice"):
+        result = await translator._create_recipients("https://example.com/notes/1",
+                                                     {"object": {"to": ["https://r.example/bob"]}},
+                                                     "alice",
+                                                     AT)
+
+    assert result == set()
+
+
+@pytest.mark.asyncio
+async def test_another_actors_followers_do_not_pull_in_ours():
+    with patch.object(translator, "recipients_at", AsyncMock(return_value={"https://r.example/x"})), \
+         patch.object(translator, "actor_url_from_username", return_value="https://example.com/actors/alice"):
+        result = await translator._create_recipients(
+                "https://example.com/notes/1",
+                {"object": {"cc": ["https://r.example/actors/bob/followers"]}},
+                "alice",
+                AT)
+
+    assert result == set()
+
+
+@pytest.mark.asyncio
 async def test_directed_queues_to_resolved_target(fake_bus, fake_storage):
     await translator._accept("Accept",
                              "https://x/act/1",

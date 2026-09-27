@@ -2,19 +2,36 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.identity import actor_url_from_username
+from profed.models.activity_pub import ActorType
 from profed.components.api.s2s.outbox.models import OrderedCollection
 from profed.components.api.s2s.outbox.reactions_service import with_collections
 from profed.components.api.s2s.outbox.storage import storage
+from profed.components.api.s2s.outbox.followers_storage import storage as followers_storage
 from typing import Optional
 
 
-async def resolve_outbox(username: str) -> OrderedCollection:
-    obx_storage = await storage()
-    activities = await obx_storage.fetch(username)
+def _host_of(actor_url: str) -> str:
+    return actor_url.split("/")[2]
 
-    return (OrderedCollection(id=f"{actor_url_from_username(username)}/outbox",
-                              totalItems=0,
-                              orderedItems=activities)
+
+def _signs_for_a_server(signer: Optional[dict]) -> bool:
+    actor_type = None if signer is None else ActorType.of(signer["actor_type"])
+    return actor_type is not None and actor_type.is_server()
+
+
+async def _reach_of(signer: Optional[dict], author_url: str) -> tuple[list, list, bool]:
+    addressed = [] if signer is None else [signer["actor_url"]]
+    hosts = [_host_of(signer["actor_url"])] if _signs_for_a_server(signer) else []
+    return (addressed,
+            hosts,
+            (False if signer is None else await (await followers_storage()).follows(author_url, addressed, hosts)))
+
+
+async def resolve_outbox(username: str, signer: Optional[dict] = None) -> OrderedCollection:
+    author_url = actor_url_from_username(username)
+    activities = await (await storage()).fetch(username, *await _reach_of(signer, author_url))
+
+    return (OrderedCollection(id=f"{author_url}/outbox", totalItems=len(activities), orderedItems=activities)
             if activities is not None else
             None)
 

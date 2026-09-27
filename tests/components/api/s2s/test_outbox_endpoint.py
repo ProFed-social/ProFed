@@ -104,3 +104,33 @@ def test_note_gone_serves_the_tombstone(client, fake_resolve_note):
     assert response.json()["type"] == "Tombstone"
     assert response.json()["deleted"] == "2026-08-24T10:00:00+00:00"
 
+
+def test_the_signer_of_the_request_decides_what_the_outbox_shows(client, fake_resolve_outbox, monkeypatch):
+    signer = {"actor_url": "https://r.example/actor", "actor_type": "Application"}
+    fake_resolve_outbox.return_value = {"@context": ["https://www.w3.org/ns/activitystreams"],
+                                        "id": "https://example.com/actors/alice/outbox",
+                                        "type": "OrderedCollection",
+                                        "totalItems": 0,
+                                        "orderedItems": []}
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.signer_of",
+                        AsyncMock(return_value=signer))
+
+    client.get("/actors/alice/outbox")
+
+    assert fake_resolve_outbox.await_args.args[1] == signer
+
+
+def test_the_signature_is_checked_against_the_path_that_was_asked_for(client, fake_resolve_outbox, monkeypatch):
+    checked = AsyncMock(return_value=None)
+    fake_resolve_outbox.return_value = {"@context": ["https://www.w3.org/ns/activitystreams"],
+                                        "id": "https://example.com/actors/alice/outbox",
+                                        "type": "OrderedCollection",
+                                        "totalItems": 0,
+                                        "orderedItems": []}
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.signer_of", checked)
+
+    client.get("/actors/alice/outbox")
+
+    assert checked.await_args.args[0] == "GET"
+    assert checked.await_args.args[1] == "/actors/alice/outbox"
+

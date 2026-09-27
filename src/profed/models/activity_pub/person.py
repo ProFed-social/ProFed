@@ -41,6 +41,7 @@ class Person(Actor):
     image: dict | None = None
     inbox: str
     outbox: str
+    followers: str | None = None
     resume: Resume | None = None
     attachment: list[dict] | None = None
     publicKey: dict | None = None
@@ -58,6 +59,7 @@ class Person(Actor):
                    attachment=_property_values(profile.fields) or None,
                    inbox=f"{actor_url}/inbox",
                    outbox=f"{actor_url}/outbox",
+                   followers=f"{actor_url}/followers",
                    publicKey=(None
                               if getattr(profile, "public_key_pem", None) is None else
                               {"id": f"{actor_url}#main-key",

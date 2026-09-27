@@ -32,3 +32,15 @@ def test_an_incomplete_field_is_dropped():
 
     assert Person.from_user(profile).attachment is None
 
+
+def test_an_actor_names_its_followers_collection():
+    assert Person.from_user(UserProfile(username="alice")).followers == \
+           "https://example.com/actors/alice/followers"
+
+
+def test_the_followers_collection_is_part_of_the_document():
+    document = Person.from_user(UserProfile(username="alice")).model_dump(by_alias=True, exclude_none=True)
+
+    assert document["followers"] == "https://example.com/actors/alice/followers"
+
+

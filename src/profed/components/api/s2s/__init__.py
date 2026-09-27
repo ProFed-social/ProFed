@@ -20,7 +20,9 @@ from .actor import router as actor_router
 from .inbox import router as inbox_router
 from .outbox import router as outbox_router
 from .nodeinfo import router as nodeinfo_router
-from .outbox import reactions_storage, reactions_projection
+from .outbox import (reactions_storage, reactions_projection,
+                     signers_storage, signers_projection,
+                     followers_storage, followers_projection)
 from .instance_actor import router as instance_actor_router
 
 
@@ -62,6 +64,16 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       reactions_projection,
                                                       reactions_projection.handle_events,
                                                       "s2s_reactions")),
+                             (["outbox"],
+                              _projection_initializer(signers_storage,
+                                                      signers_projection,
+                                                      signers_projection.handle_user_events,
+                                                      "s2s_outbox_signers")),
+                             (["outbox"],
+                              _projection_initializer(followers_storage,
+                                                      followers_projection,
+                                                      followers_projection.handle_user_events,
+                                                      "s2s_outbox_followers")),
                              (["outbox"],
                               _projection_initializer(outbox_storage,
                                                       outbox_projection,

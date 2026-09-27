@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from .activity_streams import ActivityStreamsObject
+from .fields import ActorType
 from .actor import Actor
 from .person import Person
 from .application import Application
@@ -23,6 +24,7 @@ from .activity import (Activity,
 from .object import Note
 
 __all__ = ["ActivityStreamsObject",
+           "ActorType",
            "Actor",
            "Person",
            "Application",

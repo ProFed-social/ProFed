@@ -69,7 +69,7 @@ async def test_rebuild_success(fake_storage, fake_bus):
     await projection.rebuild()
 
     fake_storage.ensure_schema.assert_awaited_once()
-    fake_storage.add.assert_awaited_once_with("alice", CREATE)
+    fake_storage.add.assert_awaited_once_with("alice", CREATE, "direct", [])
 
 
 @pytest.mark.asyncio
@@ -141,7 +141,9 @@ async def test_handle_user_events_create(fake_storage, fake_bus):
                                               {"id": CREATE_ID,
                                                "type": "Create",
                                                "actor": ALICE_URL,
-                                               "object": {"id": f"{ALICE_URL}/notes/1"}})
+                                               "object": {"id": f"{ALICE_URL}/notes/1"}},
+                                              "direct",
+                                              [])
 
 
 @pytest.mark.asyncio
@@ -172,5 +174,7 @@ async def test_handle_user_events_continues_after_malformed_event(fake_storage, 
                                               {"id": CREATE_ID,
                                                "type": "Create",
                                                "actor": ALICE_URL,
-                                               "object": {"id": f"{ALICE_URL}/notes/1"}})
+                                               "object": {"id": f"{ALICE_URL}/notes/1"}},
+                                              "direct",
+                                              [])
 

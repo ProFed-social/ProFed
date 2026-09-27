@@ -27,6 +27,8 @@ async def test_all_projections_start_when_nothing_deactivated():
                                               "s2s_inbox",
                                               "s2s_inbox_public_keys",
                                               "s2s_reactions",
+                                              "s2s_outbox_signers",
+                                              "s2s_outbox_followers",
                                               "s2s_outbox",
                                               "s2s_instance_actor"]
 
@@ -34,6 +36,16 @@ async def test_all_projections_start_when_nothing_deactivated():
 @pytest.mark.asyncio
 async def test_reactions_stop_with_the_outbox():
     assert "s2s_reactions" not in await _started_projections(["outbox"])
+
+
+@pytest.mark.asyncio
+async def test_the_signers_stop_with_the_outbox():
+    assert "s2s_outbox_signers" not in await _started_projections(["outbox"])
+
+
+@pytest.mark.asyncio
+async def test_the_followers_stop_with_the_outbox():
+    assert "s2s_outbox_followers" not in await _started_projections(["outbox"])
 
 
 @pytest.mark.asyncio

@@ -32,6 +32,10 @@ LOCAL_ACCOUNT = Account(id="1",
 
 NOTE_URL = "https://example.com/act/1"
 
+ALICE_FOLLOWERS = "https://example.com/actors/alice/followers"
+
+PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
+
 BOB_URL = "https://remote.example/actors/bob"
 
 CAROL_URL = "https://remote.example/actors/carol"
@@ -182,7 +186,7 @@ def test_create_public_reply_mentions_the_parent_author(client, fake_bus):
     assert response.status_code == 200
     obj = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
     assert obj["inReplyTo"] == "https://remote.example/notes/root"
-    assert obj["cc"] == [BOB_URL]
+    assert obj["cc"] == [ALICE_FOLLOWERS, BOB_URL]
     assert obj["to"] == ["https://www.w3.org/ns/activitystreams#Public"]
     names = {t["href"]: t["name"] for t in obj["tag"]}
     assert names[BOB_URL] == "@bob-canonical@elsewhere.example"
@@ -244,6 +248,7 @@ def test_status_context_returns_empty_context(client, fake_bus):
     data = response.json()
     assert data["ancestors"] == []
     assert data["descendants"] == []
+
 
 def test_status_context_walks_the_discussion_tree_excluding_the_status_itself(client, fake_bus):
     storage = Mock(get=AsyncMock(return_value={"url": "https://r/s"}),
@@ -393,7 +398,6 @@ def test_create_status_returns_sanitised_content(client, fake_bus):
                AsyncMock(return_value=LOCAL_ACCOUNT)):
         response = client.post("/statuses", json={"status": "<p>hi</p><script>steal()</script>"})
 
-
     assert response.json()["content"] == "<p>hi</p>"
 
 
@@ -436,7 +440,7 @@ def test_create_status_does_not_federate_mentions(client, fake_bus):
     activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert "cc" not in activity
     assert activity["object"]["tag"] == []
-    assert activity["object"]["cc"] == []
+    assert activity["object"]["cc"] == [ALICE_FOLLOWERS]
 
 
 def test_create_status_response_linkifies_known_mention(client, fake_bus):
@@ -486,6 +490,7 @@ def test_create_status_response_sets_mentions(client, fake_bus):
                                             "username": "dave",
                                             "url": "https://remote.example/actors/dave",
                                             "acct": "dave@remote.example"}]
+
 
 def test_get_status_returns_the_content_status(client):
     with _store_returning(_content_row()), _patched_accounts({BOB_URL: BOB}):
@@ -749,7 +754,7 @@ def test_an_unreblog_without_a_recorded_boost_publishes_nothing(client, fake_bus
 def test_an_unreblog_lowers_the_recorded_count(client, fake_bus):
     with _store_with_boosted(boost_of=_announce_url(), stats=BOOST_STATS), \
          patch("profed.components.api.c2s.shared.statuses.service.cached_multiple", AsyncMock(return_value={})):
-             response = client.post("/statuses/424242/unreblog")
+        response = client.post("/statuses/424242/unreblog")
 
     assert response.json()["reblogs_count"] == 3
 
@@ -825,4 +830,55 @@ def test_bookmarking_an_unknown_status_publishes_nothing(client, fake_bus):
     assert response.status_code == 404
     assert fake_bus.topic("bookmarks").published == []
 
+
+def _posted(client, fake_bus, **body):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         patch("profed.components.api.c2s.v1.statuses.router._known_accounts_storage",
+               AsyncMock(return_value=AsyncMock(get_by_acct=AsyncMock(return_value=None)))):
+        client.post("/statuses", json={"status": "hi", **body})
+
+    return fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
+
+
+def test_a_public_status_goes_to_everybody_and_names_the_followers(client, fake_bus):
+    obj = _posted(client, fake_bus, visibility="public")
+
+    assert obj["to"] == [PUBLIC]
+    assert obj["cc"] == [ALICE_FOLLOWERS]
+
+
+def test_an_unlisted_status_swaps_the_two_around(client, fake_bus):
+    obj = _posted(client, fake_bus, visibility="unlisted")
+
+    assert obj["to"] == [ALICE_FOLLOWERS]
+    assert obj["cc"] == [PUBLIC]
+
+
+def test_a_private_status_reaches_the_followers_only(client, fake_bus):
+    obj = _posted(client, fake_bus, visibility="private")
+
+    assert obj["to"] == [ALICE_FOLLOWERS]
+    assert obj["cc"] == []
+
+
+def test_a_direct_status_without_a_reply_is_not_public(client, fake_bus):
+    obj = _posted(client, fake_bus, visibility="direct")
+
+    assert PUBLIC not in obj["to"] + obj["cc"]
+    assert ALICE_FOLLOWERS not in obj["to"] + obj["cc"]
+
+
+def test_a_direct_status_goes_to_the_mentioned_actor(client, fake_bus):
+    known = AsyncMock(get_by_acct=AsyncMock(return_value={"actor_url": BOB_URL}))
+
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         patch("profed.components.api.c2s.v1.statuses.router._known_accounts_storage",
+               AsyncMock(return_value=known)):
+        client.post("/statuses", json={"status": "hi @bob@remote.example", "visibility": "direct"})
+
+    obj = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
+    assert obj["to"] == [BOB_URL]
+    assert obj["cc"] == []
 

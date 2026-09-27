@@ -72,9 +72,14 @@ def _audience(activity: dict) -> set[str]:
             for url in (part.get(key) or [])}
 
 
+def _addresses_followers(activity: dict, actor_url: str) -> bool:
+    return bool({_PUBLIC, f"{actor_url}/followers"} & _audience(activity))
+
+
 async def _followers_and_mentions(activity: dict, username: str, emitted_at) -> set[str]:
-    return ((await recipients_at(actor_url_from_username(username), emitted_at)
-             if _PUBLIC in _audience(activity) else
+    actor_url = actor_url_from_username(username)
+    return ((await recipients_at(actor_url, emitted_at)
+             if _addresses_followers(activity, actor_url) else
              set()) |
             _mentioned_actors(activity))
 
@@ -125,6 +130,7 @@ async def _publish_deliveries(object_id, activity, username, recipients) -> None
 
 def _object_fan_out(collect_recipients, persist, object_url_of=None):
     locate = object_url_of or _inner_object_url
+
     async def _fan_out(event_type, object_id, payload, emitted_at) -> None:
         activity = {"id": object_id, "type": event_type, **payload["activity"]}
         username = payload["username"]

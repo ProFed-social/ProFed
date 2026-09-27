@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 from profed.components.api.s2s.outbox.models import OrderedCollection
+from profed.components.api.s2s.outbox.signer import signer_of
 from profed.components.api.s2s.outbox.service import resolve_outbox, resolve_note
 from profed.components.api.s2s.outbox.reactions_service import COLLECTIONS, resolve_reactions
 from profed.components.api.http import ActivityPubJSONResponse
@@ -15,8 +16,8 @@ router = APIRouter()
                   methods=["GET", "HEAD"],
                   response_model=OrderedCollection,
                   response_class=ActivityPubJSONResponse)
-async def outbox(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$")):
-    outbox = await resolve_outbox(username)
+async def outbox(username: str = Path(pattern=r"^[a-zA-Z0-9_.-]+$"), request: Request = None):
+    outbox = await resolve_outbox(username, await signer_of(request.method, request.url.path, dict(request.headers)))
     if outbox is None:
         raise HTTPException(status_code=404)
     return outbox

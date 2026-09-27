@@ -74,25 +74,51 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
     if len(body.status) > int(_config.get("status_max_characters", 5000)):
         raise HTTPException(status_code=422, detail="status too long")
 
-    async def make_note(actor_url, in_reply_to):
-        recipients = (await (await conversations_storage.storage()).recipients_for(in_reply_to["url"], actor_url)
-                      if in_reply_to and body.visibility == "direct" else
-                      [])
+    async def direct_recipients(actor_url, in_reply_to, mentioned):
+        return (await (await conversations_storage.storage()).recipients_for(in_reply_to["url"], actor_url)
+                if in_reply_to else
+                mentioned)
+
+    async def addressing(actor_url, in_reply_to, mentioned):
+        async def build_adressing(followers, recipients):
+            return ({"to": recipients,
+                     "cc": [],
+                     "tag": list(await asyncio.gather(*(_mention(recipient) for recipient in recipients)))}
+                    if body.visibility == "direct" else
+                    {"to": [followers], "cc": []}
+                    if body.visibility == "private" else
+                    {"to": [followers], "cc": [_PUBLIC]}
+                    if body.visibility == "unlisted" else
+                    {"to": [_PUBLIC], "cc": [followers]})
+        return await build_adressing(followers=f"{actor_url}/followers",
+                                     recipients=(await direct_recipients(actor_url, in_reply_to, mentioned)
+                                                 if body.visibility == "direct" else
+                                                 []))
+
+    async def replied_to(in_reply_to):
+        return ({"cc": [in_reply_to["actor_url"]], "tag": [await _mention(in_reply_to["actor_url"])]}
+                if in_reply_to and body.visibility != "direct" else
+                {})
+
+    def merged(addressed, reply):
+        return {**addressed,
+                **{key: addressed.get(key, []) + [entry
+                                                  for entry in value
+                                                  if entry not in addressed.get(key, [])]
+                   for key, value in reply.items()}}
+
+    async def make_note(actor_url, in_reply_to, mentioned, content):
         return Note(id=f"{actor_url}/notes/{uuid.uuid4()}",
                     attributedTo=actor_url,
-                    content=sanitize_html(body.status),
+                    content=content,
                     summary=sanitize_html(body.spoiler_text) or None,
                     inReplyTo=in_reply_to["url"] if in_reply_to else None,
                     published=datetime.now(timezone.utc).isoformat(),
-                    **({"to": recipients,
-                        "tag": list(await asyncio.gather(*(_mention(recipient) for recipient in recipients)))}
-                       if in_reply_to and body.visibility == "direct" else
-                       {"cc": [in_reply_to["actor_url"]], "tag": [await _mention(in_reply_to["actor_url"])]}
-                       if in_reply_to else
-                       {}))
+                    **merged(await addressing(actor_url, in_reply_to, mentioned),
+                             await replied_to(in_reply_to)))
 
-    async def make_note_and_create_activity(actor_url, in_reply_to):
-        note = await make_note(actor_url, in_reply_to)
+    async def make_note_and_create_activity(actor_url, in_reply_to, mentioned, content):
+        note = await make_note(actor_url, in_reply_to, mentioned, content)
         return (note,
                 CreateActivity(id=f"{actor_url}#create/{uuid.uuid4()}",
                                actor=actor_url,
@@ -100,11 +126,15 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
                                object=note.model_dump(by_alias=True,
                                                       exclude_none=True)))
 
+    content = sanitize_html(body.status)
+    resolved = await mentions.resolve_all(content, _preliminary_resolver)
     note, activity = \
         await make_note_and_create_activity(actor_url=actor_url_from_username(username),
                                             in_reply_to=(await (await as_objects.storage()).get(body.in_reply_to_id)
                                                          if body.in_reply_to_id else
-                                                         None))
+                                                         None),
+                                            mentioned=[url for _, _, _, url in resolved if url is not None],
+                                            content=content)
 
     async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Create",
@@ -115,7 +145,6 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
                                                                             exclude_none=True).items()
                                             if k not in ("id", "type")}})
 
-    resolved = await mentions.resolve_all(note.content, _preliminary_resolver)
     return Status(id=note.id,
                   created_at=note.published,
                   visibility=body.visibility,

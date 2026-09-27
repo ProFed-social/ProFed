@@ -1,0 +1,46 @@
+# Copyright (C) 2026 Christof Donat
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+from datetime import datetime, timezone
+from profed.core.persistence.projections import build_projection
+from profed.topics import remote_actors
+from .signers_storage import storage
+
+
+async def _init() -> None:
+    await (await storage()).ensure_schema()
+
+
+async def _store_signer(actor_url: str, actor_data: dict, fetched_at: str | datetime) -> None:
+    public_key_pem = actor_data.get("publicKey", {}).get("publicKeyPem")
+    if public_key_pem is not None:
+        await (await storage()).upsert(actor_url,
+                                       actor_data.get("type") or "",
+                                       public_key_pem,
+                                       (datetime.fromisoformat(fetched_at)
+                                        if isinstance(fetched_at, str) else
+                                        fetched_at))
+
+
+async def _discovered(object_id: str, payload: dict) -> None:
+    await _store_signer(payload["actor_url"],
+                        payload.get("actor_data") or {},
+                        payload.get("last_webfinger_at", datetime.now(timezone.utc).isoformat()))
+
+
+async def _discovered_snapshot(item: dict) -> None:
+    await _store_signer(item["actor_url"],
+                        item.get("actor_data") or {},
+                        item.get("last_webfinger_at", datetime.now(timezone.utc).isoformat()))
+
+
+async def _rebuild_finished() -> None:
+    (await storage()).rebuild_finished()
+
+
+handle_user_events, rebuild, reset_last_seen = build_projection(topic=remote_actors,
+                                                                init=_init,
+                                                                rebuild_finished=_rebuild_finished,
+                                                                on_snapshot_item=_discovered_snapshot,
+                                                                on_message_type={"discovered": _discovered})
+

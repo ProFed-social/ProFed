@@ -19,8 +19,10 @@ def fake_pool(fake_conn):
     class AsyncContextManagerMock:
         def __init__(self, conn):
             self.conn = conn
+
         async def __aenter__(self):
             return self.conn
+
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
 
@@ -53,12 +55,14 @@ async def test_add_success(fake_pool, fake_conn):
         "object": {"type": "Person", "id": "https://example.com/actors/alice"},
     }
 
-    await store.add("alice", activity)
+    await store.add("alice", activity, "public", ["https://r.example/users/bob"])
 
     args = fake_conn.execute.call_args[0]
     assert "s2s_outbox" in args[0]
     assert args[1] == "alice"
     assert args[2] == activity
+    assert args[3] == "public"
+    assert args[4] == ["https://r.example/users/bob"]
 
 
 @pytest.mark.asyncio
@@ -81,7 +85,7 @@ async def test_fetch_found(fake_pool, fake_conn):
         {"activity": activity_2},
     ]
 
-    result = await store.fetch("alice")
+    result = await store.fetch("alice", [], [], False)
 
     args = fake_conn.fetch.call_args[0]
     assert "s2s_outbox" in args[0]
@@ -95,7 +99,7 @@ async def test_fetch_not_found(fake_pool, fake_conn):
 
     fake_conn.fetch.return_value = []
 
-    result = await store.fetch("alice")
+    result = await store.fetch("alice", [], [], False)
 
     assert result == []
 
@@ -129,6 +133,7 @@ async def test_latest_for_object_returns_the_latest_content_activity(fake_pool, 
     assert args[2] == "https://example.com/actors/alice/notes/abc"
     assert result["type"] == "Create"
     assert result["object"] == note
+
 
 @pytest.mark.asyncio
 async def test_latest_for_object_returns_none_when_missing(fake_pool, fake_conn):
