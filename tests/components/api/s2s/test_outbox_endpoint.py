@@ -7,7 +7,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from profed.core.config import raw, config
+from profed.components.api.s2s.outbox.models import OrderedCollection
 from profed.components.api.s2s.outbox.router import router as outbox_router
+from profed.components.api.s2s.outbox.service import NotVisible
 
 
 @pytest.fixture
@@ -42,11 +44,9 @@ def fake_resolve_outbox(monkeypatch):
 
 
 def test_outbox_success(client, fake_resolve_outbox):
-    fake_resolve_outbox.return_value = {"@context": ["https://www.w3.org/ns/activitystreams"],
-                                        "id": "https://example.com/actors/alice/outbox",
-                                        "type": "OrderedCollection",
-                                        "totalItems": 0,
-                                        "orderedItems": []}
+    fake_resolve_outbox.return_value = OrderedCollection(id="https://example.com/actors/alice/outbox",
+                                                         totalItems=0,
+                                                         orderedItems=[])
 
     response = client.get("/actors/alice/outbox")
 
@@ -107,11 +107,9 @@ def test_note_gone_serves_the_tombstone(client, fake_resolve_note):
 
 def test_the_signer_of_the_request_decides_what_the_outbox_shows(client, fake_resolve_outbox, monkeypatch):
     signer = {"actor_url": "https://r.example/actor", "actor_type": "Application"}
-    fake_resolve_outbox.return_value = {"@context": ["https://www.w3.org/ns/activitystreams"],
-                                        "id": "https://example.com/actors/alice/outbox",
-                                        "type": "OrderedCollection",
-                                        "totalItems": 0,
-                                        "orderedItems": []}
+    fake_resolve_outbox.return_value = OrderedCollection(id="https://example.com/actors/alice/outbox",
+                                                         totalItems=0,
+                                                         orderedItems=[])
     monkeypatch.setattr("profed.components.api.s2s.outbox.router.signer_of",
                         AsyncMock(return_value=signer))
 
@@ -122,15 +120,105 @@ def test_the_signer_of_the_request_decides_what_the_outbox_shows(client, fake_re
 
 def test_the_signature_is_checked_against_the_path_that_was_asked_for(client, fake_resolve_outbox, monkeypatch):
     checked = AsyncMock(return_value=None)
-    fake_resolve_outbox.return_value = {"@context": ["https://www.w3.org/ns/activitystreams"],
-                                        "id": "https://example.com/actors/alice/outbox",
-                                        "type": "OrderedCollection",
-                                        "totalItems": 0,
-                                        "orderedItems": []}
+    fake_resolve_outbox.return_value = OrderedCollection(id="https://example.com/actors/alice/outbox",
+                                                         totalItems=0,
+                                                         orderedItems=[])
     monkeypatch.setattr("profed.components.api.s2s.outbox.router.signer_of", checked)
 
     client.get("/actors/alice/outbox")
 
     assert checked.await_args.args[0] == "GET"
     assert checked.await_args.args[1] == "/actors/alice/outbox"
+
+
+def test_a_note_the_signer_may_not_see_is_refused(client, monkeypatch):
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.signer_of", AsyncMock(return_value=None))
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.resolve_note",
+                        AsyncMock(side_effect=NotVisible("https://example.com/actors/alice/notes/abc")))
+
+    assert client.get("/actors/alice/notes/abc").status_code == 401
+
+
+def test_reactions_of_a_note_the_signer_may_not_see_are_refused(client, monkeypatch):
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.signer_of", AsyncMock(return_value=None))
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.resolve_note",
+                        AsyncMock(side_effect=NotVisible("https://example.com/actors/alice/notes/abc")))
+
+    assert client.get("/actors/alice/notes/abc/likes").status_code == 401
+
+
+def test_a_note_that_does_not_exist_is_still_missing(client, monkeypatch):
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.signer_of", AsyncMock(return_value=None))
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.resolve_note", AsyncMock(return_value=None))
+
+    assert client.get("/actors/alice/notes/abc").status_code == 404
+
+
+def _public_note():
+    return {"id": "https://example.com/actors/alice/notes/abc",
+            "type": "Note",
+            "content": "hi",
+            "to": ["https://www.w3.org/ns/activitystreams#Public"]}
+
+
+def _directed_note():
+    return {"id": "https://example.com/actors/alice/notes/abc",
+            "type": "Note",
+            "content": "hi",
+            "to": ["https://r.example/users/bob"]}
+
+
+def _serving(monkeypatch, note):
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.signer_of", AsyncMock(return_value=None))
+    monkeypatch.setattr("profed.components.api.s2s.outbox.router.resolve_note", AsyncMock(return_value=note))
+
+
+def test_a_note_carries_an_etag(client, monkeypatch):
+    _serving(monkeypatch, _public_note())
+
+    assert client.get("/actors/alice/notes/abc").headers["etag"].startswith('"')
+
+
+def test_a_known_etag_is_answered_with_not_modified(client, monkeypatch):
+    _serving(monkeypatch, _public_note())
+    etag = client.get("/actors/alice/notes/abc").headers["etag"]
+
+    repeated = client.get("/actors/alice/notes/abc", headers={"If-None-Match": etag})
+
+    assert repeated.status_code == 304
+    assert repeated.content == b""
+
+
+def test_another_etag_is_answered_in_full(client, monkeypatch):
+    _serving(monkeypatch, _public_note())
+
+    answer = client.get("/actors/alice/notes/abc", headers={"If-None-Match": '"something-else"'})
+
+    assert answer.status_code == 200
+
+
+def test_a_public_note_may_be_cached_by_anyone(client, monkeypatch):
+    _serving(monkeypatch, _public_note())
+
+    assert "public" in client.get("/actors/alice/notes/abc").headers["cache-control"]
+
+
+def test_a_directed_note_may_only_be_cached_by_its_reader(client, monkeypatch):
+    _serving(monkeypatch, _directed_note())
+
+    assert "private" in client.get("/actors/alice/notes/abc").headers["cache-control"]
+
+
+def test_an_answer_varies_with_the_signature(client, monkeypatch):
+    _serving(monkeypatch, _public_note())
+
+    assert client.get("/actors/alice/notes/abc").headers["vary"] == "Signature"
+
+
+def test_a_note_with_other_content_has_another_etag(client, monkeypatch):
+    _serving(monkeypatch, _public_note())
+    first = client.get("/actors/alice/notes/abc").headers["etag"]
+    _serving(monkeypatch, {**_public_note(), "content": "different"})
+
+    assert client.get("/actors/alice/notes/abc").headers["etag"] != first
 

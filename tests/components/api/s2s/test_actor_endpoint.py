@@ -11,6 +11,7 @@ from profed.components.api.s2s.actor import storage
 
 from profed.components.api.s2s.actor.router import router as actor_router
 
+
 @pytest.fixture
 def fake_storage():
     backup = storage._instance
@@ -75,4 +76,18 @@ def test_actor_internal_error(client, fake_storage):
     fake_storage.fetch.side_effect = RuntimeError()
     response = client.get("/actors/alice")
     assert response.status_code == 500
+
+
+def test_an_actor_document_is_cachable_for_everyone(client, fake_storage):
+    fake_storage.fetch.return_value = {"@context": "https://www.w3.org/ns/activitystreams",
+                                       "id": "https://example.com/actors/alice",
+                                       "type": "Person",
+                                       "preferredUsername": "alice",
+                                       "inbox": "https://example.com/actors/alice/inbox",
+                                       "outbox": "https://example.com/actors/alice/outbox"}
+
+    response = client.get("/actors/alice")
+
+    assert "public" in response.headers["cache-control"]
+    assert "vary" not in response.headers
 

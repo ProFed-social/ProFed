@@ -32,7 +32,9 @@ class _storage(BaseStorage):
     async def latest_for_object(self, username: str, url: str) -> Optional[dict]:
         return await self.fetch_one("""SELECT activity->>'type' AS type,
                                               activity->'object' AS object,
-                                              created_at
+                                              created_at,
+                                              visibility,
+                                              recipients
                                        FROM api.s2s_outbox
                                        WHERE username = $1
                                          AND COALESCE(activity->'object'->>'id', activity->>'object') = $2

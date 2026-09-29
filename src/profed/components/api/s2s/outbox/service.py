@@ -10,6 +10,12 @@ from profed.components.api.s2s.outbox.followers_storage import storage as follow
 from typing import Optional
 
 
+class NotVisible(Exception):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_note("object exists, but signer has no access")
+
+
 def _host_of(actor_url: str) -> str:
     return actor_url.split("/")[2]
 
@@ -43,9 +49,26 @@ def _tombstone(url: str, deleted_at) -> dict:
             "deleted": deleted_at.isoformat()}
 
 
-async def resolve_note(username: str, note_id: str) -> Optional[dict]:
-    url = f"{actor_url_from_username(username)}/notes/{note_id}"
-    row = await (await storage()).latest_for_object(username, url)
+def _may_see(row: dict, addressed: list, hosts: list, follows: bool) -> bool:
+    return (row["visibility"] == "public"
+            or (row["visibility"] == "followers" and follows)
+            or any(recipient in addressed or _host_of(recipient) in hosts
+                   for recipient in row["recipients"]))
+
+
+async def resolve_note(username: str, note_id: str, signer: Optional[dict] = None) -> Optional[dict]:
+    async def with_row(row, url, author_url, signer):
+        if row is not None and not _may_see(row, *await _reach_of(signer, author_url)):
+            raise NotVisible(url)
+        return row, url
+
+    async def with_url(url, author_url, signer):
+        return await with_row(await (await storage()).latest_for_object(username, url), url, author_url, signer)
+
+    async def raise_on_access_denied(author_url, signer):
+        return await with_url(f"{author_url}/notes/{note_id}", author_url, signer)
+
+    row, url = await raise_on_access_denied(actor_url_from_username(username), signer)
 
     return (None
             if row is None else
