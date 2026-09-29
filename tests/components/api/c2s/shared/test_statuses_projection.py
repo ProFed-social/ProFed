@@ -23,12 +23,14 @@ STATUS = {"id": "424242",
 class RecordingStorage:
     def __init__(self):
         self.calls: list[tuple] = []
+        self.audience: list[dict] = []
 
     async def ensure_schema(self) -> None:
         self.calls.append(("ensure_schema", ()))
 
-    async def upsert(self, *a):
+    async def upsert(self, *a, **kw):
         self.calls.append(("upsert", a))
+        self.audience.append(kw)
 
     async def update_content(self, *a):
         self.calls.append(("update_content", a))
@@ -224,4 +226,27 @@ async def test_a_like_is_not_added_to_a_user_timeline(fake_bus, fake_objects, fa
     await projection.rebuild()
 
     assert all(call[0] != "add" for call in fake_memberships.calls)
+
+
+@pytest.mark.asyncio
+async def test_the_visibility_reaches_the_object_storage(fake_objects, fake_memberships):
+    await projection._on_store("https://remote/activities/1",
+                               {**_payload(), "visibility": "followers", "recipients": []})
+
+    assert fake_objects.audience[0]["visibility"] == "followers"
+
+
+@pytest.mark.asyncio
+async def test_the_recipients_reach_the_object_storage(fake_objects, fake_memberships):
+    await projection._on_store("https://remote/activities/1",
+                               {**_payload(), "visibility": "direct", "recipients": [ACTOR_URL]})
+
+    assert fake_objects.audience[0]["recipients"] == [ACTOR_URL]
+
+
+@pytest.mark.asyncio
+async def test_a_payload_without_an_audience_is_taken_as_public(fake_objects, fake_memberships):
+    await projection._on_store("https://remote/activities/1", _payload())
+
+    assert fake_objects.audience[0] == {"visibility": "public", "recipients": []}
 

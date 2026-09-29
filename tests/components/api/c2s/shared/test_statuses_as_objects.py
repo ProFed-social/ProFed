@@ -23,10 +23,13 @@ def fake_pool(fake_conn):
     class AsyncContextManagerMock:
         def __init__(self, conn):
             self.conn = conn
+
         async def __aenter__(self):
             return self.conn
+
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
+
     pool = Mock()
     pool.acquire = Mock(return_value=AsyncContextManagerMock(fake_conn))
     backup = as_objects._instance
@@ -43,8 +46,11 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
 
     statements = [call.args[0] for call in fake_conn.execute.await_args_list]
 
-    assert fake_conn.execute.await_count == 25
+    assert fake_conn.execute.await_count == 27
     assert any("CREATE TABLE" in s for s in statements)
+    assert any("CREATE TYPE api.visibility AS ENUM ('public', 'followers', 'direct')" in s for s in statements)
+    assert any("api.as_objects" in s and "visibility    api.visibility NOT NULL" in s for s in statements)
+    assert any("CREATE TABLE IF NOT EXISTS api.private_object_access" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.resolve_content(start_url TEXT)" in s for s in statements)
     assert any("CREATE OR REPLACE VIEW api.reblog_compression" in s and "LEAST(b.mastodon_id, c.mastodon_id)" in s
                for s in statements)
@@ -159,7 +165,7 @@ async def test_upsert_hands_the_object_to_the_database(fake_pool, fake_conn):
 
     sql, *args = fake_conn.execute.await_args.args
     assert "SELECT api.store_object(" in sql
-    assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None, None]
+    assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None, None, "public", []]
 
 
 @pytest.mark.asyncio
@@ -194,7 +200,7 @@ async def test_upsert_keeps_the_target_url(fake_pool, fake_conn):
                                               "announce",
                                               "https://r/1")
 
-    assert fake_conn.execute.await_args.args[5:] == ("announce", "https://r/1", None)
+    assert fake_conn.execute.await_args.args[5:8] == ("announce", "https://r/1", None)
 
 
 @pytest.mark.asyncio
@@ -459,7 +465,7 @@ async def test_upsert_passes_the_emoji_of_a_reaction(fake_pool, fake_conn):
                                               "\U0001F389")
 
     args = fake_conn.execute.await_args.args[1:]
-    assert args[4:] == ("like", "https://r/1", "\U0001F389")
+    assert args[4:7] == ("like", "https://r/1", "\U0001F389")
 
 
 @pytest.mark.asyncio
@@ -669,7 +675,7 @@ async def test_last_toned_reaction_of_without_any_reaction(fake_pool, fake_conn)
     assert await (await as_objects.storage()).last_toned_reaction_of("https://x/actors/me") is None
 
 
-pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_who_reacted_is_listed_newest_first_and_once_each(fake_pool, fake_conn):
     await (await as_objects.storage()).reacted_by("https://r/note", 80, None, None)
 
@@ -707,4 +713,28 @@ async def test_who_boosted_can_start_after_a_cursor(fake_pool, fake_conn):
     sql = fake_conn.fetch.await_args.args[0]
     assert "o.mastodon_id < $3::numeric" in sql
     assert "o.mastodon_id > $4::numeric" in sql
+
+@pytest.mark.asyncio
+async def test_upsert_hands_over_the_visibility_and_the_recipients(fake_pool, fake_conn):
+    await (await as_objects.storage()).upsert("45",
+                                              "https://r/2",
+                                              "https://r/bob",
+                                              {"id": "45"},
+                                              "content",
+                                              None,
+                                              visibility="direct",
+                                              recipients=["https://r/carol"])
+
+    assert fake_conn.execute.await_args.args[8:] == ("direct", ["https://r/carol"])
+
+
+@pytest.mark.asyncio
+async def test_store_object_records_who_may_read_a_directed_object(fake_pool, fake_conn):
+    await (await as_objects.storage()).ensure_schema()
+
+    body = next(s for s in [call.args[0] for call in fake_conn.execute.await_args_list]
+                if "CREATE OR REPLACE FUNCTION api.store_object" in s)
+
+    assert "api.private_object_access (object_url, actor_url)" in body
+    assert "p_visibility = 'direct'" in body
 

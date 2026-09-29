@@ -9,9 +9,6 @@ from profed.components.api.http import MastodonJSONResponse
 from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import get_active
 
-from profed.components.api.c2s.shared.actors import storage as actors_storage
-from profed.components.api.c2s.shared.actors import projection as actors_projection
-
 from .media import router as media
 from .apps import router as apps
 from .instance import router as instance
@@ -25,8 +22,6 @@ from .conversations import router as conversations
 from .pleroma import router as pleroma
 from .pleroma import storage as reaction_formats_storage
 from .pleroma import projection as reaction_formats_projection
-from .accounts.follows import storage as follows_storage
-from .accounts.follows import projection as follows_projection
 from .accounts.preferences import storage as preferences_storage
 from .accounts.preferences import projection as preferences_projection
 from .accounts.statuses import storage as user_statuses_storage
@@ -49,16 +44,6 @@ async def init(config: dict, deactivate: List[str]) -> None:
         await init_media_storage()
 
     for routers, init_fn in [(["accounts"],
-                              _projection_initializer(actors_storage,
-                                                      actors_projection,
-                                                      actors_projection.handle_account_events,
-                                                      "c2s_actor")),
-                             (["accounts"],
-                              _projection_initializer(follows_storage,
-                                                      follows_projection,
-                                                      follows_projection.handle_events,
-                                                      "c2s_v1_follows")),
-                             (["accounts"],
                               _projection_initializer(preferences_storage,
                                                       preferences_projection,
                                                       preferences_projection.handle_events,

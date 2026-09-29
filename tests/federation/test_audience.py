@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.components.api.s2s.outbox.audience import PUBLIC, recipients_of, visibility_of
+from profed.federation.audience import PUBLIC, recipients_of, visibility_of
 
 
 ALICE = "https://example.com/actors/alice"

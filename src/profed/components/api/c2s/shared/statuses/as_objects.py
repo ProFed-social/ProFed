@@ -10,17 +10,23 @@ class _storage(BaseStorage):
         super().__init__(pool)
 
     async def ensure_schema(self) -> None:
+        await self.execute("""CREATE TYPE api.visibility AS ENUM ('public', 'followers', 'direct')""")
         await self.execute("""CREATE TABLE IF NOT EXISTS
                               api.as_objects
-                                    (mastodon_id   NUMERIC     NOT NULL,
-                                     url           TEXT        NOT NULL,
-                                     actor_url     TEXT        NOT NULL,
-                                     status        JSONB       NOT NULL,
+                                    (mastodon_id   NUMERIC        NOT NULL,
+                                     url           TEXT           NOT NULL,
+                                     actor_url     TEXT           NOT NULL,
+                                     status        JSONB          NOT NULL,
                                      target_url    TEXT,
-                                     kind          TEXT        NOT NULL,
+                                     kind          TEXT           NOT NULL,
                                      emoji         TEXT,
                                      edited_at     TIMESTAMPTZ,
+                                     visibility    api.visibility NOT NULL,
                                      PRIMARY KEY (url))""")
+        await self.execute("""CREATE TABLE IF NOT EXISTS api.private_object_access
+                                  (object_url TEXT NOT NULL,
+                                   actor_url TEXT NOT NULL,
+                                   PRIMARY KEY (object_url, actor_url))""")
         await self.execute("""
             CREATE OR REPLACE FUNCTION api.resolve_content(start_url TEXT)
             RETURNS jsonb LANGUAGE sql STABLE AS $$
@@ -286,15 +292,26 @@ class _storage(BaseStorage):
                                                         p_status JSONB,
                                                         p_kind TEXT,
                                                         p_target_url TEXT,
-                                                        p_emoji TEXT)
+                                                        p_emoji TEXT,
+                                                        p_visibility api.visibility,
+                                                        p_recipients TEXT[])
             RETURNS void LANGUAGE plpgsql AS $fn$
             BEGIN
                 INSERT INTO
                     api.as_objects
-                        (mastodon_id, url, actor_url, status, kind, target_url, emoji)
+                        (mastodon_id, url, actor_url, status, kind, target_url, emoji, visibility)
                 VALUES
-                    (p_mastodon_id, p_url, p_actor_url, p_status, p_kind, p_target_url, p_emoji)
+                    (p_mastodon_id, p_url, p_actor_url, p_status, p_kind, p_target_url, p_emoji, p_visibility)
                 ON CONFLICT (url) DO NOTHING;
+
+                INSERT INTO
+                    api.private_object_access (object_url, actor_url)
+                SELECT
+                    p_url,
+                    unnest(p_recipients)
+                WHERE
+                    p_visibility = 'direct'
+                ON CONFLICT DO NOTHING;
 
                 PERFORM api.refresh_edges(ARRAY(SELECT
                                                     p_url
@@ -424,15 +441,19 @@ class _storage(BaseStorage):
                      status: dict,
                      kind: str,
                      target_url: Optional[str],
-                     emoji: Optional[str] = None) -> None:
-        await self.execute("""SELECT api.store_object($1::numeric, $2, $3, $4, $5, $6, $7)""",
+                     emoji: Optional[str] = None,
+                     visibility: str = "public",
+                     recipients: Optional[List[str]] = None) -> None:
+        await self.execute("""SELECT api.store_object($1::numeric, $2, $3, $4, $5, $6, $7, $8::api.visibility, $9)""",
                            mastodon_id,
                            url,
                            actor_url,
                            status,
                            kind,
                            target_url,
-                           emoji)
+                           emoji,
+                           visibility,
+                           recipients or [])
 
     async def update_content(self, url: str, status: dict, edited_at: Optional[str]) -> None:
         await self.execute("""UPDATE api.as_objects

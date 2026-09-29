@@ -20,8 +20,20 @@ def _edge(reference: dict | None) -> tuple[str, str | None, str | None]:
             ("content", None, None))
 
 
-async def _store(username: str, url: str, actor_url: str, status: dict, reference: dict | None) -> None:
-    await (await as_objects.storage()).upsert(status["id"], url, actor_url, status, *_edge(reference))
+async def _store(username: str,
+                 url: str,
+                 actor_url: str,
+                 status: dict,
+                 reference: dict | None,
+                 visibility: str,
+                 recipients: list[str]) -> None:
+    await (await as_objects.storage()).upsert(status["id"],
+                                              url,
+                                              actor_url,
+                                              status,
+                                              *_edge(reference),
+                                              visibility=visibility,
+                                              recipients=recipients)
     await (await user_timeline.storage()).add(username, url)
 
 
@@ -30,7 +42,9 @@ async def _apply_item(data: dict) -> None:
                  data["status_id"],
                  data.get("actor_url", ""),
                  data["status"],
-                 data.get("reference"))
+                 data.get("reference"),
+                 data.get("visibility", "public"),
+                 data.get("recipients", []))
 
 
 
@@ -39,7 +53,9 @@ async def _on_store(object_id: str, payload: dict) -> None:
                  payload["status_id"],
                  payload.get("actor_url", ""),
                  payload["status"],
-                 payload.get("reference"))
+                 payload.get("reference"),
+                 payload.get("visibility", "public"),
+                 payload.get("recipients", []))
 
 
 async def _on_update(object_id: str, payload: dict) -> None:

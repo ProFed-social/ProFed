@@ -19,7 +19,7 @@ from profed.components.api.c2s.shared.statuses import as_objects, service
 from profed.core.message_bus import message_bus
 from profed.models.mastodon import Relationship, Account
 from profed.models.activity_pub import AcceptActivity, RejectActivity
-from profed.components.api.c2s.v1.accounts.follows.storage import storage as follows_storage
+from profed.components.api.c2s.shared.follows.storage import storage as follows_storage
 from profed.components.api.c2s.v1.accounts.statuses.storage import storage as user_statuses_storage
 from profed.components.api.c2s.v1.accounts.preferences.storage import storage as preferences_storage
 from profed.languages import is_supported

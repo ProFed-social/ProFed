@@ -3,7 +3,7 @@
 
 import pytest
 from unittest.mock import AsyncMock
-from profed.components.api.c2s.v1.accounts.follows.storage import _Storage
+from profed.components.api.c2s.shared.follows.storage import _Storage
 
 
 def _store(rows):

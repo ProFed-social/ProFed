@@ -3,6 +3,7 @@
 
 from datetime import datetime
 from typing import Optional, Dict
+from profed.federation.audience import recipients_of, visibility_of
 from profed.identity import status_id
 from profed.models.activity_pub.activity_streams import ActivityStreamsObject
 from profed.models.mastodon import Status
@@ -86,6 +87,8 @@ def status_event(event_type: str,
             "status_id": object_key,
             "actor_url": activity.get("actor", ""),
             "reference": reference_of(event_type, activity),
+            "visibility": visibility_of(activity),
+            "recipients": recipients_of(activity),
             "status": Status.from_activity(activity,
                                            id=status_id(emitted_at,
                                                         sequence_id, own=own)).model_dump(exclude={"account"})}

@@ -63,3 +63,24 @@ async def test_the_reaction_history_alone_still_gets_its_projections(monkeypatch
     assert "c2s_known_accounts" in awaited
     assert "c2s_statuses" in awaited
 
+
+async def test_the_accounts_router_brings_the_follows_projection(monkeypatch):
+    awaited = _record_initializers(monkeypatch)
+    await c2s.init({}, ["v1_search", "v2_search", "v1_media", "v2_media", "oauth"])
+
+    assert "c2s_follows" in awaited
+
+
+async def test_without_the_accounts_router_there_is_no_follows_projection(monkeypatch):
+    awaited = _record_initializers(monkeypatch)
+    await c2s.init({}, ["v1_accounts", "v1_media", "v2_media", "oauth"])
+
+    assert "c2s_follows" not in awaited
+
+
+async def test_the_accounts_router_brings_the_actors_projection(monkeypatch):
+    awaited = _record_initializers(monkeypatch)
+    await c2s.init({}, ["v1_search", "v2_search", "v1_media", "v2_media", "oauth"])
+
+    assert "c2s_actor" in awaited
+

@@ -4,7 +4,7 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Path, Query, Request, Response
 from profed.components.api.s2s.outbox.models import OrderedCollection
-from profed.components.api.s2s.outbox.audience import visibility_of
+from profed.federation.audience import visibility_of
 from profed.components.api.s2s.outbox.signer import signer_of
 from profed.components.api.s2s.outbox.service import NotVisible, resolve_outbox, resolve_note
 from profed.components.api.s2s.outbox.reactions_service import COLLECTIONS, resolve_reactions

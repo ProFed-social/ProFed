@@ -7,6 +7,10 @@ from typing import List
 from collections.abc import Iterable
 from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import narrow_deactivate_routers
+from profed.components.api.c2s.shared.actors import storage as actors_storage
+from profed.components.api.c2s.shared.actors import projection as actors_projection
+from profed.components.api.c2s.shared.follows import storage as follows_storage
+from profed.components.api.c2s.shared.follows import projection as follows_projection
 from profed.components.api.c2s.shared.known_accounts import storage as known_accounts_storage
 from profed.components.api.c2s.shared.known_accounts import projection as known_accounts_projection
 from profed.components.api.c2s.shared.known_servers import storage as known_servers_storage
@@ -49,6 +53,7 @@ def _background_task_initializer(task, config_key):
 
 def _media_projection_initializer(storage, projection, handle_events):
     _projection_init = _projection_initializer(storage, projection, handle_events, "c2s_media")
+
     async def _init(config: dict):
         await init_media_storage()
         await _projection_init(config)
@@ -69,6 +74,16 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                                       known_accounts_projection,
                                                       known_accounts_projection.handle_events,
                                                       "c2s_known_accounts")),
+                             (["v1_accounts"],
+                              _projection_initializer(actors_storage,
+                                                      actors_projection,
+                                                      actors_projection.handle_account_events,
+                                                      "c2s_actor")),
+                             (["v1_accounts"],
+                              _projection_initializer(follows_storage,
+                                                      follows_projection,
+                                                      follows_projection.handle_events,
+                                                      "c2s_follows")),
                              (["v1_pleroma"],
                               _projection_initializer(known_servers_storage,
                                                       known_servers_projection,

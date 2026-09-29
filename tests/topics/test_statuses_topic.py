@@ -22,6 +22,8 @@ EMITTED_AT = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 NOTE_ID = "https://remote/notes/1"
 
+PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
+
 PAYLOAD = {"username": "alice",
            "activity": {"actor": "https://remote/bob",
                         "object": {"id": NOTE_ID, "type": "Note", "content": "hi"}}}
@@ -327,3 +329,45 @@ def test_undo_event_removes_the_reaction_by_its_activity_id():
     assert undo_event("Undo", "https://remote/bob#undo/9", UNDO_LIKE) == \
         {"username": "alice", "status_id": "https://remote/bob#like/3"}
 
+
+def _addressed(**addressing):
+    return {"username": "alice",
+            "activity": {"actor": "https://remote/bob",
+                         "object": {"id": NOTE_ID, "type": "Note", "content": "hi", **addressing}}}
+
+
+def test_status_event_carries_the_visibility_of_a_public_note():
+    event = status_event("Create", "https://remote/activities/1",
+                         _addressed(to=[PUBLIC], cc=["https://remote/bob/followers"]),
+                         EMITTED_AT, 7, own=False)
+
+    assert event["visibility"] == "public"
+    assert event["recipients"] == []
+
+
+def test_status_event_carries_the_visibility_of_a_followers_only_note():
+    event = status_event("Create", "https://remote/activities/1",
+                         _addressed(to=["https://remote/bob/followers"]),
+                         EMITTED_AT, 7, own=False)
+
+    assert event["visibility"] == "followers"
+
+
+def test_status_event_names_the_recipients_of_a_directed_note():
+    event = status_event("Create", "https://remote/activities/1",
+                         _addressed(to=["https://remote/carol"], cc=["https://other/dave"]),
+                         EMITTED_AT, 7, own=False)
+
+    assert event["visibility"] == "direct"
+    assert event["recipients"] == ["https://other/dave", "https://remote/carol"]
+
+
+def test_status_event_takes_the_recipients_from_the_addressing_not_from_the_mentions():
+    event = status_event("Create", "https://remote/activities/1",
+                         _addressed(to=["https://remote/carol"],
+                                    tag=[{"type": "Mention",
+                                          "href": "https://remote/eve",
+                                          "name": "@eve@remote"}]),
+                         EMITTED_AT, 7, own=False)
+
+    assert event["recipients"] == ["https://remote/carol"]

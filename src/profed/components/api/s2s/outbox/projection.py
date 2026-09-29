@@ -4,7 +4,7 @@
 from profed.core.persistence.projections import build_projection, with_event_type
 from profed.topics import activities
 from profed.components.api.s2s.outbox.storage import storage
-from profed.components.api.s2s.outbox.audience import recipients_of, visibility_of
+from profed.federation.audience import recipients_of, visibility_of
 
 
 _ALL_AP_VERBS = ("Create", "Update", "Delete", "Follow", "Accept",

@@ -3,8 +3,8 @@
 
 import pytest
 from datetime import datetime, timezone
-from profed.components.api.c2s.v1.accounts.follows import projection
-from profed.components.api.c2s.v1.accounts.follows import storage as storage_module
+from profed.components.api.c2s.shared.follows import projection
+from profed.components.api.c2s.shared.follows import storage as storage_module
 
 
 TS = datetime(2026, 1, 1, tzinfo=timezone.utc)
