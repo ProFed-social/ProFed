@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+from unittest.mock import AsyncMock, Mock
 from datetime import datetime, timezone
 from profed.components.api.c2s.shared.me_links import projection
 from profed.components.api.c2s.shared.me_links import storage as storage_module
@@ -73,4 +74,16 @@ async def test_deleting_an_unknown_row_is_harmless(fake_bus, fake_storage):
     await projection._deleted(EDGE, {})
 
     assert fake_storage.rows == {}
+
+
+@pytest.mark.asyncio
+async def test_the_projection_creates_its_own_schema(monkeypatch):
+    created = []
+    monkeypatch.setattr(projection, "storage",
+                        AsyncMock(return_value=Mock(ensure_schema=AsyncMock(
+                            side_effect=lambda: created.append("schema")))))
+
+    await projection._init()
+
+    assert created == ["schema"]
 

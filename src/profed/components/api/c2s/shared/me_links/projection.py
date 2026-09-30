@@ -13,6 +13,10 @@ async def init(config: dict) -> None:
     await init_storage(config)
 
 
+async def _init() -> None:
+    await (await storage()).ensure_schema()
+
+
 def _checked(state: str):
     async def _record(object_id: str, payload: dict) -> None:
         actor_url, link_url = link_parts(object_id)
@@ -27,7 +31,7 @@ async def _deleted(object_id: str, payload: dict) -> None:
 
 
 handle_events, rebuild, _ = build_projection(topic=topic,
-                                             init=noop,
+                                             init=_init,
                                              on_snapshot_item=noop,
                                              on_message_type={"verified": _checked("verified"),
                                                               "unverified": _checked("unverified"),
