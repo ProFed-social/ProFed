@@ -55,6 +55,7 @@ async def test_ensure_schema_creates_table_function_view_and_compression_functio
     assert any("CREATE OR REPLACE VIEW api.reblog_compression" in s and "LEAST(b.mastodon_id, c.mastodon_id)" in s
                for s in statements)
     assert any("CREATE TYPE api.reblog_compression_kind AS ENUM" in s for s in statements)
+    assert not any("EXCEPTION WHEN duplicate_object" in s for s in statements)
     assert any("api.compress_reblogs(kind" in s and "RETURNS int LANGUAGE plpgsql" in s for s in statements)
     assert any("CREATE OR REPLACE FUNCTION api.ancestor_chain" in s and
                "NOT break_on_author OR p.actor_url = c.actor_url" in s

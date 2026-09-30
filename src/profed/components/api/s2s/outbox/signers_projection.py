@@ -4,7 +4,11 @@
 from datetime import datetime, timezone
 from profed.core.persistence.projections import build_projection
 from profed.topics import remote_actors
-from .signers_storage import storage
+from .signers_storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
 
 
 async def _init() -> None:

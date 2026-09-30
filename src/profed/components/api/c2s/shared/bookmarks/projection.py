@@ -3,27 +3,31 @@
 
 from profed.core.persistence.projections import build_projection, with_sequence_id
 from profed.topics import bookmarks
-from profed.components.api.c2s.shared.bookmarks import storage
+from .storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
 
 
 async def _init() -> None:
-    await (await storage.storage()).ensure_schema()
+    await (await storage()).ensure_schema()
 
 
 async def _on_added(object_id: str, payload: dict, sequence_id: int) -> None:
-    await (await storage.storage()).add(payload["actor_url"], payload["object_url"], sequence_id)
+    await (await storage()).add(payload["actor_url"], payload["object_url"], sequence_id)
 
 
 async def _on_removed(object_id: str, payload: dict, sequence_id: int) -> None:
-    await (await storage.storage()).remove(payload["actor_url"], payload["object_url"])
+    await (await storage()).remove(payload["actor_url"], payload["object_url"])
 
 
 async def _apply_item(data: dict) -> None:
-    await (await storage.storage()).add(data["actor_url"], data["object_url"], data.get("marked_at", 0))
+    await (await storage()).add(data["actor_url"], data["object_url"], data.get("marked_at", 0))
 
 
 async def _rebuild_finished() -> None:
-    (await storage.storage()).rebuild_finished()
+    (await storage()).rebuild_finished()
 
 
 handle_events, rebuild, _ = \

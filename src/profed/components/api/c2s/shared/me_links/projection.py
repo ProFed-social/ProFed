@@ -6,7 +6,11 @@ from profed.core.persistence.projections import build_projection
 from profed.topics import me_links as topic
 from profed.topics.me_links_topic import link_parts
 from profed.util import noop
-from .storage import storage
+from .storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
 
 
 def _checked(state: str):

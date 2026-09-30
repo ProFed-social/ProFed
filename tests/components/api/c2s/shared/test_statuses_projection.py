@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+from unittest.mock import AsyncMock
 from datetime import datetime, timezone
-from profed.components.api.c2s.shared.statuses import projection
-from profed.components.api.c2s.shared.statuses import as_objects, user_timeline
+from profed.components.api.c2s.shared.statuses import as_objects, projection, user_timeline
 
 
 NOTE_ID = "https://remote/notes/1"
@@ -249,4 +249,15 @@ async def test_a_payload_without_an_audience_is_taken_as_public(fake_objects, fa
     await projection._on_store("https://remote/activities/1", _payload())
 
     assert fake_objects.audience[0] == {"visibility": "public", "recipients": []}
+
+
+@pytest.mark.asyncio
+async def test_the_projection_prepares_both_of_its_storages(monkeypatch):
+    prepared = []
+    monkeypatch.setattr(as_objects, "init", AsyncMock(side_effect=lambda c: prepared.append(("as_objects", c))))
+    monkeypatch.setattr(user_timeline, "init", AsyncMock(side_effect=lambda c: prepared.append(("timeline", c))))
+
+    await projection.init({"host": "db"})
+
+    assert prepared == [("as_objects", {"host": "db"}), ("timeline", {"host": "db"})]
 

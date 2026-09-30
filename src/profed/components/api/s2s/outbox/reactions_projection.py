@@ -5,7 +5,15 @@ from typing import Optional
 from profed.core.persistence.projections import build_projection
 from profed.topics import timeline as topic
 from profed.util import noop
-from .reactions_storage import storage
+from .reactions_storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
+
+
+async def _init() -> None:
+    await (await storage()).ensure_schema()
 
 
 def _reaction(payload: dict) -> Optional[dict]:
@@ -34,7 +42,7 @@ async def _rebuild_finished() -> None:
 
 
 handle_events, rebuild, _ = build_projection(topic=topic,
-                                             init=noop,
+                                             init=_init,
                                              rebuild_finished=_rebuild_finished,
                                              on_snapshot_item=noop,
                                              on_message_type={"Like": _on_react,

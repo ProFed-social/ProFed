@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+from unittest.mock import AsyncMock, Mock
 from profed.components.api.s2s.outbox import reactions_projection as projection
 from profed.components.api.s2s.outbox import reactions_storage as storage_module
 
@@ -98,4 +99,26 @@ async def test_a_changed_reaction_replaces_the_row(fake_storage):
     await projection._on_react(REACTION, _payload(reference={"kind": "like", "url": NOTE, "emoji": "🐶"}))
 
     assert fake_storage.rows[REACTION]["emoji"] == "🐶"
+
+
+@pytest.mark.asyncio
+async def test_the_projection_creates_its_own_schema(monkeypatch):
+    created = []
+    monkeypatch.setattr(projection, "storage",
+                        AsyncMock(return_value=Mock(ensure_schema=AsyncMock(
+                            side_effect=lambda: created.append("schema")))))
+
+    await projection._init()
+
+    assert created == ["schema"]
+
+
+@pytest.mark.asyncio
+async def test_the_projection_prepares_its_storage(monkeypatch):
+    prepared = []
+    monkeypatch.setattr(projection, "init_storage", AsyncMock(side_effect=lambda c: prepared.append(c)))
+
+    await projection.init({"host": "db"})
+
+    assert prepared == [{"host": "db"}]
 

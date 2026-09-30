@@ -3,7 +3,6 @@
 
 import asyncio
 from typing import List
-from collections.abc import Iterable
 from fastapi import APIRouter
 from profed.components.api.http import MastodonJSONResponse
 from profed.core.media_storage import init_media_storage
@@ -20,19 +19,14 @@ from .lists import router as lists
 from .markers import router as markers
 from .conversations import router as conversations
 from .pleroma import router as pleroma
-from .pleroma import storage as reaction_formats_storage
 from .pleroma import projection as reaction_formats_projection
-from .accounts.preferences import storage as preferences_storage
 from .accounts.preferences import projection as preferences_projection
-from .accounts.statuses import storage as user_statuses_storage
 from .accounts.statuses import projection as user_statuses_projection
 
 
-def _projection_initializer(storages, projection, handle_events, name):
+def _projection_initializer(projection, handle_events, name):
     async def _init_projection(config: dict):
-        for storage in storages if isinstance(storages, Iterable) else [storages]:
-            await storage.init(config)
-            await (await storage.storage()).ensure_schema()
+        await projection.init(config)
         await projection.rebuild()
         asyncio.create_task(handle_events(), name=name)
 
@@ -44,18 +38,15 @@ async def init(config: dict, deactivate: List[str]) -> None:
         await init_media_storage()
 
     for routers, init_fn in [(["accounts"],
-                              _projection_initializer(preferences_storage,
-                                                      preferences_projection,
+                              _projection_initializer(preferences_projection,
                                                       preferences_projection.handle_events,
                                                       "c2s_v1_preferences")),
                              (["accounts"],
-                              _projection_initializer(user_statuses_storage,
-                                                      user_statuses_projection,
+                              _projection_initializer(user_statuses_projection,
                                                       user_statuses_projection.handle_events,
                                                       "c2s_v1_user_statuses")),
                              (["pleroma"],
-                              _projection_initializer(reaction_formats_storage,
-                                                      reaction_formats_projection,
+                              _projection_initializer(reaction_formats_projection,
                                                       reaction_formats_projection.handle_events,
                                                       "c2s_v1_reaction_formats"))]:
         if any(r not in deactivate for r in routers):

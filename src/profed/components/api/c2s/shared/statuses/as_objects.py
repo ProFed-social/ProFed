@@ -367,10 +367,7 @@ class _storage(BaseStorage):
                                     JOIN api.as_objects b ON a.target_url = b.url
                                     JOIN api.as_objects c ON b.target_url = c.url) w
                               WHERE w.newref <> w.a_url AND w.newref <> w.b_url""")
-        await self.execute("""DO $$ BEGIN
-                                  CREATE TYPE api.reblog_compression_kind AS ENUM ('chain', 'cycle');
-                              EXCEPTION WHEN duplicate_object THEN NULL;
-                              END $$""")
+        await self.execute("""CREATE TYPE api.reblog_compression_kind AS ENUM ('chain', 'cycle')""")
         await self.execute("""
             CREATE OR REPLACE FUNCTION
             api.compress_reblogs(kind api.reblog_compression_kind, sample int DEFAULT NULL)

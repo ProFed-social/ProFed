@@ -7,6 +7,8 @@ from profed.topics import instance
 from profed.util import noop
 
 
+init = noop
+
 _current = {}
 
 

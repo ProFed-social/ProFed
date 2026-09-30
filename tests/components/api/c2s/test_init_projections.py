@@ -1,14 +1,14 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from profed.components.api import c2s
 
 
 def _record_initializers(monkeypatch):
     awaited = []
 
-    def _fake_initializer(storage, projection, handle_events, name):
+    def _fake_initializer(projection, handle_events, name):
         async def _init(config):
             awaited.append(name)
         return _init
@@ -83,4 +83,24 @@ async def test_the_accounts_router_brings_the_actors_projection(monkeypatch):
     await c2s.init({}, ["v1_search", "v2_search", "v1_media", "v2_media", "oauth"])
 
     assert "c2s_actor" in awaited
+
+
+async def test_the_initializer_hands_the_config_to_the_projection(monkeypatch):
+    projection = Mock(init=AsyncMock(), rebuild=AsyncMock())
+    monkeypatch.setattr(c2s.asyncio, "create_task", lambda coro, name=None: coro.close())
+
+    await c2s._projection_initializer(projection, AsyncMock(), "probe")({"host": "db"})
+
+    projection.init.assert_awaited_once_with({"host": "db"})
+
+
+async def test_the_initializer_prepares_the_projection_before_rebuilding_it(monkeypatch):
+    order = []
+    projection = Mock(init=AsyncMock(side_effect=lambda c: order.append("init")),
+                      rebuild=AsyncMock(side_effect=lambda: order.append("rebuild")))
+    monkeypatch.setattr(c2s.asyncio, "create_task", lambda coro, name=None: coro.close())
+
+    await c2s._projection_initializer(projection, AsyncMock(), "probe")({})
+
+    assert order == ["init", "rebuild"]
 

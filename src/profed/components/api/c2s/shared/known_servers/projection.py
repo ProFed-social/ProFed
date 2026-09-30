@@ -5,7 +5,15 @@ from datetime import datetime
 from profed.core.persistence.projections import build_projection
 from profed.topics import known_servers
 from profed.util import noop
-from .storage import storage
+from .storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
+
+
+async def _init() -> None:
+    await (await storage()).ensure_schema()
 
 
 async def _observed(object_id: str, payload: dict) -> None:
@@ -21,7 +29,7 @@ async def _updated(object_id: str, payload: dict) -> None:
 
 
 handle_events, rebuild, _ = build_projection(topic=known_servers,
-                                             init=noop,
+                                             init=_init,
                                              on_snapshot_item=noop,
                                              on_message_type={"observed": _observed,
                                                               "updated": _updated})

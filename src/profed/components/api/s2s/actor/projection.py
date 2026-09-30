@@ -3,7 +3,11 @@
 
 from profed.core.persistence.projections import build_projection
 from profed.topics import person
-from profed.components.api.s2s.actor.storage import storage
+from profed.components.api.s2s.actor.storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
 
 
 async def _init() -> None:

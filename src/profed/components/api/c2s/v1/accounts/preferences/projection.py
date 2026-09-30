@@ -7,7 +7,11 @@ from asyncpg import ForeignKeyViolationError
 
 from profed.core.persistence.projections import build_projection
 from profed.topics import preferences as preferences_topic
-from .storage import storage
+from .storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
 
 
 logger = logging.getLogger(__name__)

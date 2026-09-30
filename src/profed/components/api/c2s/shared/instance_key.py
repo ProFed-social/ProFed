@@ -6,6 +6,8 @@ from profed.identity import domain
 from profed.topics import instance
 from profed.util import noop
 
+init = noop
+
 
 _key = {}
 

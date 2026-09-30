@@ -6,6 +6,11 @@ from profed.topics import timeline
 from profed.components.api.c2s.shared.statuses import as_objects, user_timeline
 
 
+async def init(config: dict) -> None:
+    await as_objects.init(config)
+    await user_timeline.init(config)
+
+
 async def _init() -> None:
     await (await as_objects.storage()).ensure_schema()
     await (await user_timeline.storage()).ensure_schema()

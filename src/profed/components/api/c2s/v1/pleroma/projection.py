@@ -4,7 +4,11 @@
 from profed.core.persistence.projections import build_projection, with_event_type
 from profed.topics import activities
 from profed.util import noop
-from .storage import storage
+from .storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
 
 
 REACTION_VERBS = ("Like", "EmojiReact")

@@ -5,22 +5,26 @@ from datetime import datetime
 
 from profed.core.persistence.projections import build_projection
 from profed.topics import timeline
-from profed.components.api.c2s.shared.conversations import storage
+from .storage import init as init_storage, storage
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
 
 
 async def _init() -> None:
-    await (await storage.storage()).ensure_schema()
+    await (await storage()).ensure_schema()
 
 
 async def _record(message_url: str, actor_url: str, status: dict) -> None:
     if status.get("visibility") != "direct":
         return
-    await (await storage.storage()).record(message_url,
-                                           status.get("in_reply_to_id"),
-                                           datetime.fromisoformat(status["created_at"]),
-                                           status["id"],
-                                           actor_url,
-                                           [mention["url"] for mention in status.get("mentions", [])])
+    await (await storage()).record(message_url,
+                                   status.get("in_reply_to_id"),
+                                   datetime.fromisoformat(status["created_at"]),
+                                   status["id"],
+                                   actor_url,
+                                   [mention["url"] for mention in status.get("mentions", [])])
 
 
 async def _apply_item(data: dict) -> None:
@@ -32,7 +36,7 @@ async def _on_store(object_id: str, payload: dict) -> None:
 
 
 async def _rebuild_finished() -> None:
-    (await storage.storage()).rebuild_finished()
+    (await storage()).rebuild_finished()
 
 
 handle_events, rebuild, _ = \

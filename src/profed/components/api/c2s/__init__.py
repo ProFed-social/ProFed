@@ -4,42 +4,28 @@
 
 import asyncio
 from typing import List
-from collections.abc import Iterable
 from profed.core.media_storage import init_media_storage
 from profed.components.api.active_routers import narrow_deactivate_routers
-from profed.components.api.c2s.shared.actors import storage as actors_storage
 from profed.components.api.c2s.shared.actors import projection as actors_projection
-from profed.components.api.c2s.shared.follows import storage as follows_storage
 from profed.components.api.c2s.shared.follows import projection as follows_projection
-from profed.components.api.c2s.shared.known_accounts import storage as known_accounts_storage
 from profed.components.api.c2s.shared.known_accounts import projection as known_accounts_projection
-from profed.components.api.c2s.shared.known_servers import storage as known_servers_storage
 from profed.components.api.c2s.shared.known_servers import projection as known_servers_projection
-from profed.components.api.c2s.shared.me_links import storage as me_links_storage
 from profed.components.api.c2s.shared.me_links import projection as me_links_projection
 from profed.components.api.c2s.shared import instance_key as instance_key_projection
-from profed.components.api.c2s.shared.media import storage as media_db_storage
 from profed.components.api.c2s.shared.media import projection as media_projection
-from profed.components.api.c2s.shared.statuses import as_objects as statuses_objects
-from profed.components.api.c2s.shared.statuses import user_timeline as statuses_memberships
 from profed.components.api.c2s.shared.statuses import projection as statuses_projection
 from profed.components.api.c2s.shared.statuses import compressor as statuses_compressor
 from profed.components.api.c2s.shared.statuses import sweeper as statuses_sweeper
-from profed.components.api.c2s.shared.bookmarks import storage as bookmarks_storage
 from profed.components.api.c2s.shared.bookmarks import projection as bookmarks_projection
-from profed.components.api.c2s.shared.conversations import storage as conversations_storage
 from profed.components.api.c2s.shared.conversations import projection as conversations_projection
 from . import oauth
 from . import v1, v2, profed
 from .router import mount_routers
 
 
-def _projection_initializer(storages, projection, handle_events, name):
+def _projection_initializer(projection, handle_events, name):
     async def _init(config: dict):
-        for storage in storages if isinstance(storages, Iterable) else [storages]:
-            if storage is not None:
-                await storage.init(config)
-                await (await storage.storage()).ensure_schema()
+        await projection.init(config)
         await projection.rebuild()
         asyncio.create_task(handle_events(), name=name)
     return _init
@@ -51,8 +37,8 @@ def _background_task_initializer(task, config_key):
     return _init
 
 
-def _media_projection_initializer(storage, projection, handle_events):
-    _projection_init = _projection_initializer(storage, projection, handle_events, "c2s_media")
+def _media_projection_initializer(projection, handle_events):
+    _projection_init = _projection_initializer(projection, handle_events, "c2s_media")
 
     async def _init(config: dict):
         await init_media_storage()
@@ -70,33 +56,27 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                "profed_reactions",
                                "v1_timelines",
                                "v2_search"],
-                              _projection_initializer(known_accounts_storage,
-                                                      known_accounts_projection,
+                              _projection_initializer(known_accounts_projection,
                                                       known_accounts_projection.handle_events,
                                                       "c2s_known_accounts")),
                              (["v1_accounts"],
-                              _projection_initializer(actors_storage,
-                                                      actors_projection,
+                              _projection_initializer(actors_projection,
                                                       actors_projection.handle_account_events,
                                                       "c2s_actor")),
                              (["v1_accounts"],
-                              _projection_initializer(follows_storage,
-                                                      follows_projection,
+                              _projection_initializer(follows_projection,
                                                       follows_projection.handle_events,
                                                       "c2s_follows")),
                              (["v1_pleroma"],
-                              _projection_initializer(known_servers_storage,
-                                                      known_servers_projection,
+                              _projection_initializer(known_servers_projection,
                                                       known_servers_projection.handle_events,
                                                       "c2s_known_servers")),
                              (["v1_search", "v1_accounts", "v2_search"],
-                              _projection_initializer(me_links_storage,
-                                                      me_links_projection,
+                              _projection_initializer(me_links_projection,
                                                       me_links_projection.handle_events,
                                                       "c2s_me_links")),
                              (["v1_search", "v1_accounts", "v1_timelines", "v2_search"],
-                              _projection_initializer(None,
-                                                      instance_key_projection,
+                              _projection_initializer(instance_key_projection,
                                                       instance_key_projection.handle_events,
                                                       "c2s_instance_key")),
                              (["v1_timelines",
@@ -105,8 +85,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                "profed_reactions",
                                "v1_accounts",
                                "profed_timeline"],
-                              _projection_initializer([statuses_objects, statuses_memberships],
-                                                      statuses_projection,
+                              _projection_initializer(statuses_projection,
                                                       statuses_projection.handle_events,
                                                       "c2s_statuses")),
                              (["v1_timelines",
@@ -115,8 +94,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                "profed_reactions",
                                "v1_accounts",
                                "profed_timeline"],
-                              _projection_initializer(conversations_storage,
-                                                      conversations_projection,
+                              _projection_initializer(conversations_projection,
                                                       conversations_projection.handle_events,
                                                       "c2s_conversations")),
                              (["v1_timelines",
@@ -126,8 +104,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                "v1_accounts",
                                "v1_lists",
                                "profed_timeline"],
-                              _projection_initializer(bookmarks_storage,
-                                                      bookmarks_projection,
+                              _projection_initializer(bookmarks_projection,
                                                       bookmarks_projection.handle_events,
                                                       "c2s_bookmarks")),
                              (["v1_timelines",
@@ -145,9 +122,7 @@ async def init(config: dict, deactivate: List[str]) -> None:
                                "profed_timeline"],
                               _background_task_initializer(statuses_sweeper, "sweeping")),
                              (["v1_media", "v2_media"],
-                              _media_projection_initializer(media_db_storage,
-                                                            media_projection,
-                                                            media_projection.handle_events))]:
+                              _media_projection_initializer(media_projection, media_projection.handle_events))]:
         if any(r not in deactivate for r in routers):
             await init_fn(config)
     if "oauth" not in deactivate:

@@ -1,8 +1,13 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from profed.components.api.s2s.inbox.storage import storage
+from profed.components.api.s2s.inbox.storage import init as init_storage, storage
 from profed.components.api.s2s.shared.projection import build_person_projection
+
+
+async def init(config: dict) -> None:
+    await init_storage(config)
+
 
 handle_user_events, rebuild, reset_last_seen = build_person_projection(storage)
 
