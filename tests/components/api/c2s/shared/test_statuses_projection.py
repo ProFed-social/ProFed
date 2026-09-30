@@ -11,6 +11,8 @@ NOTE_ID = "https://remote/notes/1"
 
 ACTOR_URL = "https://remote/bob"
 
+LOCAL_ACTOR = "https://example.com/actors/alice"
+
 STATUS = {"id": "424242",
           "created_at": "2026-01-01T00:00:00.000Z",
           "uri": "https://remote/activities/1",
@@ -239,9 +241,25 @@ async def test_the_visibility_reaches_the_object_storage(fake_objects, fake_memb
 @pytest.mark.asyncio
 async def test_the_recipients_reach_the_object_storage(fake_objects, fake_memberships):
     await projection._on_store("https://remote/activities/1",
-                               {**_payload(), "visibility": "direct", "recipients": [ACTOR_URL]})
+                               {**_payload(), "visibility": "direct", "recipients": [LOCAL_ACTOR]})
 
-    assert fake_objects.audience[0]["recipients"] == [ACTOR_URL]
+    assert fake_objects.audience[0]["recipients"] == [LOCAL_ACTOR]
+
+
+@pytest.mark.asyncio
+async def test_a_remote_recipient_is_not_recorded_because_it_cannot_read_here(fake_objects, fake_memberships):
+    await projection._on_store("https://remote/activities/1",
+                               {**_payload(), "visibility": "direct", "recipients": [ACTOR_URL, LOCAL_ACTOR]})
+
+    assert fake_objects.audience[0]["recipients"] == [LOCAL_ACTOR]
+
+
+@pytest.mark.asyncio
+async def test_the_instance_actor_is_not_recorded_either(fake_objects, fake_memberships):
+    await projection._on_store("https://remote/activities/1",
+                               {**_payload(), "visibility": "direct", "recipients": ["https://example.com/actor"]})
+
+    assert fake_objects.audience[0]["recipients"] == []
 
 
 @pytest.mark.asyncio

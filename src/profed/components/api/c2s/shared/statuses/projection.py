@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.persistence.projections import build_projection
+from profed.identity import is_local_actor_url
 from profed.topics import timeline
 from profed.components.api.c2s.shared.statuses import as_objects, user_timeline
 
@@ -38,7 +39,9 @@ async def _store(username: str,
                                               status,
                                               *_edge(reference),
                                               visibility=visibility,
-                                              recipients=recipients)
+                                              recipients=[recipient
+                                                          for recipient in recipients
+                                                          if is_local_actor_url(recipient)])
     await (await user_timeline.storage()).add(username, url)
 
 
@@ -50,7 +53,6 @@ async def _apply_item(data: dict) -> None:
                  data.get("reference"),
                  data.get("visibility", "public"),
                  data.get("recipients", []))
-
 
 
 async def _on_store(object_id: str, payload: dict) -> None:
