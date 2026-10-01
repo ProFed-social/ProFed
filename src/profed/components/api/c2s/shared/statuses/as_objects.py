@@ -462,7 +462,7 @@ class _storage(BaseStorage):
                                                    $7,
                                                    $8::api.visibility,
                                                    $9,
-                                                   $10::timestamptz)""",
+                                                   $10::text::timestamptz)""",
                            mastodon_id,
                            url,
                            actor_url,

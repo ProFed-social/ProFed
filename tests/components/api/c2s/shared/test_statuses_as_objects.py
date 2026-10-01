@@ -165,7 +165,7 @@ async def test_upsert_hands_the_object_to_the_database(fake_pool, fake_conn):
     await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None)
 
     sql, *args = fake_conn.execute.await_args.args
-    assert "api.store_object(" in sql
+    assert re.search(r"SELECT\s+api\.store_object\(", sql)
     assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None, None, "public", [], None]
 
 
@@ -221,7 +221,7 @@ async def test_delete_hands_the_url_to_the_database(fake_pool, fake_conn):
     await (await as_objects.storage()).delete("https://r/1")
 
     sql, *args = fake_conn.execute.await_args.args
-    assert "SELECT api.delete_object(" in sql
+    assert re.search(r"SELECT\s+api\.delete_object\(", sql)
     assert args == ["https://r/1"]
 
 
