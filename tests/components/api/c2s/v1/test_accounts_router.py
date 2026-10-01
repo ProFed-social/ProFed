@@ -11,7 +11,7 @@ from profed.core.config import config, raw
 from profed.identity import account_id
 from profed.models.mastodon import Account, Status
 from profed.components.api.c2s.v1.accounts import router as accounts_module
-from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.core.message_bus.source_key import source_key
 
 from _fakes import FakeMessageBus
@@ -883,7 +883,7 @@ def test_the_profile_hands_the_cursor_to_the_storage(anon_client, fake_bus):
                    AsyncMock(return_value=store)):
             anon_client.get("/accounts/123456/statuses?max_id=400&since_id=100&limit=7")
 
-    assert store.fetch_by_actor.call_args.kwargs == {"limit": 7, "max_id": "400", "since_id": "100"}
+    assert store.fetch_by_actor.call_args.kwargs == {"limit": 7, "max_id": "400", "since_id": "100", "viewer": None}
 
 
 def test_the_profile_without_a_cursor_asks_for_the_front(anon_client, fake_bus):
@@ -896,7 +896,7 @@ def test_the_profile_without_a_cursor_asks_for_the_front(anon_client, fake_bus):
                    AsyncMock(return_value=store)):
             anon_client.get("/accounts/123456/statuses")
 
-    assert store.fetch_by_actor.call_args.kwargs == {"limit": 20, "max_id": None, "since_id": None}
+    assert store.fetch_by_actor.call_args.kwargs == {"limit": 20, "max_id": None, "since_id": None, "viewer": None}
 
 
 def _remote_account():
@@ -926,4 +926,21 @@ def test_a_follow_activity_targets_the_actor_url(client, fake_bus):
 
     activity = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]
     assert activity["object"] == "https://remote.example/users/bob"
+
+
+def test_the_profile_is_read_on_behalf_of_the_logged_in_user(fake_bus):
+    accounts_module.init({})
+    app = FastAPI()
+    app.include_router(accounts_module.router)
+    app.dependency_overrides[current_user_optional] = lambda: CLAIMS
+    store = _profile_store([])
+
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        with patch("profed.components.api.c2s.v1.accounts.router._resolve_account",
+                   AsyncMock(return_value=_remote_account())), \
+             patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                   AsyncMock(return_value=store)):
+            TestClient(app).get("/accounts/123456/statuses")
+
+    assert store.fetch_by_actor.call_args.kwargs["viewer"] == "https://example.com/actors/alice"
 

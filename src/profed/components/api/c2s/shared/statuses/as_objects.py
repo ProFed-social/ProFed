@@ -21,6 +21,7 @@ class _storage(BaseStorage):
                                      kind          TEXT           NOT NULL,
                                      emoji         TEXT,
                                      edited_at     TIMESTAMPTZ,
+                                     emitted_at    TIMESTAMPTZ,
                                      visibility    api.visibility NOT NULL,
                                      PRIMARY KEY (url))""")
         await self.execute("""CREATE TABLE IF NOT EXISTS api.private_object_access
@@ -294,14 +295,23 @@ class _storage(BaseStorage):
                                                         p_target_url TEXT,
                                                         p_emoji TEXT,
                                                         p_visibility api.visibility,
-                                                        p_recipients TEXT[])
+                                                        p_recipients TEXT[],
+                                                        p_emitted_at TIMESTAMPTZ)
             RETURNS void LANGUAGE plpgsql AS $fn$
             BEGIN
                 INSERT INTO
                     api.as_objects
-                        (mastodon_id, url, actor_url, status, kind, target_url, emoji, visibility)
+                        (mastodon_id, url, actor_url, status, kind, target_url, emoji, visibility, emitted_at)
                 VALUES
-                    (p_mastodon_id, p_url, p_actor_url, p_status, p_kind, p_target_url, p_emoji, p_visibility)
+                    (p_mastodon_id,
+                     p_url,
+                     p_actor_url,
+                     p_status,
+                     p_kind,
+                     p_target_url,
+                     p_emoji,
+                     p_visibility,
+                     p_emitted_at)
                 ON CONFLICT (url) DO NOTHING;
 
                 INSERT INTO
@@ -440,8 +450,19 @@ class _storage(BaseStorage):
                      target_url: Optional[str],
                      emoji: Optional[str] = None,
                      visibility: str = "public",
-                     recipients: Optional[List[str]] = None) -> None:
-        await self.execute("""SELECT api.store_object($1::numeric, $2, $3, $4, $5, $6, $7, $8::api.visibility, $9)""",
+                     recipients: Optional[List[str]] = None,
+                     emitted_at: Optional[str] = None) -> None:
+        await self.execute("""SELECT
+                                  api.store_object($1::numeric,
+                                                   $2,
+                                                   $3,
+                                                   $4,
+                                                   $5,
+                                                   $6,
+                                                   $7,
+                                                   $8::api.visibility,
+                                                   $9,
+                                                   $10::timestamptz)""",
                            mastodon_id,
                            url,
                            actor_url,
@@ -450,7 +471,8 @@ class _storage(BaseStorage):
                            target_url,
                            emoji,
                            visibility,
-                           recipients or [])
+                           recipients or [],
+                           emitted_at)
 
     async def update_content(self, url: str, status: dict, edited_at: Optional[str]) -> None:
         await self.execute("""UPDATE api.as_objects
@@ -478,16 +500,32 @@ class _storage(BaseStorage):
             SELECT count(*)::int AS swept FROM del""")
         return row["swept"]
 
-    async def get(self, mastodon_id: str) -> Optional[dict]:
-        return await self.fetch_one("""SELECT mastodon_id,
-                                              url,
-                                              actor_url,
-                                              kind,
-                                              status,
-                                              api.resolve_content(url) AS content
-                                       FROM api.as_objects
-                                       WHERE mastodon_id = $1::numeric""",
-                                    mastodon_id)
+    async def get(self, mastodon_id: str, viewer: Optional[str] = None) -> Optional[dict]:
+        return await self.fetch_one("""
+            SELECT
+                o.mastodon_id,
+                o.url,
+                o.actor_url,
+                o.kind,
+                o.status,
+                api.resolve_content(o.url) AS content
+            FROM
+                api.as_objects AS o LEFT JOIN
+                api.private_object_access AS a ON
+                    a.object_url = o.url AND
+                    a.actor_url = $2 LEFT JOIN
+                api.follows AS f ON
+                    f.following = o.actor_url AND
+                    f.follower = $2 AND
+                    f.state = 'accepted'
+            WHERE
+                o.mastodon_id = $1::numeric AND
+                (o.visibility = 'public' OR
+                 o.actor_url = $2 OR
+                 a.object_url IS NOT NULL OR
+                 (o.visibility = 'followers' AND f.follower IS NOT NULL))""",
+                                    mastodon_id,
+                                    viewer)
 
     async def url_for(self, mastodon_id: str) -> Optional[str]:
         row = await self.fetch_one("""SELECT url
@@ -520,22 +558,68 @@ class _storage(BaseStorage):
                              actor_url: str,
                              limit: int = 20,
                              max_id: Optional[str] = None,
-                             since_id: Optional[str] = None) -> List[dict]:
-        return await self.fetch_all("""SELECT o.mastodon_id, o.url, o.actor_url, o.kind, o.status, r.content
-                                       FROM api.as_objects o
-                                       CROSS JOIN LATERAL
-                                            (SELECT api.resolve_content(o.url) AS content) r
-                                       WHERE o.actor_url = $1
-                                         AND o.kind IN ('content', 'announce')
-                                         AND ($3::numeric IS NULL OR o.mastodon_id < $3::numeric)
-                                         AND ($4::numeric IS NULL OR o.mastodon_id > $4::numeric)
-                                         AND r.content IS NOT NULL
-                                       ORDER BY o.mastodon_id DESC
-                                       LIMIT $2""",
+                             since_id: Optional[str] = None,
+                             viewer: Optional[str] = None) -> List[dict]:
+        return await self.fetch_all("""
+            WITH
+                private_access AS NOT MATERIALIZED
+                    (SELECT
+                         object_url
+                     FROM
+                         api.private_object_access
+                     WHERE
+                         actor_url = $5),
+                follows AS NOT MATERIALIZED
+                    (SELECT
+                         following
+                     FROM
+                         api.follows
+                     WHERE
+                         follower = $5 AND
+                         state = 'accepted'),
+                target AS
+                    (SELECT
+                         t.*
+                     FROM
+                         api.as_objects AS t LEFT JOIN
+                         private_access AS ta ON ta.object_url = t.url LEFT JOIN
+                         follows AS tf ON tf.following = t.actor_url
+                     WHERE
+                         t.visibility = 'public' OR
+                         t.actor_url = $5 OR
+                         ta.object_url IS NOT NULL OR
+                         (t.visibility = 'followers' AND tf.following IS NOT NULL))
+            SELECT
+                o.mastodon_id,
+                o.url,
+                o.actor_url,
+                o.kind,
+                o.status,
+                r.content
+            FROM
+                api.as_objects AS o CROSS JOIN LATERAL
+                (SELECT api.resolve_content(o.url) AS content) AS r JOIN
+                target AS t ON t.url = COALESCE(o.target_url, o.url) LEFT JOIN
+                private_access AS a ON a.object_url = o.url LEFT JOIN
+                follows AS f ON f.following = o.actor_url
+            WHERE
+                o.actor_url = $1 AND
+                o.kind IN ('content', 'announce') AND
+                ($3::numeric IS NULL OR o.mastodon_id < $3::numeric) AND
+                ($4::numeric IS NULL OR o.mastodon_id > $4::numeric) AND
+                r.content IS NOT NULL AND
+                (o.visibility = 'public' OR
+                 o.actor_url = $5 OR
+                 a.object_url IS NOT NULL OR
+                 (o.visibility = 'followers' AND f.following IS NOT NULL))
+            ORDER BY
+                o.mastodon_id DESC
+            LIMIT $2""",
                                     actor_url,
                                     limit,
                                     max_id,
-                                    since_id)
+                                    since_id,
+                                    viewer)
 
     async def reaction_breakdown(self, object_urls: list[str], viewer: Optional[str]) -> dict:
         rows = await self.fetch_all("""
@@ -699,7 +783,11 @@ class _storage(BaseStorage):
                                     urls)
         return {row["url"]: str(row["mastodon_id"]) for row in rows}
 
-    async def descendants_of(self, root_url: str, max_depth: int, break_on_author: bool) -> List[dict]:
+    async def descendants_of(self,
+                             root_url: str,
+                             max_depth: int,
+                             break_on_author: bool,
+                             viewer: Optional[str] = None) -> List[dict]:
         return await self.fetch_all("""
             WITH RECURSIVE thread AS
                     (SELECT
@@ -722,17 +810,42 @@ class _storage(BaseStorage):
                         thread AS t ON c.status->>'in_reply_to_id' = t.url AND
                                        (NOT $3::boolean OR c.actor_url = t.actor_url)
                     WHERE
-                        t.depth < $2) CYCLE url SET is_cycle USING cyclepath
+                        t.depth < $2) CYCLE url SET is_cycle USING cyclepath,
+                private_access AS NOT MATERIALIZED
+                    (SELECT
+                         object_url
+                     FROM
+                         api.private_object_access
+                     WHERE
+                         actor_url = $4),
+                follows AS NOT MATERIALIZED
+                    (SELECT
+                         following
+                     FROM
+                         api.follows
+                     WHERE
+                         follower = $4 AND
+                         state = 'accepted')
             SELECT
                 o.mastodon_id,
                 o.url,
-                o.actor_url,
-                o.kind,
-                o.status,
-                r.content
+                o.status->>'in_reply_to_id' AS in_reply_to,
+                o.emitted_at,
+                v.visible,
+                CASE WHEN v.visible THEN o.actor_url END AS actor_url,
+                CASE WHEN v.visible THEN o.kind END AS kind,
+                CASE WHEN v.visible THEN o.status END AS status,
+                CASE WHEN v.visible THEN r.content END AS content
             FROM
                 thread AS th INNER JOIN
-                api.as_objects AS o ON o.url = th.url CROSS JOIN LATERAL
+                api.as_objects AS o ON o.url = th.url LEFT JOIN
+                private_access AS a ON a.object_url = o.url LEFT JOIN
+                follows AS f ON f.following = o.actor_url CROSS JOIN LATERAL
+                (SELECT
+                     o.visibility = 'public' OR
+                     o.actor_url IS NOT DISTINCT FROM $4 OR
+                     a.object_url IS NOT NULL OR
+                     (o.visibility = 'followers' AND f.following IS NOT NULL) AS visible) AS v CROSS JOIN LATERAL
                 (SELECT api.resolve_content(o.url) AS content) AS r
             WHERE
                 NOT th.is_cycle
@@ -740,7 +853,8 @@ class _storage(BaseStorage):
                 th.sortkey""",
                                     root_url,
                                     max_depth,
-                                    break_on_author)
+                                    break_on_author,
+                                    viewer)
 
     async def thread_of(self, root_url: str, max_depth: int = 20) -> List[dict]:
         return await self.descendants_of(root_url, max_depth, True)

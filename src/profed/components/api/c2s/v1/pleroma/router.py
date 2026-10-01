@@ -17,7 +17,8 @@ from .storage import storage as reaction_formats
 from profed.components.api.c2s.v1.statuses.router import (_boosted_row,
                                                           _publish_activity,
                                                           _reaction_state,
-                                                          _username)
+                                                          _username,
+                                                          _viewer)
 
 router = APIRouter()
 active = False
@@ -150,7 +151,7 @@ async def react(id: str, emoji: str, claims: Annotated[dict, Depends(current_use
         return await reaction_events(username, row, actor_url_from_username(username))
 
     return _reacted((await service.make_statuses(*(await do_react(username=_username(claims),
-                                                                  row=await _boosted_row(id)))))[0],
+                                                                  row=await _boosted_row(id, _viewer(claims))))))[0],
                     emoji)
 
 
@@ -174,5 +175,6 @@ async def unreact(id: str, emoji: str, claims: Annotated[dict, Depends(current_u
         return await publish_undo(username, row, actor_url=actor_url_from_username(username))
 
     return _unreacted((await service.make_statuses(*(await do_unreact(username=_username(claims),
-                                                                      row=await _boosted_row(id)))))[0])
+                                                                      row=await _boosted_row(id,
+                                                                                             _viewer(claims))))))[0])
 

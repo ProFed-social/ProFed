@@ -130,7 +130,8 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
     resolved = await mentions.resolve_all(content, _preliminary_resolver)
     note, activity = \
         await make_note_and_create_activity(actor_url=actor_url_from_username(username),
-                                            in_reply_to=(await (await as_objects.storage()).get(body.in_reply_to_id)
+                                            in_reply_to=(await (await as_objects.storage()).get(body.in_reply_to_id,
+                                                                                                actor_url_from_username(username))
                                                          if body.in_reply_to_id else
                                                          None),
                                             mentioned=[url for _, _, _, url in resolved if url is not None],
@@ -160,7 +161,7 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
 
 @router.get("/statuses/{id}")
 async def get_status(id: str, claims: Annotated[dict, Depends(current_user)] = None):
-    row = await (await as_objects.storage()).get(id) if id.isdigit() else None
+    row = await (await as_objects.storage()).get(id, _viewer(claims)) if id.isdigit() else None
     if row is None or row["content"] is None:
         raise HTTPException(status_code=404, detail="status_not_found")
     return (await service.make_statuses([row], _viewer(claims)))[0]
@@ -207,7 +208,7 @@ async def status_context(id: str, claims: Annotated[dict, Depends(current_user)]
 @router.post("/statuses/{id}/favourite")
 async def favourite_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     username = _username(claims)
-    row = await _boosted_row(id)
+    row = await _boosted_row(id, _viewer(claims))
     actor_url = actor_url_from_username(username)
     if await (await as_objects.storage()).reaction_of(actor_url, row["content"]["url"]) is None:
         await _publish_activity("Like",
@@ -223,7 +224,7 @@ async def favourite_status(id: str, claims: Annotated[dict, Depends(current_user
 @router.post("/statuses/{id}/unfavourite")
 async def unfavourite_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     username = _username(claims)
-    row = await _boosted_row(id)
+    row = await _boosted_row(id, _viewer(claims))
     actor_url = actor_url_from_username(username)
     like_url = await (await as_objects.storage()).reaction_of(actor_url, row["content"]["url"])
     if like_url is not None:
@@ -249,8 +250,8 @@ def _username(claims: dict) -> str:
     return username
 
 
-async def _boosted_row(id: str) -> dict:
-    row = await (await as_objects.storage()).get(id) if id.isdigit() else None
+async def _boosted_row(id: str, viewer: str | None) -> dict:
+    row = await (await as_objects.storage()).get(id, viewer) if id.isdigit() else None
     if row is None or row["content"] is None:
         raise HTTPException(status_code=404, detail="status_not_found")
 
@@ -259,7 +260,7 @@ async def _boosted_row(id: str) -> dict:
 
 async def _bookmark_state(id: str, claims: dict, *, bookmarked: bool) -> Status:
     actor_url = actor_url_from_username(_username(claims))
-    row = await _boosted_row(id)
+    row = await _boosted_row(id, _viewer(claims))
 
     await publish_bookmark("added" if bookmarked else "removed", actor_url, row["content"]["url"])
 
@@ -312,7 +313,7 @@ async def _publish_activity(event_type: str, username: str, activity) -> None:
 @router.post("/statuses/{id}/reblog")
 async def reblog_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     username = _username(claims)
-    row = await _boosted_row(id)
+    row = await _boosted_row(id, _viewer(claims))
     actor_url = actor_url_from_username(username)
     if await (await as_objects.storage()).boost_of(actor_url, row["content"]["url"]) is None:
         await _publish_activity("Announce",
@@ -329,7 +330,7 @@ async def reblog_status(id: str, claims: Annotated[dict, Depends(current_user)])
 @router.post("/statuses/{id}/unreblog")
 async def unreblog_status(id: str, claims: Annotated[dict, Depends(current_user)]):
     username = _username(claims)
-    row = await _boosted_row(id)
+    row = await _boosted_row(id, _viewer(claims))
     actor_url = actor_url_from_username(username)
     announce_url = await (await as_objects.storage()).boost_of(actor_url, row["content"]["url"])
     if announce_url is not None:

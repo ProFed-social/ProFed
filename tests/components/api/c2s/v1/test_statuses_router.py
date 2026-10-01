@@ -882,3 +882,21 @@ def test_a_direct_status_goes_to_the_mentioned_actor(client, fake_bus):
     assert obj["to"] == [BOB_URL]
     assert obj["cc"] == []
 
+
+def test_get_status_asks_the_storage_on_behalf_of_the_logged_in_user(client, fake_bus):
+    store = Mock(get=AsyncMock(return_value=None))
+
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        client.get("/statuses/424242")
+
+    assert store.get.await_args.args == ("424242", "https://example.com/actors/alice")
+
+
+def test_reblogging_asks_the_storage_on_behalf_of_the_logged_in_user(client, fake_bus):
+    store = Mock(get=AsyncMock(return_value=None))
+
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        client.post("/statuses/424242/reblog")
+
+    assert store.get.await_args.args == ("424242", "https://example.com/actors/alice")
+

@@ -266,7 +266,7 @@ async def test_the_instance_actor_is_not_recorded_either(fake_objects, fake_memb
 async def test_a_payload_without_an_audience_is_taken_as_public(fake_objects, fake_memberships):
     await projection._on_store("https://remote/activities/1", _payload())
 
-    assert fake_objects.audience[0] == {"visibility": "public", "recipients": []}
+    assert fake_objects.audience[0] == {"visibility": "public", "recipients": [], "emitted_at": None}
 
 
 @pytest.mark.asyncio

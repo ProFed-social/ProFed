@@ -32,7 +32,8 @@ async def _store(username: str,
                  status: dict,
                  reference: dict | None,
                  visibility: str,
-                 recipients: list[str]) -> None:
+                 recipients: list[str],
+                 emitted_at: str | None) -> None:
     await (await as_objects.storage()).upsert(status["id"],
                                               url,
                                               actor_url,
@@ -41,7 +42,8 @@ async def _store(username: str,
                                               visibility=visibility,
                                               recipients=[recipient
                                                           for recipient in recipients
-                                                          if is_local_actor_url(recipient)])
+                                                          if is_local_actor_url(recipient)],
+                                              emitted_at=emitted_at)
     await (await user_timeline.storage()).add(username, url)
 
 
@@ -52,7 +54,8 @@ async def _apply_item(data: dict) -> None:
                  data["status"],
                  data.get("reference"),
                  data.get("visibility", "public"),
-                 data.get("recipients", []))
+                 data.get("recipients", []),
+                 data.get("emitted_at"))
 
 
 async def _on_store(object_id: str, payload: dict) -> None:
@@ -62,7 +65,9 @@ async def _on_store(object_id: str, payload: dict) -> None:
                  payload["status"],
                  payload.get("reference"),
                  payload.get("visibility", "public"),
-                 payload.get("recipients", []))
+                 payload.get("recipients", []),
+                 payload.get("emitted_at"))
+
 
 
 async def _on_update(object_id: str, payload: dict) -> None:

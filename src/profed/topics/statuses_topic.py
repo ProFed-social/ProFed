@@ -89,6 +89,7 @@ def status_event(event_type: str,
             "reference": reference_of(event_type, activity),
             "visibility": visibility_of(activity),
             "recipients": recipients_of(activity),
+            "emitted_at": emitted_at.isoformat(),
             "status": Status.from_activity(activity,
                                            id=status_id(emitted_at,
                                                         sequence_id, own=own)).model_dump(exclude={"account"})}

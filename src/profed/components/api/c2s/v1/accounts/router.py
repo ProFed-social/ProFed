@@ -160,7 +160,8 @@ async def account_statuses(id: str,
     return await service.make_statuses(await (await as_objects.storage()).fetch_by_actor(account.uri or account.url,
                                                                                          limit=limit,
                                                                                          max_id=max_id,
-                                                                                         since_id=since_id),
+                                                                                         since_id=since_id,
+                                                                                         viewer=_viewer(claims)),
                                        _viewer(claims))
 
 

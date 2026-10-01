@@ -165,8 +165,8 @@ async def test_upsert_hands_the_object_to_the_database(fake_pool, fake_conn):
     await (await as_objects.storage()).upsert("42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None)
 
     sql, *args = fake_conn.execute.await_args.args
-    assert "SELECT api.store_object(" in sql
-    assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None, None, "public", []]
+    assert "api.store_object(" in sql
+    assert args == ["42", "https://r/1", "https://r/bob", {"id": "42"}, "content", None, None, "public", [], None]
 
 
 @pytest.mark.asyncio
@@ -248,8 +248,8 @@ async def test_get_resolves_the_content_via_the_function(fake_pool, fake_conn):
     result = await (await as_objects.storage()).get("42")
 
     sql, *args = fake_conn.fetchrow.await_args.args
-    assert "api.resolve_content(url)" in sql
-    assert args == ["42"]
+    assert "api.resolve_content(o.url)" in sql
+    assert args == ["42", None]
     assert result["content"] == {"id": "1", "content": "ziel"}
 
 
@@ -269,9 +269,9 @@ async def test_fetch_by_actor_resolves_filters_unresolved_and_paginates(fake_poo
     assert "CROSS JOIN LATERAL" in sql
     assert "api.resolve_content(o.url)" in sql
     assert "r.content IS NOT NULL" in sql
-    assert "o.actor_url, o.kind" in sql
-    assert "ORDER BY o.mastodon_id DESC" in sql
-    assert args == ["https://r/bob", 5, "99", None]
+    assert "o.kind IN ('content', 'announce')" in sql
+    assert "o.mastodon_id DESC" in sql
+    assert args == ["https://r/bob", 5, "99", None, None]
     assert [row["mastodon_id"] for row in result] == [43]
 
 
@@ -343,7 +343,7 @@ async def test_thread_of_walks_same_author_replies_ordered_and_resolved(fake_poo
     assert "c.actor_url = t.actor_url" in sql
     assert "api.resolve_content(o.url)" in sql
     assert "ORDER BY" in sql and "th.sortkey" in sql
-    assert args == ["https://r/a1", 10, True]
+    assert args == ["https://r/a1", 10, True, None]
     assert [row["url"] for row in result] == ["https://r/a1", "https://r/a2"]
 
 
@@ -371,7 +371,7 @@ async def test_discussion_of_walks_all_authors_via_break_flag(fake_pool, fake_co
     sql, *args = fake_conn.fetch.await_args.args
     assert "WITH RECURSIVE thread" in sql
     assert "NOT $3::boolean OR c.actor_url = t.actor_url" in sql
-    assert args == ["https://r/root", 10, False]
+    assert args == ["https://r/root", 10, False, None]
 
 
 @pytest.mark.asyncio
@@ -726,7 +726,7 @@ async def test_upsert_hands_over_the_visibility_and_the_recipients(fake_pool, fa
                                               visibility="direct",
                                               recipients=["https://r/carol"])
 
-    assert fake_conn.execute.await_args.args[8:] == ("direct", ["https://r/carol"])
+    assert fake_conn.execute.await_args.args[8:10] == ("direct", ["https://r/carol"])
 
 
 @pytest.mark.asyncio
@@ -738,4 +738,71 @@ async def test_store_object_records_who_may_read_a_directed_object(fake_pool, fa
 
     assert "api.private_object_access (object_url, actor_url)" in body
     assert "p_visibility = 'direct'" in body
+
+
+@pytest.mark.asyncio
+async def test_get_asks_only_for_what_the_viewer_may_see(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = None
+
+    await (await as_objects.storage()).get("42", "https://example.com/actors/alice")
+
+    sql, *args = fake_conn.fetchrow.await_args.args
+    assert "api.private_object_access" in sql
+    assert "api.follows" in sql
+    assert args == ["42", "https://example.com/actors/alice"]
+
+
+@pytest.mark.asyncio
+async def test_get_lets_the_author_see_their_own_object(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = None
+
+    await (await as_objects.storage()).get("42", "https://example.com/actors/alice")
+
+    assert "o.actor_url = $2" in fake_conn.fetchrow.await_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_fetch_by_actor_shows_only_what_the_viewer_may_see(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await as_objects.storage()).fetch_by_actor("https://r/bob", viewer="https://example.com/actors/alice")
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "api.private_object_access" in sql
+    assert "api.follows" in sql
+    assert args[4] == "https://example.com/actors/alice"
+
+
+@pytest.mark.asyncio
+async def test_fetch_by_actor_shows_a_stranger_only_the_public_posts(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await as_objects.storage()).fetch_by_actor("https://r/bob")
+
+    assert "o.visibility = 'public'" in fake_conn.fetch.await_args.args[0]
+    assert fake_conn.fetch.await_args.args[5] is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_by_actor_also_weighs_the_post_a_boost_points_at(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await as_objects.storage()).fetch_by_actor("https://r/bob", viewer="https://example.com/actors/alice")
+
+    sql = fake_conn.fetch.await_args.args[0]
+    assert "target AS t ON t.url = COALESCE(o.target_url, o.url)" in sql
+    assert "t.visibility = 'public'" in sql
+    assert "ta.object_url IS NOT NULL" in sql
+    assert "t.visibility = 'followers' AND tf.following IS NOT NULL" in sql
+
+
+@pytest.mark.asyncio
+async def test_fetch_by_actor_keeps_the_helper_queries_inlined(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await as_objects.storage()).fetch_by_actor("https://r/bob")
+
+    sql = fake_conn.fetch.await_args.args[0]
+    assert "private_access AS NOT MATERIALIZED" in sql
+    assert "follows AS NOT MATERIALIZED" in sql
 
