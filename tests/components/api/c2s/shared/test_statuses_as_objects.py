@@ -408,9 +408,34 @@ async def test_rows_for_urls_fetches_rows_for_a_url_list(fake_pool, fake_conn):
     await (await as_objects.storage()).rows_for_urls(["https://x/1", "https://x/2"])
 
     sql, *args = fake_conn.fetch.await_args.args
-    assert "api.resolve_content(url)" in sql
-    assert "WHERE url = ANY($1::text[])" in sql
-    assert args == [["https://x/1", "https://x/2"]]
+
+    assert "api.resolve_content(o.url)" in sql
+    assert "o.url = ANY($1::text[])" in sql
+    assert args == [["https://x/1", "https://x/2"], None]
+
+
+@pytest.mark.asyncio
+async def test_rows_for_urls_drops_what_the_viewer_may_not_see(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await as_objects.storage()).rows_for_urls(["https://x/1"], "https://example.com/actors/me")
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "api.private_object_access" in sql
+    assert "o.visibility = 'public'" in sql
+    assert args[1] == "https://example.com/actors/me"
+
+
+@pytest.mark.asyncio
+async def test_rows_for_urls_also_weighs_the_post_a_boost_points_at(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await as_objects.storage()).rows_for_urls(["https://x/1"], "https://example.com/actors/me")
+
+    sql = fake_conn.fetch.await_args.args[0]
+    assert "target AS t ON t.url = COALESCE(o.target_url, o.url)" in sql
+    assert "t.visibility = 'followers' AND tf.following IS NOT NULL" in sql
+
 
 
 @pytest.mark.asyncio

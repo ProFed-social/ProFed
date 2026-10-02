@@ -543,16 +543,56 @@ class _storage(BaseStorage):
                                    actor_url)
         return row["url"] if row else None
 
-    async def rows_for_urls(self, urls: list[str]) -> List[dict]:
-        return await self.fetch_all("""SELECT mastodon_id,
-                                              url,
-                                              actor_url,
-                                              kind,
-                                              status,
-                                              api.resolve_content(url) AS content
-                                       FROM api.as_objects
-                                       WHERE url = ANY($1::text[])""",
-                                    urls)
+    async def rows_for_urls(self, urls: list[str], viewer: Optional[str] = None) -> List[dict]:
+        return await self.fetch_all("""
+            WITH
+                private_access AS NOT MATERIALIZED
+                    (SELECT
+                         object_url
+                     FROM
+                         api.private_object_access
+                     WHERE
+                         actor_url = $2),
+                follows AS NOT MATERIALIZED
+                    (SELECT
+                         following
+                     FROM
+                         api.follows
+                     WHERE
+                         follower = $2 AND
+                         state = 'accepted'),
+                target AS
+                    (SELECT
+                         t.*
+                     FROM
+                         api.as_objects AS t LEFT JOIN
+                         private_access AS ta ON ta.object_url = t.url LEFT JOIN
+                         follows AS tf ON tf.following = t.actor_url
+                     WHERE
+                         t.visibility = 'public' OR
+                         t.actor_url = $2 OR
+                         ta.object_url IS NOT NULL OR
+                         (t.visibility = 'followers' AND tf.following IS NOT NULL))
+            SELECT
+                o.mastodon_id,
+                o.url,
+                o.actor_url,
+                o.kind,
+                o.status,
+                api.resolve_content(o.url) AS content
+            FROM
+                api.as_objects AS o JOIN
+                target AS t ON t.url = COALESCE(o.target_url, o.url) LEFT JOIN
+                private_access AS a ON a.object_url = o.url LEFT JOIN
+                follows AS f ON f.following = o.actor_url
+            WHERE
+                o.url = ANY($1::text[]) AND
+                (o.visibility = 'public' OR
+                 o.actor_url = $2 OR
+                 a.object_url IS NOT NULL OR
+                 (o.visibility = 'followers' AND f.following IS NOT NULL))""",
+                                    urls,
+                                    viewer)
 
     async def fetch_by_actor(self,
                              actor_url: str,

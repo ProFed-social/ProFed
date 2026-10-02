@@ -62,3 +62,13 @@ def test_lists_active_flag_set_after_init():
 def test_get_filters_returns_empty_list(client):
     assert client.get("/filters").json() == []
 
+
+def test_bookmarked_statuses_are_read_on_behalf_of_the_logged_in_user(client):
+    objects = Mock(rows_for_urls=AsyncMock(return_value=[]))
+
+    with _marks(page=AsyncMock(return_value=[{"object_url": "https://r/1", "marked_at": "2026-01-01T00:00:00Z"}])), \
+         patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=objects)):
+        client.get("/bookmarks")
+
+    assert objects.rows_for_urls.await_args.args == (["https://r/1"], "https://example.com/actors/alice")
+

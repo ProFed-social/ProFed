@@ -179,3 +179,25 @@ def test_the_cursor_reaches_the_storage(client):
 
     store.messages_of.assert_awaited_once_with("https://r/root", 7, "400")
 
+
+def test_the_last_messages_are_read_on_behalf_of_the_logged_in_user(client):
+    conversations = Mock(conversations_of=AsyncMock(return_value=[{"conversation_id": "https://r/root",
+                                                                   "accounts": [],
+                                                                   "last_message": "https://r/m4", "cursor": 400}]))
+    objects = Mock(rows_for_urls=AsyncMock(return_value=[]),
+                   mastodon_ids_for=AsyncMock(return_value={}))
+
+    with patch("profed.components.api.c2s.v1.conversations.router.actor_url_from_username",
+               lambda username: f"https://local/actors/{username}"), \
+         patch("profed.components.api.c2s.shared.conversations.storage.storage",
+               AsyncMock(return_value=conversations)), \
+         patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=objects)), \
+         patch("profed.components.api.c2s.shared.known_accounts.storage.storage",
+               AsyncMock(return_value=Mock(get_by_actor_url=AsyncMock(return_value=None)))), \
+         patch("profed.components.api.c2s.shared.statuses.service.make_statuses",
+               AsyncMock(return_value=[])):
+        client.get("/conversations")
+
+    assert objects.rows_for_urls.await_args.args == (["https://r/m4"], "https://local/actors/alice")
+

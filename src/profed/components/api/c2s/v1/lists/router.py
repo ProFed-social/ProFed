@@ -29,7 +29,8 @@ async def get_lists(claims: Annotated[dict, Depends(current_user)]):
 
 async def _marked_statuses(marks: list, actor_url: str) -> list:
     rows = {row["url"]: row
-            for row in await (await as_objects.storage()).rows_for_urls([mark["object_url"] for mark in marks])}
+            for row in await (await as_objects.storage())
+            .rows_for_urls([mark["object_url"] for mark in marks], actor_url)}
     found = [mark for mark in marks if mark["object_url"] in rows]
 
     return [{"marked_at": mark["marked_at"], "status": status}
@@ -69,37 +70,31 @@ async def create_list(claims: Annotated[dict, Depends(current_user)]):
 
 
 @router.get("/lists/{id}")
-async def get_list(id: str,
-                   claims: Annotated[dict, Depends(current_user)] = None):
+async def get_list(id: str, claims: Annotated[dict, Depends(current_user)] = None):
     raise HTTPException(status_code=404, detail="list_not_found")
 
 
 @router.put("/lists/{id}")
-async def update_list(id: str,
-                      claims: Annotated[dict, Depends(current_user)]):
+async def update_list(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="list_not_found")
 
 
 @router.delete("/lists/{id}")
-async def delete_list(id: str,
-                      claims: Annotated[dict, Depends(current_user)]):
+async def delete_list(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="list_not_found")
 
 
 @router.get("/lists/{id}/accounts")
-async def get_list_accounts(id: str,
-                            claims: Annotated[dict, Depends(current_user)] = None):
+async def get_list_accounts(id: str, claims: Annotated[dict, Depends(current_user)] = None):
     raise HTTPException(status_code=404, detail="list_not_found")
 
 
 @router.post("/lists/{id}/accounts")
-async def add_list_accounts(id: str,
-                            claims: Annotated[dict, Depends(current_user)]):
+async def add_list_accounts(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="list_not_found")
 
 
 @router.delete("/lists/{id}/accounts")
-async def remove_list_accounts(id: str,
-                              claims: Annotated[dict, Depends(current_user)]):
+async def remove_list_accounts(id: str, claims: Annotated[dict, Depends(current_user)]):
     raise HTTPException(status_code=404, detail="list_not_found")
 
