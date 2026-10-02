@@ -856,38 +856,68 @@ class _storage(BaseStorage):
                                     break_on_author,
                                     viewer)
 
-    async def thread_of(self, root_url: str, max_depth: int = 20) -> List[dict]:
-        return await self.descendants_of(root_url, max_depth, True)
+    async def thread_of(self, root_url: str, max_depth: int = 20, viewer: Optional[str] = None) -> List[dict]:
+        return await self.descendants_of(root_url, max_depth, True, viewer)
 
-    async def discussion_of(self, root_url: str, max_depth: int = 20) -> List[dict]:
-        return await self.descendants_of(root_url, max_depth, False)
+    async def discussion_of(self, root_url: str, max_depth: int = 20, viewer: Optional[str] = None) -> List[dict]:
+        return await self.descendants_of(root_url, max_depth, False, viewer)
 
-    async def ancestors_of(self, url: str, max_depth: int, break_on_author: bool) -> List[dict]:
+    async def ancestors_of(self,
+                           url: str,
+                           max_depth: int,
+                           break_on_author: bool,
+                           viewer: Optional[str] = None) -> List[dict]:
         return await self.fetch_all("""
+            WITH
+                private_access AS NOT MATERIALIZED
+                    (SELECT
+                         object_url
+                     FROM
+                         api.private_object_access
+                     WHERE
+                         actor_url = $4),
+                follows AS NOT MATERIALIZED
+                    (SELECT
+                         following
+                     FROM
+                         api.follows
+                     WHERE
+                         follower = $4 AND
+                         state = 'accepted')
             SELECT
                 o.mastodon_id,
                 o.url,
-                o.actor_url,
-                o.kind,
-                o.status,
-                r.content
+                o.status->>'in_reply_to_id' AS in_reply_to,
+                o.emitted_at,
+                v.visible,
+                CASE WHEN v.visible THEN o.actor_url END AS actor_url,
+                CASE WHEN v.visible THEN o.kind END AS kind,
+                CASE WHEN v.visible THEN o.status END AS status,
+                CASE WHEN v.visible THEN r.content END AS content
             FROM
                 api.ancestor_chain($1, $2, $3::boolean) AS a INNER JOIN
-                api.as_objects AS o ON o.url = a.url CROSS JOIN LATERAL
+                api.as_objects AS o ON o.url = a.url LEFT JOIN
+                private_access AS pa ON pa.object_url = o.url LEFT JOIN
+                follows AS f ON f.following = o.actor_url CROSS JOIN LATERAL
+                (SELECT
+                     o.visibility = 'public' OR
+                     o.actor_url IS NOT DISTINCT FROM $4 OR
+                     pa.object_url IS NOT NULL OR
+                     (o.visibility = 'followers' AND f.following IS NOT NULL) AS visible) AS v
+                CROSS JOIN LATERAL
                 (SELECT api.resolve_content(o.url) AS content) AS r
-            WHERE
-                a.depth > 1
             ORDER BY
                 a.depth DESC""",
                                     url,
                                     max_depth,
-                                    break_on_author)
+                                    break_on_author,
+                                    viewer)
 
-    async def thread_ancestors(self, url: str, max_depth: int = 20) -> List[dict]:
-        return await self.ancestors_of(url, max_depth, True)
+    async def thread_ancestors(self, url: str, max_depth: int = 20, viewer: Optional[str] = None) -> List[dict]:
+        return await self.ancestors_of(url, max_depth, True, viewer)
 
-    async def discussion_ancestors(self, url: str, max_depth: int = 20) -> List[dict]:
-        return await self.ancestors_of(url, max_depth, False)
+    async def discussion_ancestors(self, url: str, max_depth: int = 20, viewer: Optional[str] = None) -> List[dict]:
+        return await self.ancestors_of(url, max_depth, False, viewer)
 
     async def boosted_parts(self, booster: str, part_urls: list[str]) -> list[str]:
         rows = await self.fetch_all("""SELECT api.content_url(o.url) AS boosted_part

@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
+from profed.components.api.c2s.shared.statuses import hidden
 from profed.components.api.c2s.shared.auth import current_user
 from profed.models.mastodon import Account
 from profed.identity import account_id, actor_url_from_username, heuristic_acct
@@ -250,11 +251,21 @@ def test_status_context_returns_empty_context(client, fake_bus):
     assert data["descendants"] == []
 
 
+def _tree_row(url, parent=None, visible=True, mastodon_id="1"):
+    return {"url": url,
+            "in_reply_to": parent,
+            "visible": visible,
+            "mastodon_id": mastodon_id,
+            "emitted_at": "2026-10-01T12:00:00+00:00"}
+
+
 def test_status_context_walks_the_discussion_tree_excluding_the_status_itself(client, fake_bus):
     storage = Mock(get=AsyncMock(return_value={"url": "https://r/s"}),
-                   discussion_ancestors=AsyncMock(return_value=[{"url": "https://r/root"}]),
-                   discussion_of=AsyncMock(return_value=[{"url": "https://r/s"},
-                                                         {"url": "https://r/reply"}]))
+                   discussion_ancestors=AsyncMock(
+                       return_value=[_tree_row("https://r/root", mastodon_id="0"),
+                                     _tree_row("https://r/s", "https://r/root", True, "1")]),
+                   discussion_of=AsyncMock(return_value=[_tree_row("https://r/s", mastodon_id="1"),
+                                                         _tree_row("https://r/reply", "https://r/s", True, "2")]))
     make = AsyncMock(return_value=[])
     with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
                AsyncMock(return_value=storage)), \
@@ -262,9 +273,35 @@ def test_status_context_walks_the_discussion_tree_excluding_the_status_itself(cl
         response = client.get("/statuses/42/context")
 
     assert response.status_code == 200
-    storage.discussion_ancestors.assert_awaited_once_with("https://r/s")
-    storage.discussion_of.assert_awaited_once_with("https://r/s")
-    assert make.await_args_list[1].args[0] == [{"url": "https://r/reply"}]
+    storage.discussion_ancestors.assert_awaited_once_with("https://r/s", viewer="https://example.com/actors/alice")
+    storage.discussion_of.assert_awaited_once_with("https://r/s", viewer="https://example.com/actors/alice")
+    assert [row["url"] for row in make.await_args_list[1].args[0]] == ["https://r/reply"]
+
+
+def test_status_context_is_read_on_behalf_of_the_logged_in_user(client, fake_bus):
+    storage = Mock(get=AsyncMock(return_value=None))
+
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=storage)):
+        client.get("/statuses/42/context")
+
+    assert storage.get.await_args.args == ("42", "https://example.com/actors/alice")
+
+
+def test_status_context_puts_a_placeholder_where_a_subtree_is_hidden(client, fake_bus):
+    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s"}),
+                   discussion_ancestors=AsyncMock(return_value=[]),
+                   discussion_of=AsyncMock(return_value=[_tree_row("https://r/s", mastodon_id="1"),
+                                                         _tree_row("https://r/x", "https://r/s", False, "2"),
+                                                         _tree_row("https://r/y", "https://r/x", True, "3")]))
+    make = AsyncMock(return_value=[])
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=storage)), \
+         patch("profed.components.api.c2s.shared.statuses.service.make_statuses", make):
+        client.get("/statuses/42/context")
+
+    handed = make.await_args_list[1].args[0]
+    assert [row["url"] for row in handed] == ["https://r/x", "https://r/y"]
+    assert handed[0]["content"]["status"]["content"] == hidden.HIDDEN_CONTENT
 
 
 def test_favourite_returns_404(client, fake_bus):
@@ -899,4 +936,22 @@ def test_reblogging_asks_the_storage_on_behalf_of_the_logged_in_user(client, fak
         client.post("/statuses/424242/reblog")
 
     assert store.get.await_args.args == ("424242", "https://example.com/actors/alice")
+
+
+def test_status_context_hides_what_the_viewer_may_not_see_above_the_status(client, fake_bus):
+    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s"}),
+                   discussion_ancestors=AsyncMock(return_value=[_tree_row("https://r/top", mastodon_id="1"),
+                                                                _tree_row("https://r/mid", "https://r/top", False, "2"),
+                                                                _tree_row("https://r/s", "https://r/mid", True, "3")]),
+                   discussion_of=AsyncMock(return_value=[]))
+    make = AsyncMock(return_value=[])
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=storage)), \
+         patch("profed.components.api.c2s.shared.statuses.service.make_statuses", make):
+        client.get("/statuses/42/context")
+
+    handed = make.await_args_list[0].args[0]
+    assert [row["url"] for row in handed] == ["https://r/top", "https://r/mid"]
+    assert handed[1]["content"]["status"]["content"] == hidden.HIDDEN_CONTENT
+    assert handed[1]["content"]["status"]["in_reply_to_id"] == "https://r/top"
 

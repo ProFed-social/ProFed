@@ -24,7 +24,7 @@ from profed.components.api.c2s.shared.pagination import cursor_in, only, paginat
 from profed.topics.bookmarks_topic import publish_bookmark
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
-from profed.components.api.c2s.shared.statuses import as_objects, service
+from profed.components.api.c2s.shared.statuses import as_objects, hidden, service
 from profed.components.api.c2s.shared.conversations import storage as conversations_storage
 from profed.sanitize import sanitize_html
 from profed import mentions
@@ -195,14 +195,20 @@ async def status_context(id: str, claims: Annotated[dict, Depends(current_user)]
     if not id.isdigit():
         return StatusContext()
     storage = await as_objects.storage()
-    row = await storage.get(id)
+    viewer = _viewer(claims)
+    row = await storage.get(id, viewer)
     if row is None:
         return StatusContext()
 
-    ancestors = await storage.discussion_ancestors(row["url"])
-    descendants = [r for r in await storage.discussion_of(row["url"]) if r["url"] != row["url"]]
-    return StatusContext(ancestors=await service.make_statuses(ancestors, _viewer(claims)),
-                         descendants=await service.make_statuses(descendants, _viewer(claims)))
+    async def without_the_hidden(parts):
+        shown, placeholders = hidden.collapse(parts)
+        return sorted([part for part in shown if part["url"] != row["url"]] + hidden.as_rows(placeholders),
+                      key=lambda part: int(part["mastodon_id"]))
+
+    ancestors = await without_the_hidden(await storage.discussion_ancestors(row["url"], viewer=viewer))
+    descendants = await without_the_hidden(await storage.discussion_of(row["url"], viewer=viewer))
+    return StatusContext(ancestors=await service.make_statuses(ancestors, viewer),
+                         descendants=await service.make_statuses(descendants, viewer))
 
 
 @router.post("/statuses/{id}/favourite")

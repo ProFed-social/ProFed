@@ -6,16 +6,13 @@ from urllib.parse import urlparse
 from profed.identity import (username_from_acct,
                              actor_url_from_username,
                              acct_from_username,
+                             instance_actor_url,
                              domain)
 from profed.components.api.s2s.webfinger.storage import storage
 
 
 def instance_acct() -> str:
     return f"{domain()}@{domain()}"
-
-
-def instance_actor_url() -> str:
-    return f"https://{domain()}/actor"
 
 
 async def _from_username(username: str, conversion: Callable[[str], str | None]) -> str | None:

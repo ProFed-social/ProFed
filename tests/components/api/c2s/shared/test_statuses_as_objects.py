@@ -375,16 +375,30 @@ async def test_discussion_of_walks_all_authors_via_break_flag(fake_pool, fake_co
 
 
 @pytest.mark.asyncio
-async def test_discussion_ancestors_joins_ancestor_chain_without_the_status_itself(fake_pool, fake_conn):
+async def test_discussion_ancestors_joins_ancestor_chain_including_the_status_itself(fake_pool, fake_conn):
     fake_conn.fetch.return_value = [{"url": "https://r/root", "content": {"id": "1"}}]
 
     await (await as_objects.storage()).discussion_ancestors("https://r/leaf", max_depth=10)
 
     sql, *args = fake_conn.fetch.await_args.args
     assert "api.ancestor_chain($1, $2, $3::boolean)" in sql
-    assert "a.depth > 1" in sql
-    assert "ORDER BY\n                a.depth DESC" in sql
-    assert args == ["https://r/leaf", 10, False]
+    assert "a.depth > 1" not in sql
+    assert re.search(r"ORDER BY\s+a\.depth DESC", sql)
+    assert args == ["https://r/leaf", 10, False, None]
+
+
+@pytest.mark.asyncio
+async def test_discussion_ancestors_marks_what_the_viewer_may_not_see(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await as_objects.storage()).discussion_ancestors("https://r/leaf", viewer="https://example.com/actors/me")
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "api.private_object_access" in sql
+    assert "o.visibility = 'public'" in sql
+    assert "pa.object_url IS NOT NULL" in sql
+    assert "o.visibility = 'followers' AND f.following IS NOT NULL" in sql
+    assert args[3] == "https://example.com/actors/me"
 
 
 @pytest.mark.asyncio

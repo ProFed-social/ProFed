@@ -19,6 +19,10 @@ def acct_from_username(username: str) -> str:
     return f"{username}@{domain()}"
 
 
+def instance_actor_url() -> str:
+    return f"https://{domain()}/actor"
+
+
 def actor_url_from_username(username: str) -> str:
     return f"https://{domain()}/actors/{username}"
 
