@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Annotated, Optional
 from profed.components.api.c2s.shared.statuses import user_timeline, service
-from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.components.api.c2s.shared.pagination import paginated
 from profed.identity import actor_url_from_username
 
@@ -28,12 +28,13 @@ async def home_timeline(claims: Annotated[dict, Depends(current_user)],
     rows = await (await user_timeline.storage()).fetch(username,
                                                        limit=limit,
                                                        max_id=max_id,
-                                                       since_id=since_id)
+                                                       since_id=since_id,
+                                                       viewer=actor_url_from_username(username))
     return await service.make_statuses(rows, actor_url_from_username(username))
 
 
 @router.get("/timelines/public")
-async def public_timeline(claims: Annotated[dict, Depends(current_user)],
+async def public_timeline(claims: Annotated[dict | None, Depends(current_user_optional)],
                           limit: int = Query(default=20, ge=1, le=40),
                           max_id: Optional[str] = Query(default=None),
                           since_id: Optional[str] = Query(default=None),
@@ -43,7 +44,7 @@ async def public_timeline(claims: Annotated[dict, Depends(current_user)],
 
 @router.get("/timelines/tag/{hashtag}")
 async def hashtag_timeline(hashtag: str,
-                           claims: Annotated[dict, Depends(current_user)],
+                           claims: Annotated[dict | None, Depends(current_user_optional)],
                            limit: int = Query(default=20, ge=1, le=40),
                            max_id: Optional[str] = Query(default=None),
                            since_id: Optional[str] = Query(default=None),

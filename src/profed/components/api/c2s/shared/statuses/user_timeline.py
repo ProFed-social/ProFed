@@ -39,22 +39,62 @@ class _storage(BaseStorage):
                     username: str,
                     limit: int = 20,
                     max_id: Optional[str] = None,
-                    since_id: Optional[str] = None) -> List[dict]:
-        return await self.fetch_all("""SELECT o.mastodon_id, o.url, o.actor_url, o.kind, o.status, r.content
-                                       FROM api.as_objects o
-                                       JOIN api.user_timeline ut ON ut.object_url = o.url
-                                       CROSS JOIN LATERAL
-                                            (SELECT api.resolve_content(o.url) AS content) r
-                                       WHERE ut.username = $1
-                                         AND ($3::numeric IS NULL OR o.mastodon_id < $3::numeric)
-                                         AND ($4::numeric IS NULL OR o.mastodon_id > $4::numeric)
-                                         AND r.content IS NOT NULL
-                                       ORDER BY o.mastodon_id DESC
-                                       LIMIT $2""",
+                    since_id: Optional[str] = None,
+                    viewer: Optional[str] = None) -> List[dict]:
+        return await self.fetch_all("""
+            WITH
+                private_access AS NOT MATERIALIZED
+                    (SELECT
+                         object_url
+                     FROM
+                         api.private_object_access
+                     WHERE
+                         actor_url = $5),
+                follows AS NOT MATERIALIZED
+                    (SELECT
+                         following
+                     FROM
+                         api.follows
+                     WHERE
+                         follower = $5 AND
+                         state = 'accepted'),
+                target AS
+                    (SELECT
+                         t.*
+                     FROM
+                         api.as_objects AS t LEFT JOIN
+                         private_access AS ta ON ta.object_url = t.url LEFT JOIN
+                         follows AS tf ON tf.following = t.actor_url
+                     WHERE
+                         t.visibility = 'public' OR
+                         t.actor_url = $5 OR
+                         ta.object_url IS NOT NULL OR
+                         (t.visibility = 'followers' AND tf.following IS NOT NULL))
+            SELECT
+                o.mastodon_id,
+                o.url,
+                o.actor_url,
+                o.kind,
+                o.status,
+                r.content
+            FROM
+                api.as_objects AS o JOIN
+                api.user_timeline AS ut ON ut.object_url = o.url JOIN
+                target AS t ON t.url = COALESCE(o.target_url, o.url) CROSS JOIN LATERAL
+                (SELECT api.resolve_content(o.url) AS content) AS r
+            WHERE
+                ut.username = $1 AND
+                ($3::numeric IS NULL OR o.mastodon_id < $3::numeric) AND
+                ($4::numeric IS NULL OR o.mastodon_id > $4::numeric) AND
+                r.content IS NOT NULL
+            ORDER BY
+                o.mastodon_id DESC
+            LIMIT $2""",
                                     username,
                                     limit,
                                     max_id,
-                                    since_id)
+                                    since_id,
+                                    viewer)
 
     def thread_roots(self, username: str, max_depth: int = 20):
         return self.stream("""SELECT o.mastodon_id,

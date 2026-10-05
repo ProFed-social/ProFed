@@ -505,10 +505,11 @@ class _storage(BaseStorage):
             SELECT
                 o.mastodon_id,
                 o.url,
-                o.actor_url,
-                o.kind,
-                o.status,
-                api.resolve_content(o.url) AS content
+                v.visible,
+                CASE WHEN v.visible THEN o.actor_url END AS actor_url,
+                CASE WHEN v.visible THEN o.kind END AS kind,
+                CASE WHEN v.visible THEN o.status END AS status,
+                CASE WHEN v.visible THEN api.resolve_content(o.url) END AS content
             FROM
                 api.as_objects AS o LEFT JOIN
                 api.private_object_access AS a ON
@@ -517,13 +518,14 @@ class _storage(BaseStorage):
                 api.follows AS f ON
                     f.following = o.actor_url AND
                     f.follower = $2 AND
-                    f.state = 'accepted'
+                    f.state = 'accepted' CROSS JOIN LATERAL
+                (SELECT
+                     o.visibility = 'public' OR
+                     o.actor_url IS NOT DISTINCT FROM $2 OR
+                     a.object_url IS NOT NULL OR
+                     (o.visibility = 'followers' AND f.follower IS NOT NULL) AS visible) AS v
             WHERE
-                o.mastodon_id = $1::numeric AND
-                (o.visibility = 'public' OR
-                 o.actor_url = $2 OR
-                 a.object_url IS NOT NULL OR
-                 (o.visibility = 'followers' AND f.follower IS NOT NULL))""",
+                o.mastodon_id = $1::numeric""",
                                     mastodon_id,
                                     viewer)
 

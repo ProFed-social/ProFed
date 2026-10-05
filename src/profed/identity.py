@@ -7,8 +7,18 @@ from urllib.parse import urlparse
 from profed.core.config import config
 
 
-def domain() -> str:
-    return config().get("web-server", {}).get("domain", "example.com")
+def _make_domain():
+    dom = None
+    def domain() -> str:
+        nonlocal dom
+
+        if dom is None:
+            dom = config().get("web-server", {}).get("domain", "example.com")
+        return dom
+    return domain
+
+
+domain = _make_domain()
 
 
 def is_local(acct: str) -> bool:

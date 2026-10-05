@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from profed.models.mastodon import Account
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.components.api.c2s.v1.timelines import router as timelines_module
 from profed.components.api.c2s.shared.statuses import user_timeline
-from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
@@ -63,7 +63,7 @@ def _boost_row():
 class FakeStorage:
     def __init__(self, rows):
         self._rows = rows
-    async def fetch(self, username, limit=20, max_id=None, since_id=None, max_depth=20):
+    async def fetch(self, username, limit=20, max_id=None, since_id=None, max_depth=20, viewer=None):
         return self._rows
 
 
@@ -89,11 +89,11 @@ def client():
     app = FastAPI()
     app.include_router(timelines_module.router)
     app.dependency_overrides[current_user] = lambda: CLAIMS
+    app.dependency_overrides[current_user_optional] = lambda: CLAIMS
 
     yield TestClient(app)
 
     user_timeline._instance = backup
-
 
 
 def test_home_timeline_returns_the_content_status(fake_bus, client):
@@ -190,4 +190,38 @@ def test_an_empty_home_timeline_has_no_link_header(client, fake_bus):
         response = client.get("/timelines/home")
 
     assert "Link" not in response.headers
+
+
+def _anonymous_client():
+    timelines_module.init({})
+    app = FastAPI()
+    app.include_router(timelines_module.router)
+    app.dependency_overrides[current_user_optional] = lambda: None
+    return TestClient(app)
+
+
+def test_the_public_timeline_can_be_read_without_logging_in():
+    assert _anonymous_client().get("/timelines/public").status_code == 200
+
+
+def test_a_hashtag_timeline_can_be_read_without_logging_in():
+    assert _anonymous_client().get("/timelines/tag/profed").status_code == 200
+
+
+def test_the_home_timeline_still_needs_a_login():
+    timelines_module.init({})
+    app = FastAPI()
+    app.include_router(timelines_module.router)
+
+    assert TestClient(app).get("/timelines/home").status_code == 401
+
+
+def test_the_home_timeline_is_read_on_behalf_of_its_owner(fake_bus, client):
+    storage = Mock(fetch=AsyncMock(return_value=[]))
+
+    with patch("profed.components.api.c2s.shared.statuses.user_timeline.storage",
+               AsyncMock(return_value=storage)):
+        client.get("/timelines/home")
+
+    assert storage.fetch.await_args.kwargs["viewer"] == "https://example.com/actors/alice"
 

@@ -17,7 +17,7 @@ from profed.models.activity_pub import (AnnounceActivity,
                                         LikeActivity,
                                         UndoLikeActivity)
 from profed.models.mastodon import Status, StatusContext
-from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
 from profed.components.api.c2s.shared.pagination import cursor_in, only, paginated
@@ -107,7 +107,7 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
                                                   if entry not in addressed.get(key, [])]
                    for key, value in reply.items()}}
 
-    async def make_note(actor_url, in_reply_to, mentioned, content):
+    async def note(actor_url, in_reply_to, mentioned, content):
         return Note(id=f"{actor_url}/notes/{uuid.uuid4()}",
                     attributedTo=actor_url,
                     content=content,
@@ -117,25 +117,24 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
                     **merged(await addressing(actor_url, in_reply_to, mentioned),
                              await replied_to(in_reply_to)))
 
-    async def make_note_and_create_activity(actor_url, in_reply_to, mentioned, content):
-        note = await make_note(actor_url, in_reply_to, mentioned, content)
+    async def activity(actor_url, note):
         return (note,
                 CreateActivity(id=f"{actor_url}#create/{uuid.uuid4()}",
                                actor=actor_url,
                                to=note.to,
-                               object=note.model_dump(by_alias=True,
-                                                      exclude_none=True)))
+                               object=note.model_dump(by_alias=True, exclude_none=True)))
 
     content = sanitize_html(body.status)
     resolved = await mentions.resolve_all(content, _preliminary_resolver)
     note, activity = \
-        await make_note_and_create_activity(actor_url=actor_url_from_username(username),
-                                            in_reply_to=(await (await as_objects.storage()).get(body.in_reply_to_id,
-                                                                                                actor_url_from_username(username))
-                                                         if body.in_reply_to_id else
-                                                         None),
-                                            mentioned=[url for _, _, _, url in resolved if url is not None],
-                                            content=content)
+        await activity(actor_url_from_username(username),
+                       await note(actor_url_from_username(username),
+                                  (_readable(await (await as_objects.storage()).get(body.in_reply_to_id,
+                                                                                    actor_url_from_username(username)))
+                                   if body.in_reply_to_id else
+                                   None),
+                                  [url for _, _, _, url in resolved if url is not None],
+                                  content))
 
     async with message_bus().topic("raw_activities").publish() as publish:
         await publish(event_type="Create",
@@ -160,8 +159,8 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
 
 
 @router.get("/statuses/{id}")
-async def get_status(id: str, claims: Annotated[dict, Depends(current_user)] = None):
-    row = await (await as_objects.storage()).get(id, _viewer(claims)) if id.isdigit() else None
+async def get_status(id: str, claims: Annotated[dict | None, Depends(current_user_optional)]):
+    row = _readable(await (await as_objects.storage()).get(id, _viewer(claims)) if id.isdigit() else None)
     if row is None or row["content"] is None:
         raise HTTPException(status_code=404, detail="status_not_found")
     return (await service.make_statuses([row], _viewer(claims)))[0]
@@ -191,12 +190,12 @@ async def delete_status(id: str, claims: Annotated[dict, Depends(current_user)])
 
 
 @router.get("/statuses/{id}/context")
-async def status_context(id: str, claims: Annotated[dict, Depends(current_user)] = None):
+async def status_context(id: str, claims: Annotated[dict | None, Depends(current_user_optional)]):
     if not id.isdigit():
         return StatusContext()
     storage = await as_objects.storage()
     viewer = _viewer(claims)
-    row = await storage.get(id, viewer)
+    row = _readable(await storage.get(id, viewer))
     if row is None:
         return StatusContext()
 
@@ -256,8 +255,14 @@ def _username(claims: dict) -> str:
     return username
 
 
+def _readable(row: dict | None) -> dict | None:
+    if row is not None and not row["visible"]:
+        raise HTTPException(status_code=403, detail="status_not_visible")
+    return row
+
+
 async def _boosted_row(id: str, viewer: str | None) -> dict:
-    row = await (await as_objects.storage()).get(id, viewer) if id.isdigit() else None
+    row = _readable(await (await as_objects.storage()).get(id, viewer) if id.isdigit() else None)
     if row is None or row["content"] is None:
         raise HTTPException(status_code=404, detail="status_not_found")
 
@@ -414,7 +419,7 @@ async def edit_status(id: str, claims: Annotated[dict, Depends(current_user)]):
 
 
 @router.get("/statuses/{id}/history")
-async def status_history(id: str, claims: Annotated[dict, Depends(current_user)] = None):
+async def status_history(id: str, claims: Annotated[dict | None, Depends(current_user_optional)]):
     raise HTTPException(status_code=404, detail="status_not_found")
 
 

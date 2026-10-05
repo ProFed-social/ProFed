@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from profed.core import message_bus
 from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.statuses import hidden
-from profed.components.api.c2s.shared.auth import current_user
+from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.models.mastodon import Account
 from profed.identity import account_id, actor_url_from_username, heuristic_acct
 
@@ -22,6 +22,7 @@ def client(fake_bus):
     app = FastAPI()
     app.include_router(statuses_module.router)
     app.dependency_overrides[current_user] = lambda: CLAIMS
+    app.dependency_overrides[current_user_optional] = lambda: CLAIMS
     return TestClient(app)
 
 
@@ -65,7 +66,8 @@ BOOST_STATUS = {"id": "500",
 
 
 def _content_row():
-    return {"mastodon_id": 424242,
+    return {"visible": True,
+            "mastodon_id": 424242,
             "url": NOTE_URL,
             "actor_url": BOB_URL,
             "kind": "content",
@@ -74,7 +76,8 @@ def _content_row():
 
 
 def _boost_row():
-    return {"mastodon_id": 500,
+    return {"visible": True,
+            "mastodon_id": 500,
             "url": "https://remote.example/carol/announce/1",
             "actor_url": CAROL_URL,
             "kind": "announce",
@@ -146,7 +149,7 @@ def test_create_status_activity_has_context_and_to(client, fake_bus):
 
 
 def test_create_reply_sets_in_reply_to_and_direct_recipients(client, fake_bus):
-    root = {"url": "https://remote.example/notes/root"}
+    root = {"url": "https://remote.example/notes/root", "visible": True}
 
     async def by_actor_url(url):
         return {"acct": "bob-canonical@elsewhere.example"} if url == BOB_URL else None
@@ -171,7 +174,7 @@ def test_create_reply_sets_in_reply_to_and_direct_recipients(client, fake_bus):
 
 
 def test_create_public_reply_mentions_the_parent_author(client, fake_bus):
-    root = {"url": "https://remote.example/notes/root", "actor_url": BOB_URL}
+    root = {"url": "https://remote.example/notes/root", "actor_url": BOB_URL, "visible": True}
 
     async def by_actor_url(url):
         return {"acct": "bob-canonical@elsewhere.example"} if url == BOB_URL else None
@@ -260,7 +263,7 @@ def _tree_row(url, parent=None, visible=True, mastodon_id="1"):
 
 
 def test_status_context_walks_the_discussion_tree_excluding_the_status_itself(client, fake_bus):
-    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s"}),
+    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s", "visible": True}),
                    discussion_ancestors=AsyncMock(
                        return_value=[_tree_row("https://r/root", mastodon_id="0"),
                                      _tree_row("https://r/s", "https://r/root", True, "1")]),
@@ -288,7 +291,7 @@ def test_status_context_is_read_on_behalf_of_the_logged_in_user(client, fake_bus
 
 
 def test_status_context_puts_a_placeholder_where_a_subtree_is_hidden(client, fake_bus):
-    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s"}),
+    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s", "visible": True}),
                    discussion_ancestors=AsyncMock(return_value=[]),
                    discussion_of=AsyncMock(return_value=[_tree_row("https://r/s", mastodon_id="1"),
                                                          _tree_row("https://r/x", "https://r/s", False, "2"),
@@ -565,7 +568,8 @@ def test_get_status_404_when_the_boost_target_is_unresolvable(client):
     assert response.status_code == 404
 
 
-BOOSTED = {"mastodon_id": 424242,
+BOOSTED = {"visible": True,
+           "mastodon_id": 424242,
            "url": "https://remote.example/notes/7",
            "actor_url": "https://remote.example/users/bob",
            "kind": "content",
@@ -811,7 +815,8 @@ def test_favourited_by_refuses_less_than_one(client, fake_bus):
 
 
 def test_bookmarking_publishes_the_bookmark(client, fake_bus):
-    row = {"mastodon_id": 424242,
+    row = {"visible": True,
+           "mastodon_id": 424242,
            "url": NOTE_URL,
            "actor_url": "https://example.com/actors/bob",
            "kind": "content",
@@ -838,7 +843,8 @@ def test_bookmarking_publishes_the_bookmark(client, fake_bus):
 
 
 def test_unbookmarking_publishes_the_removal(client, fake_bus):
-    row = {"mastodon_id": 424242,
+    row = {"visible": True,
+           "mastodon_id": 424242,
            "url": NOTE_URL,
            "actor_url": "https://example.com/actors/bob",
            "kind": "content",
@@ -939,7 +945,7 @@ def test_reblogging_asks_the_storage_on_behalf_of_the_logged_in_user(client, fak
 
 
 def test_status_context_hides_what_the_viewer_may_not_see_above_the_status(client, fake_bus):
-    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s"}),
+    storage = Mock(get=AsyncMock(return_value={"url": "https://r/s", "visible": True}),
                    discussion_ancestors=AsyncMock(return_value=[_tree_row("https://r/top", mastodon_id="1"),
                                                                 _tree_row("https://r/mid", "https://r/top", False, "2"),
                                                                 _tree_row("https://r/s", "https://r/mid", True, "3")]),
@@ -954,4 +960,70 @@ def test_status_context_hides_what_the_viewer_may_not_see_above_the_status(clien
     assert [row["url"] for row in handed] == ["https://r/top", "https://r/mid"]
     assert handed[1]["content"]["status"]["content"] == hidden.HIDDEN_CONTENT
     assert handed[1]["content"]["status"]["in_reply_to_id"] == "https://r/top"
+
+
+def _store_returning_hidden():
+    return patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+                 AsyncMock(return_value=Mock(get=AsyncMock(return_value={"url": "https://r/s",
+                                                                         "visible": False,
+                                                                         "content": None}))))
+
+
+def test_reading_a_status_the_viewer_may_not_see_is_forbidden(client):
+    with _store_returning_hidden():
+        assert client.get("/statuses/424242").status_code == 403
+
+
+def test_a_status_that_does_not_exist_is_still_missing(client):
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage",
+               AsyncMock(return_value=Mock(get=AsyncMock(return_value=None)))):
+        assert client.get("/statuses/424242").status_code == 404
+
+
+def test_boosting_a_status_the_viewer_may_not_see_is_forbidden(client, fake_bus):
+    with _store_returning_hidden():
+        assert client.post("/statuses/424242/reblog").status_code == 403
+
+
+def test_the_context_of_a_status_the_viewer_may_not_see_is_forbidden(client):
+    with _store_returning_hidden():
+        assert client.get("/statuses/424242/context").status_code == 403
+
+
+def test_the_logged_in_user_reaches_the_storage_as_the_viewer(client):
+    storage = Mock(get=AsyncMock(return_value=None))
+
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=storage)):
+        client.get("/statuses/424242")
+
+    assert storage.get.await_args.args[1] == "https://example.com/actors/alice"
+
+
+def _anonymous_client():
+    statuses_module.init({"status_max_characters": "5000"})
+    app = FastAPI()
+    app.include_router(statuses_module.router)
+    app.dependency_overrides[current_user_optional] = lambda: None
+    return TestClient(app)
+
+
+def test_a_public_status_can_be_read_without_logging_in(fake_bus):
+    store = Mock(get=AsyncMock(return_value=None))
+
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        response = _anonymous_client().get("/statuses/424242")
+
+    assert response.status_code == 404
+    assert store.get.await_args.args == ("424242", None)
+
+
+def test_the_context_can_be_read_without_logging_in(fake_bus):
+    store = Mock(get=AsyncMock(return_value=None))
+
+    with patch("profed.components.api.c2s.shared.statuses.as_objects.storage", AsyncMock(return_value=store)):
+        assert _anonymous_client().get("/statuses/424242/context").status_code == 200
+
+
+def test_the_edit_history_can_be_read_without_logging_in(fake_bus):
+    assert _anonymous_client().get("/statuses/424242/history").status_code == 404
 

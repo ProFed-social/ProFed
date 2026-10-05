@@ -6,11 +6,21 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from profed.components.api.c2s.profed.timeline import service
+from profed.components.api.c2s.shared.statuses import hidden
 
 
 class _Status:
     def __init__(self, id):
         self.id = id
+
+
+def _part(url, mastodon_id, visible=True, parent=None):
+    return {"url": url,
+            "mastodon_id": mastodon_id,
+            "in_reply_to": parent,
+            "visible": visible,
+            "emitted_at": "2026-10-05T12:00:00+00:00",
+            "content": {"url": url} if visible else None}
 
 
 @pytest.fixture(autouse=True)
@@ -20,14 +30,14 @@ def viewer_actor_url(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_build_block_normal_post_has_no_booster_and_no_highlights(monkeypatch):
-    part_rows = [{"url": "a1", "mastodon_id": 1}, {"url": "a2", "mastodon_id": 2}]
+    part_rows = [_part("a1", 1), _part("a2", 2)]
     ao = SimpleNamespace(thread_of=AsyncMock(return_value=part_rows), boosted_parts=AsyncMock())
     monkeypatch.setattr(service.as_objects, "storage", AsyncMock(return_value=ao))
     monkeypatch.setattr(service, "make_statuses", AsyncMock(return_value=[_Status("1"), _Status("2")]))
 
     block = await service._build_block({"root": "a1", "booster": None, "mastodon_id": 5}, "https://x/actors/me")
 
-    ao.thread_of.assert_awaited_once_with("a1")
+    ao.thread_of.assert_awaited_once_with("a1", viewer="https://x/actors/me")
     ao.boosted_parts.assert_not_awaited()
     assert [s.id for s in block["parts"]] == ["1", "2"]
     assert block["booster"] is None
@@ -37,7 +47,7 @@ async def test_build_block_normal_post_has_no_booster_and_no_highlights(monkeypa
 
 @pytest.mark.asyncio
 async def test_build_block_boost_highlights_boosted_parts_and_sets_booster(monkeypatch):
-    part_rows = [{"url": "a1", "mastodon_id": 1}, {"url": "a2", "mastodon_id": 2}, {"url": "a4", "mastodon_id": 4}]
+    part_rows = [_part("a1", 1), _part("a2", 2), _part("a4", 4)]
     ao = SimpleNamespace(thread_of=AsyncMock(return_value=part_rows),
                          boosted_parts=AsyncMock(return_value=["a2", "a4"]))
     monkeypatch.setattr(service.as_objects, "storage", AsyncMock(return_value=ao))
@@ -70,6 +80,7 @@ async def test_timeline_wires_thread_roots_through_grouping(monkeypatch):
 
     assert [block["cursor"] async for block in blocks] == [2]
 
+
 @pytest.mark.asyncio
 async def test_build_block_returns_none_when_the_thread_cannot_be_resolved(monkeypatch):
     ao = SimpleNamespace(thread_of=AsyncMock(return_value=[]), boosted_parts=AsyncMock())
@@ -78,6 +89,47 @@ async def test_build_block_returns_none_when_the_thread_cannot_be_resolved(monke
     monkeypatch.setattr(service, "make_statuses", make)
 
     assert await service._build_block({"root": None, "booster": None, "mastodon_id": 5}, "https://x/actors/me") is None
-    ao.thread_of.assert_awaited_once_with(None)
+    ao.thread_of.assert_awaited_once_with(None, viewer="https://x/actors/me")
     make.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_build_block_never_hands_a_hidden_part_to_make_statuses(monkeypatch):
+    part_rows = [_part("a1", 1), _part("a2", 2, visible=False, parent="a1"), _part("a3", 3, parent="a2")]
+    ao = SimpleNamespace(thread_of=AsyncMock(return_value=part_rows), boosted_parts=AsyncMock())
+    monkeypatch.setattr(service.as_objects, "storage", AsyncMock(return_value=ao))
+    handed = AsyncMock(return_value=[_Status("1"), _Status("2"), _Status("3")])
+    monkeypatch.setattr(service, "make_statuses", handed)
+
+    await service._build_block({"root": "a1", "booster": None, "mastodon_id": 5}, "https://x/actors/me")
+
+    assert all(row["content"] is not None for row in handed.await_args.args[0])
+
+
+@pytest.mark.asyncio
+async def test_build_block_puts_a_placeholder_where_a_part_is_hidden(monkeypatch):
+    part_rows = [_part("a1", 1), _part("a2", 2, visible=False, parent="a1"), _part("a3", 3, parent="a2")]
+    ao = SimpleNamespace(thread_of=AsyncMock(return_value=part_rows), boosted_parts=AsyncMock())
+    monkeypatch.setattr(service.as_objects, "storage", AsyncMock(return_value=ao))
+    handed = AsyncMock(return_value=[_Status("1"), _Status("2"), _Status("3")])
+    monkeypatch.setattr(service, "make_statuses", handed)
+
+    await service._build_block({"root": "a1", "booster": None, "mastodon_id": 5}, "https://x/actors/me")
+
+    rows = handed.await_args.args[0]
+    assert [row["url"] for row in rows] == ["a1", "a2", "a3"]
+    assert rows[1]["content"]["status"]["content"] == hidden.HIDDEN_CONTENT
+
+
+@pytest.mark.asyncio
+async def test_build_block_drops_a_hidden_part_without_anything_visible_below(monkeypatch):
+    part_rows = [_part("a1", 1), _part("a2", 2, visible=False, parent="a1")]
+    ao = SimpleNamespace(thread_of=AsyncMock(return_value=part_rows), boosted_parts=AsyncMock())
+    monkeypatch.setattr(service.as_objects, "storage", AsyncMock(return_value=ao))
+    handed = AsyncMock(return_value=[_Status("1")])
+    monkeypatch.setattr(service, "make_statuses", handed)
+
+    await service._build_block({"root": "a1", "booster": None, "mastodon_id": 5}, "https://x/actors/me")
+
+    assert [row["url"] for row in handed.await_args.args[0]] == ["a1"]
 

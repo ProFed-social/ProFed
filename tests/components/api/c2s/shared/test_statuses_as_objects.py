@@ -437,7 +437,6 @@ async def test_rows_for_urls_also_weighs_the_post_a_boost_points_at(fake_pool, f
     assert "t.visibility = 'followers' AND tf.following IS NOT NULL" in sql
 
 
-
 @pytest.mark.asyncio
 async def test_url_for_author_returns_the_url_of_the_authors_own_object(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = {"url": "https://example.com/actors/alice/notes/1"}
@@ -754,6 +753,7 @@ async def test_who_boosted_can_start_after_a_cursor(fake_pool, fake_conn):
     assert "o.mastodon_id < $3::numeric" in sql
     assert "o.mastodon_id > $4::numeric" in sql
 
+
 @pytest.mark.asyncio
 async def test_upsert_hands_over_the_visibility_and_the_recipients(fake_pool, fake_conn):
     await (await as_objects.storage()).upsert("45",
@@ -792,12 +792,24 @@ async def test_get_asks_only_for_what_the_viewer_may_see(fake_pool, fake_conn):
 
 
 @pytest.mark.asyncio
+async def test_get_marks_a_row_the_viewer_may_not_see_instead_of_dropping_it(fake_pool, fake_conn):
+    fake_conn.fetchrow.return_value = None
+
+    await (await as_objects.storage()).get("42")
+
+    sql = fake_conn.fetchrow.await_args.args[0]
+    assert "AS visible" in sql
+    assert "CASE WHEN v.visible THEN o.status END AS status" in sql
+    assert re.search(r"WHERE\s+o\.mastodon_id = \$1::numeric\s*$", sql)
+
+
+@pytest.mark.asyncio
 async def test_get_lets_the_author_see_their_own_object(fake_pool, fake_conn):
     fake_conn.fetchrow.return_value = None
 
     await (await as_objects.storage()).get("42", "https://example.com/actors/alice")
 
-    assert "o.actor_url = $2" in fake_conn.fetchrow.await_args.args[0]
+    assert "o.actor_url IS NOT DISTINCT FROM $2" in fake_conn.fetchrow.await_args.args[0]
 
 
 @pytest.mark.asyncio

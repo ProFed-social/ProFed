@@ -1,6 +1,8 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import re
+
 import pytest
 from unittest.mock import AsyncMock, Mock
 from profed.components.api.c2s.shared.statuses import user_timeline
@@ -82,12 +84,12 @@ async def test_fetch_joins_resolves_filters_and_paginates(fake_pool, fake_conn):
     result = await (await user_timeline.storage()).fetch("alice", limit=5, max_id="999")
 
     sql, *args = fake_conn.fetch.await_args.args
-    assert "JOIN api.user_timeline ut ON ut.object_url = o.url" in sql
+    assert "api.user_timeline AS ut ON ut.object_url = o.url" in sql
     assert "api.resolve_content(o.url)" in sql
     assert "r.content IS NOT NULL" in sql
-    assert "o.actor_url, o.kind" in sql
-    assert "ORDER BY o.mastodon_id DESC" in sql
-    assert args == ["alice", 5, "999", None]
+    assert "ut.username = $1" in sql
+    assert re.search(r"ORDER BY\s+o\.mastodon_id DESC", sql)
+    assert args == ["alice", 5, "999", None, None]
     assert [row["mastodon_id"] for row in result] == [102, 100]
 
 
@@ -111,4 +113,29 @@ async def test_thread_roots_streams_rows_with_thread_root_and_booster(fake_pool)
     assert "ORDER BY o.mastodon_id DESC" in captured["sql"]
     assert captured["args"] == ("me", 10)
     assert rows == [{"mastodon_id": 7, "root": "s1", "booster": None}]
+
+
+@pytest.mark.asyncio
+async def test_fetch_also_weighs_the_post_a_boost_points_at(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await user_timeline.storage()).fetch("alice", viewer="https://example.com/actors/alice")
+
+    sql, *args = fake_conn.fetch.await_args.args
+    assert "target AS t ON t.url = COALESCE(o.target_url, o.url)" in sql
+    assert "t.visibility = 'public'" in sql
+    assert "ta.object_url IS NOT NULL" in sql
+    assert "t.visibility = 'followers' AND tf.following IS NOT NULL" in sql
+    assert args[4] == "https://example.com/actors/alice"
+
+
+@pytest.mark.asyncio
+async def test_fetch_keeps_the_helper_queries_inlined(fake_pool, fake_conn):
+    fake_conn.fetch.return_value = []
+
+    await (await user_timeline.storage()).fetch("alice")
+
+    sql = fake_conn.fetch.await_args.args[0]
+    assert "private_access AS NOT MATERIALIZED" in sql
+    assert "follows AS NOT MATERIALIZED" in sql
 

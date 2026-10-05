@@ -5,13 +5,14 @@ from functools import partial
 from profed.identity import actor_url_from_username
 from profed.models.mastodon import placeholder_account
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
-from profed.components.api.c2s.shared.statuses import as_objects, user_timeline
+from profed.components.api.c2s.shared.statuses import as_objects, hidden, user_timeline
 from profed.components.api.c2s.shared.statuses.service import make_statuses
 from profed.components.api.c2s.profed.timeline.grouping import timeline_blocks
 
 
 async def _build_block(row, viewer):
-    part_rows = await (await as_objects.storage()).thread_of(row["root"])
+    shown, placeholders = hidden.collapse(await (await as_objects.storage()).thread_of(row["root"], viewer=viewer))
+    part_rows = sorted(shown + hidden.as_rows(placeholders), key=lambda part: int(part["mastodon_id"]))
     if not part_rows:
         return None
     parts = await make_statuses(part_rows, viewer)

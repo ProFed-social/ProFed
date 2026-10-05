@@ -14,7 +14,8 @@ from profed.components.api.c2s.v1 import pleroma as pleroma_module
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
 
-BOOSTED = {"mastodon_id": 424242,
+BOOSTED = {"visible": True,
+           "mastodon_id": 424242,
            "url": "https://remote.example/notes/7",
            "actor_url": "https://remote.example/users/bob",
            "kind": "content",
