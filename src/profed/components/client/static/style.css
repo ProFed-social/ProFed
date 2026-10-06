@@ -701,4 +701,46 @@ a:hover { text-decoration: underline; }
   .conversations-layout--view .conversations { display: none; }
   .conversation-head .back { display: inline; }
 }
+.media-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 0.6rem 0 0;
+}
+
+.media-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+    position: relative;
+}
+
+.media-row.single {
+    grid-template-columns: 1fr;
+}
+
+.media-item {
+    margin: 0;
+    min-width: 0;
+}
+
+.media-item img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 24rem;
+    object-fit: cover;
+    border-radius: 0.5rem;
+}
+
+.media-more {
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 0.75rem;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-size: 0.85em;
+}
 

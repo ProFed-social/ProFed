@@ -6,6 +6,7 @@ from pathlib import Path
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, select_autoescape
 from markupsafe import escape
 
+from profed.components.client.media import media_rows
 from profed.core.config import config
 from profed.identity import domain
 from profed.sanitize import sanitize_html
@@ -97,7 +98,8 @@ def build_environment(standard_dir, theme_dir):
                                rfc822=rfc822,
                                relative_time=relative_time,
                                local_minutes=local_minutes)
-    environment.globals.update(breakdown_title=breakdown_title,
+    environment.globals.update(media_rows=media_rows,
+                               breakdown_title=breakdown_title,
                                emoji_tones=emoji.tones,
                                emoji_toned=emoji.toned)
     return environment
