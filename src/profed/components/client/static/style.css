@@ -702,6 +702,8 @@ a:hover { text-decoration: underline; }
   .conversation-head .back { display: inline; }
 }
 .media-grid {
+    --media-max-height: 384px;
+    --media-min-height: 200px;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -709,27 +711,31 @@ a:hover { text-decoration: underline; }
 }
 
 .media-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-wrap: wrap;
     gap: 0.4rem;
     position: relative;
-}
-
-.media-row.single {
-    grid-template-columns: 1fr;
+    align-items: flex-start;
+    justify-content: center;
 }
 
 .media-item {
     margin: 0;
-    min-width: 0;
+    flex-grow: 0;
+    flex-shrink: var(--ratio);
+    flex-basis: calc(var(--ratio) * var(--media-max-height));
+    min-width: min(100%, calc(var(--ratio) * var(--media-min-height)));
+    max-width: calc(var(--ratio) * var(--media-max-height));
+}
+ 
+.media-row.fills .media-item {
+    flex-grow: var(--ratio);
 }
 
 .media-item img {
     display: block;
     width: 100%;
     height: auto;
-    max-height: 24rem;
-    object-fit: cover;
     border-radius: 0.5rem;
 }
 
@@ -744,3 +750,8 @@ a:hover { text-decoration: underline; }
     font-size: 0.85em;
 }
 
+@media (max-width: 480px) {
+    .media-item {
+        flex-basis: 100%;
+    }
+}

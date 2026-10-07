@@ -1,4 +1,4 @@
-{% from "status.html" import visibility_icon, status_actions %}
+{% from "status.html" import visibility_icon, status_actions, media %}
 {% macro timeline_block(block, own_acct=None) %}
 {% set parts = block.parts %}
 {% set head = parts[0] %}
@@ -39,6 +39,7 @@
         </span>
       </div>
       <div class="e-content part-content">{{ part.content | sanitize | safe }}</div>
+      {{ media(part) }}
       {{ status_actions(part, uid=false, own_acct=own_acct) }}
     </div>
     {% endfor %}

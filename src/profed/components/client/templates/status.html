@@ -37,25 +37,23 @@
   {% if uid %}<data class="u-uid" value="{{ s.uri }}"></data>{% endif %}
 </footer>
 {% endmacro %}
-{% macro media_figure(item) %}
-<figure class="media-item">
-  <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">
-    <img src="{{ item.preview_url or item.url }}" alt="{{ item.description or '' }}" loading="lazy"
-         {% if item.meta and item.meta.original and item.meta.original.width %}
-         width="{{ item.meta.original.width }}" height="{{ item.meta.original.height }}"
-         {% endif %}>
+{% macro media_figure(entry) %}
+<figure class="media-item" style="--ratio: {{ '%.4f' | format(entry.ratio) }}">
+  <a href="{{ entry.item.url }}" target="_blank" rel="noopener noreferrer">
+    <img src="{{ entry.item.preview_url or entry.item.url }}" alt="{{ entry.item.description or '' }}" loading="lazy"
+         width="{{ entry.item.meta.original.width }}" height="{{ entry.item.meta.original.height }}">
   </a>
 </figure>
 {% endmacro %}
 {% macro media(s, max_rows=3) %}
-{% set rows = media_rows(s.media_attachments, max_rows) %}
-{% if rows.lead or rows.pairs %}
-<div class="media-grid">
-  {% if rows.lead %}<div class="media-row single">{{ media_figure(rows.lead) }}</div>{% endif %}
-  {% for pair in rows.pairs %}
-  <div class="media-row{% if pair | length == 1 %} single{% endif %}">
-    {% for item in pair %}{{ media_figure(item) }}{% endfor %}
-    {% if rows.extra and loop.last %}<span class="media-more">+{{ rows.extra }}</span>{% endif %}
+{% set grid = media_rows(s.media_attachments, max_rows) %}
+{% if grid.rows %}
+<div class="media-grid" data-media-grid data-media-total="{{ grid.total }}"
+     {% if max_rows is not none %}data-media-rows="{{ max_rows }}"{% endif %}>
+  {% for row in grid.rows %}
+  <div class="media-row{% if row.fills %} fills{% endif %}">
+    {% for entry in row['items'] %}{{ media_figure(entry) }}{% endfor %}
+    {% if grid.extra and loop.last %}<span class="media-more">+{{ grid.extra }}</span>{% endif %}
   </div>
   {% endfor %}
 </div>
