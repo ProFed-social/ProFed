@@ -16,6 +16,7 @@
     <script src="/static/reply.js" defer></script>
     <script src="/static/media_grid.js" defer></script>
     <script src="/static/compose_reply.js" defer></script>
+    <script src="/static/compose_media.js" defer></script>
     <link rel="stylesheet" href="/static/style.css">
     {% block head_extra %}{% endblock %}
   </head>
@@ -44,6 +45,7 @@
     <main class="column">
       {% block content %}{% endblock %}
     </main>
+    {% if current_username %}{% include "compose.html" %}{% endif %}
   </body>
 </html>
 

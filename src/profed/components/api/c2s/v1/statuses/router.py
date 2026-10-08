@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Annotated, Optional
 from profed.core.message_bus import message_bus
-from profed.identity import actor_url_from_username, heuristic_acct
+from profed.identity import acct_from_username, actor_url_from_username, heuristic_acct
 from profed.models.activity_pub import (AnnounceActivity,
                                         CreateActivity,
                                         DeleteActivity,
@@ -16,7 +16,7 @@ from profed.models.activity_pub import (AnnounceActivity,
                                         UndoAnnounceActivity,
                                         LikeActivity,
                                         UndoLikeActivity)
-from profed.models.mastodon import Status, StatusContext
+from profed.models.mastodon import Status, StatusContext, media_attachments_from_attachment
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.components.api.c2s.shared.actors.service import resolve_actor
 from profed.models.mastodon import mentions_from_tag
@@ -26,6 +26,8 @@ from profed.components.api.c2s.shared.known_accounts.service import cached_multi
 from profed.components.api.c2s.shared.known_accounts.storage import storage as _known_accounts_storage
 from profed.components.api.c2s.shared.statuses import as_objects, hidden, service
 from profed.components.api.c2s.shared.conversations import storage as conversations_storage
+from profed.components.api.c2s.shared.media.storage import storage as _media_storage
+from profed.components.api.c2s.shared.media.upload import MAX_MEDIA_ATTACHMENTS
 from profed.sanitize import sanitize_html
 from profed import mentions
 
@@ -63,6 +65,7 @@ class StatusCreate(BaseModel):
     spoiler_text: str = ""
     language: str | None = None
     in_reply_to_id: str | None = None
+    media_ids: list[str] = []
 
 
 @router.post("/statuses")
@@ -73,6 +76,31 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
 
     if len(body.status) > int(_config.get("status_max_characters", 5000)):
         raise HTTPException(status_code=422, detail="status too long")
+
+    if len(body.media_ids) > MAX_MEDIA_ATTACHMENTS:
+        raise HTTPException(status_code=422, detail="too many attachments")
+
+    async def attachments():
+        def document(row):
+            return {key: value
+                    for key, value in {"type": "Document",
+                                       "mediaType": row["content_type"],
+                                       "url": row["url"],
+                                       "name": row["description"],
+                                       "width": row["width"],
+                                       "height": row["height"]}.items()
+                    if value is not None}
+
+        async def resolved():
+            owned = {row["file_id"]: row
+                     for row in await (await _media_storage()).owned_by(body.media_ids,
+                                                                        acct_from_username(username))}
+            if len(owned) != len(set(body.media_ids)):
+                raise HTTPException(status_code=422, detail="unknown attachment")
+
+            return [document(owned[file_id]) for file_id in body.media_ids]
+
+        return await resolved() if body.media_ids else None
 
     async def direct_recipients(actor_url, in_reply_to, mentioned):
         return (await (await conversations_storage.storage()).recipients_for(in_reply_to["url"], actor_url)
@@ -114,6 +142,7 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
                     summary=sanitize_html(body.spoiler_text) or None,
                     inReplyTo=in_reply_to["url"] if in_reply_to else None,
                     published=datetime.now(timezone.utc).isoformat(),
+                    attachment=await attachments(),
                     **merged(await addressing(actor_url, in_reply_to, mentioned),
                              await replied_to(in_reply_to)))
 
@@ -155,6 +184,7 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
                   url=note.id,
                   content=mentions.linkify_resolved(note.content, resolved),
                   mentions=mentions_from_tag(mentions.tag_cc(resolved)[0]),
+                  media_attachments=media_attachments_from_attachment(note.attachment or []),
                   account=await resolve_actor(username))
 
 

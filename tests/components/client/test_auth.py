@@ -106,6 +106,7 @@ def test_callback_exchanges_token_and_creates_session():
     assert kv.set.await_args.args[1] == {"username": "alice",
                                          "acct": "alice@example.com",
                                          "token": "acc-tok",
+                                         "posting": {"visibility": "public", "language": ""},
                                          "reactions": {},
                                          "tone": ""}
     assert response.cookies.get("session") is not None
@@ -339,4 +340,28 @@ async def test_save_session_without_a_cookie_writes_nothing():
         await auth.save_session(request, {"username": "alice"})
 
     kv.set.assert_not_awaited()
+
+
+def test_the_posting_defaults_of_the_account_land_in_the_session():
+    api = _logging_in()
+    api.get = AsyncMock(side_effect=[_response(200, {"username": "alice",
+                                                     "acct": "alice@example.com",
+                                                     "source": {"privacy": "unlisted", "language": "de"}}),
+                                     _response(200, {"counts": [], "last_toned": None})])
+    kv = MagicMock()
+    kv.set = AsyncMock()
+
+    _callback(api, kv)
+
+    assert kv.set.await_args.args[1]["posting"] == {"visibility": "unlisted", "language": "de"}
+
+
+def test_an_account_without_posting_defaults_falls_back_to_public():
+    api = _logging_in()
+    kv = MagicMock()
+    kv.set = AsyncMock()
+
+    _callback(api, kv)
+
+    assert kv.set.await_args.args[1]["posting"] == {"visibility": "public", "language": ""}
 

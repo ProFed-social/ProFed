@@ -22,5 +22,6 @@ class MediaObject(BaseModel):
     content_hash:  str | None = None
     last_modified: str | None = None
     etag:          str | None = None
+    description:   str | None = None
     metadata:      ImageMeta | None = None
 

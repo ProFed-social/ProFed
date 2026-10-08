@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Christof Donat
 // SPDX-License-Identifier: AGPL-3.0-or-later
- 
+
 (function () {
   function measure(root) {
     root.querySelectorAll(".e-content.not-expandable, .thread-body.not-expandable").forEach(function (content) {
@@ -23,7 +23,7 @@
       });
     });
   }
- 
+
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { measure(document); });
   } else {

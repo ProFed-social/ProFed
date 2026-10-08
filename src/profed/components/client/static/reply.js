@@ -23,11 +23,11 @@
   function requestedPath(event) {
     return (event.detail && event.detail.requestConfig && event.detail.requestConfig.path) || "";
   }
- 
+
   function loadsOlderMessages(event) {
     return requestedPath(event).indexOf("/messages/more") !== -1;
   }
- 
+
   function sendsAReply(event) {
     return /\/conversations\/[^/]+\/reply$/.test(requestedPath(event));
   }
@@ -68,7 +68,7 @@
     var list = messages();
     heightBeforeSwap = loadsOlderMessages(event) && list ? list.scrollHeight : null;
   });
- 
+
   document.addEventListener("htmx:afterSwap", function (event) {
     var list = messages();
     bindReplyButtons(event.target);

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.languages import supported
+from profed.components.api.c2s.shared.media.upload import ALLOWED_TYPES, MAX_MEDIA_ATTACHMENTS, MAX_SIZE_BYTES
 
 
 def build_common_response(config: dict, d :str, max_chars: int) -> dict:
@@ -10,10 +11,10 @@ def build_common_response(config: dict, d :str, max_chars: int) -> dict:
             "version":           "0.1.0 (compatible; ProFed 0.1.0)",
             "languages":         sorted(supported()),
             "configuration":     {"statuses": {"max_characters": max_chars,
-                                               "max_media_attachments": 0},
+                                               "max_media_attachments": MAX_MEDIA_ATTACHMENTS},
                                   "accounts": {"max_featured_tags": 0},
-                                  "media_attachments": {"supported_mime_types": [],
-                                                        "image_size_limit": 0,
+                                  "media_attachments": {"supported_mime_types": sorted(ALLOWED_TYPES),
+                                                        "image_size_limit": MAX_SIZE_BYTES,
                                                         "image_matrix_limit": 0,
                                                         "video_size_limit": 0,
                                                         "video_frame_rate_limit": 0,

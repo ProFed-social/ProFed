@@ -11,6 +11,7 @@ from profed.components.api.c2s.shared.statuses import hidden
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.models.mastodon import Account
 from profed.identity import account_id, actor_url_from_username, heuristic_acct
+from profed.components.api.c2s.shared.media.upload import MAX_MEDIA_ATTACHMENTS
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
@@ -1026,4 +1027,90 @@ def test_the_context_can_be_read_without_logging_in(fake_bus):
 
 def test_the_edit_history_can_be_read_without_logging_in(fake_bus):
     assert _anonymous_client().get("/statuses/424242/history").status_code == 404
+
+
+def _media_row(file_id="m1", description="Ein Diagramm", width=1920, height=1080):
+    return {"file_id": file_id,
+            "url": f"https://example.com/media/{file_id}",
+            "content_type": "image/jpeg",
+            "description": description,
+            "width": width,
+            "height": height}
+
+
+def _patched_media(rows):
+    storage = Mock()
+    storage.owned_by = AsyncMock(return_value=rows)
+    return patch("profed.components.api.c2s.v1.statuses.router._media_storage",
+                 AsyncMock(return_value=storage))
+
+
+def _post_with_media(client, media_ids, rows):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)), \
+         _patched_media(rows):
+        return client.post("/statuses", json={"status": "Look at this", "media_ids": media_ids})
+
+
+def test_attached_media_is_federated_on_the_note(client, fake_bus):
+    response = _post_with_media(client, ["m1"], [_media_row()])
+
+    assert response.status_code == 200
+    attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"]
+    assert attachment == [{"type": "Document",
+                           "mediaType": "image/jpeg",
+                           "url": "https://example.com/media/m1",
+                           "name": "Ein Diagramm",
+                           "width": 1920,
+                           "height": 1080}]
+
+
+def test_attached_media_comes_back_on_the_created_status(client, fake_bus):
+    response = _post_with_media(client, ["m1"], [_media_row()])
+    attachments = response.json()["media_attachments"]
+
+    assert len(attachments) == 1
+    assert attachments[0]["type"] == "image"
+    assert attachments[0]["description"] == "Ein Diagramm"
+    assert attachments[0]["meta"]["original"] == {"width": 1920, "height": 1080}
+
+
+def test_media_keeps_the_order_the_author_chose(client, fake_bus):
+    rows = [_media_row("second"), _media_row("first")]
+
+    response = _post_with_media(client, ["first", "second"], rows)
+
+    urls = [item["url"] for item in response.json()["media_attachments"]]
+    assert urls == ["https://example.com/media/first", "https://example.com/media/second"]
+
+
+def test_media_of_another_uploader_is_refused(client, fake_bus):
+    response = _post_with_media(client, ["not-mine"], [])
+
+    assert response.status_code == 422
+    assert fake_bus.topic("raw_activities").published == []
+
+
+def test_an_alt_text_that_was_never_given_is_left_off_the_attachment(client, fake_bus):
+    _post_with_media(client, ["m1"], [_media_row(description=None)])
+
+    attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"]
+    assert "name" not in attachment[0]
+
+
+def test_a_status_without_media_federates_no_attachment(client, fake_bus):
+    with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
+               AsyncMock(return_value=LOCAL_ACCOUNT)):
+        client.post("/statuses", json={"status": "Hello Fediverse!"})
+
+    assert "attachment" not in fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]
+
+
+def test_more_media_than_allowed_is_refused(client, fake_bus):
+    ids = [f"m{number}" for number in range(MAX_MEDIA_ATTACHMENTS + 1)]
+
+    response = _post_with_media(client, ids, [_media_row(file_id) for file_id in ids])
+
+    assert response.status_code == 422
+    assert fake_bus.topic("raw_activities").published == []
 

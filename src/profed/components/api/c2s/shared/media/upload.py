@@ -17,6 +17,7 @@ from profed.models.mastodon import (MediaAttachment,
 
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_SIZE_BYTES = 10 * 1024 * 1024
+MAX_MEDIA_ATTACHMENTS = 12
 PREVIEW_DIM = 400
 
 
@@ -62,6 +63,7 @@ async def process_upload(username: str,
                                           content_type=file.content_type,
                                           size=stored.size,
                                           uploader=acct_from_username(username),
+                                          description=strip_tags(description),
                                           metadata=ImageMeta(width=orig_w,
                                                              height=orig_h)).model_dump(exclude_none=True))
 

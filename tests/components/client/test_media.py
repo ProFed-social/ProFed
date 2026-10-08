@@ -3,7 +3,7 @@
 
 import re
 from pathlib import Path
- 
+
 from profed.components.client.media import ASSUMED_WIDTH, MAX_HEIGHT, media_rows
 
 
@@ -19,12 +19,12 @@ def _image(name, width=800, height=600):
 
 def _names(rows):
     return [[item["item"]["url"].rsplit("/", 1)[1] for item in row["items"]] for row in rows["rows"]]
- 
- 
+
+
 def _height(row, width):
     return width / sum(item["ratio"] for item in row["items"]) if row["fills"] else MAX_HEIGHT
- 
- 
+
+
 def test_a_post_without_attachments_has_no_rows():
     rows = media_rows([])
 
@@ -65,13 +65,13 @@ def test_a_trailing_row_is_marked_as_not_filling():
 
 def test_a_trailing_row_keeps_the_maximum_height():
     rows = media_rows([_image("a", 1000, 1000)], assumed_width=NARROW)
- 
+
     assert _height(rows["rows"][0], NARROW) == MAX_HEIGHT
 
 
 def test_rows_beyond_the_limit_are_counted_instead_of_shown():
     rows = media_rows([_image(name, 1920, 1080) for name in "abcde"], assumed_width=NARROW)
- 
+
     assert _names(rows) == [["a"], ["b"], ["c"]]
     assert rows["extra"] == 2
 
@@ -99,26 +99,26 @@ def test_an_image_without_known_dimensions_is_left_out():
 def test_anything_that_is_not_an_image_is_left_out_for_now():
     rows = media_rows([{"type": "video", "url": "https://r/v", "meta": {"original": {"width": 800, "height": 600}}},
                        _image("a")])
- 
+
     assert _names(rows) == [["a"]]
- 
- 
+
+
 def test_a_narrower_column_breaks_rows_earlier():
     images = [_image(name, 800, 600) for name in "abcd"]
- 
+
     assert len(media_rows(images, assumed_width=320)["rows"]) > len(media_rows(images, assumed_width=1280)["rows"])
- 
- 
+
+
 def test_the_maximum_height_is_the_one_the_client_lays_out_with():
     css = STYLE_CSS.read_text(encoding="utf-8")
- 
+
     assert MAX_HEIGHT == int(re.search(r"--media-max-height:\s*(\d+)px", css)[1])
- 
- 
+
+
 def test_the_assumed_width_is_as_wide_as_the_layout_column_can_get():
     css = STYLE_CSS.read_text(encoding="utf-8")
     column = int(re.search(r"--col:\s*(\d+)px", css)[1])
     padding = float(re.search(r"^\.column\s*\{[^}]*?padding-inline:\s*([\d.]+)rem", css, re.MULTILINE)[1])
- 
+
     assert ASSUMED_WIDTH == column - 2 * padding * 16
 

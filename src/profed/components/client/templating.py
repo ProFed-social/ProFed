@@ -9,6 +9,7 @@ from markupsafe import escape
 from profed.components.client.media import media_rows
 from profed.core.config import config
 from profed.identity import domain
+from profed.languages import supported
 from profed.sanitize import sanitize_html
 from profed import emoji
 
@@ -101,7 +102,8 @@ def build_environment(standard_dir, theme_dir):
     environment.globals.update(media_rows=media_rows,
                                breakdown_title=breakdown_title,
                                emoji_tones=emoji.tones,
-                               emoji_toned=emoji.toned)
+                               emoji_toned=emoji.toned,
+                               supported_languages=lambda: sorted(supported()))
     return environment
 
 

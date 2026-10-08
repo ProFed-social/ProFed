@@ -1,11 +1,49 @@
-<form class="compose" hx-post="/compose" hx-target=".posts" hx-swap="afterbegin">
-  <div class="compose-reply-target" hidden>
-    <span class="compose-reply-target-icon">&#8617;</span>
-    <span class="compose-reply-target-name"></span>
-    <span class="compose-reply-target-text"></span>
-    <button class="compose-reply-clear" type="button" title="Cancel">&times;</button>
-  </div>
-  <input type="hidden" name="in_reply_to_id" value="">
-  <textarea name="status" rows="3" required placeholder="What are you working on?"></textarea>
-  <button type="submit">Post</button>
-</form>
+<button type="button" class="compose-open" title="New post" aria-label="New post">
+  <svg viewBox="0 0 24 24" width="1.4em" height="1.4em" fill="none" stroke="currentColor" stroke-width="2"
+       aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+{% set defaults = posting | default({}, true) %}
+<dialog class="compose-dialog">
+  <form class="compose" hx-post="/compose" hx-swap="none" hx-encoding="multipart/form-data"
+        enctype="multipart/form-data">
+    <header class="compose-head">
+      <span class="compose-heading">New post</span>
+      <button type="button" class="compose-close" title="Cancel" aria-label="Cancel">&times;</button>
+    </header>
+    <div class="compose-reply-target" hidden>
+      <span class="compose-reply-target-icon">&#8617;</span>
+      <span class="compose-reply-target-name"></span>
+      <span class="compose-reply-target-text"></span>
+      <button class="compose-reply-clear" type="button" title="Cancel reply">&times;</button>
+    </div>
+    <input type="hidden" name="in_reply_to_id" value="">
+    <input class="compose-warning" type="text" name="spoiler_text" placeholder="Content warning" hidden>
+    <textarea name="status" rows="5" required placeholder="What are you working on?"></textarea>
+    <div class="compose-previews" hidden></div>
+    <input class="compose-files" type="file" name="media" accept="image/*" multiple hidden>
+    <footer class="compose-tools">
+      <button type="button" class="compose-tool compose-attach" title="Add images" aria-label="Add images">
+        <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="2"
+             aria-hidden="true"><path d="M17 8.5 9.4 16a2.5 2.5 0 0 0 3.5 3.5l7.1-7a4.5 4.5 0 0 0-6.4-6.4l-7 7.1a6.5
+                                        6.5 0 0 0 9.2 9.2l5.3-5.3"/></svg>
+      </button>
+      <button type="button" class="compose-tool compose-warn" title="Content warning"
+              aria-label="Content warning" aria-pressed="false">CW</button>
+      <input class="compose-language" name="language" list="compose-languages"
+             value="{{ defaults.get('language', '') }}" placeholder="Language"
+             title="Language of this post" aria-label="Language of this post">
+      <datalist id="compose-languages">
+        {% for code in supported_languages() %}<option value="{{ code }}"></option>{% endfor %}
+      </datalist>
+      <select class="compose-visibility" name="visibility" title="Who can see this" aria-label="Who can see this">
+        {% for value, label in [("public", "Public"), ("unlisted", "Unlisted"),
+                                ("private", "Followers only"), ("direct", "Direct")] %}
+        {% set chosen = defaults.get('visibility', 'public') == value %}
+        <option value="{{ value }}"{% if chosen %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="compose-send" type="submit">Post</button>
+    </footer>
+  </form>
+</dialog>
+

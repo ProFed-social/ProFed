@@ -37,7 +37,8 @@ class _Storage(BaseStorage):
                      last_modified: str | None = None,
                      etag: str | None = None,
                      width: int | None = None,
-                     height: int | None = None) -> None:
+                     height: int | None = None,
+                     description: str | None = None) -> None:
         await self.execute("""INSERT INTO api.media
                                       (file_id,
                                        url,
@@ -49,8 +50,9 @@ class _Storage(BaseStorage):
                                        last_modified,
                                        etag,
                                        width,
-                                       height)
-                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                                       height,
+                                       description)
+                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                               ON CONFLICT (file_id) DO NOTHING""",
                            file_id,
                            url,
@@ -62,7 +64,24 @@ class _Storage(BaseStorage):
                            last_modified,
                            etag,
                            width,
-                           height)
+                           height,
+                           description)
+
+    async def owned_by(self, file_ids: list[str], uploader: str) -> list[dict]:
+        return await self.fetch_all("""SELECT
+                                           file_id,
+                                           url,
+                                           content_type,
+                                           description,
+                                           width,
+                                           height
+                                       FROM
+                                           api.media
+                                       WHERE
+                                           file_id = ANY($1::text[]) AND
+                                           uploader = $2""",
+                                    file_ids,
+                                    uploader) if file_ids else []
 
     async def delete(self, file_id: str) -> None:
         await self.execute("DELETE FROM api.media WHERE file_id = $1", file_id)

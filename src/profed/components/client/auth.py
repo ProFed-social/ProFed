@@ -66,6 +66,7 @@ async def page_context(request, session=None):
     session = session if session is not None else await current_user_optional(request)
     return {"current_username": (session or {}).get("username"),
             "current_acct": (session or {}).get("acct"),
+            "posting": (session or {}).get("posting") or _posting_defaults({}),
             "login_url": _login_url(request)}
 
 
@@ -146,6 +147,11 @@ async def _reaction_state(access_token: str):
     return from_history(response.json())
 
 
+def _posting_defaults(source: dict) -> dict:
+    return {"visibility": source.get("privacy") or "public",
+            "language": source.get("language") or ""}
+
+
 async def _start_session(access_token: str, session_ttl):
     sid = secrets.token_urlsafe(32)
     me = await _account(access_token)
@@ -153,6 +159,7 @@ async def _start_session(access_token: str, session_ttl):
                                 {"username": me["username"],
                                  "acct": me["acct"],
                                  "token": access_token,
+                                 "posting": _posting_defaults(me.get("source") or {}),
                                  **await _reaction_state(access_token)},
                                 session_ttl)
     return sid

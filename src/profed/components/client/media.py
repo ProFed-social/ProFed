@@ -14,25 +14,25 @@ def media_rows(attachments,
                assumed_width: int = ASSUMED_WIDTH,
                max_height: int = MAX_HEIGHT) -> dict:
     fill = assumed_width / max_height
- 
+
     def field(item, name):
         return item.get(name) if isinstance(item, dict) else getattr(item, name, None)
- 
+
     def ratio(item):
         size = (field(item, "meta") or {}).get("original") or {}
         return size["width"] / size["height"] if size.get("width") and size.get("height") else None
- 
+
     def row_numbers(ratios):
         def placed(so_far, next_ratio):
             row, width = so_far
             return (row + 1, next_ratio) if width >= fill else (row, width + next_ratio)
- 
+
         return (row for row, _ in islice(accumulate(ratios, placed, initial=(0, 0.0)), 1, None))
- 
+
     def row_of(images):
         return {"items": images,
                 "fills": sum(image["ratio"] for image in images) >= fill}
- 
+
     images = [image
               for image in ({"item": item, "ratio": ratio(item)}
                             for item in (attachments or [])

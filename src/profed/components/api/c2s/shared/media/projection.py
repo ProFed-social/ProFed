@@ -26,7 +26,8 @@ async def _store(file_id: str, source: dict) -> None:
                                    last_modified=source.get("last_modified"),
                                    etag=source.get("etag"),
                                    width=metadata.get("width"),
-                                   height=metadata.get("height"))
+                                   height=metadata.get("height"),
+                                   description=source.get("description"))
 
 
 async def _uploaded(object_id: str, payload: dict) -> None:

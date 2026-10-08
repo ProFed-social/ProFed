@@ -11,6 +11,7 @@ class Note(ActivityStreamsObject):
     summary: str | None = None
     inReplyTo: str | None = None
     published: str
+    attachment: list[dict] | None = None
     to: list[str] = ["https://www.w3.org/ns/activitystreams#Public"]
     tag: list[dict] = []
     cc: list[str] = []

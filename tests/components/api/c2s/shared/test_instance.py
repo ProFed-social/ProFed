@@ -5,6 +5,7 @@ import os
 from profed.core.config import config, raw
 from profed.components.api.c2s.shared.instance import build_common_response
 from profed.languages import supported
+from profed.components.api.c2s.shared.media.upload import ALLOWED_TYPES, MAX_MEDIA_ATTACHMENTS, MAX_SIZE_BYTES
 
 
 class Cfg:
@@ -47,4 +48,25 @@ def test_build_common_response_languages_is_the_supported_set():
         result = build_common_response({}, "example.com", 5000)
     assert result["languages"] == sorted(supported())
     assert "en" in result["languages"]
+
+
+def test_the_instance_reports_the_image_types_it_actually_accepts():
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        result = build_common_response({}, "example.com", 5000)
+
+    assert set(result["configuration"]["media_attachments"]["supported_mime_types"]) == ALLOWED_TYPES
+
+
+def test_the_instance_reports_the_size_limit_it_actually_enforces():
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        result = build_common_response({}, "example.com", 5000)
+
+    assert result["configuration"]["media_attachments"]["image_size_limit"] == MAX_SIZE_BYTES
+
+
+def test_the_instance_reports_how_many_attachments_a_status_may_carry():
+    with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
+        result = build_common_response({}, "example.com", 5000)
+
+    assert result["configuration"]["statuses"]["max_media_attachments"] == MAX_MEDIA_ATTACHMENTS
 
