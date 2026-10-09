@@ -46,9 +46,31 @@
     });
   }
 
+  function extras(form) {
+    return form.querySelector(".conversation-extras");
+  }
+
+  function collapse(form) {
+    var toggle = form.querySelector(".conversation-expand");
+    extras(form).hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+    form.querySelector(".conversation-input").rows = 1;
+  }
+
+  function bindExpand(form) {
+    var toggle = form.querySelector(".conversation-expand");
+    toggle.addEventListener("click", function () {
+      var opened = extras(form).hidden;
+      extras(form).hidden = !opened;
+      toggle.setAttribute("aria-expanded", String(opened));
+      form.querySelector(".conversation-input").rows = opened ? 4 : 1;
+    });
+  }
+
   function bindCompose() {
     var form = compose();
     if (!form) { return; }
+    bindExpand(form);
     form.querySelector(".conversation-reply-clear").addEventListener("click", function () { clearTarget(form); });
     form.querySelector(".conversation-input").addEventListener("keydown", function (event) {
       if (event.key === "Enter" && !event.shiftKey) {
@@ -57,7 +79,11 @@
       }
     });
     form.addEventListener("htmx:afterRequest", function (event) {
-      if (event.detail.successful) { form.reset(); clearTarget(form); }
+      if (!event.detail.successful) { return; }
+      form.reset();
+      clearTarget(form);
+      collapse(form);
+      form.dispatchEvent(new CustomEvent("compose:reset"));
     });
   }
 

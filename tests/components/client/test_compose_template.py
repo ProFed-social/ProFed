@@ -17,6 +17,10 @@ def _editor(**context):
     return _ENV.get_template("compose.html").render(**context)
 
 
+def _chat(**context):
+    return _ENV.get_template("conversation.html").render(active_id="42", messages=[], following=None, **context)
+
+
 def test_a_logged_in_visitor_gets_a_button_to_start_a_post():
     assert "compose-open" in _page(current_username="alice")
 
@@ -100,4 +104,53 @@ def test_the_editor_renders_even_without_posting_defaults():
 
 def test_the_editor_sits_in_the_layout_so_every_page_has_it():
     assert "compose-dialog" in _ENV.get_template("base.html").render(current_username="alice")
+
+
+def test_the_chat_editor_offers_to_unfold_itself():
+    chat = _chat()
+
+    assert "conversation-expand" in chat
+    assert 'aria-expanded="false"' in chat
+
+
+def test_the_unfolded_chat_editor_is_hidden_until_it_is_wanted():
+    extras = re.search(r'<div class="conversation-extras"[^>]*>', _chat())[0]
+
+    assert "hidden" in extras
+
+
+def test_the_chat_editor_offers_images_with_alt_texts():
+    chat = _chat()
+
+    assert 'name="media"' in chat
+    assert "compose-previews" in chat
+    assert "compose-attach" in chat
+
+
+def test_the_chat_editor_offers_a_warning_and_a_language():
+    chat = _chat()
+
+    assert 'name="spoiler_text"' in chat
+    assert 'name="language"' in chat
+
+
+def test_the_chat_editor_does_not_let_anyone_change_the_visibility():
+    assert "compose-visibility" not in _chat()
+
+
+def test_the_chat_editor_sends_its_files_as_multipart():
+    chat = _chat()
+
+    assert 'hx-encoding="multipart/form-data"' in chat
+    assert 'enctype="multipart/form-data"' in chat
+
+
+def test_both_editors_share_the_one_list_of_languages():
+    assert _editor().count('<datalist id="compose-languages"') == 1
+    assert '<datalist id="compose-languages"' not in _chat()
+
+
+def test_both_editors_are_bound_by_the_same_script():
+    assert "data-editor" in _editor()
+    assert "data-editor" in _chat()
 

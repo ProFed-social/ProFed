@@ -445,6 +445,8 @@ a:hover { text-decoration: underline; }
   color: CanvasText;
 }
 
+body:has(.conversations-layout) .compose-open { display: none; }
+
 .compose-dialog::backdrop { background: rgb(0 0 0 / .45); }
 
 .compose { display: grid; gap: .6rem; padding: 1rem; min-width: 0; }
@@ -794,6 +796,25 @@ a:hover { text-decoration: underline; }
 .conversation-reply-target-name { font-weight: 600; flex: none; }
 .conversation-reply-target-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .conversation-reply-clear { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 .2rem; }
+.conversation-expand {
+  align-self: center;
+  display: inline-flex;
+  padding: .1rem .9rem;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.conversation-expand:hover { color: var(--accent); }
+.conversation-expand svg { transition: transform .15s ease; }
+.conversation-expand[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .conversation-expand svg { transition: none; }
+}
+
+.conversation-extras:not([hidden]) { display: grid; gap: .4rem; min-width: 0; }
+
 .conversation-compose-row { display: flex; gap: .5rem; align-items: flex-end; }
 .conversation-input {
   flex: 1;

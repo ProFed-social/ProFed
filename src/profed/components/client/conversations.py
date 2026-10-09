@@ -9,6 +9,7 @@ from typing import Annotated, Optional
 
 from .api_client import api_client
 from .paging import fetched
+from .posting import attachment_entry, language_entry, media_ids, warning_entry
 from .auth import page_context, requires_login
 from .templating import environment
 from profed.identity import actor_url_from_username
@@ -93,11 +94,17 @@ async def reply(request: Request,
                 id: str,
                 session,
                 status: Annotated[str, Form()],
-                in_reply_to_id: Annotated[str, Form()] = ""):
+                in_reply_to_id: Annotated[str, Form()] = "",
+                spoiler_text: Annotated[str, Form()] = "",
+                language: Annotated[str, Form()] = ""):
+    attachments = await media_ids(request, session["token"])
     response = await api_client().post("/api/v1/statuses",
                                        json={"status": status,
                                              "in_reply_to_id": in_reply_to_id or id,
-                                             "visibility": "direct"},
+                                             "visibility": "direct",
+                                             **warning_entry(spoiler_text),
+                                             **language_entry(language),
+                                             **attachment_entry(attachments)},
                                        token=session["token"])
     if response.status_code != 200:
         logger.warning("posting a reply failed: %s %s", response.status_code, response.text)

@@ -1,10 +1,13 @@
+{% from "editor.html" import attach_button, language_field, language_options, media_fields, warning_button,
+                              warning_field %}
+{% set defaults = posting | default({}, true) %}
 <button type="button" class="compose-open" title="New post" aria-label="New post">
   <svg viewBox="0 0 24 24" width="1.4em" height="1.4em" fill="none" stroke="currentColor" stroke-width="2"
        aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
 </button>
-{% set defaults = posting | default({}, true) %}
+{{ language_options() }}
 <dialog class="compose-dialog">
-  <form class="compose" hx-post="/compose" hx-swap="none" hx-encoding="multipart/form-data"
+  <form class="compose" data-editor hx-post="/compose" hx-swap="none" hx-encoding="multipart/form-data"
         enctype="multipart/form-data">
     <header class="compose-head">
       <span class="compose-heading">New post</span>
@@ -17,24 +20,13 @@
       <button class="compose-reply-clear" type="button" title="Cancel reply">&times;</button>
     </div>
     <input type="hidden" name="in_reply_to_id" value="">
-    <input class="compose-warning" type="text" name="spoiler_text" placeholder="Content warning" hidden>
+    {{ warning_field() }}
     <textarea name="status" rows="5" required placeholder="What are you working on?"></textarea>
-    <div class="compose-previews" hidden></div>
-    <input class="compose-files" type="file" name="media" accept="image/*" multiple hidden>
+    {{ media_fields() }}
     <footer class="compose-tools">
-      <button type="button" class="compose-tool compose-attach" title="Add images" aria-label="Add images">
-        <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="2"
-             aria-hidden="true"><path d="M17 8.5 9.4 16a2.5 2.5 0 0 0 3.5 3.5l7.1-7a4.5 4.5 0 0 0-6.4-6.4l-7 7.1a6.5
-                                        6.5 0 0 0 9.2 9.2l5.3-5.3"/></svg>
-      </button>
-      <button type="button" class="compose-tool compose-warn" title="Content warning"
-              aria-label="Content warning" aria-pressed="false">CW</button>
-      <input class="compose-language" name="language" list="compose-languages"
-             value="{{ defaults.get('language', '') }}" placeholder="Language"
-             title="Language of this post" aria-label="Language of this post">
-      <datalist id="compose-languages">
-        {% for code in supported_languages() %}<option value="{{ code }}"></option>{% endfor %}
-      </datalist>
+      {{ attach_button() }}
+      {{ warning_button() }}
+      {{ language_field(defaults) }}
       <select class="compose-visibility" name="visibility" title="Who can see this" aria-label="Who can see this">
         {% for value, label in [("public", "Public"), ("unlisted", "Unlisted"),
                                 ("private", "Followers only"), ("direct", "Direct")] %}

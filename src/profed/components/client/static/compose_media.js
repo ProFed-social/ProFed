@@ -92,9 +92,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    var form = document.querySelector(".compose-dialog .compose");
-    if (!form) { return; }
-    bind(form);
+    document.querySelectorAll("[data-editor]").forEach(bind);
     nameLanguages();
   });
 })();

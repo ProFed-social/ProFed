@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock
 import httpx
 from fastapi import FastAPI
 
-from profed.components.client import auth, conversations, templating
+from profed.components.client import auth, conversations, posting, templating
 
 
 _ENV = templating.build_environment(templating.STANDARD_TEMPLATES, None)
@@ -463,4 +463,96 @@ async def test_loading_more_conversations_hands_the_query_back(monkeypatch):
     await _fetch(_app(monkeypatch), "/conversations/more?following=limit%3D20%26max_id%3D400")
 
     assert client.get.call_args.kwargs["params"] == "limit=20&max_id=400"
+
+
+def _serving(monkeypatch, client):
+    monkeypatch.setattr(conversations, "api_client", lambda: client)
+    monkeypatch.setattr(posting, "api_client", lambda: client)
+
+    return client
+
+
+def _sending(monkeypatch, uploads=()):
+    posted = []
+
+    async def post(path, json=None, token=None, files=None, data=None):
+        posted.append({"path": path, "json": json, "files": files, "data": data})
+        return (_resp(200, {"id": uploads[len(posted) - 1]})
+                if len(posted) <= len(uploads) else
+                _resp(200, _status("99")))
+
+    _serving(monkeypatch, Mock(post=AsyncMock(side_effect=post),
+                               get=AsyncMock(return_value=_resp(200, []))))
+
+    return posted
+
+
+async def _post_multipart(app, path, data, files=None):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="https://test.local") as client:
+        return await client.post(path, data=data, files=files or {})
+
+
+async def test_a_chat_message_can_carry_an_image_with_its_alt_text(monkeypatch):
+    _login(monkeypatch)
+    posted = _sending(monkeypatch, uploads=["m1"])
+
+    await _post_multipart(_app(monkeypatch), "/conversations/42/reply",
+                          {"status": "schau mal", "media_descriptions": "Ein Diagramm"},
+                          {"media": ("a.png", b"a", "image/png")})
+
+    assert posted[0]["path"] == "/api/v1/media"
+    assert posted[0]["data"] == {"description": "Ein Diagramm"}
+    assert posted[1]["json"]["media_ids"] == ["m1"]
+
+
+async def test_a_chat_message_stays_direct_whatever_else_is_set(monkeypatch):
+    _login(monkeypatch)
+    posted = _sending(monkeypatch)
+
+    await _post(_app(monkeypatch), "/conversations/42/reply",
+                {"status": "hi", "visibility": "public", "language": "de"})
+
+    assert posted[0]["json"]["visibility"] == "direct"
+
+
+async def test_a_chat_message_carries_its_language(monkeypatch):
+    _login(monkeypatch)
+    posted = _sending(monkeypatch)
+
+    await _post(_app(monkeypatch), "/conversations/42/reply", {"status": "hallo", "language": "de"})
+
+    assert posted[0]["json"]["language"] == "de"
+
+
+async def test_a_warned_chat_message_is_sensitive(monkeypatch):
+    _login(monkeypatch)
+    posted = _sending(monkeypatch)
+
+    await _post(_app(monkeypatch), "/conversations/42/reply", {"status": "hi", "spoiler_text": "Spoiler"})
+
+    assert posted[0]["json"]["spoiler_text"] == "Spoiler"
+    assert posted[0]["json"]["sensitive"] is True
+
+
+async def test_a_plain_chat_message_stays_as_lean_as_before(monkeypatch):
+    _login(monkeypatch)
+    posted = _sending(monkeypatch)
+
+    await _post(_app(monkeypatch), "/conversations/42/reply", {"status": "hi"})
+
+    assert posted[0]["json"] == {"status": "hi", "in_reply_to_id": "42", "visibility": "direct"}
+
+
+async def test_the_empty_file_part_a_browser_sends_does_not_break_a_chat_message(monkeypatch):
+    _login(monkeypatch)
+    posted = _sending(monkeypatch)
+
+    response = await _post_multipart(_app(monkeypatch), "/conversations/42/reply",
+                                     {"status": "hi", "in_reply_to_id": "", "spoiler_text": "", "language": ""},
+                                     {"media": ("", b"", "application/octet-stream")})
+
+    assert response.status_code == 200
+    assert len(posted) == 1
+    assert "media_ids" not in posted[0]["json"]
 

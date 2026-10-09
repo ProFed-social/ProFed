@@ -6,10 +6,17 @@ from unittest.mock import AsyncMock, Mock
 import httpx
 from fastapi import FastAPI
 
-from profed.components.client import auth, compose, templating
+from profed.components.client import auth, compose, posting, templating
 
 
 _ENV = templating.build_environment(templating.STANDARD_TEMPLATES, None)
+
+
+def _serving(monkeypatch, client):
+    monkeypatch.setattr(compose, "api_client", lambda: client)
+    monkeypatch.setattr(posting, "api_client", lambda: client)
+
+    return client
 
 
 def _app(monkeypatch):
@@ -58,7 +65,7 @@ def _login(monkeypatch, token="tok"):
 async def test_compose_posts_the_status_to_the_api(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hello"})
 
@@ -70,7 +77,7 @@ async def test_compose_posts_the_status_to_the_api(monkeypatch):
 async def test_compose_includes_in_reply_to_id_when_replying(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi", "in_reply_to_id": "42"})
 
@@ -81,8 +88,7 @@ async def test_compose_includes_in_reply_to_id_when_replying(monkeypatch):
 
 async def test_compose_returns_the_new_status_as_a_fragment(monkeypatch):
     _login(monkeypatch)
-    monkeypatch.setattr(compose, "api_client",
-                        lambda: Mock(post=AsyncMock(return_value=_resp(200, _status("<p>a new post</p>")))))
+    _serving(monkeypatch, Mock(post=AsyncMock(return_value=_resp(200, _status("<p>a new post</p>")))))
 
     response = await _post(_app(monkeypatch), "/compose", {"status": "a new post"})
 
@@ -94,7 +100,7 @@ async def test_compose_returns_the_new_status_as_a_fragment(monkeypatch):
 
 async def test_compose_reports_an_api_failure(monkeypatch):
     _login(monkeypatch)
-    monkeypatch.setattr(compose, "api_client", lambda: Mock(post=AsyncMock(return_value=_resp(422))))
+    _serving(monkeypatch, Mock(post=AsyncMock(return_value=_resp(422))))
 
     response = await _post(_app(monkeypatch), "/compose", {"status": "x" * 6000})
 
@@ -103,7 +109,7 @@ async def test_compose_reports_an_api_failure(monkeypatch):
 
 async def test_compose_redirects_an_anonymous_visitor_to_login(monkeypatch):
     client = Mock(post=AsyncMock())
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     response = await _post(_app(monkeypatch), "/compose", {"status": "hello"})
 
@@ -125,7 +131,7 @@ async def _post_multipart(app, path, data, files=None):
 async def test_compose_carries_the_chosen_visibility(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi", "visibility": "private"})
 
@@ -135,7 +141,7 @@ async def test_compose_carries_the_chosen_visibility(monkeypatch):
 async def test_compose_carries_a_content_warning(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi", "spoiler_text": "Spoiler"})
 
@@ -145,7 +151,7 @@ async def test_compose_carries_a_content_warning(monkeypatch):
 async def test_a_content_warning_marks_the_media_as_sensitive(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi", "spoiler_text": "Spoiler"})
 
@@ -155,7 +161,7 @@ async def test_a_content_warning_marks_the_media_as_sensitive(monkeypatch):
 async def test_a_post_without_a_warning_is_not_sensitive(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi"})
 
@@ -165,7 +171,7 @@ async def test_a_post_without_a_warning_is_not_sensitive(monkeypatch):
 async def test_compose_carries_the_chosen_language(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi", "language": "de"})
 
@@ -175,7 +181,7 @@ async def test_compose_carries_the_chosen_language(monkeypatch):
 async def test_a_region_we_support_is_kept_as_it_is(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi", "language": "pt-BR"})
 
@@ -185,7 +191,7 @@ async def test_a_region_we_support_is_kept_as_it_is(monkeypatch):
 async def test_a_language_written_in_the_wrong_case_still_counts(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi", "language": "PT-br"})
 
@@ -195,7 +201,7 @@ async def test_a_language_written_in_the_wrong_case_still_counts(monkeypatch):
 async def test_a_language_with_a_region_keeps_only_what_we_know(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi", "language": "de-CH"})
 
@@ -205,7 +211,7 @@ async def test_a_language_with_a_region_keeps_only_what_we_know(monkeypatch):
 async def test_a_language_nobody_knows_is_left_off_instead_of_failing(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     response = await _post(_app(monkeypatch), "/compose", {"status": "hi", "language": "Klingonisch"})
 
@@ -216,7 +222,7 @@ async def test_a_language_nobody_knows_is_left_off_instead_of_failing(monkeypatc
 async def test_a_post_without_extras_stays_minimal(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi"})
 
@@ -226,7 +232,7 @@ async def test_a_post_without_extras_stays_minimal(monkeypatch):
 async def test_a_chosen_image_is_uploaded_before_the_status(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(side_effect=[_upload("m1"), _resp(200, _status())]))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post_multipart(_app(monkeypatch), "/compose",
                           {"status": "look", "media_descriptions": "Ein Diagramm"},
@@ -243,7 +249,7 @@ async def test_a_chosen_image_is_uploaded_before_the_status(monkeypatch):
 async def test_several_images_keep_their_order_and_alt_texts(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(side_effect=[_upload("first"), _upload("second"), _resp(200, _status())]))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post_multipart(_app(monkeypatch), "/compose",
                           {"status": "look", "media_descriptions": ["Erstes", "Zweites"]},
@@ -257,7 +263,7 @@ async def test_several_images_keep_their_order_and_alt_texts(monkeypatch):
 async def test_an_image_without_an_alt_text_is_uploaded_anyway(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(side_effect=[_upload("m1"), _resp(200, _status())]))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post_multipart(_app(monkeypatch), "/compose", {"status": "look"},
                           {"media": ("a.png", b"a", "image/png")})
@@ -268,7 +274,7 @@ async def test_an_image_without_an_alt_text_is_uploaded_anyway(monkeypatch):
 async def test_a_failing_upload_stops_the_post(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(side_effect=[_resp(422), _resp(200, _status())]))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     response = await _post_multipart(_app(monkeypatch), "/compose", {"status": "look"},
                                      {"media": ("a.png", b"a", "image/png")})
@@ -280,7 +286,7 @@ async def test_a_failing_upload_stops_the_post(monkeypatch):
 async def test_a_post_without_images_uploads_nothing(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     await _post(_app(monkeypatch), "/compose", {"status": "hi"})
 
@@ -291,7 +297,7 @@ async def test_a_post_without_images_uploads_nothing(monkeypatch):
 async def test_the_empty_file_part_a_browser_always_sends_is_ignored(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
-    monkeypatch.setattr(compose, "api_client", lambda: client)
+    _serving(monkeypatch, client)
 
     response = await _post_multipart(_app(monkeypatch), "/compose",
                                      {"status": "hi", "visibility": "public", "in_reply_to_id": "",
@@ -301,5 +307,4 @@ async def test_the_empty_file_part_a_browser_always_sends_is_ignored(monkeypatch
     assert response.status_code == 200
     assert client.post.call_count == 1
     assert "media_ids" not in client.post.call_args.kwargs["json"]
-
 
