@@ -405,6 +405,7 @@ a:hover { text-decoration: underline; }
 .compose-reply-target:not([hidden]) {
   display: flex;
   align-items: center;
+  min-width: 0;
   gap: .4rem;
   padding: .3rem .5rem;
   background: var(--surface);
@@ -446,7 +447,7 @@ a:hover { text-decoration: underline; }
 
 .compose-dialog::backdrop { background: rgb(0 0 0 / .45); }
 
-.compose { display: grid; gap: .6rem; padding: 1rem; }
+.compose { display: grid; gap: .6rem; padding: 1rem; min-width: 0; }
 .compose-head { display: flex; align-items: center; gap: .5rem; }
 .compose-heading { font-weight: 600; }
 .compose-close {

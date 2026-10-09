@@ -172,6 +172,26 @@ async def test_compose_carries_the_chosen_language(monkeypatch):
     assert client.post.call_args.kwargs["json"]["language"] == "de"
 
 
+async def test_a_region_we_support_is_kept_as_it_is(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
+    monkeypatch.setattr(compose, "api_client", lambda: client)
+
+    await _post(_app(monkeypatch), "/compose", {"status": "hi", "language": "pt-BR"})
+
+    assert client.post.call_args.kwargs["json"]["language"] == "pt-BR"
+
+
+async def test_a_language_written_in_the_wrong_case_still_counts(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
+    monkeypatch.setattr(compose, "api_client", lambda: client)
+
+    await _post(_app(monkeypatch), "/compose", {"status": "hi", "language": "PT-br"})
+
+    assert client.post.call_args.kwargs["json"]["language"] == "pt-BR"
+
+
 async def test_a_language_with_a_region_keeps_only_what_we_know(monkeypatch):
     _login(monkeypatch)
     client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
@@ -266,4 +286,20 @@ async def test_a_post_without_images_uploads_nothing(monkeypatch):
 
     assert client.post.call_count == 1
     assert "media_ids" not in client.post.call_args.kwargs["json"]
+
+
+async def test_the_empty_file_part_a_browser_always_sends_is_ignored(monkeypatch):
+    _login(monkeypatch)
+    client = Mock(post=AsyncMock(return_value=_resp(200, _status())))
+    monkeypatch.setattr(compose, "api_client", lambda: client)
+
+    response = await _post_multipart(_app(monkeypatch), "/compose",
+                                     {"status": "hi", "visibility": "public", "in_reply_to_id": "",
+                                      "spoiler_text": "", "language": ""},
+                                     {"media": ("", b"", "application/octet-stream")})
+
+    assert response.status_code == 200
+    assert client.post.call_count == 1
+    assert "media_ids" not in client.post.call_args.kwargs["json"]
+
 

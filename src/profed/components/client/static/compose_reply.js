@@ -43,7 +43,15 @@
 
   function show(markup) {
     var posts = document.querySelector(".posts");
-    if (posts) { posts.insertAdjacentHTML("afterbegin", markup); }
+    if (!posts) { return; }
+
+    var before = Array.prototype.slice.call(posts.children);
+    posts.insertAdjacentHTML("afterbegin", markup);
+    Array.prototype.forEach.call(posts.children, function (child) {
+      if (before.indexOf(child) !== -1) { return; }
+      if (window.htmx) { window.htmx.process(child); }
+      bindTriggers(child);
+    });
   }
 
   function done(form) {

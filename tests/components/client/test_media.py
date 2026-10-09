@@ -96,6 +96,7 @@ def test_an_image_without_known_dimensions_is_left_out():
     assert rows["total"] == 1
     assert rows["extra"] == 0
 
+
 def test_anything_that_is_not_an_image_is_left_out_for_now():
     rows = media_rows([{"type": "video", "url": "https://r/v", "meta": {"original": {"width": 800, "height": 600}}},
                        _image("a")])

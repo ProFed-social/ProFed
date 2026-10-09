@@ -66,8 +66,11 @@
 
     var names = new Intl.DisplayNames([navigator.language || "en"], {type: "language", fallback: "none"});
     options.forEach(function (option) {
-      var name = names.of(option.value);
-      if (name) { option.label = name; }
+      try {
+        option.label = names.of(option.value) || option.label;
+      } catch (notATag) {
+        option.dataset.unnamed = "malformed";
+      }
     });
   }
 
