@@ -27,7 +27,7 @@ from profed.components.api.c2s.shared.known_accounts.storage import storage as _
 from profed.components.api.c2s.shared.statuses import as_objects, hidden, service
 from profed.components.api.c2s.shared.conversations import storage as conversations_storage
 from profed.components.api.c2s.shared.media.storage import storage as _media_storage
-from profed.components.api.c2s.shared.media.upload import MAX_MEDIA_ATTACHMENTS
+from profed.components.api.c2s.shared.media.upload import as_type, max_media_attachments
 from profed.sanitize import sanitize_html
 from profed import mentions
 
@@ -77,16 +77,17 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
     if len(body.status) > int(_config.get("status_max_characters", 5000)):
         raise HTTPException(status_code=422, detail="status too long")
 
-    if len(body.media_ids) > MAX_MEDIA_ATTACHMENTS:
+    if len(body.media_ids) > max_media_attachments():
         raise HTTPException(status_code=422, detail="too many attachments")
 
     async def attachments():
         def document(row):
             return {key: value
-                    for key, value in {"type": "Document",
+                    for key, value in {"type": as_type(row["content_type"]),
                                        "mediaType": row["content_type"],
                                        "url": row["url"],
                                        "name": row["description"],
+                                       "filename": row["filename"],
                                        "width": row["width"],
                                        "height": row["height"]}.items()
                     if value is not None}

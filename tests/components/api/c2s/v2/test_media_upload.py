@@ -56,7 +56,7 @@ def client():
 
 
 @pytest.fixture(autouse=True)
-def mocks():
+def mocks(api_config):
     bus     = FakeMessageBus()
     storage = FakeStorage()
     with patch("profed.components.api.c2s.shared.media.upload.message_bus", return_value=bus), \
@@ -94,7 +94,7 @@ def test_upload_publishes_event(client, mocks):
 
 
 def test_unsupported_type_returns_422(client):
-    response = client.post("/media", files={"file": ("doc.pdf", b"data", "application/pdf")})
+    response = client.post("/media", files={"file": ("bundle.zip", b"data", "application/zip")})
 
     assert response.status_code == 422
 

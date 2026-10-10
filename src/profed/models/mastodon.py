@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from typing import Any
 
+from .media_object import MediaKind
 from .resume import Resume
 from profed.identity import account_id, heuristic_acct
 from profed.sanitize import sanitize_html
@@ -118,16 +119,9 @@ def property_value_fields(attachment) -> list[dict]:
 
 
 def _attachment_type(entry: dict) -> str:
-    media_type = entry.get("mediaType", "")
-    if media_type.startswith("video/"):
-        return "video"
-    if media_type.startswith("audio/"):
-        return "audio"
-    if media_type.startswith("image/"):
-        return "image"
-    return {"Image": "image",
-            "Video": "video",
-            "Audio": "audio"}.get(entry.get("type", ""), "unknown")
+    kind = MediaKind.of(entry.get("mediaType", "")) or MediaKind.named(entry.get("type", ""))
+
+    return kind.mastodon_type if kind else "unknown"
 
 
 def _href(value) -> str | None:
@@ -177,6 +171,7 @@ def media_attachments_from_attachment(attachment: list) -> list[dict]:
         return {"id": url,
                 "type": _attachment_type(item),
                 "mime_type": item.get("mediaType"),
+                "filename": item.get("filename") or item.get("profed:filename"),
                 "url": url,
                 "description": item.get("name"),
                 "blurhash": item.get("blurhash"),
@@ -263,8 +258,9 @@ class Conversation(BaseModel):
 
 
 class MediaAttachmentMeta(BaseModel):
-    width:  int | None = None
+    width: int | None = None
     height: int | None = None
+    duration: float | None = None
 
 
 class MediaAttachmentMetadata(BaseModel):
@@ -278,6 +274,8 @@ class MediaAttachment(BaseModel):
     url:         str
     preview_url: str | None = None
     remote_url:  str | None = None
+    mime_type:   str | None = None
+    filename:    str | None = None
     description: str | None = None
     blurhash:    str | None = None
     meta:        MediaAttachmentMetadata | None = None

@@ -15,6 +15,7 @@
     <script src="/static/collapse.js" defer></script>
     <script src="/static/reply.js" defer></script>
     <script src="/static/media_grid.js" defer></script>
+    <script src="/static/media_viewer.js" defer></script>
     <script src="/static/compose_reply.js" defer></script>
     <script src="/static/compose_media.js" defer></script>
     <link rel="stylesheet" href="/static/style.css">
@@ -46,6 +47,13 @@
       {% block content %}{% endblock %}
     </main>
     {% if current_username %}{% include "compose.html" %}{% endif %}
+    <dialog class="media-viewer" data-media-viewer>
+      <button type="button" class="media-viewer-close" data-media-viewer-close
+              title="Close" aria-label="Close">&times;</button>
+      <img class="media-viewer-image" alt="" hidden>
+      <video class="media-viewer-video" controls playsinline hidden></video>
+      <iframe class="media-viewer-frame" title="Document" hidden></iframe>
+    </dialog>
   </body>
 </html>
 

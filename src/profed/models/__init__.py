@@ -3,7 +3,15 @@
 
 from .resume import Resume
 from .user_profile import UserProfile, MediaReference
-from .media_object import MediaObject, ImageMeta
+from .media_object import AudioMeta, DocumentMeta, MediaKind, MediaObject, ImageMeta, VideoMeta
 
-__all__ = ["Resume", "UserProfile", "MediaReference", "MediaObject", "ImageMeta"]
+__all__ = ["Resume",
+           "UserProfile",
+           "MediaReference",
+           "MediaKind",
+           "MediaObject",
+           "ImageMeta",
+           "VideoMeta",
+           "AudioMeta",
+           "DocumentMeta"]
 

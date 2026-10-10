@@ -22,6 +22,7 @@ class _Storage(BaseStorage):
                                          etag TEXT,
                                          width INTEGER,
                                          height INTEGER,
+                                         filename TEXT,
                                          description TEXT)""")
         await self.execute("""CREATE INDEX IF NOT EXISTS
                               api_media_source_url ON api.media (source_url)""")
@@ -38,6 +39,7 @@ class _Storage(BaseStorage):
                      etag: str | None = None,
                      width: int | None = None,
                      height: int | None = None,
+                     filename: str | None = None,
                      description: str | None = None) -> None:
         await self.execute("""INSERT INTO api.media
                                       (file_id,
@@ -51,8 +53,9 @@ class _Storage(BaseStorage):
                                        etag,
                                        width,
                                        height,
+                                       filename,
                                        description)
-                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                               ON CONFLICT (file_id) DO NOTHING""",
                            file_id,
                            url,
@@ -65,6 +68,7 @@ class _Storage(BaseStorage):
                            etag,
                            width,
                            height,
+                           filename,
                            description)
 
     async def owned_by(self, file_ids: list[str], uploader: str) -> list[dict]:
@@ -73,6 +77,7 @@ class _Storage(BaseStorage):
                                            url,
                                            content_type,
                                            description,
+                                           filename,
                                            width,
                                            height
                                        FROM

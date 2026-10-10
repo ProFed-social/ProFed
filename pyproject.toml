@@ -20,6 +20,7 @@ dependencies = [
     "cryptography>=42",
     "pillow>=10.0",
     "nh3>=0.2",
+    "beautifulsoup4>=4.12",
   ]
 
 classifiers = [

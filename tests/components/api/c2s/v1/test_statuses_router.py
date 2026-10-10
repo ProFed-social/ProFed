@@ -1,20 +1,32 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import os
 import pytest
 from unittest.mock import patch, AsyncMock, Mock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from profed.core import message_bus
+from profed.core.config import config as profed_config, raw
 from profed.components.api.c2s.v1.statuses import router as statuses_module
 from profed.components.api.c2s.shared.statuses import hidden
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.models.mastodon import Account
 from profed.identity import account_id, actor_url_from_username, heuristic_acct
-from profed.components.api.c2s.shared.media.upload import MAX_MEDIA_ATTACHMENTS
+from profed.components.api.c2s.shared.media.upload import max_media_attachments
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
+
+
+@pytest.fixture(autouse=True)
+def api_configured():
+    raw.paths = []
+    raw.argv = ["", "--profed.run=api", "--api.domain=example.com"]
+    os.environ = {key: value
+                  for key, value in os.environ.items()
+                  if not key.startswith("PROFED_")}
+    profed_config.reset()
 
 
 @pytest.fixture
@@ -1029,11 +1041,17 @@ def test_the_edit_history_can_be_read_without_logging_in(fake_bus):
     assert _anonymous_client().get("/statuses/424242/history").status_code == 404
 
 
-def _media_row(file_id="m1", description="Ein Diagramm", width=1920, height=1080):
+def _media_row(file_id="m1",
+               description="Ein Diagramm",
+               width=1920,
+               height=1080,
+               content_type="image/jpeg",
+               filename=None):
     return {"file_id": file_id,
             "url": f"https://example.com/media/{file_id}",
-            "content_type": "image/jpeg",
+            "content_type": content_type,
             "description": description,
+            "filename": filename,
             "width": width,
             "height": height}
 
@@ -1057,7 +1075,7 @@ def test_attached_media_is_federated_on_the_note(client, fake_bus):
 
     assert response.status_code == 200
     attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"]
-    assert attachment == [{"type": "Document",
+    assert attachment == [{"type": "Image",
                            "mediaType": "image/jpeg",
                            "url": "https://example.com/media/m1",
                            "name": "Ein Diagramm",
@@ -1098,6 +1116,47 @@ def test_an_alt_text_that_was_never_given_is_left_off_the_attachment(client, fak
     assert "name" not in attachment[0]
 
 
+def test_each_attachment_is_federated_with_the_type_of_its_medium(client, fake_bus):
+    rows = [_media_row("m1", content_type="video/mp4"),
+            _media_row("m2", content_type="audio/mpeg"),
+            _media_row("m3", content_type="application/pdf")]
+
+    _post_with_media(client, ["m1", "m2", "m3"], rows)
+
+    attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"]
+    assert [entry["type"] for entry in attachment] == ["Video", "Audio", "Document"]
+
+
+def test_an_attachment_of_an_unknown_medium_stays_a_document(client, fake_bus):
+    _post_with_media(client, ["m1"], [_media_row("m1", content_type="application/x-whatever")])
+
+    attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"]
+    assert attachment[0]["type"] == "Document"
+
+
+def test_the_filename_is_federated_so_a_document_can_be_named(client, fake_bus):
+    _post_with_media(client, ["m1"], [_media_row("m1",
+                                                 content_type="application/pdf",
+                                                 filename="Jahresbericht.pdf")])
+
+    attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"]
+    assert attachment[0]["filename"] == "Jahresbericht.pdf"
+
+
+def test_an_attachment_without_a_filename_federates_none(client, fake_bus):
+    _post_with_media(client, ["m1"], [_media_row()])
+
+    attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"]
+    assert "filename" not in attachment[0]
+
+
+def test_the_note_declares_the_term_it_uses_for_the_filename(client, fake_bus):
+    _post_with_media(client, ["m1"], [_media_row("m1", filename="bild.jpg")])
+
+    context = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["@context"]
+    assert {"profed": "https://profed.social/ns#", "filename": "profed:filename"} in context
+
+
 def test_a_status_without_media_federates_no_attachment(client, fake_bus):
     with patch("profed.components.api.c2s.v1.statuses.router.resolve_actor",
                AsyncMock(return_value=LOCAL_ACCOUNT)):
@@ -1107,7 +1166,7 @@ def test_a_status_without_media_federates_no_attachment(client, fake_bus):
 
 
 def test_more_media_than_allowed_is_refused(client, fake_bus):
-    ids = [f"m{number}" for number in range(MAX_MEDIA_ATTACHMENTS + 1)]
+    ids = [f"m{number}" for number in range(max_media_attachments() + 1)]
 
     response = _post_with_media(client, ids, [_media_row(file_id) for file_id in ids])
 

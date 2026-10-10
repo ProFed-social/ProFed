@@ -27,6 +27,7 @@ async def _store(file_id: str, source: dict) -> None:
                                    etag=source.get("etag"),
                                    width=metadata.get("width"),
                                    height=metadata.get("height"),
+                                   filename=source.get("filename"),
                                    description=source.get("description"))
 
 

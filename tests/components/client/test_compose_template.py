@@ -53,12 +53,18 @@ def test_the_editor_sends_its_files_as_multipart():
     assert 'enctype="multipart/form-data"' in editor
 
 
-def test_several_images_can_be_chosen_at_once():
-    picker = re.search(r'<input class="compose-files"[^>]*>', _editor())[0]
+def test_several_attachments_can_be_chosen_at_once():
+    picker = re.search(r'<input class="compose-files"[^>]*>', _editor(), re.DOTALL)[0]
 
     assert "multiple" in picker
-    assert 'accept="image/*"' in picker
     assert 'name="media"' in picker
+
+
+def test_the_file_dialog_offers_every_kind_we_accept():
+    picker = re.search(r'<input class="compose-files"[^>]*>', _editor(), re.DOTALL)[0]
+    accepted = re.search(r'accept="([^"]+)"', picker)[1]
+
+    assert set(accepted.split(",")) == {"image/*", "video/*", "audio/*", "application/pdf"}
 
 
 def test_every_visibility_can_be_chosen():

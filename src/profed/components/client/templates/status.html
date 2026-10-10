@@ -38,24 +38,70 @@
 </footer>
 {% endmacro %}
 {% macro media_figure(entry) %}
-<figure class="media-item" style="--ratio: {{ '%.4f' | format(entry.ratio) }}">
-  <a href="{{ entry.item.url }}" target="_blank" rel="noopener noreferrer">
+<figure class="media-item media-{{ entry.flavour }}" style="--ratio: {{ '%.4f' | format(entry.ratio) }}">
+  {% if entry.flavour == 'document' %}
+  <button type="button" class="media-document" data-media-open="{{ entry.item.url }}" data-media-kind="document">
+    <span class="media-document-icon" aria-hidden="true">&#128196;</span>
+    <span class="media-document-name">{{ entry.item.filename or entry.item.description or 'PDF' }}</span>
+  </button>
+  {% elif entry.flavour == 'video' %}
+  <button type="button" class="media-play" data-media-open="{{ entry.item.url }}" data-media-kind="video"
+          aria-label="Play {{ entry.item.filename or entry.item.description or 'video' }}">
+    {% if entry.item.preview_url %}
+    <img src="{{ entry.item.preview_url }}" alt="{{ entry.item.description or '' }}" loading="lazy">
+    {% endif %}
+    <span class="media-play-badge" aria-hidden="true">&#9654;</span>
+  </button>
+  {% else %}
+  <button type="button" class="media-open" data-media-open="{{ entry.item.url }}" data-media-kind="image">
     <img src="{{ entry.item.preview_url or entry.item.url }}" alt="{{ entry.item.description or '' }}" loading="lazy"
          width="{{ entry.item.meta.original.width }}" height="{{ entry.item.meta.original.height }}">
-  </a>
+  </button>
+  {% endif %}
 </figure>
+{% endmacro %}
+{% macro media_block(segment) %}
+<div class="media-block media-{{ segment.flavour }}">
+  {% if segment.flavour == 'audio' %}
+  {% if segment.item.description %}<p class="media-caption">{{ segment.item.description }}</p>{% endif %}
+  <audio src="{{ segment.item.url }}" preload="metadata" controls></audio>
+  {% elif segment.flavour == 'video' %}
+  <video src="{{ segment.item.url }}" {% if segment.item.preview_url %}poster="{{ segment.item.preview_url }}"{% endif %}
+         preload="metadata" controls playsinline></video>
+  {% elif segment.flavour == 'image' %}
+  <button type="button" class="media-open" data-media-open="{{ segment.item.url }}" data-media-kind="image">
+    <img src="{{ segment.item.preview_url or segment.item.url }}"
+         alt="{{ segment.item.description or '' }}" loading="lazy">
+  </button>
+  {% else %}
+  <a class="media-file" href="{{ segment.item.url }}" target="_blank" rel="noopener noreferrer">
+    <span class="media-document-icon" aria-hidden="true">&#128206;</span>
+    <span class="media-document-name">
+      {{ segment.item.filename or segment.item.description or segment.item.mime_type or 'Attachment' }}
+    </span>
+  </a>
+  {% endif %}
+</div>
 {% endmacro %}
 {% macro media(s, max_rows=3) %}
 {% set grid = media_rows(s.media_attachments, max_rows) %}
-{% if grid.rows %}
-<div class="media-grid" data-media-grid data-media-total="{{ grid.total }}"
-     {% if max_rows is not none %}data-media-rows="{{ max_rows }}"{% endif %}>
-  {% for row in grid.rows %}
-  <div class="media-row{% if row.fills %} fills{% endif %}">
-    {% for entry in row['items'] %}{{ media_figure(entry) }}{% endfor %}
-    {% if grid.extra and loop.last %}<span class="media-more">+{{ grid.extra }}</span>{% endif %}
+{% if grid.segments %}
+<div class="media" data-media data-media-total="{{ grid.total }}"
+     {% if max_rows is not none %}data-media-budget="{{ max_rows }}"{% endif %}>
+  {% for segment in grid.segments %}
+  {% if segment.kind == 'grid' %}
+  <div class="media-grid" data-media-grid>
+    {% for row in segment.rows %}
+    <div class="media-row{% if row.fills %} fills{% endif %}">
+      {% for entry in row['items'] %}{{ media_figure(entry) }}{% endfor %}
+    </div>
+    {% endfor %}
   </div>
+  {% else %}
+  {{ media_block(segment) }}
+  {% endif %}
   {% endfor %}
+  {% if grid.extra %}<span class="media-more">+{{ grid.extra }}</span>{% endif %}
 </div>
 {% endif %}
 {% endmacro %}

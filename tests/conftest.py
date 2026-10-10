@@ -1,12 +1,14 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import os
 import pytest
 from unittest.mock import patch
 
 from profed import identity
 from profed.http import client
 from profed.core import message_bus, media_storage
+from profed.core.config import config, raw
 from profed.core.persistence import base_storage
 from profed.components.api.c2s.shared.bookmarks import storage as bookmarks_storage
 from _fakes import FakeMediaStorage, FakeMessageBus
@@ -34,6 +36,18 @@ def no_bookmarks():
     yield bookmarks_storage._instance
 
     bookmarks_storage._instance = backup
+
+
+@pytest.fixture
+def api_config():
+    raw.paths = []
+    raw.argv = ["", "--profed.run=api", "--api.domain=example.com"]
+    os.environ = {key: value
+                  for key, value in os.environ.items()
+                  if not key.startswith("PROFED_")}
+    config.reset()
+
+    return config()
 
 
 @pytest.fixture
@@ -71,5 +85,4 @@ def storages_ready_by_default(monkeypatch):
         original_init(self, *args, **kwargs)
         self._is_rebuilt = None
     monkeypatch.setattr(base_storage.BaseStorage, "__init__", _init)
-
 
