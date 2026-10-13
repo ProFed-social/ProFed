@@ -242,3 +242,14 @@ async def test_an_animated_gif_keeps_the_mastodon_name_for_it(uploading):
 
     assert attachment.type == "gifv"
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content_type, filename", [("application/ogg", "tone.ogg"),
+                                                    ("audio/x-m4a", "tone.m4a")])
+async def test_the_names_browsers_really_send_for_audio_are_accepted(uploading, content_type, filename):
+    with _measured(AUDIO_META):
+        attachment = await process_upload("alice", _file(b"tone", content_type, filename), None)
+
+    assert attachment.type == "audio"
+    assert attachment.mime_type == content_type
+

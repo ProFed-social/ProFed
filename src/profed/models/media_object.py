@@ -14,8 +14,8 @@ class MediaKind(str, Enum):
 
     @classmethod
     def of(cls, content_type: str) -> Optional["MediaKind"]:
-        return (cls.document
-                if content_type == "application/pdf" else
+        return ({"application/pdf": cls.document,
+                 "application/ogg": cls.audio}.get(content_type) or
                 cls.__members__.get((content_type or "").split("/")[0]))
 
     @classmethod
@@ -62,7 +62,7 @@ MediaMeta = Annotated[Union[ImageMeta, VideoMeta, AudioMeta, DocumentMeta], Fiel
 class MediaObject(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    url:str
+    url: str
     content_type: str
     size: StrictInt
     uploader: str | None = None

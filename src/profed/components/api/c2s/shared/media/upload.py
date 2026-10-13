@@ -25,6 +25,7 @@ ACCEPTED = {"image/jpeg",
             "image/gif",
             "image/webp",
             "video/mp4",
+            "audio/x-m4a",
             "video/webm",
             "video/ogg",
             "video/quicktime",
@@ -35,6 +36,7 @@ ACCEPTED = {"image/jpeg",
             "audio/flac",
             "audio/wav",
             "audio/x-wav",
+            "application/ogg",
             "application/pdf"}
 
 VISIBILITY_POLL = 0.01
