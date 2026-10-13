@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import asyncio
 import io
 from pathlib import Path
 from PIL import Image
@@ -16,6 +17,7 @@ from profed.models.mastodon import (MediaAttachment,
                                     MediaAttachmentMeta,
                                     MediaAttachmentMetadata)
 from .probe import measured, preview_dimension
+from .storage import storage
 
 
 ACCEPTED = {"image/jpeg",
@@ -35,6 +37,8 @@ ACCEPTED = {"image/jpeg",
             "audio/x-wav",
             "application/pdf"}
 
+VISIBILITY_POLL = 0.01
+
 
 def supported_types() -> set[str]:
     return set(ACCEPTED)
@@ -46,6 +50,10 @@ def max_media_attachments() -> int:
 
 def size_limit(kind: MediaKind) -> int:
     return config()["api"][f"{kind.value}_size_limit"]
+
+
+def visible_timeout() -> float:
+    return config()["api"]["media_visible_timeout"]
 
 
 def as_type(content_type: str) -> str:
@@ -113,6 +121,16 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
     def mastodon_type(kind: MediaKind) -> str:
         return "gifv" if kind is MediaKind.image and "gif" in file.content_type else kind.mastodon_type
 
+    async def visible(file_id: str) -> None:
+        async def readable() -> None:
+            while not await (await storage()).owned_by([file_id], acct_from_username(username)):
+                await asyncio.sleep(VISIBILITY_POLL)
+
+        try:
+            await asyncio.wait_for(readable(), visible_timeout())
+        except TimeoutError:
+            raise HTTPException(status_code=503, detail="attachment_not_ready")
+
     async def publish_and_return(kind):
         async def with_data(kind, data):
             async def with_stored(kind, data, stored):
@@ -127,6 +145,8 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
                                                           filename=file.filename or None,
                                                           description=strip_tags(description),
                                                           metadata=metadata).model_dump(exclude_none=True))
+
+                    await visible(stored.file_id)
 
                     return MediaAttachment(id=stored.file_id,
                                            type=mastodon_type(kind),

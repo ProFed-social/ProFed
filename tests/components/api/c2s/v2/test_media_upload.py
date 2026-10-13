@@ -46,6 +46,19 @@ class FakeStorage:
         return f"https://example.com/media/ab/{file_id}{suffix}"
 
 
+class FakeProjection:
+    def __init__(self, lag: int = 0, forever: bool = False):
+        self.lag = lag
+        self.forever = forever
+        self.asked = 0
+
+    async def owned_by(self, file_ids, uploader):
+        self.asked += 1
+
+        return ([] if self.forever or self.asked <= self.lag else
+                [{"file_id": file_id, "uploader": uploader} for file_id in file_ids])
+
+
 @pytest.fixture
 def client():
     media_module.init({})
@@ -55,14 +68,23 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture
+def projection():
+    return FakeProjection()
+
+
 @pytest.fixture(autouse=True)
-def mocks(api_config):
-    bus     = FakeMessageBus()
+def mocks(api_config, projection):
+    async def reading():
+        return projection
+
+    bus = FakeMessageBus()
     storage = FakeStorage()
     with patch("profed.components.api.c2s.shared.media.upload.message_bus", return_value=bus), \
          patch("profed.components.api.c2s.shared.media.upload.media_storage", return_value=storage), \
+         patch("profed.components.api.c2s.shared.media.upload.storage", reading), \
          patch("profed.components.api.c2s.shared.media.upload.acct_from_username", return_value=UPLOADER):
-        yield bus, storage
+        yield bus, storage, projection
 
 
 def test_upload_jpeg_returns_media_attachment(client):
@@ -78,7 +100,7 @@ def test_upload_jpeg_returns_media_attachment(client):
 
 
 def test_upload_publishes_event(client, mocks):
-    bus, _ = mocks
+    bus, _, _ = mocks
     client.post("/media", files={"file": ("photo.jpg", make_jpeg(), "image/jpeg")})
 
     published = bus.topic("media").published
@@ -113,7 +135,7 @@ def test_thumbnail_is_smaller_than_original(client):
                            files={"file": ("large.jpg", make_jpeg(800, 600), "image/jpeg")})
 
     meta = response.json()["meta"]
-    assert meta["small"]["width"]  <= 400
+    assert meta["small"]["width"] <= 400
     assert meta["small"]["height"] <= 400
 
 
@@ -131,4 +153,22 @@ def test_upload_description_drops_dangerous_url(client):
                            data={"description": "javascript:alert(1)"})
 
     assert response.json()["description"] == ""
+
+
+def test_the_upload_waits_until_the_attachment_can_be_read_back(client, projection):
+    projection.lag = 3
+
+    response = client.post("/media", files={"file": ("photo.jpg", make_jpeg(), "image/jpeg")})
+
+    assert response.status_code == 200
+    assert projection.asked > projection.lag
+
+def test_an_attachment_that_never_appears_fails_loudly(client, projection, api_config):
+    api_config["api"]["media_visible_timeout"] = 0.05
+    projection.forever = True
+
+    response = client.post("/media", files={"file": ("photo.jpg", make_jpeg(), "image/jpeg")})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "attachment_not_ready"
 

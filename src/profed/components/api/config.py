@@ -18,6 +18,7 @@ def parse(cfg: dict, database: dict) -> dict:
                                          "image_size_limit": int(cfg.get("image_size_limit", 10 * 1024 * 1024)),
                                          "audio_size_limit": int(cfg.get("audio_size_limit", 50 * 1024 * 1024)),
                                          "video_size_limit": int(cfg.get("video_size_limit", 200 * 1024 * 1024)),
-                                         "document_size_limit": int(cfg.get("document_size_limit", 25 * 1024 * 1024))},
+                                         "document_size_limit": int(cfg.get("document_size_limit", 25 * 1024 * 1024)),
+                                         "media_visible_timeout": float(cfg.get("media_visible_timeout", 5.0))},
                                   database)
 

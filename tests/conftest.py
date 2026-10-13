@@ -11,7 +11,13 @@ from profed.core import message_bus, media_storage
 from profed.core.config import config, raw
 from profed.core.persistence import base_storage
 from profed.components.api.c2s.shared.bookmarks import storage as bookmarks_storage
+from profed.components.api.c2s.shared.media import storage as media_projection
 from _fakes import FakeMediaStorage, FakeMessageBus
+
+
+class _EveryUploadIsReadable:
+    async def owned_by(self, file_ids, uploader):
+        return [{"file_id": file_id, "uploader": uploader} for file_id in file_ids]
 
 
 class _NobodyBookmarkedAnything:
@@ -36,6 +42,14 @@ def no_bookmarks():
     yield bookmarks_storage._instance
 
     bookmarks_storage._instance = backup
+
+
+@pytest.fixture(autouse=True)
+def readable_uploads():
+    backup = media_projection._instance
+    media_projection._instance = _EveryUploadIsReadable()
+    yield media_projection._instance
+    media_projection._instance = backup
 
 
 @pytest.fixture
