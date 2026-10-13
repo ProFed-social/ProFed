@@ -61,6 +61,7 @@
 
                     var figure = document.createElement("figure");
                     figure.className = "compose-preview compose-preview-" + flavour;
+                    figure.file = file;
 
                     var name = document.createElement("span");
                     name.className = "compose-preview-name";
@@ -87,12 +88,19 @@
                     return figure;
                 }
 
-                held.files.files = chosen.files;
-                held.previews.replaceChildren();
-                Array.prototype.forEach.call(chosen.files, function (file) {
-                    held.previews.append(preview(file));
+                function shown(file) {
+                    return Array.prototype.find.call(held.previews.children, function (figure) {
+                        return figure.file === file;
+                    });
+                }
+
+                var figures = Array.prototype.map.call(chosen.files, function (file) {
+                    return shown(file) || preview(file);
                 });
-                held.previews.hidden = chosen.files.length === 0;
+
+                held.files.files = chosen.files;
+                held.previews.replaceChildren.apply(held.previews, figures);
+                held.previews.hidden = figures.length === 0;
             }
 
             function take(picked) {
@@ -131,10 +139,19 @@
         }
 
         function nameLanguages() {
+            function naming() {
+                try {
+                    return new Intl.DisplayNames([navigator.language || "en"],
+                                                 {type: "language", fallback: "none"});
+                } catch (notALocale) {
+                    return new Intl.DisplayNames(["en"], {type: "language", fallback: "none"});
+                }
+            }
+
             var options = document.querySelectorAll("#compose-languages option");
             if ( !window.Intl || !Intl.DisplayNames || !options.length ) { return; }
 
-            var names = new Intl.DisplayNames([navigator.language || "en"], {type: "language", fallback: "none"});
+            var names = naming();
             options.forEach(function (option) {
                 try {
                     option.label = names.of(option.value) || option.label;
