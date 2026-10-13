@@ -13,6 +13,26 @@ from .api_client import api_client
 
 logger = logging.getLogger(__name__)
 
+REASONS = {"file_too_large": "That file is too large.",
+           "unsupported_media_type": "That file type is not supported.",
+           "too many attachments": "That is more attachments than a post can carry.",
+           "unknown attachment": "An attachment did not reach the server. Please try again.",
+           "attachment_not_ready": "An attachment is not ready yet. Please try again.",
+           "status too long": "That post is too long."}
+
+
+def failed(response) -> HTTPException:
+    def stated():
+        try:
+            body = response.json()
+        except ValueError:
+            return None
+
+        return body.get("detail") if isinstance(body, dict) else None
+
+    return HTTPException(status_code=response.status_code,
+                         detail=REASONS.get(stated(), "Sending failed. Please try again."))
+
 
 async def media_ids(request: Request, token: str) -> list[str]:
     form = await request.form()
@@ -25,7 +45,7 @@ async def media_ids(request: Request, token: str) -> list[str]:
                                            token=token)
         if response.status_code != 200:
             logger.warning("uploading an attachment failed: %s %s", response.status_code, response.text)
-            raise HTTPException(status_code=response.status_code, detail="upload failed")
+            raise failed(response)
 
         return response.json()["id"]
 

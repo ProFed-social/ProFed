@@ -3,13 +3,13 @@
 
 import logging
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 from typing import Annotated, Optional
 
 from .api_client import api_client
 from .paging import fetched
-from .posting import attachment_entry, language_entry, media_ids, warning_entry
+from .posting import attachment_entry, failed, language_entry, media_ids, warning_entry
 from .auth import page_context, requires_login
 from .templating import environment
 from profed.identity import actor_url_from_username
@@ -108,7 +108,7 @@ async def reply(request: Request,
                                        token=session["token"])
     if response.status_code != 200:
         logger.warning("posting a reply failed: %s %s", response.status_code, response.text)
-        raise HTTPException(status_code=response.status_code, detail="reply failed")
+        raise failed(response)
     messages, following = await _messages(id, session["username"], session["token"])
     return HTMLResponse(environment().get_template("conversation_messages.html").render(messages=messages,
                                                                                         following=following,

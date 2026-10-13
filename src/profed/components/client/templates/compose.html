@@ -1,5 +1,10 @@
-{% from "editor.html" import attach_button, language_field, language_options, media_fields, warning_button,
-                              warning_field %}
+{% from "editor.html" import attach_button,
+                             error_slot,
+                             language_field,
+                             language_options,
+                             media_fields,
+                             warning_button,
+                             warning_field %}
 {% set defaults = posting | default({}, true) %}
 <button type="button" class="compose-open" title="New post" aria-label="New post">
   <svg viewBox="0 0 24 24" width="1.4em" height="1.4em" fill="none" stroke="currentColor" stroke-width="2"
@@ -23,13 +28,16 @@
     {{ warning_field() }}
     <textarea name="status" rows="5" required placeholder="What are you working on?"></textarea>
     {{ media_fields() }}
+    {{ error_slot() }}
     <footer class="compose-tools">
       {{ attach_button() }}
       {{ warning_button() }}
       {{ language_field(defaults) }}
       <select class="compose-visibility" name="visibility" title="Who can see this" aria-label="Who can see this">
-        {% for value, label in [("public", "Public"), ("unlisted", "Unlisted"),
-                                ("private", "Followers only"), ("direct", "Direct")] %}
+        {% for value, label in [("public", "Public"),
+                                ("unlisted", "Unlisted"),
+                                ("private", "Followers only"),
+                                ("direct", "Direct")] %}
         {% set chosen = defaults.get('visibility', 'public') == value %}
         <option value="{{ value }}"{% if chosen %} selected{% endif %}>{{ label }}</option>
         {% endfor %}

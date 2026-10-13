@@ -1,6 +1,9 @@
 {% macro warning_field() %}
 <input class="compose-warning" type="text" name="spoiler_text" placeholder="Content warning" hidden>
 {% endmacro %}
+{% macro error_slot() %}
+<p class="compose-error" role="alert" hidden></p>
+{% endmacro %}
 {% macro media_fields() %}
 <div class="compose-previews" hidden></div>
 <input class="compose-files" type="file" name="media"

@@ -3,13 +3,13 @@
 
 import logging
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 from typing import Annotated
 
 from .api_client import api_client
 from .auth import page_context, requires_login
-from .posting import attachment_entry, language_entry, media_ids, warning_entry
+from .posting import attachment_entry, failed, language_entry, media_ids, warning_entry
 from .templating import environment
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ async def compose(request: Request, session,
                                        token=session["token"])
     if response.status_code != 200:
         logger.warning("posting a status failed: %s %s", response.status_code, response.text)
-        raise HTTPException(status_code=response.status_code, detail="posting failed")
+        raise failed(response)
 
     return HTMLResponse(environment().get_template("status.html").render(status=response.json(),
                                                                          **(await page_context(request, session))))

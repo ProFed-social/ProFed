@@ -160,3 +160,14 @@ def test_both_editors_are_bound_by_the_same_script():
     assert "data-editor" in _editor()
     assert "data-editor" in _chat()
 
+
+def test_the_editor_can_show_what_went_wrong():
+    slot = re.search(r'<p class="compose-error"[^>]*>', _editor())[0]
+
+    assert 'role="alert"' in slot
+    assert "hidden" in slot
+
+
+def test_the_chat_editor_can_show_what_went_wrong_too():
+    assert 'class="compose-error"' in _chat()
+

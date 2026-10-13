@@ -24,10 +24,11 @@
   --surface:     color-mix(in srgb, CanvasText 5%, Canvas);
   --chip-bg:     color-mix(in srgb, var(--accent) 12%, Canvas);
   --chip-border: color-mix(in srgb, var(--accent) 32%, Canvas);
+  --warn: #9c3326;
   --col: 1500px;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --accent: #4cb6bd; }
+  :root { --accent: #4cb6bd; --warn: #e3907f; }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -477,6 +478,16 @@ body:has(.conversations-layout) .compose-open { display: none; }
 }
 .compose textarea:focus-visible,
 .compose-warning:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.compose-error:not([hidden]) {
+  margin: 0;
+  padding: .5rem .7rem;
+  border-left: 3px solid var(--warn);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--warn) 10%, Canvas);
+  color: var(--warn);
+  font-size: .9rem;
+}
 
 .compose-previews:not([hidden]) {
   display: grid;

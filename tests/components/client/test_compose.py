@@ -308,3 +308,20 @@ async def test_the_empty_file_part_a_browser_always_sends_is_ignored(monkeypatch
     assert client.post.call_count == 1
     assert "media_ids" not in client.post.call_args.kwargs["json"]
 
+
+def test_a_rejected_upload_is_explained_in_words_the_user_can_act_on():
+    refused = httpx.Response(422, json={"detail": "file_too_large"})
+
+    assert posting.failed(refused).detail == "That file is too large."
+    assert posting.failed(refused).status_code == 422
+
+
+def test_a_rejection_we_have_no_wording_for_still_says_something():
+    assert posting.failed(httpx.Response(422, json={"detail": "nothing_we_know"})).detail \
+        == "Sending failed. Please try again."
+
+
+def test_a_rejection_that_is_not_json_still_says_something():
+    assert posting.failed(httpx.Response(502, text="<html>bad gateway</html>")).detail \
+        == "Sending failed. Please try again."
+

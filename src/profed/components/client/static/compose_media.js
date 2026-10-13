@@ -7,7 +7,8 @@
             var held = {files: form.querySelector(".compose-files"),
                         previews: form.querySelector(".compose-previews"),
                         warning: form.querySelector(".compose-warning"),
-                        warn: form.querySelector(".compose-warn")};
+                        warn: form.querySelector(".compose-warn"),
+                        error: form.querySelector(".compose-error")};
             var chosen = new DataTransfer();
 
             function render() {
@@ -124,6 +125,11 @@
                 render();
             }
 
+            function complain(text) {
+                held.error.textContent = text;
+                held.error.hidden = !text;
+            }
+
             form.querySelector(".compose-attach").addEventListener("click", function () { held.files.click(); });
             held.files.addEventListener("change", function () { take(held.files.files); });
             held.warn.addEventListener("click", function () {
@@ -131,9 +137,21 @@
                 held.warn.setAttribute("aria-pressed", String(!held.warning.hidden));
                 if ( !held.warning.hidden ) { held.warning.focus(); }
             });
+            form.addEventListener("htmx:beforeRequest", function () { complain(""); });
+            form.addEventListener("htmx:responseError", function (event) {
+                function stated() {
+                    try {
+                        return JSON.parse(event.detail.xhr.responseText).detail;
+                    } catch (notJson) {
+                        return "";
+                    }
+                }
+                complain(stated() || "Sending failed. Please try again.");
+            });
             form.addEventListener("compose:reset", function () {
                 held.warning.hidden = true;
                 held.warn.setAttribute("aria-pressed", "false");
+                complain("");
                 forget();
             });
         }
