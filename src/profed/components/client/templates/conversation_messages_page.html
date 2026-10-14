@@ -42,7 +42,7 @@
       <span class="action-menu">
         <button type="button" class="msg-action" popovertarget="menu-{{ message.id }}" title="More" aria-label="More">&#8943;</button>
         <ul popover id="menu-{{ message.id }}" class="action-menu-items">
-          <li><a class="u-url action-menu-item" href="{{ message.url }}">Permalink</a></li>
+          <li><a class="u-url action-menu-item" href="{{ message | status_href }}">View message</a></li>
           {% if message.own %}
           <li><button type="button" class="action-menu-item destructive"
                       hx-delete="/statuses/{{ message.id }}"

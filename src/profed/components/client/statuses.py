@@ -13,13 +13,27 @@ from fastapi.responses import HTMLResponse
 from profed.core.config import config
 
 from .api_client import api_client
-from .auth import current_user_optional, requires_login, save_session
+from .auth import current_user_optional, page_context, requires_login, save_session
 from profed.emoji import grid, tones
 from .reactions import after_react, after_unreact, quick_access
 from .templating import environment
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get("/statuses/{id}", response_class=HTMLResponse)
+@requires_login
+async def status_page(request: Request, session, id: str):
+    response = await api_client().get(f"/api/v1/statuses/{id}", token=session["token"])
+    if response.status_code != 200:
+        logger.warning("fetching a status failed: %s %s", response.status_code, response.text)
+        raise HTTPException(status_code=response.status_code, detail="status not found")
+
+    return HTMLResponse(environment().get_template("status_detail.html")
+                        .render(status=response.json(),
+                                media_rows_limit=None,
+                                **(await page_context(request, session))))
 
 
 @router.delete("/statuses/{id}", response_class=HTMLResponse)

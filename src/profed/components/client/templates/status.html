@@ -24,7 +24,10 @@
     <button type="button" class="action menu" popovertarget="menu-{{ s.id }}"
             title="More" aria-label="More">&#8943;</button>
     <ul popover id="menu-{{ s.id }}" class="action-menu-items">
-      <li><a class="u-url action-menu-item" href="{{ s.url }}">Permalink</a></li>
+      <li><a class="u-url action-menu-item" href="{{ s | status_href }}">View post</a></li>
+      {% if s.url and s.account and "@" in s.account.acct %}
+      <li><a class="action-menu-item" href="{{ s.url }}">Original</a></li>
+      {% endif %}
       {% if own_acct and s.account and s.account.acct == own_acct %}
       <li><button type="button" class="action-menu-item destructive"
                   hx-delete="/statuses/{{ s.id }}"

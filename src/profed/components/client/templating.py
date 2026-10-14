@@ -78,6 +78,11 @@ def profile_href(account) -> str:
     return f"https://{domain()}/@{acct}" if acct else (account or {}).get("url", "")
 
 
+def status_href(status) -> str:
+    id = (status or {}).get("id")
+    return f"https://{domain()}/statuses/{id}" if id else (status or {}).get("url", "")
+
+
 def link_field(value: str) -> str:
     return (f'<a rel="me" href="{escape(value)}">{escape(value)}</a>'
             if value.startswith("https://") or value.startswith("http://") else
@@ -96,6 +101,7 @@ def build_environment(standard_dir, theme_dir):
     environment.filters.update(sanitize=sanitize_html,
                                link_field=link_field,
                                profile_href=profile_href,
+                               status_href=status_href,
                                rfc822=rfc822,
                                relative_time=relative_time,
                                local_minutes=local_minutes)

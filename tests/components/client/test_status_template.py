@@ -59,7 +59,7 @@ def test_status_is_a_note_and_carries_no_name(entry):
 
 
 def test_status_exposes_its_permalink_as_url(entry):
-    assert entry["properties"]["url"] == ["https://example.com/@alice/1"]
+    assert entry["properties"]["url"] == ["https://example.com/statuses/1"]
 
 
 def test_status_exposes_the_activity_uri_as_uid(entry):
@@ -223,7 +223,7 @@ def test_the_timestamp_is_no_longer_a_link():
 
 
 def test_the_entry_url_comes_from_the_menu_permalink(entry):
-    assert entry["properties"]["url"] == ["https://example.com/@alice/1"]
+    assert entry["properties"]["url"] == ["https://example.com/statuses/1"]
 
 
 def test_a_reply_without_a_known_target_still_reads_as_a_sentence():
@@ -237,4 +237,21 @@ def test_a_reply_names_whom_it_answers_when_known():
 
     assert "@bob@remote.example" in body
     assert "responded to a post" not in body
+
+
+def test_the_entry_url_points_at_our_own_page(entry):
+    assert entry["properties"]["url"] == ["https://example.com/statuses/1"]
+
+
+def test_a_local_post_offers_no_original_elsewhere():
+    assert "Original" not in _render(STATUS)
+
+
+def test_a_remote_post_offers_the_original_next_to_our_page():
+    body = _render({**STATUS,
+                    "url": "https://remote.example/@bob/9",
+                    "account": {**STATUS["account"], "acct": "bob@remote.example"}})
+
+    assert 'href="https://example.com/statuses/1">View post' in body
+    assert 'href="https://remote.example/@bob/9">Original' in body
 

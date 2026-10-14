@@ -74,7 +74,7 @@ def test_the_timeline_entries_keep_their_content():
 def test_the_timeline_entries_carry_their_permalink():
     feed = _feeds(_parse_home([_block(STATUS)]))[0]
 
-    assert feed["children"][0]["properties"]["url"] == ["https://example.com/@alice/1"]
+    assert feed["children"][0]["properties"]["url"] == ["https://example.com/statuses/1"]
 
 
 def _parse_profile(statuses):
