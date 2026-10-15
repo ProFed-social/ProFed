@@ -163,6 +163,7 @@ def test_the_upload_waits_until_the_attachment_can_be_read_back(client, projecti
     assert response.status_code == 200
     assert projection.asked > projection.lag
 
+
 def test_an_attachment_that_never_appears_fails_loudly(client, projection, api_config):
     api_config["api"]["media_visible_timeout"] = 0.05
     projection.forever = True

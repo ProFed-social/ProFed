@@ -8,7 +8,7 @@ from profed.core.message_bus import message_bus
 from profed.core.persistence.projections import (build_projection,
                                                  with_event_type,
                                                  with_emitted_at)
-from profed.topics import activities
+from profed.topics import deliverable_activities
 from profed.identity import actor_url_from_username
 from profed.util import noop
 from .projections import recipients_at
@@ -172,7 +172,7 @@ _undo = _undo_fan_out({"Announce": _undo_announce, "Like": _reaction, "EmojiReac
                       _directed_fan_out(_undo_target))
 
 
-handle_events, rebuild, _ = build_projection(topic=activities,
+handle_events, rebuild, _ = build_projection(topic=deliverable_activities,
                                              init=noop,
                                              on_snapshot_item=noop,
                                              on_message_type={"Create": _create,

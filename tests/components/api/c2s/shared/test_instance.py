@@ -6,7 +6,8 @@ from profed.core.config import config, raw
 from profed.components.api.c2s.shared.instance import build_common_response
 from profed.languages import supported
 from profed.models import MediaKind
-from profed.components.api.c2s.shared.media.upload import max_media_attachments, size_limit, supported_types
+from profed.components.api.config import cfg
+from profed.components.api.c2s.shared.media.upload import size_limit, supported_types
 
 
 class Cfg:
@@ -69,7 +70,7 @@ def test_the_instance_reports_how_many_attachments_a_status_may_carry():
     with Cfg({"profed": {"run": "api"}, "api": {"domain": "example.com"}}):
         result = build_common_response({}, "example.com", 5000)
 
-    assert result["configuration"]["statuses"]["max_media_attachments"] == max_media_attachments()
+    assert result["configuration"]["statuses"]["max_media_attachments"] == cfg["max_media_attachments"]
 
 
 def test_the_instance_reports_a_configured_attachment_limit():

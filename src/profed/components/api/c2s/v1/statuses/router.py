@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Annotated, Optional
+from profed.core.media_storage import media_storage
 from profed.core.message_bus import message_bus
 from profed.identity import acct_from_username, actor_url_from_username, heuristic_acct
 from profed.models.activity_pub import (AnnounceActivity,
@@ -27,7 +28,9 @@ from profed.components.api.c2s.shared.known_accounts.storage import storage as _
 from profed.components.api.c2s.shared.statuses import as_objects, hidden, service
 from profed.components.api.c2s.shared.conversations import storage as conversations_storage
 from profed.components.api.c2s.shared.media.storage import storage as _media_storage
-from profed.components.api.c2s.shared.media.upload import as_type, max_media_attachments
+from profed.components.api.config import cfg
+from profed.components.api.c2s.shared.media.upload import as_type
+from profed.models import MediaKind
 from profed.sanitize import sanitize_html
 from profed import mentions
 
@@ -77,11 +80,18 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
     if len(body.status) > int(_config.get("status_max_characters", 5000)):
         raise HTTPException(status_code=422, detail="status too long")
 
-    if len(body.media_ids) > max_media_attachments():
+    if len(body.media_ids) > cfg["max_media_attachments"]:
         raise HTTPException(status_code=422, detail="too many attachments")
 
     async def attachments():
         def document(row):
+            def thumbnails():
+                def at(variant):
+                    return {"type": "Image", "url": media_storage().url_for(row["file_id"], variant)}
+
+                return ({"preview": at("preview"), "icon": at("icon")}
+                        if MediaKind.of(row["content_type"]) is MediaKind.image else
+                        {})
             return {key: value
                     for key, value in {"type": as_type(row["content_type"]),
                                        "mediaType": row["content_type"],
@@ -89,7 +99,8 @@ async def create_status(body: StatusCreate, claims: Annotated[dict, Depends(curr
                                        "name": row["description"],
                                        "filename": row["filename"],
                                        "width": row["width"],
-                                       "height": row["height"]}.items()
+                                       "height": row["height"],
+                                       **thumbnails()}.items()
                     if value is not None}
 
         async def resolved():

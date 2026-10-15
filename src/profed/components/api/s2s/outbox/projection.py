@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from profed.core.persistence.projections import build_projection, with_event_type
-from profed.topics import activities
+from profed.topics import deliverable_activities
 from profed.components.api.s2s.outbox.storage import init as init_storage, storage
 from profed.federation.audience import recipients_of, visibility_of
 
@@ -40,7 +40,7 @@ async def _rebuild_finished() -> None:
 
 
 handle_user_events, rebuild, reset_last_seen = \
-        build_projection(topic=activities,
+        build_projection(topic=deliverable_activities,
                          init=_init,
                          rebuild_finished=_rebuild_finished,
                          on_snapshot_item=_apply_item,

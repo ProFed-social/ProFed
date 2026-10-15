@@ -13,7 +13,7 @@ from profed.components.api.c2s.shared.statuses import hidden
 from profed.components.api.c2s.shared.auth import current_user, current_user_optional
 from profed.models.mastodon import Account
 from profed.identity import account_id, actor_url_from_username, heuristic_acct
-from profed.components.api.c2s.shared.media.upload import max_media_attachments
+from profed.components.api.config import cfg
 
 
 CLAIMS = {"preferred_username": "alice", "sub": "alice"}
@@ -30,7 +30,7 @@ def api_configured():
 
 
 @pytest.fixture
-def client(fake_bus):
+def client(fake_bus, fake_media_storage):
     statuses_module.init({"status_max_characters": "5000"})
     app = FastAPI()
     app.include_router(statuses_module.router)
@@ -1080,7 +1080,27 @@ def test_attached_media_is_federated_on_the_note(client, fake_bus):
                            "url": "https://example.com/media/m1",
                            "name": "Ein Diagramm",
                            "width": 1920,
-                           "height": 1080}]
+                           "height": 1080,
+                           "preview": {"type": "Image", "url": "https://fake.example.com/m1_preview"},
+                           "icon": {"type": "Image", "url": "https://fake.example.com/m1_icon"}}]
+
+
+def test_an_image_claims_both_the_preview_and_the_square_icon(client, fake_bus):
+    _post_with_media(client, ["m1"], [_media_row()])
+
+    attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"][0]
+
+    assert attachment["preview"]["url"].endswith("_preview")
+    assert attachment["icon"]["url"].endswith("_icon")
+
+
+def test_a_document_claims_neither(client, fake_bus):
+    _post_with_media(client, ["m1"], [_media_row(content_type="application/pdf")])
+
+    attachment = fake_bus.topic("raw_activities").published[0]["payload"]["activity"]["object"]["attachment"][0]
+
+    assert "preview" not in attachment
+    assert "icon" not in attachment
 
 
 def test_attached_media_comes_back_on_the_created_status(client, fake_bus):
@@ -1166,7 +1186,7 @@ def test_a_status_without_media_federates_no_attachment(client, fake_bus):
 
 
 def test_more_media_than_allowed_is_refused(client, fake_bus):
-    ids = [f"m{number}" for number in range(max_media_attachments() + 1)]
+    ids = [f"m{number}" for number in range(cfg["max_media_attachments"] + 1)]
 
     response = _post_with_media(client, ids, [_media_row(file_id) for file_id in ids])
 

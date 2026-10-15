@@ -6,9 +6,8 @@ import io
 from pathlib import Path
 from PIL import Image
 from fastapi import HTTPException, UploadFile
-from profed.core.config import config
+from profed.components.api.config import cfg
 from profed.core.media_storage import media_storage
-from profed.media import scale_image
 from profed.core.message_bus import message_bus
 from profed.identity import acct_from_username
 from profed.models import ImageMeta, MediaKind, MediaObject
@@ -16,7 +15,7 @@ from profed.sanitize import strip_tags
 from profed.models.mastodon import (MediaAttachment,
                                     MediaAttachmentMeta,
                                     MediaAttachmentMetadata)
-from .probe import measured, preview_dimension
+from .probe import measured
 from .storage import storage
 
 
@@ -46,16 +45,8 @@ def supported_types() -> set[str]:
     return set(ACCEPTED)
 
 
-def max_media_attachments() -> int:
-    return config()["api"]["max_media_attachments"]
-
-
 def size_limit(kind: MediaKind) -> int:
-    return config()["api"][f"{kind.value}_size_limit"]
-
-
-def visible_timeout() -> float:
-    return config()["api"]["media_visible_timeout"]
+    return cfg[f"{kind.value}_size_limit"]
 
 
 def as_type(content_type: str) -> str:
@@ -80,7 +71,7 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
 
     def described(width=None, height=None, duration=None) -> MediaAttachmentMetadata:
         def fitted():
-            edge = preview_dimension()
+            edge = cfg["preview_dimension"]
 
             return (MediaAttachmentMeta(width=edge, height=round(height * edge / width))
                     if width >= height else
@@ -92,17 +83,9 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
                                        small=fitted() if width and height else None)
 
     async def picture(file_id: str, data: bytes):
-        image = Image.open(io.BytesIO(data))
-        width, height = image.size
+        width, height = Image.open(io.BytesIO(data)).size
 
-        if getattr(image, "is_animated", False):
-            return ImageMeta(width=width, height=height), media_storage().url_for(file_id)
-
-        scale_image(file_id,
-                    "small",
-                    **({"width": preview_dimension()} if width >= height else {"height": preview_dimension()}))
-
-        return ImageMeta(width=width, height=height), media_storage().url_for(file_id, "small")
+        return ImageMeta(width=width, height=height), media_storage().url_for(file_id)
 
     async def probed(file_id: str, data: bytes, kind: MediaKind):
         metadata, poster = await measured(data, kind, Path(file.filename or "").suffix or ".bin")
@@ -129,7 +112,7 @@ async def process_upload(username: str, file: UploadFile, description: str | Non
                 await asyncio.sleep(VISIBILITY_POLL)
 
         try:
-            await asyncio.wait_for(readable(), visible_timeout())
+            await asyncio.wait_for(readable(), cfg["media_visible_timeout"])
         except TimeoutError:
             raise HTTPException(status_code=503, detail="attachment_not_ready")
 

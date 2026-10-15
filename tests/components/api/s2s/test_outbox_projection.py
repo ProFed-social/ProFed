@@ -41,7 +41,7 @@ def with_activities(activities):
     def wrapper(f):
         @wraps(f)
         async def call(*args, **kwargs):
-            message_bus.message_bus().topic("activities").messages = [
+            message_bus.message_bus().topic("deliverable_activities").messages = [
                     (n+1, et, oid, TS, p)
                     for n, (et, oid, p) in enumerate(activities)]
             return await f(*args, **kwargs)
@@ -53,7 +53,7 @@ def with_snapshots(snapshots):
     def wrapper(f):
         @wraps(f)
         async def call(*args, **kwargs):
-            message_bus.message_bus().topic("activities").snapshots = snapshots
+            message_bus.message_bus().topic("deliverable_activities").snapshots = snapshots
             return await f(*args, **kwargs)
         return call
     return wrapper

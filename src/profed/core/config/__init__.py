@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from functools import wraps
 from .component_parser import components_from_raw, ConfigError
 from .raw import raw_config, force_reload_raw
 
@@ -24,4 +25,18 @@ class parsed_config:
 
 
 config = parsed_config()
+
+
+def capture_config(cfg: dict):
+    def capturing(parse):
+        @wraps(parse)
+        def parsed(*arguments, **sections):
+            cfg.clear()
+            cfg.update(parse(*arguments, **sections))
+
+            return cfg
+
+        return parsed
+
+    return capturing
 

@@ -3,15 +3,11 @@
 
 from profed.models.mastodon import ReplyPreview, Status, placeholder_account
 from profed.components.api.c2s.shared.known_accounts.service import cached_multiple
-from profed.core.config import config
+from profed.components.api.config import cfg
 from profed.identity import is_local_actor_url
 from profed.topics.reaction_refresh_topic import publish_refresh
 from profed.components.api.c2s.shared.bookmarks import storage as bookmarks
 from profed.components.api.c2s.shared.statuses import as_objects
-
-
-def _default_emoji() -> str:
-    return config().get("api", {}).get("default_reaction_emoji", "\u2764\ufe0f")
 
 
 def _emoji_reactions(rows: list[dict], default: str) -> list[dict]:
@@ -91,7 +87,7 @@ async def make_statuses(rows: list[dict], viewer: str | None = None) -> list[Sta
         await publish_refresh(content_urls)
 
         async def build_statuses_list(rows, accounts, replies, boosts, reactions, breakdown, marked):
-            default_emoji = _default_emoji() if any(breakdown.values()) else ""
+            default_emoji = cfg["default_reaction_emoji"] if any(breakdown.values()) else ""
             return [_make_status(row, accounts, replies, boosts, reactions, breakdown, marked, default_emoji)
                     for row in rows]
 

@@ -9,16 +9,12 @@ import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from profed.core.config import config
+from profed.components.api.config import cfg
 from profed.models import AudioMeta, DocumentMeta, MediaKind, VideoMeta
 
 logger = logging.getLogger(__name__)
 
 PIXELS_PER_POINT = 96 / 72
-
-
-def preview_dimension() -> int:
-    return config()["api"]["preview_dimension"]
 
 
 async def measured(data: bytes, kind: MediaKind, suffix: str) -> tuple:
@@ -61,6 +57,7 @@ async def measured(data: bytes, kind: MediaKind, suffix: str) -> tuple:
         except (KeyError, TypeError, ValueError):
             return None
 
+
     def visual(probed):
         return next((stream
                      for stream in probed.get("streams", [])
@@ -70,7 +67,8 @@ async def measured(data: bytes, kind: MediaKind, suffix: str) -> tuple:
     async def poster():
         async with spilled(suffix) as source:
             target = source.with_name("poster.jpg")
-            fitted = f"scale=w={preview_dimension()}:h={preview_dimension()}:force_original_aspect_ratio=decrease"
+            edge = cfg["preview_dimension"]
+            fitted = f"scale=w={edge}:h={edge}:force_original_aspect_ratio=decrease"
             produced = await run("ffmpeg", "-v", "error", "-i", str(source),
                                  "-vf", f"thumbnail,{fitted}", "-frames:v", "1", "-y", str(target))
 

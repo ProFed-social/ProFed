@@ -102,7 +102,6 @@ def placeholder_account(actor_url: str) -> Account:
     return Account(id="0", username=username, acct=acct, display_name=username, url=actor_url)
 
 
-
 def tags_from_tag(tag: list) -> list[dict]:
     return [{"name": entry["name"].lstrip("#"), "url": entry.get("href", "")}
             for entry in tag
@@ -116,12 +115,6 @@ def property_value_fields(attachment) -> list[dict]:
                item.get("type") == "PropertyValue" and
                item.get("name") and
                item.get("value")]
-
-
-def _attachment_type(entry: dict) -> str:
-    kind = MediaKind.of(entry.get("mediaType", "")) or MediaKind.named(entry.get("type", ""))
-
-    return kind.mastodon_type if kind else "unknown"
 
 
 def _href(value) -> str | None:
@@ -141,13 +134,12 @@ def _href(value) -> str | None:
 _PUBLIC = "https://www.w3.org/ns/activitystreams#Public"
 
 
-def _as_list(value) -> list:
-    return value if isinstance(value, list) else [] if value is None else [value]
-
-
 def _visibility(obj: dict, activity: dict, mentions: list[dict]) -> str:
-    to = _as_list(obj.get("to")) or _as_list(activity.get("to"))
-    cc = _as_list(obj.get("cc")) or _as_list(activity.get("cc"))
+    def as_list(value) -> list:
+        return value if isinstance(value, list) else [] if value is None else [value]
+
+    to = as_list(obj.get("to")) or as_list(activity.get("to"))
+    cc = as_list(obj.get("cc")) or as_list(activity.get("cc"))
     if _PUBLIC in to:
         return "public"
     if _PUBLIC in cc:
@@ -159,25 +151,45 @@ def _visibility(obj: dict, activity: dict, mentions: list[dict]) -> str:
             "private")
 
 
-def _attachment_url(entry: dict) -> str | None:
-    return _href(entry.get("url"))
-
-
 def media_attachments_from_attachment(attachment: list) -> list[dict]:
-    def entry_of(item):
-        url = _attachment_url(item)
-        width, height = item.get("width"), item.get("height")
-        meta = {"original": {"width": width, "height": height}} if width or height else None
-        return {"id": url,
-                "type": _attachment_type(item),
-                "mime_type": item.get("mediaType"),
-                "filename": item.get("filename") or item.get("profed:filename"),
-                "url": url,
-                "description": item.get("name"),
-                "blurhash": item.get("blurhash"),
-                "meta": meta}
+    def attachment_url(entry: dict) -> str | None:
+        return _href(entry.get("url"))
 
-    return [entry_of(item) for item in attachment if isinstance(item, dict) and _attachment_url(item)]
+    def entry_of(item):
+        def thumbnail_url(entry: dict) -> str | None:
+            def shown(value):
+                return (value
+                        if isinstance(value, str) else
+                        value.get("url") or value.get("href")
+                        if isinstance(value, dict) else
+                        next((shown(item) for item in value if shown(item)), None)
+                        if isinstance(value, list) else
+                        None)
+
+            return shown(entry.get("preview")) or shown(entry.get("icon"))
+
+        def attachment_type(entry: dict) -> str:
+            kind = MediaKind.of(entry.get("mediaType", "")) or MediaKind.named(entry.get("type", ""))
+
+            return kind.mastodon_type if kind else "unknown"
+
+        def build_entry(url, kind, width, height):
+            return {"id": url,
+                    "type": kind,
+                    "mime_type": item.get("mediaType"),
+                    "filename": item.get("filename") or item.get("profed:filename"),
+                    "url": url,
+                    "preview_url": thumbnail_url(item) or (url if kind in ("image", "gifv") else None),
+                    "description": item.get("name"),
+                    "blurhash": item.get("blurhash"),
+                    "meta": {"original": {"width": width, "height": height}} if width or height else None}
+
+        return build_entry(url=attachment_url(item),
+                           kind=attachment_type(item),
+                           width=item.get("width"),
+                           height=item.get("height"))
+
+    return [entry_of(item) for item in attachment if isinstance(item, dict) and attachment_url(item)]
 
 
 class ReplyPreview(BaseModel):

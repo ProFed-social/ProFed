@@ -88,3 +88,44 @@ def test_component_parser(monkeypatch):
         assert config()["example"]["foo"] == "blub"
 
 
+def _example(monkeypatch, body):
+    mod = ModuleType("profed.components.example.config")
+    monkeypatch.setitem(sys.modules, "profed.components.example.config", mod)
+    exec(body, mod.__dict__)
+
+    return mod
+
+
+CAPTURING = ("from profed.core.config import capture_config\n"
+             "cfg = {}\n"
+             "@capture_config(cfg)\n"
+             "def parse(section, database):\n"
+             "    return section | {'dsn': database.get('dsn', 'none')}\n")
+
+
+def test_a_captured_parse_fills_the_module_dict(monkeypatch):
+    mod = _example(monkeypatch, CAPTURING)
+
+    with Cfg(argv = ["", "--example.foo=bar", "--profed.run=example"]):
+        assert mod.cfg == {"foo": "bar", "dsn": "none"}
+        assert config()["example"] is mod.cfg
+
+
+def test_a_captured_config_is_refreshed_in_place(monkeypatch):
+    mod = _example(monkeypatch, CAPTURING)
+
+    with Cfg(argv = ["", "--example.foo=bar", "--profed.run=example"]):
+        captured = mod.cfg
+        first = captured["foo"]
+        raw.argv = ["", "--example.foo=blub", "--profed.run=example"]
+        config.reset()
+
+        assert (first, captured["foo"], mod.cfg is captured) == ("bar", "blub", True)
+
+
+def test_a_captured_parse_keeps_its_section_dependencies(monkeypatch):
+    mod = _example(monkeypatch, CAPTURING)
+
+    with Cfg(argv = ["", "--example.foo=bar", "--database.dsn=postgres://x", "--profed.run=example"]):
+        assert mod.cfg["dsn"] == "postgres://x"
+

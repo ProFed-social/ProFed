@@ -3,6 +3,7 @@
 
 import asyncio
 from typing import Optional
+from profed.core.media_storage.variants import box_image as _core_box_image
 from profed.core.media_storage.variants import scale_image as _core_scale_image
 from .completion_handler import variant_added
 from .download import should_redownload, download, emit_uploaded
@@ -19,4 +20,9 @@ def scale_image(media_id: str,
                                                  height=height,
                                                  on_complete=variant_added),
                                name=f"scale:{media_id}:{variant}")
+
+
+def box_image(media_id: str, variant: str, *, edge: int) -> asyncio.Task:
+    return asyncio.create_task(_core_box_image(media_id, variant, edge=edge, on_complete=variant_added),
+                               name=f"box:{media_id}:{variant}")
 

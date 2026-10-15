@@ -195,7 +195,8 @@ async def test_the_poster_is_scaled_to_the_configured_preview_size():
     with _tools(ffprobe=_json(VIDEO_PROBE), ffmpeg=remember):
         await measured(b"irrelevant", MediaKind.video, ".mp4")
 
-    assert f"scale=w={probe.preview_dimension()}:h={probe.preview_dimension()}" in seen[0]
+    edge = probe.cfg["preview_dimension"]
+    assert f"scale=w={edge}:h={edge}" in seen[0]
 
 
 @pytest.mark.asyncio

@@ -3,7 +3,8 @@
 
 from profed.languages import supported
 from profed.models import MediaKind
-from profed.components.api.c2s.shared.media.upload import max_media_attachments, size_limit, supported_types
+from profed.components.api.config import cfg
+from profed.components.api.c2s.shared.media.upload import size_limit, supported_types
 
 
 def build_common_response(config: dict, d :str, max_chars: int) -> dict:
@@ -12,7 +13,7 @@ def build_common_response(config: dict, d :str, max_chars: int) -> dict:
             "version": "0.1.0 (compatible; ProFed 0.1.0)",
             "languages": sorted(supported()),
             "configuration": {"statuses": {"max_characters": max_chars,
-                                           "max_media_attachments": max_media_attachments()},
+                                           "max_media_attachments": cfg["max_media_attachments"]},
                               "accounts": {"max_featured_tags": 0},
                               "media_attachments": {"supported_mime_types": sorted(supported_types()),
                                                     "image_size_limit": size_limit(MediaKind.image),

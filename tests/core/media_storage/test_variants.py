@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import io
+import subprocess
 
 import pytest
 from PIL import Image
+from unittest.mock import patch
 
 
 from profed.core.media_storage import variants
@@ -33,6 +35,15 @@ def _png(width: int, height: int, mode: str = "RGBA") -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+
+def _jpegtran(seen: list, output: bytes, returncode: int = 0):
+    def run(command, **kwargs):
+        seen.append(kwargs["input"])
+
+        return subprocess.CompletedProcess(command, returncode, output, b"jpegtran said no")
+
+    return patch.object(subprocess, "run", run)
 
 
 def _animated_gif() -> bytes:
@@ -141,34 +152,63 @@ async def test_scale_image_raises_on_unrecoverable_jpeg(fake_bus, fake_media_sto
 
 
 @pytest.mark.asyncio
-async def test_scale_image_transcodes_when_pillow_cannot_decode(monkeypatch, fake_bus, fake_media_storage):
+async def test_scale_image_transcodes_when_pillow_cannot_decode(fake_bus, fake_media_storage):
+    broken = _broken_jpeg()
     seen = []
-    def fake_scale(image_bytes, width, height):
-        seen.append(image_bytes)
-        if image_bytes == b"undecodable":
-            raise OSError("broken data stream")
-        return (b"scaled-bytes", width, height, "image/jpeg")
-    monkeypatch.setattr(variants, "_scale_pillow", fake_scale)
-    monkeypatch.setattr(variants, "_transcode_baseline", lambda data: b"transcoded")
-    stored = await fake_media_storage.store(b"undecodable", "image/jpeg")
+    stored = await fake_media_storage.store(broken, "image/jpeg")
 
-    await variants.scale_image(stored.file_id, "x", width=80, height=80)
-
-    assert seen == [b"undecodable", b"transcoded"]
-    variant_data, content_type = fake_media_storage._files[f"{stored.file_id}_x"]
-    assert variant_data == b"scaled-bytes"
-    assert content_type == "image/jpeg"
-@pytest.mark.asyncio
-async def test_scale_image_propagates_when_transcode_also_fails(monkeypatch,
-                                                                fake_bus,
-                                                                fake_media_storage):
-    def always_fail(image_bytes, width, height):
-        raise OSError("still broken")
-    monkeypatch.setattr(variants, "_scale_pillow", always_fail)
-    monkeypatch.setattr(variants, "_transcode_baseline", lambda data: b"still-bad")
-
-    stored = await fake_media_storage.store(b"undecodable", "image/jpeg")
-
-    with pytest.raises(OSError):
+    with _jpegtran(seen, _jpeg(600, 600)):
         await variants.scale_image(stored.file_id, "x", width=80, height=80)
+
+    variant_data, content_type = fake_media_storage._files[f"{stored.file_id}_x"]
+    assert seen == [broken]
+    assert content_type == "image/jpeg"
+    assert Image.open(io.BytesIO(variant_data)).size == (80, 80)
+
+
+@pytest.mark.asyncio
+async def test_scale_image_propagates_when_transcode_also_fails(fake_bus, fake_media_storage):
+    seen = []
+    stored = await fake_media_storage.store(_broken_jpeg(), "image/jpeg")
+
+    with _jpegtran(seen, b"still-bad"), pytest.raises(OSError):
+        await variants.scale_image(stored.file_id, "x", width=80, height=80)
+
+    assert len(seen) == 1
+    assert f"{stored.file_id}_x" not in fake_media_storage._files
+
+
+@pytest.mark.asyncio
+async def test_scale_image_reports_what_jpegtran_said(fake_bus, fake_media_storage):
+    stored = await fake_media_storage.store(_broken_jpeg(), "image/jpeg")
+
+    with _jpegtran([], b"", returncode=1), pytest.raises(OSError, match="jpegtran said no"):
+        await variants.scale_image(stored.file_id, "x", width=80, height=80)
+
+@pytest.mark.asyncio
+async def test_box_image_letterboxes_a_portrait_into_a_square(fake_bus, fake_media_storage):
+    stored = await fake_media_storage.store(_jpeg(300, 600), "image/jpeg")
+
+    assert await variants.box_image(stored.file_id, "icon", edge=100) == (100, 100)
+
+    variant_data, content_type = fake_media_storage._files[f"{stored.file_id}_icon"]
+    boxed = Image.open(io.BytesIO(variant_data))
+
+    assert content_type == "image/jpeg"
+    assert boxed.size == (100, 100)
+    assert max(boxed.getpixel((5, 50))) < 20
+    assert boxed.getpixel((50, 50))[0] > 200
+
+
+@pytest.mark.asyncio
+async def test_box_image_transcodes_when_pillow_cannot_decode(fake_bus, fake_media_storage):
+    broken = _broken_jpeg()
+    seen = []
+    stored = await fake_media_storage.store(broken, "image/jpeg")
+
+    with _jpegtran(seen, _jpeg(600, 300)):
+        assert await variants.box_image(stored.file_id, "icon", edge=100) == (100, 100)
+
+    assert seen == [broken]
+    assert Image.open(io.BytesIO(fake_media_storage._files[f"{stored.file_id}_icon"][0])).size == (100, 100)
 

@@ -414,11 +414,11 @@ async def test_an_emoji_react_is_delivered_to_the_addressed_author(fake_bus, fak
 
 
 async def test_an_emoji_react_is_registered_on_the_activities_topic(fake_bus, fake_storage):
-    fake_bus.topic("activities").messages.append((1,
-                                                  "EmojiReact",
-                                                  "https://example.com/actors/alice#react/1",
-                                                  AT,
-                                                  _like_payload()))
+    fake_bus.topic("deliverable_activities").messages.append((1,
+                                                              "EmojiReact",
+                                                              "https://example.com/actors/alice#react/1",
+                                                              AT,
+                                                              _like_payload()))
 
     await translator.handle_events()
 
@@ -464,11 +464,11 @@ def test_an_unaddressed_activity_has_no_target():
 
 
 async def test_a_like_from_the_activities_topic_is_delivered(fake_bus, fake_storage):
-    fake_bus.topic("activities").messages = [(1,
-                                              "Like",
-                                              "https://example.com/actors/alice#like/1",
-                                              AT,
-                                              _like_payload())]
+    fake_bus.topic("deliverable_activities").messages = [(1,
+                                                          "Like",
+                                                          "https://example.com/actors/alice#like/1",
+                                                          AT,
+                                                          _like_payload())]
 
     await translator.rebuild()
 

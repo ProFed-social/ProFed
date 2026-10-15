@@ -42,8 +42,7 @@ def _file(data=None, content_type="image/png", filename="picture.png"):
 
 @pytest.fixture
 def uploading(api_config, fake_bus, fake_media_storage):
-    with patch("profed.components.api.c2s.shared.media.upload.scale_image", Mock()):
-        yield fake_bus
+    return fake_bus
 
 
 @pytest.mark.asyncio
