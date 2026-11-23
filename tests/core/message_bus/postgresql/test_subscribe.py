@@ -72,3 +72,35 @@ async def test_reconnects_after_a_dropped_connection(topic, db, monkeypatch):
     assert message[4]["v"] == "a"
 
 
+@pytest.mark.asyncio
+async def test_a_backlog_larger_than_the_window_arrives_completely(topic, db, drain):
+    for value in range(250):
+        db.insert_message("public.test", {"v": value})
+
+    messages = await drain()
+
+    assert [m[4]["v"] for m in messages] == list(range(250))
+
+
+@pytest.mark.asyncio
+async def test_a_single_poll_reads_at_most_one_window(topic, db):
+    for value in range(250):
+        db.insert_message("public.test", {"v": value})
+    sizes = []
+    original_fetch = fake_asyncpg.FakeConnection.fetch
+
+    async def counting_fetch(self, query, *args):
+        rows = await original_fetch(self, query, *args)
+        if "ORDER BY" in query:
+            sizes.append(len(rows))
+        return rows
+    fake_asyncpg.FakeConnection.fetch = counting_fetch
+
+    try:
+        subscriber = topic.subscribe()
+        await subscriber.__anext__()
+    finally:
+        fake_asyncpg.FakeConnection.fetch = original_fetch
+
+    assert sizes == [200]
+

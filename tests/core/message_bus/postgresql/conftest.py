@@ -6,6 +6,8 @@ from pytest_asyncio import fixture as async_fixture
 from unittest.mock import patch
 
 import asyncio
+import logging
+import os
 
 from .fake_asyncpg import InMemoryDatabase, FakePool
 from profed.core.message_bus.postgresql import subscriber
@@ -29,15 +31,11 @@ def db():
 
 @fixture(autouse=True)
 def no_process_exit():
-    def _raise(*args):
+    def raise_instead(*args):
         raise RuntimeError("corruption")
 
-    original = subscriber._fatal_corruption
-    subscriber._fatal_corruption = _raise
-
-    yield
-
-    subscriber._fatal_corruption = original
+    with patch.object(os, "_exit", raise_instead), patch.object(logging, "shutdown", lambda: None):
+        yield
 
 
 @async_fixture
@@ -79,3 +77,4 @@ async def drain(topic):
         return collected
 
     return _drain
+

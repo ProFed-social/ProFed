@@ -4,8 +4,6 @@
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from profed.core.message_bus.postgresql.subscriber import _expected
-
 
 def _row(i, v):
     return {"id": i,
@@ -14,18 +12,6 @@ def _row(i, v):
             "payload": {"v": v},
             "message_id": None,
             "emitted_at": datetime.now(timezone.utc) - timedelta(seconds=10)}
-
-
-def test_expected_counts_the_full_window_without_gaps():
-    assert _expected([], 1, 5) == 5
-
-
-def test_expected_subtracts_a_contained_gap():
-    assert _expected([(2, 2)], 1, 3) == 2
-
-
-def test_expected_clips_a_gap_to_the_window():
-    assert _expected([(0, 10)], 3, 5) == 0
 
 
 @pytest.mark.asyncio

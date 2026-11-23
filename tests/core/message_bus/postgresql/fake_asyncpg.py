@@ -52,14 +52,15 @@ class FakeConnection:
             self._db.delete_gaps(self._extract_table(query),
                                  args[0])
 
-    def _fetch_single_table(self, table_name, *args):
+    def _fetch_single_table(self, table_name, *args, limit=None):
         if "_snapshots" in table_name:
             return self._db.fetch_snapshots(self._extract_table(table_name))
         elif "_gaps" in table_name:
             return self._db.fetch_gaps(self._extract_table(table_name))
         else:
             return self._db.fetch_messages(self._extract_table(table_name),
-                                           args[0] if len(args) > 0 else 0)
+                                           args[0] if len(args) > 0 else 0,
+                                           limit)
 
     def join(self, left_rows, right_rows, l_col, r_col):
         return [{**lr, **rr}
@@ -91,7 +92,11 @@ class FakeConnection:
                                 query.upper(),
                                 re.IGNORECASE)
             if not tables:
-                return self._fetch_single_table(self._extract_table(query), *args)
+                return self._fetch_single_table(self._extract_table(query),
+                                                *args,
+                                                limit=(args[1]
+                                                       if "LIMIT" in query.upper() and len(args) > 1 else
+                                                       None))
 
             left_table, _, right_table, _, _, l_col, _, r_col = tables[0]
 
@@ -189,11 +194,12 @@ class InMemoryDatabase:
 
         return None
 
-    def fetch_messages(self, table, last_seen):
-        return sorted((m
+    def fetch_messages(self, table, last_seen, limit=None):
+        rows = sorted((m
                        for m in self.messages[table]
                        if m["id"] > last_seen),
                       key=lambda m: m["id"])
+        return rows if limit is None else rows[:limit]
 
     def insert_snapshot(self, table, payload, event_id):
         self.snapshots[table].append({"payload": payload,

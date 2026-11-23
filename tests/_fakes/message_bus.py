@@ -49,6 +49,7 @@ class FakeTopic:
         self.published = []
         self.snapshots = []
         self.last_seen = 0
+        self.subscribed_from = None
         self._published_ids = set()
 
     async def last_snapshot(self):
@@ -57,7 +58,12 @@ class FakeTopic:
     async def last_snapshot_id(self):
         return self.snapshots[-1][0] if self.snapshots else 0
 
+    async def head(self):
+        return max((msg[0] for msg in self.messages), default=0)
+
     def subscribe(self, last_seen=0, caught_up=None):
+        self.subscribed_from = last_seen
+
         async def generator():
             for msg in self.messages:
                 if msg[0] > last_seen:

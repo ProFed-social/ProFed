@@ -55,6 +55,15 @@ def test_count_received_window_covers_a_large_jump():
     assert tracker.count_received() == (7, 1, 8)
 
 
+def test_count_received_clips_a_gap_to_the_window():
+    tracker = GapTracker(2, timedelta(seconds=2))
+    tracker.accept_gap(0, 10)
+    for rid in (3, 4, 5):
+        tracker.received(*_old(rid))
+
+    assert tracker.count_received() == (0, 3, 5)
+
+
 def test_commit_prunes_a_settled_gap():
     tracker = GapTracker(0, timedelta(seconds=2))
     tracker.received(*_old(1))

@@ -7,7 +7,7 @@ import asyncio
 from asyncpg import Pool
 from .publisher import Publisher
 from .snapshot import SnapshotPublisher, last_snapshot, last_snapshot_id
-from .subscriber import subscribe
+from .subscriber import head, subscribe
 
 class Topic:
     def __init__(self, pool: Pool, config: Dict[str, str], name: str):
@@ -24,6 +24,9 @@ class Topic:
     def subscribe(self, last_seen: int = 0, caught_up: asyncio.Event | None = None) \
             -> AsyncGenerator[Tuple[int, str, str, Any, Dict[str, Any]], None]:
         return subscribe(self._pool, self._config, self._name, last_seen, caught_up)
+
+    def head(self):
+        return head(self._pool, self._config, self._name)
 
     def last_snapshot(self):
         return last_snapshot(self._pool, self._config["schema"], self._name)
