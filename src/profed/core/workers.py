@@ -9,6 +9,9 @@ import random
 logger = logging.getLogger(__name__)
 
 IDLE_LIMIT = 15
+FAILURE_LIMIT = 5
+BACKOFF_MIN = 1.0
+BACKOFF_MAX = 60.0
 JITTER = 0.1
 SLEEP_MIN = 10.0
 SLEEP_MAX = 30.0
@@ -21,10 +24,17 @@ async def jittered_sleep(seconds: float | None = None) -> None:
 
 
 class KeyedWorkers:
-    def __init__(self, step, *, name="worker", idle_limit=IDLE_LIMIT, sleep=jittered_sleep):
+    def __init__(self,
+                 step,
+                 *,
+                 name="worker",
+                 idle_limit=IDLE_LIMIT,
+                 failure_limit=FAILURE_LIMIT,
+                 sleep=jittered_sleep):
         self._step = step
         self._name = name
         self._idle_limit = idle_limit
+        self._failure_limit = failure_limit
         self._sleep = sleep
         self._queues: dict = {}
         self._tasks: dict = {}
@@ -55,31 +65,51 @@ class KeyedWorkers:
     def _retire(self, key, task) -> None:
         if self._tasks.get(key) is task:
             self._tasks.pop(key, None)
-        self._release(key)
+        if key in self._tasks:
+            return
 
-    def _release(self, key) -> None:
         queue = self._queues.get(key)
-        if key not in self._tasks and queue is not None and queue.empty():
-            del self._queues[key]
+        if queue is None or queue.empty():
+            self._queues.pop(key, None)
+        elif self._started:
+            self._spawn(key)
 
-    async def _work(self, key) -> float | None:
+    async def _work(self, key) -> tuple[float | None, bool]:
         try:
-            return await self._step(key, self.queue(key))
+            return await self._step(key, self.queue(key)), True
         except Exception:
             logger.exception("%s:%s failed", self._name, key)
-            return 0.0
+            return None, False
 
     async def _run(self, key) -> None:
         idle = 0
+        failures = 0
+        backoff = 0.0
 
         while True:
-            due_in = await self._work(key)
+            due_in, succeeded = await self._work(key)
+
+            if not succeeded:
+                failures += 1
+                if failures > self._failure_limit:
+                    logger.error("%s:%s abandoned after %d failures", self._name, key, failures - 1)
+                    self._queues.pop(key, None)
+                    return
+                backoff = min(max(2 * backoff, BACKOFF_MIN), BACKOFF_MAX)
+                await self._sleep(backoff)
+                continue
+
+            failures, backoff = 0, 0.0
+            if due_in is None and not self._idle_limit:
+                return
+
             idle = idle + 1 if due_in is None else 0
 
-            if idle >= self._idle_limit:
+            if self._idle_limit and idle >= self._idle_limit:
                 self._tasks.pop(key, None)
                 await self._sleep()
-                if await self._work(key) is None:
+                due_in, _ = await self._work(key)
+                if due_in is None:
                     return
                 self._tasks[key] = asyncio.current_task()
                 idle = 0

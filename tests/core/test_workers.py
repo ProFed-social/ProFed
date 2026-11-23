@@ -239,6 +239,135 @@ async def test_stop_releases_the_empty_queues():
 
 
 @pytest.mark.asyncio
+async def test_a_failing_step_backs_off_instead_of_spinning():
+    slept = []
+
+    async def failing(key, queue):
+        raise ConnectionError("remote server unreachable")
+
+    async def sleep(seconds=None):
+        slept.append(seconds)
+        await asyncio.sleep(0)
+
+    workers = KeyedWorkers(failing, failure_limit=4, sleep=sleep)
+    workers.start()
+
+    workers.submit("a")
+    await _settle()
+    await workers.stop()
+
+    assert slept[:4] == [1.0, 2.0, 4.0, 8.0]
+
+
+@pytest.mark.asyncio
+async def test_the_backoff_is_capped():
+    slept = []
+
+    async def failing(key, queue):
+        raise ConnectionError("remote server unreachable")
+
+    async def sleep(seconds=None):
+        slept.append(seconds)
+        await asyncio.sleep(0)
+
+    workers = KeyedWorkers(failing, failure_limit=20, sleep=sleep)
+    workers.start()
+
+    workers.submit("a")
+    await _settle(200)
+    await workers.stop()
+
+    assert max(slept) == workers_module.BACKOFF_MAX
+
+
+@pytest.mark.asyncio
+async def test_a_worker_abandons_a_key_that_keeps_failing():
+    calls = []
+
+    async def failing(key, queue):
+        calls.append(key)
+        raise ConnectionError("remote server unreachable")
+
+    workers = KeyedWorkers(failing, failure_limit=3, sleep=_noop_sleep)
+    workers.start()
+
+    workers.submit("a", "item")
+    await _settle()
+
+    assert len(calls) == 4
+    assert workers._tasks == {}
+    assert workers._queues == {}
+
+
+@pytest.mark.asyncio
+async def test_a_step_that_recovers_forgets_the_backoff():
+    slept = []
+    calls = []
+
+    async def flaky(key, queue):
+        calls.append(key)
+        if len(calls) in (1, 2, 4):
+            raise ConnectionError("remote server unreachable")
+        return None
+
+    async def sleep(seconds=None):
+        slept.append(seconds)
+        await asyncio.sleep(0)
+
+    workers = KeyedWorkers(flaky, idle_limit=5, failure_limit=4, sleep=sleep)
+    workers.start()
+
+    workers.submit("a")
+    await _settle()
+    await workers.stop()
+
+    assert slept[:4] == [1.0, 2.0, None, 1.0]
+
+
+@pytest.mark.asyncio
+async def test_a_worker_without_an_idle_budget_retires_at_once():
+    slept = []
+
+    async def idle(key, queue):
+        return None
+
+    async def sleep(seconds=None):
+        slept.append(seconds)
+        await asyncio.sleep(0)
+
+    workers = KeyedWorkers(idle, idle_limit=0, sleep=sleep)
+    workers.start()
+
+    workers.submit("a")
+    await _settle()
+
+    assert workers._tasks == {}
+    assert workers._queues == {}
+    assert slept == []
+
+
+@pytest.mark.asyncio
+async def test_a_retiring_worker_hands_waiting_work_to_a_new_one():
+    seen = []
+
+    async def step(key, queue):
+        seen.append(list(queue._queue))
+        return None
+
+    workers = KeyedWorkers(step, idle_limit=0, sleep=_noop_sleep)
+    workers.start()
+    workers.submit("a")
+    task = workers._tasks["a"]
+    await _settle(2)
+    workers.queue("a").put_nowait("spaet")
+    workers._retire("a", task)
+    await _settle()
+    await workers.stop()
+
+    assert ["spaet"] in seen
+
+
+@pytest.mark.asyncio
 async def test_a_step_that_asks_for_a_delay_is_not_called_again_immediately():
     calls = []
     slept = []

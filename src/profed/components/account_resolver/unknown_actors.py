@@ -13,7 +13,7 @@ from .storage import storage
 
 logger = logging.getLogger(__name__)
 
-_workers = KeyedWorkers(worker.step, name="account_resolver")
+_workers = KeyedWorkers(worker.step, name="account_resolver", idle_limit=0)
 
 
 def workers() -> KeyedWorkers:
