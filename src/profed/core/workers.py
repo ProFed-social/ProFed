@@ -55,6 +55,12 @@ class KeyedWorkers:
     def _retire(self, key, task) -> None:
         if self._tasks.get(key) is task:
             self._tasks.pop(key, None)
+        self._release(key)
+
+    def _release(self, key) -> None:
+        queue = self._queues.get(key)
+        if key not in self._tasks and queue is not None and queue.empty():
+            del self._queues[key]
 
     async def _work(self, key) -> float | None:
         try:

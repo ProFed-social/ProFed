@@ -179,6 +179,66 @@ async def test_after_stop_a_submit_starts_nothing():
 
 
 @pytest.mark.asyncio
+async def test_a_retired_worker_releases_its_queue():
+    workers = KeyedWorkers(_recorder([]), idle_limit=2, sleep=_noop_sleep)
+    workers.start()
+
+    workers.submit("a")
+    await _settle()
+
+    assert workers._queues == {}
+
+
+@pytest.mark.asyncio
+async def test_a_queue_that_still_holds_work_survives_the_retirement():
+    async def step(key, queue):
+        return None
+
+    workers = KeyedWorkers(step, idle_limit=2, sleep=_noop_sleep)
+    workers.start()
+
+    workers.submit("a", "unbearbeitet")
+    await _settle()
+
+    assert workers._queues["a"].get_nowait() == "unbearbeitet"
+
+
+@pytest.mark.asyncio
+async def test_a_submit_after_the_release_gets_a_working_queue_again():
+    received = []
+
+    async def step(key, queue):
+        while not queue.empty():
+            received.append(queue.get_nowait())
+        return None
+
+    workers = KeyedWorkers(step, idle_limit=2, sleep=_noop_sleep)
+    workers.start()
+
+    workers.submit("a", "erst")
+    await _settle()
+    workers.submit("a", "dann")
+    await _settle()
+    await workers.stop()
+
+    assert received == ["erst", "dann"]
+
+
+@pytest.mark.asyncio
+async def test_stop_releases_the_empty_queues():
+    workers = KeyedWorkers(_recorder([]), sleep=_noop_sleep)
+    workers.start()
+    workers.submit("a")
+    await _settle(2)
+    assert "a" in workers._queues
+
+    await workers.stop()
+    await _settle()
+
+    assert workers._queues == {}
+
+
+@pytest.mark.asyncio
 async def test_a_step_that_asks_for_a_delay_is_not_called_again_immediately():
     calls = []
     slept = []
