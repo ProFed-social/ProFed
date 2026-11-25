@@ -30,12 +30,13 @@ def _make_notifier():
         nonlocal connection
         async with lock:
             known = channels.setdefault(channel, set())
+            first = event not in known and not known
             known.add(event)
 
             if not _alive():
                 connection = None
                 await _connect(pool)
-            elif len(known) == 1:
+            elif first:
                 await connection.add_listener(channel, _notify)
 
     async def forget(channel: str, event: asyncio.Event) -> None:

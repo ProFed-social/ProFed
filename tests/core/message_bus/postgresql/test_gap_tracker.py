@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from datetime import datetime, timezone, timedelta
-from profed.core.message_bus.postgresql import subscriber
-from profed.core.message_bus.postgresql.subscriber import GapTracker
+from profed.core.message_bus.postgresql import gaps
+from profed.core.message_bus.postgresql.gaps import GapTracker
 
 
 def _old(rid):
@@ -83,7 +83,7 @@ def test_gap_settles_after_the_timeout(monkeypatch):
         @classmethod
         def now(cls, tz=None):
             return clock["now"]
-    monkeypatch.setattr(subscriber, "datetime", _Clock)
+    monkeypatch.setattr(gaps, "datetime", _Clock)
 
     tracker = GapTracker(0, timedelta(seconds=2))
     tracker.received(1, t0)
