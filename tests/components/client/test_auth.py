@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI, Request
 from starlette.testclient import TestClient
 
-from profed.components.client import auth
+from profed.components.client import auth, errors
 
 
 CLIENT_CFG = {"client": {"client_id": "cid",
@@ -17,6 +17,7 @@ CLIENT_CFG = {"client": {"client_id": "cid",
 
 def _app():
     app = FastAPI()
+    errors.mount(app)
     app.include_router(auth.router)
     return app
 

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — ProFed{% endblock %}
+{% block content %}
+<section class="error">
+  <h1>{{ title }}</h1>
+  <p>{{ message }}</p>
+  {% if retry %}
+  <p class="error-retry"><a href="{{ retry }}">Try again</a></p>
+  {% endif %}
+</section>
+{% endblock %}
+

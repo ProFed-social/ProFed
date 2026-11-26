@@ -163,3 +163,47 @@ async def test_correction_deduped_across_instances_logs_once(fake_bus, caplog):
     corrections = [p for p in fake_bus.topic("t").published if p["event_type"] == "updated"]
     assert len(corrections) == 1
     assert caplog.text.count("second line healed") == 1
+
+
+def _verifying_projection(received, verify):
+    async def _handler(object_id, payload):
+        received.append(payload)
+
+    handle, _, _ = projections.build_projection(topic=_TOPIC,
+                                                init=_noop,
+                                                on_snapshot_item=_noop,
+                                                on_message_type={"created": _handler},
+                                                verify_event=verify)
+
+    return handle
+
+
+async def test_a_rejected_event_is_not_dispatched(fake_bus):
+    fake_bus.topic("t").messages = [(1, "created", "alice", None, {"v": 1})]
+    received = []
+
+    await _verifying_projection(received, lambda event_type, payload: False)()
+
+    assert received == []
+
+
+async def test_a_rejected_event_says_so_in_the_log(fake_bus, caplog):
+    fake_bus.topic("t").messages = [(1, "created", "alice", None, {"v": 1})]
+
+    with caplog.at_level("WARNING"):
+        await _verifying_projection([], lambda event_type, payload: False)()
+
+    assert "rejected" in caplog.text
+    assert "alice" in caplog.text
+
+
+async def test_an_accepted_event_is_dispatched_without_complaint(fake_bus, caplog):
+    fake_bus.topic("t").messages = [(1, "created", "alice", None, {"v": 1})]
+    received = []
+
+    with caplog.at_level("WARNING"):
+        await _verifying_projection(received, lambda event_type, payload: True)()
+
+    assert received == [{"v": 1}]
+    assert "rejected" not in caplog.text
+

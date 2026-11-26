@@ -115,7 +115,13 @@ def build_projection(topic: Dict,
 
         async def _get_validated_and_sanitized():
             validated = topic["validate"](event_type, payload)
-            if validated is None or not verify_event(event_type, validated):
+            if validated is None:
+                return None
+            if not verify_event(event_type, validated):
+                logger.warning("%s: event %s on %s rejected, not dispatched",
+                               topic["name"],
+                               event_type,
+                               object_id)
                 return None
 
             sanitized = topic.get("sanitize", _identity)(validated)

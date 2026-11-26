@@ -1,11 +1,14 @@
 # Copyright (C) 2026 Christof Donat
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import time
 from typing import Optional
 from profed.core.persistence.projections import build_projection
 from profed.topics import oauth_apps, oauth_codes, oauth_tokens
 
+
+logger = logging.getLogger(__name__)
 
 _apps: dict[str, dict] = {}
 _codes: dict[str, dict] = {}
@@ -92,7 +95,10 @@ async def _codes_init() -> None:
 
 
 async def _code_issued(object_id: str, payload: dict) -> None:
-    if payload["expires_at"] > time.time():
+    if payload["expires_at"] <= time.time():
+        logger.warning("oauth code expired %.1f s before it was projected, dropping it",
+                       time.time() - payload["expires_at"])
+    else:
         _codes[object_id] = {"code": object_id,
                              "client_id": payload["client_id"],
                              "username": payload["username"],
@@ -107,6 +113,9 @@ async def _code_consumed(object_id: str, payload: dict) -> None:
 async def _code_snapshot(item: dict) -> None:
     if item["expires_at"] > time.time():
         _codes[item["code"]] = item
+    else:
+        logger.warning("oauth code from the snapshot expired %.1f s ago, dropping it",
+                       time.time() - item["expires_at"])
 
 
 codes_handle_events, codes_rebuild, _ = \

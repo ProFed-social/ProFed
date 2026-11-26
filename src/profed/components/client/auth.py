@@ -15,6 +15,7 @@ from profed.core.key_value_store import key_value_store
 from profed.identity import domain
 
 from .api_client import api_client
+from .errors import ClientError
 from .reactions import from_history
 
 
@@ -128,13 +129,16 @@ async def _access_token(code: str, client_id: str, client_secret: str):
                                                    "client_secret": client_secret})
     if token_response.status_code != 200:
         logger.warning("token exchange failed: %s %s", token_response.status_code, token_response.text)
-        raise HTTPException(status_code=502, detail="token_exchange_failed")
+        raise ClientError(502,
+                          "Sign-in failed",
+                          "The server could not complete the sign-in. This is often temporary, so signing in again "
+                          "usually works. If it keeps happening, please let the administrator of this instance know.",
+                          "/login")
     return token_response.json()["access_token"]
 
 
 async def _account(access_token: str):
-    account = await api_client().get("/api/v1/accounts/verify_credentials",
-                                     token=access_token)
+    account = await api_client().get("/api/v1/accounts/verify_credentials", token=access_token)
     account.raise_for_status()
     return account.json()
 
@@ -175,7 +179,11 @@ async def save_session(request: Request, session):
 async def callback(request: Request, code: str, state: str):
     cfg = config().get("client", {})
     if request.cookies.get(STATE_COOKIE) != state:
-        raise HTTPException(status_code=400, detail="invalid_state")
+        raise ClientError(400,
+                          "Sign-in failed",
+                          "This sign-in link does not belong to your browser session. That happens when the link is "
+                          "old, was opened in another browser, or cookies are blocked for this site.",
+                          "/login")
 
     response = RedirectResponse(_safe_next(request.cookies.get(RETURN_COOKIE)), status_code=303)
     response.set_cookie(SESSION_COOKIE,

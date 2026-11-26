@@ -76,3 +76,34 @@ async def test_consumed_code_removed_from_projection(fake_bus):
 
     assert projection.get_code("mycode") is None
 
+
+@pytest.mark.asyncio
+async def test_an_expired_code_says_so_in_the_log(fake_bus, caplog):
+    payload = {"client_id":  "abc123",
+               "username":   "alice",
+               "id_token":   "tok",
+               "expires_at": time.time() - 3}
+    fake_bus.topic("oauth_codes").messages = [
+            (1, "issued", "mycode", TS, payload)]
+
+    with caplog.at_level("WARNING"):
+        await projection.codes_rebuild()
+
+    assert "oauth code expired" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_valid_code_is_stored_without_complaint(fake_bus, caplog):
+    payload = {"client_id":  "abc123",
+               "username":   "alice",
+               "id_token":   "tok",
+               "expires_at": time.time() + 300}
+    fake_bus.topic("oauth_codes").messages = [
+            (1, "issued", "mycode", TS, payload)]
+
+    with caplog.at_level("WARNING"):
+        await projection.codes_rebuild()
+
+    assert projection.get_code("mycode") is not None
+    assert "expired" not in caplog.text
+
