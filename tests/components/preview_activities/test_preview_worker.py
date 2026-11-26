@@ -129,11 +129,42 @@ async def test_the_icon_is_square_and_the_preview_keeps_the_shape(telling, fake_
 
 
 async def test_the_post_waits_while_the_media_is_not_in_the_projection_yet(telling):
-    with _storing([]):
+    with _storing([]), patch.dict(cfg, {"preview_attempts": 3, "preview_retry": 5.0}):
+        outcomes = await _drive(make_step(), _queue(_item(_activity(LOCAL))), rounds=2)
+
+    assert outcomes == [5.0, 5.0]
+    assert telling.topic("deliverable_activities").published == []
+
+
+async def test_a_media_that_never_arrives_lets_the_post_out_without_its_preview(telling):
+    with _storing([]), patch.dict(cfg, {"preview_attempts": 2, "preview_retry": 0.0}):
         outcomes = await _drive(make_step(), _queue(_item(_activity(LOCAL))))
 
-    assert outcomes == [None]
-    assert telling.topic("deliverable_activities").published == []
+    published = telling.topic("deliverable_activities").published
+    attachment = published[0]["payload"]["activity"]["object"]["attachment"][0]
+
+    assert outcomes == [0.0, None]
+    assert len(published) == 1
+    assert "preview" not in attachment
+    assert "icon" not in attachment
+    assert attachment["url"] == LOCAL
+
+
+async def test_a_media_that_arrives_late_still_gets_its_preview(telling, fake_media_storage):
+    fake_media_storage._files["m1"] = (_image(), "image/jpeg")
+    rows = _Rows([], fake_media_storage._files)
+    queue = _queue(_item(_activity(LOCAL)))
+
+    with patch.object(preview_storage, "_instance", rows), \
+         patch.dict(cfg, {"preview_attempts": 3, "preview_retry": 0.0}):
+        step = make_step()
+        waited = await step(NOTE, queue)
+        rows.rows = [_row()]
+        await _drive(step, queue)
+
+    assert waited == 0.0
+    assert await fake_media_storage.retrieve("m1_preview")
+    assert len(telling.topic("deliverable_activities").published) == 1
 
 
 async def test_a_remote_attachment_is_not_waited_for(telling):

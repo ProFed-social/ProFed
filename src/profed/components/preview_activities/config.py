@@ -11,6 +11,8 @@ cfg: dict = {}
 @capture_config(cfg)
 def parse(raw: dict, database: dict) -> dict:
     return with_database_defaults(raw | {"preview_dimension": int(raw.get("preview_dimension", 400)),
-                                         "preview_delay": float(raw.get("preview_delay", 1.0))},
+                                         "preview_delay": float(raw.get("preview_delay", 1.0)),
+                                         "preview_retry": float(raw.get("preview_retry", 10.0)),
+                                         "preview_attempts": max(int(raw.get("preview_attempts", 2)), 1)},
                                   database)
 

@@ -31,7 +31,7 @@ def make_step():
 
     def held(key, queue):
         if key not in pending and not queue.empty():
-            pending[key] = (queue.get_nowait(), set())
+            pending[key] = (queue.get_nowait(), set(), 0)
 
         return pending.get(key)
 
@@ -46,7 +46,7 @@ def make_step():
                     if variant not in row["variants"] and (row["url"], variant) not in failed]
 
         def unknown():
-            return any(is_local_url(entry["url"]) and entry["url"] not in rows for entry in attached)
+            return [entry["url"] for entry in attached if is_local_url(entry["url"]) and entry["url"] not in rows]
 
         def first_missing():
             return next(((row, variant)
@@ -54,7 +54,7 @@ def make_step():
                          for variant in lacking(row)),
                         None)
 
-        return (False, None) if unknown() else (True, first_missing())
+        return unknown(), first_missing()
 
     async def attempted(row, variant, failed):
         try:
@@ -62,6 +62,8 @@ def make_step():
         except Exception:
             logger.exception("preview_activities: no %s for %s", variant, row["file_id"])
             failed.add((row["url"], variant))
+
+        return failed
 
     def without_failed(activity, failed):
         def stripped(entry):
@@ -88,19 +90,21 @@ def make_step():
         if item is None:
             return None
 
-        (event_type, object_id, payload, sequence_id), failed = item
+        message, failed, tries = item
+        pending[key] = (message, failed, tries + 1)
 
         await jittered_sleep(cfg["preview_delay"])
 
-        ready, missing = await outstanding(payload["activity"], failed)
-        if not ready:
-            return None
+        unknown, missing = await outstanding(message[2]["activity"], failed)
+        if unknown and tries + 1 < cfg["preview_attempts"]:
+            return cfg["preview_retry"]
 
+        failed.update((url, claim) for url in unknown for claim in CLAIMS)
         if missing is not None:
-            await attempted(*missing, failed)
+            failed = await attempted(*missing, failed=failed)
             return 0.0
 
-        await forwarded(event_type, object_id, payload, sequence_id, failed)
+        await forwarded(*message, failed=failed)
         pending.pop(key, None)
 
         return None if queue.empty() else 0.0

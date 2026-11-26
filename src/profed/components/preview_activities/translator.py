@@ -25,7 +25,7 @@ def object_key(object_id: str, payload: dict) -> str:
 
 
 async def _submit(event_type, object_id, payload, sequence_id) -> None:
-    _workers.submit(object_key(object_id, payload), (event_type, object_id, payload, sequence_id))
+    _workers = KeyedWorkers(step, name="preview_activities", idle_limit=0)
 
 
 handle_events, rebuild, _ = build_projection(topic=activities,
