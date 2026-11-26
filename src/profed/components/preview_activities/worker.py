@@ -59,11 +59,10 @@ def make_step():
     async def attempted(row, variant, failed):
         try:
             await produce(row, variant, cfg["preview_dimension"])
+            return failed
         except Exception:
             logger.exception("preview_activities: no %s for %s", variant, row["file_id"])
-            failed.add((row["url"], variant))
-
-        return failed
+            return failed | {(row["url"], variant)}
 
     def without_failed(activity, failed):
         def stripped(entry):
@@ -91,17 +90,17 @@ def make_step():
             return None
 
         message, failed, tries = item
-        pending[key] = (message, failed, tries + 1)
 
         await jittered_sleep(cfg["preview_delay"])
 
         unknown, missing = await outstanding(message[2]["activity"], failed)
         if unknown and tries + 1 < cfg["preview_attempts"]:
+            pending[key] = (message, failed, tries + 1)
             return cfg["preview_retry"]
 
-        failed.update((url, claim) for url in unknown for claim in CLAIMS)
+        failed = failed | {(url, claim) for url in unknown for claim in CLAIMS}
         if missing is not None:
-            failed = await attempted(*missing, failed=failed)
+            pending[key] = (message, await attempted(*missing, failed=failed), tries + 1)
             return 0.0
 
         await forwarded(*message, failed=failed)
